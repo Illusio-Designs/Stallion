@@ -234,7 +234,10 @@ const processAndSaveImage = (uploadType = 'general') => {
           });
         }
 
-        if (!req.files || req.files.length === 0) {
+        // Handle both single file (.single()) and multiple files (.array())
+        const files = req.files || (req.file ? [req.file] : []);
+        
+        if (!files || files.length === 0) {
           return res.status(400).json({
             success: false,
             message: 'No file uploaded'
@@ -243,7 +246,7 @@ const processAndSaveImage = (uploadType = 'general') => {
 
         try {
           let fileInfo = [];
-          for (const file of req.files) {
+          for (const file of files) {
             let processedBuffer = file.buffer;
             let fileName = file.originalname;
 
@@ -296,8 +299,14 @@ const processAndSaveImage = (uploadType = 'general') => {
               originalName: file.originalname
             });
           }
-          // Add file info to request
-          req.fileInfos = fileInfo;
+          
+          // For single file uploads (profile, slider, bill), set req.fileInfo (singular)
+          // For multiple file uploads (product), set req.fileInfos (plural)
+          if (uploadType === 'product') {
+            req.fileInfos = fileInfo;
+          } else {
+            req.fileInfo = fileInfo[0]; // Single file
+          }
 
           next();
         } catch (error) {

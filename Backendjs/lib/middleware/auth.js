@@ -10,6 +10,7 @@ async function authenticateToken(req, res, next) {
     const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
     if (!token) {
+      console.log("No token provided");
       return res.status(401).json({
         success: false,
         message: 'Access token required'
@@ -22,6 +23,7 @@ async function authenticateToken(req, res, next) {
     // Find user in database
     const user = await User.findByPk(decoded.userId);
     if (!user) {
+      console.log("User not found");
       return res.status(401).json({
         success: false,
         message: 'Invalid token - user not found'

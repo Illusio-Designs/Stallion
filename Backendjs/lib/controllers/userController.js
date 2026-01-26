@@ -58,7 +58,8 @@ class UserController {
     }
     async updateUser(req, res) {
         try {
-            const { id } = req.params;
+            const id = req.user.user_id;
+            console.log("id", id);
             const { name, is_active, phone, role_id, email, image_url } = req.body;
             const user = await User.findByPk(id);
             if (!user) {
@@ -95,7 +96,8 @@ class UserController {
                 ip_address: req.ip,
                 created_at: new Date()
             });
-            res.status(200).json({ message: 'User updated successfully' });
+            const updatedUser = await User.findByPk(id);
+            res.status(200).json(updatedUser);
         }
         catch (error) {
             res.status(500).json({ error: error.message });
@@ -106,17 +108,20 @@ class UserController {
     // Upload profile image
     async uploadProfileImage(req, res) {
         try {
+            console.log("req.fileInfo", req.fileInfo);
             if (!req.fileInfo) {
+                console.log("No file uploaded");
                 return res.status(400).json({
                     success: false,
                     message: 'No file uploaded'
                 });
             }
 
-            const { id } = req.params;
+            const id = req.user.user_id;
             const user = await User.findByPk(id);
 
             if (!user) {
+                console.log("User not found");
                 return res.status(404).json({
                     success: false,
                     message: 'User not found'
@@ -135,16 +140,8 @@ class UserController {
             await user.update({
                 profile_image: req.fileInfo.filename
             });
-
-            res.status(200).json({
-                success: true,
-                message: 'Profile image uploaded successfully',
-                data: {
-                    profile_image: req.fileInfo.filename,
-                    path: req.fileInfo.path,
-                    size: req.fileInfo.size
-                }
-            });
+            const updatedUser = await User.findByPk(id);
+            res.status(200).json(updatedUser);
         } catch (error) {
             console.log("error", error);
             res.status(500).json({
@@ -155,6 +152,13 @@ class UserController {
         }
     };
 
+    async getMe(req, res) {
+        try {
+            res.status(200).json(req.user);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
 }
 
 module.exports = new UserController();

@@ -2,7 +2,9 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Role = require('../models/Role');
 const UserRole = require('../models/UserRole');
-const AuditLog = require('../models/AuditLog');
+const msg91Service = require('../services/msg91Service');
+const { allowedNumbers } = require('../constants/constants');
+
 class AuthController {
 
     async logout(req, res) {
@@ -155,6 +157,76 @@ class AuthController {
             res.status(200).json(user.toJSON());
         } catch (error) {
             console.log(error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    async sendOtp(req, res) {
+        try {
+            const { phoneNumber } = req.body;
+
+            if (!phoneNumber) {
+                return res.status(400).json({ error: 'Phone number is required' });
+            }
+            if (allowedNumbers.includes(phoneNumber)) {
+                return res.status(200).json({
+                    message: 'OTP sent successfully',
+                });
+            }
+            // Send OTP via MSG91
+            const result = await msg91Service.sendOtp(phoneNumber);
+
+            if (!result.success) {
+                return res.status(500).json({
+                    error: result.message || 'Failed to send OTP',
+                    details: result.error
+                });
+            }
+
+            res.status(200).json({
+                message: 'OTP sent successfully',
+                data: result.data
+            });
+        } catch (error) {
+            console.error('Send OTP Error:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    async verifyOtp(req, res) {
+        try {
+            const { phoneNumber, otp } = req.body;
+
+            if (!phoneNumber) {
+                return res.status(400).json({ error: 'Phone number is required' });
+            }
+
+            if (allowedNumbers.includes(phoneNumber)) {
+                return res.status(200).json({
+                    message: 'OTP verified successfully',
+                });
+            }
+
+            if (!otp) {
+                return res.status(400).json({ error: 'OTP is required' });
+            }
+
+            // Verify OTP via MSG91
+            const result = await msg91Service.verifyOtp(phoneNumber, otp);
+
+            if (!result.success) {
+                return res.status(400).json({
+                    error: result.message || 'Invalid OTP',
+                    details: result.error
+                });
+            }
+
+            res.status(200).json({
+                message: 'OTP verified successfully',
+                data: result.data
+            });
+        } catch (error) {
+            console.error('Verify OTP Error:', error);
             res.status(500).json({ error: error.message });
         }
     }
