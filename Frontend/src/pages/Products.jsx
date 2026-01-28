@@ -45,10 +45,11 @@ const Products = ({ onPageChange }) => {
   // Products display
   const [products, setProducts] = useState([]);
   const [totalResults, setTotalResults] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const limit = 21;
+  const limit = 21; // Products per page
   
   // Filter options from API
   const [brandsData, setBrandsData] = useState([]);
@@ -224,11 +225,15 @@ const Products = ({ onPageChange }) => {
         
         setProducts(productsData || []);
         setTotalResults(productsData?.length || 0);
+        // Calculate total pages (assuming backend returns all matching products)
+        // If backend implements proper pagination, update this logic
+        setTotalPages(Math.ceil((productsData?.length || 0) / limit));
       } catch (err) {
         console.error('Error fetching products:', err);
         setError(err.message || 'Failed to fetch products');
         setProducts([]);
         setTotalResults(0);
+        setTotalPages(1);
       } finally {
         setLoading(false);
       }
@@ -251,6 +256,23 @@ const Products = ({ onPageChange }) => {
     setSelectedColorCode(null);
     setPage(1);
   };
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setPage(1);
+  }, [
+    selectedGender,
+    selectedColorCode,
+    selectedShapes,
+    selectedLensColor,
+    selectedFrameColor,
+    selectedType,
+    selectedLensMaterial,
+    selectedFrameMaterials,
+    selectedBrands,
+    minPrice,
+    maxPrice
+  ]);
 
   const toggleSelection = (item, selectedItems, setSelectedItems) => {
     if (selectedItems.includes(item)) {
@@ -730,6 +752,29 @@ const Products = ({ onPageChange }) => {
               </div>
             )}
           </div>
+          
+          {/* Pagination Controls */}
+          {!loading && products.length > 0 && totalPages > 1 && (
+            <div className="products-pagination">
+              <button 
+                className="pagination-btn"
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+              >
+                Previous
+              </button>
+              <div className="pagination-info">
+                Page {page} of {totalPages}
+              </div>
+              <button 
+                className="pagination-btn"
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+              >
+                Next
+              </button>
+            </div>
+          )}
         </main>
       </div>
     </div>

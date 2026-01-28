@@ -358,7 +358,7 @@ const DashboardProducts = () => {
     try {
       setError(null);
       // Send null filters to get all products
-      const data = await getProducts(1, 21, null);
+      const data = await getProducts(1, 3000, null); // Increased limit to show all products
       setProducts(data || []);
       
       // Get all product image URLs to identify which orphaned images are now assigned
@@ -563,7 +563,7 @@ const DashboardProducts = () => {
       setLoading(true);
       setError(null);
       // Send null filters to get all products
-      const data = await getProducts(1, 21, null);
+      const data = await getProducts(1, 3000, null); // Increased limit to show all products
       setProducts(data || []);
       
       // Get all product image URLs to identify which orphaned images are now assigned

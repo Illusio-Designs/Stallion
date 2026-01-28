@@ -775,10 +775,11 @@
 }
 .ui-table tbody td {
   padding: 18px 12px 0px;
-  white-space: nowrap;
+  white-space: normal; /* Changed from nowrap to allow text wrapping */
   overflow: visible;
-  text-overflow: ellipsis;
+  text-overflow: clip; /* Changed from ellipsis to clip */
   position: relative;
+  word-wrap: break-word; /* Break long words if needed */
 }
 .ui-empty {
   text-align: center;
