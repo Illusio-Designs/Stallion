@@ -174,6 +174,9 @@ const Products = ({ onPageChange }) => {
       filters.brand_id = selectedBrands.length === 1 ? selectedBrands[0] : selectedBrands;
     }
     
+    // Always filter to show only active products in public page (hide draft products)
+    filters.status = 'active';
+    
     // Always include price filter with full range (backend requires it)
     filters.price = {
       min: 0,
