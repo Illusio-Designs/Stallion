@@ -703,13 +703,30 @@
 .ui-table__scroll {
   overflow-x: auto;
   overflow-y: visible;
-  /* Hide scrollbar but keep scrolling functional */
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
   position: relative;
+  /* Show scrollbar for horizontal scrolling */
+  scrollbar-width: thin; /* Firefox - thin scrollbar */
+  scrollbar-color: #181265 #f0f0f0; /* Firefox - thumb and track color */
 }
+
+/* Show scrollbar in Chrome, Safari, Opera */
 .ui-table__scroll::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
+  display: block;
+  height: 12px; /* Scrollbar height */
+}
+
+.ui-table__scroll::-webkit-scrollbar-track {
+  background: #f0f0f0;
+  border-radius: 6px;
+}
+
+.ui-table__scroll::-webkit-scrollbar-thumb {
+  background: #181265;
+  border-radius: 6px;
+}
+
+.ui-table__scroll::-webkit-scrollbar-thumb:hover {
+  background: #0D0A34;
 }
 .ui-table table {
   width: 100%;
