@@ -257,19 +257,19 @@
 
 /* Collection Filters */
 .collection-filters {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, auto));
-  grid-template-rows: repeat(2, auto); /* Only 2 rows */
-  grid-auto-flow: column; /* Flow items horizontally */
+  display: flex;
+  flex-wrap: wrap;
   gap: 12px 35px;
   max-width: 1400px;
   margin: 0 auto 50px;
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 15px;
-  max-height: 120px; /* Limit to 2 rows height */
+  max-height: 100px; /* Limit to approximately 2 rows, then scroll */
+  justify-content: flex-start;
 }
 
+/* Show scrollbar when content overflows */
 .collection-filters::-webkit-scrollbar {
   height: 8px;
 }
