@@ -1115,8 +1115,19 @@ const DashboardManage = () => {
         return;
       }
       console.error('Error deleting:', error);
-      // Check for database errors
-      if (error.message?.toLowerCase().includes("doesn't exist") || 
+      
+      // Check for foreign key constraint errors
+      if (error.message?.toLowerCase().includes('foreign key constraint') || 
+          error.message?.toLowerCase().includes('cannot delete or update a parent row')) {
+        // Provide specific error messages based on the tab
+        if (activeTab === 'Brands') {
+          setError('Cannot delete this brand because it has collections linked to it. Please delete the collections first.');
+        } else if (activeTab === 'Collections') {
+          setError('Cannot delete this collection because it has products linked to it. Please delete or reassign the products first.');
+        } else {
+          setError('Cannot delete this item because other records depend on it. Please delete the dependent records first.');
+        }
+      } else if (error.message?.toLowerCase().includes("doesn't exist") || 
           error.message?.toLowerCase().includes('table')) {
         setError('Database tables not found. Please contact the administrator to set up the database tables.');
       } else {
