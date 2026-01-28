@@ -44,6 +44,7 @@ const Products = ({ onPageChange }) => {
   
   // Products display
   const [products, setProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]); // Store all products for pagination
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -199,9 +200,9 @@ const Products = ({ onPageChange }) => {
     maxPrice
   ]);
 
-  // Fetch products when filters change
+  // Fetch all products when filters change (not page)
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchAllProducts = async () => {
       setLoading(true);
       setError(null);
       
@@ -221,17 +222,16 @@ const Products = ({ onPageChange }) => {
           maxPrice
         });
         console.log('Built filters object:', filters);
-        const productsData = await getProducts(page, limit, filters);
+        // Fetch all products with high limit to get total count
+        const productsData = await getProducts(1, 3000, filters);
         
-        setProducts(productsData || []);
+        setAllProducts(productsData || []);
         setTotalResults(productsData?.length || 0);
-        // Calculate total pages (assuming backend returns all matching products)
-        // If backend implements proper pagination, update this logic
         setTotalPages(Math.ceil((productsData?.length || 0) / limit));
       } catch (err) {
         console.error('Error fetching products:', err);
         setError(err.message || 'Failed to fetch products');
-        setProducts([]);
+        setAllProducts([]);
         setTotalResults(0);
         setTotalPages(1);
       } finally {
@@ -239,8 +239,15 @@ const Products = ({ onPageChange }) => {
       }
     };
     
-    fetchProducts();
-  }, [page, buildFilters]);
+    fetchAllProducts();
+  }, [buildFilters, limit]);
+
+  // Update displayed products when page changes
+  useEffect(() => {
+    const startIndex = (page - 1) * limit;
+    const endIndex = startIndex + limit;
+    setProducts(allProducts.slice(startIndex, endIndex));
+  }, [page, allProducts, limit]);
 
   const handleReset = () => {
     setMinPrice(PRICE_MIN);
