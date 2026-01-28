@@ -28,10 +28,6 @@ const Products = ({ onPageChange }) => {
     }
   }, []);
 
-  const PRICE_MIN = 0;
-  const PRICE_MAX = 10000;
-  const [minPrice, setMinPrice] = useState(PRICE_MIN);
-  const [maxPrice, setMaxPrice] = useState(PRICE_MAX);
   const [selectedBrands, setSelectedBrands] = useState([]); // Array of brand IDs
   const [selectedFrameMaterials, setSelectedFrameMaterials] = useState([]); // Array of frame_material_id
   const [selectedShapes, setSelectedShapes] = useState([]); // Array of shape_id
@@ -178,11 +174,10 @@ const Products = ({ onPageChange }) => {
       filters.brand_id = selectedBrands.length === 1 ? selectedBrands[0] : selectedBrands;
     }
     
-    // Always include price filter (backend requires it)
-    // Use full range (0-10000) when user hasn't changed it, so it effectively shows all products
+    // Always include price filter with full range (backend requires it)
     filters.price = {
-      min: minPrice,
-      max: maxPrice
+      min: 0,
+      max: 10000
     };
     
     return filters;
@@ -195,9 +190,7 @@ const Products = ({ onPageChange }) => {
     selectedType,
     selectedLensMaterial,
     selectedFrameMaterials,
-    selectedBrands,
-    minPrice,
-    maxPrice
+    selectedBrands
   ]);
 
   // Fetch all products when filters change (not page)
@@ -217,9 +210,7 @@ const Products = ({ onPageChange }) => {
           selectedType,
           selectedLensMaterial,
           selectedFrameMaterials,
-          selectedBrands,
-          minPrice,
-          maxPrice
+          selectedBrands
         });
         console.log('Built filters object:', filters);
         // Fetch all products with high limit to get total count
@@ -250,8 +241,6 @@ const Products = ({ onPageChange }) => {
   }, [page, allProducts, limit]);
 
   const handleReset = () => {
-    setMinPrice(PRICE_MIN);
-    setMaxPrice(PRICE_MAX);
     setSelectedBrands([]);
     setSelectedFrameMaterials([]);
     setSelectedShapes([]);
@@ -276,9 +265,7 @@ const Products = ({ onPageChange }) => {
     selectedType,
     selectedLensMaterial,
     selectedFrameMaterials,
-    selectedBrands,
-    minPrice,
-    maxPrice
+    selectedBrands
   ]);
 
   const toggleSelection = (item, selectedItems, setSelectedItems) => {
@@ -405,48 +392,11 @@ const Products = ({ onPageChange }) => {
     return '/images/products/spac1.webp';
   };
 
-  const minPercent = (minPrice / PRICE_MAX) * 100;
-  const maxPercent = (maxPrice / PRICE_MAX) * 100;
-
   const FilterContent = () => (
     <>
       <div className="filter-header">
         <h2>Filter</h2>
         <button className="reset-button" onClick={handleReset}>RESET</button>
-      </div>
-
-      {/* Price Filter */}
-      <div className="filter-section">
-        <h3>Price</h3>
-        <div className="price-slider-container">
-          <div className="price-range-track"></div>
-          <div
-            className="price-range-fill"
-            style={{ left: `${minPercent}%`, width: `${Math.max(0, maxPercent - minPercent)}%` }}
-          ></div>
-          <input 
-            type="range" 
-            min={PRICE_MIN} 
-            max={PRICE_MAX} 
-            value={minPrice}
-            onChange={(e) => setMinPrice(Math.min(parseInt(e.target.value), maxPrice - 1))}
-            className="price-range-input"
-            id="min-price"
-          />
-          <input 
-            type="range" 
-            min={PRICE_MIN} 
-            max={PRICE_MAX} 
-            value={maxPrice}
-            onChange={(e) => setMaxPrice(Math.max(parseInt(e.target.value), minPrice + 1))}
-            className="price-range-input"
-            id="max-price"
-          />
-        </div>
-        <div className="price-inputs">
-          <input type="text" value={`₹${minPrice}`} readOnly />
-          <input type="text" value={`₹${maxPrice}`} readOnly />
-        </div>
       </div>
 
       {/* Brands Filter */}
