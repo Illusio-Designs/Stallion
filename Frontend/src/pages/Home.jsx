@@ -75,7 +75,18 @@ const Home = ({ onPageChange }) => {
         const products = await getFeaturedProducts(collectionId);
         // Handle both array response and object with data property
         const productsArray = Array.isArray(products) ? products : (products?.data || []);
-        setFeaturedProducts(productsArray);
+        
+        // Filter out draft products (case-insensitive)
+        // Only show products with status 'active' or 'published'
+        const activeProducts = productsArray.filter(product => {
+          const status = (product.status || '').toLowerCase().trim();
+          return status === 'active' || status === 'published';
+        });
+        
+        console.log('Featured products received:', productsArray.length);
+        console.log('Active products after filtering:', activeProducts.length);
+        
+        setFeaturedProducts(activeProducts);
       } catch (error) {
         console.error('Error fetching featured products:', error);
         setFeaturedProducts([]);
