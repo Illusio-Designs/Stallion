@@ -340,7 +340,7 @@ class DatabaseManager {
             require('../models/Cities');
             require('../models/Zone');
             require('../models/Party');
-            require('../models/Distributor');
+            require('../models/distributor');
             require('../models/Salesman');
             require('../models/ColorCode');
             require('../models/FrameColor');

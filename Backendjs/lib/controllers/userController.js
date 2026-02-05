@@ -4,6 +4,7 @@ const fs = require('fs');
 const User = require('../models/User');
 const Role = require('../models/Role');
 const AuditLog = require('../models/AuditLog');
+const UserRole = require('../models/UserRole');
 
 class UserController {
     async getUsers(req, res) {
@@ -155,6 +156,29 @@ class UserController {
     async getMe(req, res) {
         try {
             res.status(200).json(req.user);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    async getUserRole(req, res) {
+        try {
+            const user = req.user;
+
+            const userRoles = await UserRole.findAll({
+                where: { user_id: user.user_id },
+                include: [{
+                    model: Role,
+                    as: 'role'
+                }]
+            });
+            const roles = userRoles.map(ur => ({
+                role_id: ur.role_id,
+                role_name: ur.role ? ur.role.role_name : null,
+                role_description: ur.role ? ur.role.description : null,
+                assigned_at: ur.assigned_at
+            }));
+            res.status(200).json(roles);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

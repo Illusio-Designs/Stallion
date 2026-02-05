@@ -50,22 +50,30 @@ const UserRole = sequelize.define('UserRole', {
     ]
 });
 
-// Define associations
+// Define associations (set up on load so they work without a central associate() call)
+const User = require('./User');
+const Role = require('./Role');
+
+UserRole.belongsTo(User, {
+    foreignKey: 'user_id',
+    as: 'user'
+});
+
+UserRole.belongsTo(Role, {
+    foreignKey: 'role_id',
+    as: 'role'
+});
+
+UserRole.belongsTo(User, {
+    foreignKey: 'assigned_by',
+    as: 'assigner'
+});
+
+// Keep for any code that may call associate(models) in the future
 UserRole.associate = function (models) {
-    UserRole.belongsTo(models.User, {
-        foreignKey: 'user_id',
-        as: 'user'
-    });
-
-    UserRole.belongsTo(models.Role, {
-        foreignKey: 'role_id',
-        as: 'role'
-    });
-
-    UserRole.belongsTo(models.User, {
-        foreignKey: 'assigned_by',
-        as: 'assigner'
-    });
+    UserRole.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
+    UserRole.belongsTo(models.Role, { foreignKey: 'role_id', as: 'role' });
+    UserRole.belongsTo(models.User, { foreignKey: 'assigned_by', as: 'assigner' });
 };
 
 module.exports = UserRole;

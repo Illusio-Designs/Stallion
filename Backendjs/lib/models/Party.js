@@ -135,6 +135,14 @@ const Party = sequelize.define('Party', {
     prefered_courier: {
         type: DataTypes.STRING(255),
         allowNull: true,
+    },
+    user_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+            model: 'users',
+            key: 'user_id'
+        }
     }
 }, {
     tableName: 'parties',

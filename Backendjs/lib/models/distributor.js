@@ -139,6 +139,14 @@ const Distributor = sequelize.define('Distributor', {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW
+    },
+    user_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+            model: 'users',
+            key: 'user_id'
+        }
     }
 }, {
     tableName: 'distributors',

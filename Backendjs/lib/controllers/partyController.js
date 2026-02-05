@@ -1,12 +1,27 @@
 const Party = require('../models/Party');
 const AuditLog = require('../models/AuditLog');
-const Distributor = require('../models/Distributor');
+const Distributor = require('../models/distributor');
 const User = require('../models/User');
 const Salesman = require('../models/Salesman');
 const UserRole = require('../models/UserRole');
 const Role = require('../models/Role');
 const { Op } = require('sequelize');
 class PartyController {
+    async getPartie(req, res) {
+        try {
+            const id = req.user.user_id;
+            if (!id) {
+                return res.status(400).json({ error: 'User ID is required' });
+            }
+            const party = await Party.findOne({ where: { user_id: id } });
+            if (!party) {
+                return res.status(404).json({ error: 'Party not found' });
+            }
+            res.status(200).json(party);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
     async getParties(req, res) {
         try {
             const parties = await Party.findAll({ where: { is_active: true } });
@@ -137,8 +152,12 @@ class PartyController {
     async createParty(req, res) {
         try {
             const user = req.user;
-            const { party_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
+            const { user_id, party_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
+            if (!user_id) {
+                return res.status(400).json({ error: 'User ID is required' });
+            }
             const party = await Party.create({
+                user_id,
                 party_name,
                 trade_name,
                 contact_person,

@@ -1,13 +1,13 @@
 {
     "compilerOptions": {
-        "module": "ESNext",
-        "moduleResolution": "Bundler",
+        "module": "CommonJS",
+        "moduleResolution": "Node",
         "target": "ES2022",
-        "jsx": "react",
-        "allowImportingTsExtensions": true,
+        "checkJs": false,
         "strictNullChecks": true,
-        "strictFunctionTypes": true,
+        "strictFunctionTypes": true
     },
+    "include": ["lib/**/*.js"],
     "exclude": [
         "node_modules",
         "**/node_modules/*"

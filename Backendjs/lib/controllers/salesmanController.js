@@ -5,6 +5,24 @@ const { TrayStatus } = require('../constants/enums');
 const SalesmanTray = require('../models/SalesmanTray');
 
 class SalesmanController {
+
+    async getSalesman(req, res) {
+        try {
+            const id = req.user.user_id;
+            if (!id) {
+                return res.status(400).json({ error: 'User ID is required' });
+            }
+            const salesman = await Salesman.findOne({ where: { user_id: id } });
+            if (!salesman) {
+                return res.status(404).json({ error: 'Salesman not found' });
+            }
+            res.status(200).json(salesman);
+        }
+        catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async getSalesmen(req, res) {
         try {
             const salesmen = await Salesman.findAll({ where: { is_active: true } });

@@ -8,6 +8,7 @@ router.get('/', userController.getUsers);
 router.get('/me', authenticateToken, userController.getMe);
 router.put('/', authenticateToken, userController.updateUser);
 router.delete('/', authenticateToken, userController.deleteUser);
+router.get('/role', authenticateToken, userController.getUserRole);
 
 // 📸 Profile Image Upload (requires auth)
 router.post('/upload-profile', authenticateToken, profileUpload, userController.uploadProfileImage);
