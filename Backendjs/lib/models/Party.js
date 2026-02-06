@@ -143,6 +143,22 @@ const Party = sequelize.define('Party', {
             model: 'users',
             key: 'user_id'
         }
+    },
+    distributor_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+            model: 'distributors',
+            key: 'distributor_id'
+        }
+    },
+    salesman_id: {
+        type: DataTypes.UUID,
+        allowNull: true,
+        references: {
+            model: 'salesmen',
+            key: 'salesman_id'
+        }
     }
 }, {
     tableName: 'parties',

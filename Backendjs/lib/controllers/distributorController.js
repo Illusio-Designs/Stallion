@@ -2,6 +2,7 @@ const Distributor = require('../models/distributor');
 const AuditLog = require('../models/AuditLog');
 const User = require('../models/User');
 const { Op } = require('sequelize');
+const Party = require('../models/Party');
 class DistributorController {
     async getDistributor(req, res) {
         try {
@@ -13,11 +14,30 @@ class DistributorController {
             if (!distributor) {
                 return res.status(404).json({ error: 'Distributor not found' });
             }
+            res.status(200).json(distributor);
         }
         catch (error) {
             res.status(500).json({ error: error.message });
         }
     }
+
+    async getDistributorParties(req, res) {
+        try {
+            const id = req.user.user_id;
+            if (!id) {
+                return res.status(400).json({ error: 'User ID is required' });
+            }
+            const distributor = await Distributor.findOne({ where: { user_id: id } });
+            if (!distributor) {
+                return res.status(404).json({ error: 'Distributor not found' });
+            }
+            const parties = await Party.findAll({ where: { distributor_id: distributor.distributor_id } });
+            res.status(200).json(parties);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async getDistributors(req, res) {
         try {
             const distributors = await Distributor.findAll({ where: { is_active: true } });

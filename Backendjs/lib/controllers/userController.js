@@ -57,6 +57,45 @@ class UserController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    async createUser(req, res) {
+        try {
+            const { name, is_active, phone, role_id, email, image_url } = req.body;
+            const role = await Role.findByPk(role_id);
+            if (!role) {
+                return res.status(404).json({ error: 'Role not found' });
+            }
+            const user = await User.create({
+                full_name: name,
+                phone: phone,
+                email: email,
+                role_id: role_id,
+                is_active: is_active,
+                profile_image: image_url,
+                created_at: new Date(),
+                updated_at: new Date()
+            });
+            await UserRole.create({
+                user_id: user.user_id,
+                role_id: role_id
+            });
+            await AuditLog.create({
+                user_id: user.user_id,
+                action: 'create',
+                description: 'User created',
+                table_name: 'users',
+                record_id: user.user_id,
+                old_values: null,
+                new_values: user.toJSON(),
+                ip_address: req.ip,
+                created_at: new Date()
+            });
+            res.status(200).json(user);
+        } catch (error) {
+            console.log("error", error);
+            res.status(500).json({ error: error.message });
+        }
+    }
     async updateUser(req, res) {
         try {
             const id = req.user.user_id;

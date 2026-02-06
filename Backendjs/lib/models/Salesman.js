@@ -138,6 +138,14 @@ const Salesman = sequelize.define('Salesman', {
             model: 'users',
             key: 'user_id'
         }
+    },
+    zone_id: {
+        type: DataTypes.UUID,
+        allowNull: false,
+        references: {
+            model: 'zones',
+            key: 'id'
+        }
     }
 }, {
     tableName: 'salesmen',

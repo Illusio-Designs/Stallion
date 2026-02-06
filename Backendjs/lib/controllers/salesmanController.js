@@ -3,6 +3,7 @@ const AuditLog = require('../models/AuditLog');
 const Tray = require('../models/Tray');
 const { TrayStatus } = require('../constants/enums');
 const SalesmanTray = require('../models/SalesmanTray');
+const Party = require('../models/Party');
 
 class SalesmanController {
 
@@ -23,6 +24,24 @@ class SalesmanController {
         }
     }
 
+    async getSalesmanParties(req, res) {
+        try {
+            const id = req.user.user_id;
+            if (!id) {
+                return res.status(400).json({ error: 'User ID is required' });
+            }
+            const salesman = await Salesman.findOne({ where: { user_id: id } });
+            if (!salesman) {
+                return res.status(404).json({ error: 'Salesman not found' });
+            }
+            const parties = await Party.findAll({ where: { salesman_id: salesman.salesman_id } });
+            res.status(200).json(parties);
+        }
+        catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async getSalesmen(req, res) {
         try {
             const salesmen = await Salesman.findAll({ where: { is_active: true } });
@@ -37,8 +56,9 @@ class SalesmanController {
     async createSalesman(req, res) {
         try {
             const user = req.user;
-            const { user_id, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date } = req.body;
+            const { zone_id, user_id, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date } = req.body;
             const salesman = await Salesman.create({
+                zone_id,
                 employee_code,
                 phone,
                 alternate_phone,
@@ -91,9 +111,10 @@ class SalesmanController {
             if (!id) {
                 return res.status(400).json({ error: 'Salesman ID is required' });
             }
-            const { employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date, is_active } = req.body;
+            const { zone_id, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date, is_active } = req.body;
             const user = req.user;
             const salesman = await Salesman.update({
+                zone_id,
                 employee_code,
                 phone,
                 alternate_phone,
