@@ -152,11 +152,13 @@ class PartyController {
     async createParty(req, res) {
         try {
             const user = req.user;
-            const { user_id, party_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
+            const { distributor_id, salesman_id, user_id, party_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
             if (!user_id) {
                 return res.status(400).json({ error: 'User ID is required' });
             }
             const party = await Party.create({
+                distributor_id,
+                salesman_id,
                 user_id,
                 party_name,
                 trade_name,
@@ -201,13 +203,15 @@ class PartyController {
                 return res.status(400).json({ error: 'Party ID is required' });
             }
             const user = req.user;
-            const { party_name, trade_name, contact_person, email,
+            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email,
                 phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
             const party = await Party.findOne({ where: { party_id: id } });
             if (!party) {
                 return res.status(404).json({ error: 'Party not found' });
             }
             await Party.update({
+                distributor_id: distributor_id || party.distributor_id,
+                salesman_id: salesman_id || party.salesman_id,
                 party_name: party_name || party.party_name,
                 trade_name: trade_name || party.trade_name,
                 contact_person: contact_person || party.contact_person,
