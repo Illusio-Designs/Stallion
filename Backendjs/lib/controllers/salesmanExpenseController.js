@@ -25,8 +25,9 @@ class SalesmanExpenseController {
             if (!id) {
                 return res.status(400).json({ error: 'User ID is required' });
             }
-            const { expense_date, expense_amount, expense_description, expense_type, images } = req.body;
+            const { kilometers, expense_date, expense_amount, expense_description, expense_type, images } = req.body;
             const salesmanExpense = await SalesmanExpense.create({
+                kilometers,
                 expense_date,
                 expense_amount,
                 expense_description,
@@ -57,8 +58,9 @@ class SalesmanExpenseController {
             if (!id) {
                 return res.status(400).json({ error: 'Salesman expense ID is required' });
             }
-            const { status, expense_date, expense_amount, expense_description, expense_type } = req.body;
+            const { kilometers, status, expense_date, expense_amount, expense_description, expense_type } = req.body;
             const salesmanExpense = await SalesmanExpense.update({
+                kilometers,
                 status,
                 expense_date,
                 expense_amount,

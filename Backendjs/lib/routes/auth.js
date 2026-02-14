@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
+const { authenticateToken } = require('../middleware/auth');
 
 
 router.post('/verify-otp', authController.verifyOtp);
@@ -13,6 +14,8 @@ router.post('/logout', authController.logout);
 router.post('/refresh-token', authController.refreshToken);
 
 router.post('/check-user', authController.checkUser);
+
+router.get('/check-token', authenticateToken, authController.checkToken);
 
 router.post('/login', authController.login);
 

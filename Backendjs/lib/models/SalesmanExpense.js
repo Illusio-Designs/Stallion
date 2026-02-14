@@ -12,7 +12,11 @@ const SalesmanExpense = sequelize.define('SalesmanExpense', {
     salesman_id: {
         type: DataTypes.UUID,
         primaryKey: true,
-        defaultValue: DataTypes.UUIDV4
+        defaultValue: DataTypes.UUIDV4,
+        references: {
+            model: 'salesmen',
+            key: 'salesman_id'
+        }
     },
     expense_date: {
         type: DataTypes.DATE,
@@ -39,6 +43,10 @@ const SalesmanExpense = sequelize.define('SalesmanExpense', {
         allowNull: false,
         defaultValue: 'pending'
     },
+    kilometers: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    }
 }, {
     tableName: 'salesman_expense',
     timestamps: true,
