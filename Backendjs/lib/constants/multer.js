@@ -113,7 +113,7 @@ const billUpload = multer({
       cb(new Error('Only PDF and image files are allowed for bills!'), false);
     }
   }
-}).single('bill_file');
+}).array('bill_file');
 
 // General upload for other files
 const generalUpload = multer({
@@ -236,7 +236,7 @@ const processAndSaveImage = (uploadType = 'general') => {
 
         // Handle both single file (.single()) and multiple files (.array())
         const files = req.files || (req.file ? [req.file] : []);
-        
+
         if (!files || files.length === 0) {
           return res.status(400).json({
             success: false,
@@ -299,10 +299,10 @@ const processAndSaveImage = (uploadType = 'general') => {
               originalName: file.originalname
             });
           }
-          
+
           // For single file uploads (profile, slider, bill), set req.fileInfo (singular)
           // For multiple file uploads (product), set req.fileInfos (plural)
-          if (uploadType === 'product') {
+          if (uploadType === 'product' || uploadType === 'bill') {
             req.fileInfos = fileInfo;
           } else {
             req.fileInfo = fileInfo[0]; // Single file

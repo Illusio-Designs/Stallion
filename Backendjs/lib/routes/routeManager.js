@@ -28,6 +28,7 @@ const salesmanTrayRoutes = require('./salesman_tray');
 const trayProductsRoutes = require('./tray_products');
 const eventRoutes = require('./event');
 const orderRoutes = require('./order');
+const salesmanExpenseRoutes = require('./salesman_expense');
 
 router.use((req, res, next) => {
     const timestamp = new Date();
@@ -63,6 +64,7 @@ router.use('/salesman_trays', salesmanTrayRoutes);
 router.use('/tray_products', trayProductsRoutes);
 router.use('/events', eventRoutes);
 router.use('/orders', orderRoutes);
+router.use('/salesman_expenses', salesmanExpenseRoutes);
 
 // API documentation route
 router.get('/docs', (req, res) => {
@@ -116,6 +118,9 @@ router.get('/docs', (req, res) => {
 
             // Order endpoints
             orders: '/api/orders',
+
+            // Salesman expense endpoints
+            salesman_expenses: '/api/salesman_expenses',
         }
     });
 });

@@ -5,7 +5,9 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const AuditLog = require('../models/AuditLog');
 const UserRole = require('../models/UserRole');
-
+const Salesman = require('../models/Salesman');
+const Party = require('../models/Party');
+const Distributor = require('../models/distributor');
 class UserController {
     async getUsers(req, res) {
         try {
@@ -118,6 +120,34 @@ class UserController {
                 profile_image: image_url || user.profile_image,
                 updated_at: new Date()
             });
+            const salesmen = await Salesman.findOne({ where: { user_id: user.user_id } });
+            if (salesmen) {
+                await salesmen.update({
+                    full_name: name || salesmen.full_name,
+                    phone: phone || salesmen.phone,
+                    email: email || salesmen.email,
+                    updated_at: new Date()
+                });
+            }
+            const party = await Party.findOne({ where: { user_id: user.user_id } });
+            if (party) {
+                await party.update({
+                    party_name: name || party.party_name,
+                    phone: phone || party.phone,
+                    email: email || party.email,
+                    updated_at: new Date()
+                });
+            }
+            const distributor = await Distributor.findOne({ where: { user_id: user.user_id } });
+            if (distributor) {
+                await distributor.update({
+                    distributor_name: name || distributor.distributor_name,
+                    phone: phone || distributor.phone,
+                    email: email || distributor.email,
+                    updated_at: new Date()
+                });
+            }
+
             await AuditLog.create({
                 user_id: user.user_id,
                 action: 'update',
