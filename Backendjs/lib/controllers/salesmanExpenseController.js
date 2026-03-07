@@ -19,6 +19,23 @@ class SalesmanExpenseController {
         }
     }
 
+
+    async getAdminSalesmanExpenses(req, res) {
+        try {
+            const salesman_id = req.params.salesman_id;
+            if (!salesman_id) {
+                return res.status(400).json({ error: 'Salesman ID is required' });
+            }
+            const salesmanExpenses = await SalesmanExpense.findAll({ where: { salesman_id: salesman_id } });
+            if (!salesmanExpenses || salesmanExpenses.length === 0) {
+                return res.status(404).json({ error: 'Salesman expenses not found' });
+            }
+            res.status(200).json(salesmanExpenses);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async createSalesmanExpense(req, res) {
         try {
             const id = req.user.user_id;
