@@ -47,7 +47,7 @@ const Products = ({ onPageChange }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const limit = 21; // Products per page
+  const limit = 20; // Products per page
   
   // Filter options from API
   const [brandsData, setBrandsData] = useState([]);
@@ -254,9 +254,14 @@ const Products = ({ onPageChange }) => {
 
   // Update displayed products when page changes
   useEffect(() => {
+    console.log('[Products Pagination] Page:', page, 'Limit:', limit);
+    console.log('[Products Pagination] Total products:', allProducts.length);
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
-    setProducts(allProducts.slice(startIndex, endIndex));
+    const slicedProducts = allProducts.slice(startIndex, endIndex);
+    console.log('[Products Pagination] Showing products:', startIndex, 'to', endIndex);
+    console.log('[Products Pagination] Sliced products count:', slicedProducts.length);
+    setProducts(slicedProducts);
   }, [page, allProducts, limit]);
 
   const handleReset = () => {
