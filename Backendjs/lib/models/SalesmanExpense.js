@@ -46,6 +46,10 @@ const SalesmanExpense = sequelize.define('SalesmanExpense', {
     kilometers: {
         type: DataTypes.INTEGER,
         allowNull: true
+    },
+    remarks: {
+        type: DataTypes.TEXT,
+        allowNull: true
     }
 }, {
     tableName: 'salesman_expense',

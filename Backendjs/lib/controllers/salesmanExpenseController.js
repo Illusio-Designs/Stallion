@@ -19,14 +19,9 @@ class SalesmanExpenseController {
         }
     }
 
-
     async getAdminSalesmanExpenses(req, res) {
         try {
-            const salesman_id = req.params.salesman_id;
-            if (!salesman_id) {
-                return res.status(400).json({ error: 'Salesman ID is required' });
-            }
-            const salesmanExpenses = await SalesmanExpense.findAll({ where: { salesman_id: salesman_id } });
+            const salesmanExpenses = await SalesmanExpense.findAll();
             if (!salesmanExpenses || salesmanExpenses.length === 0) {
                 return res.status(404).json({ error: 'Salesman expenses not found' });
             }
@@ -42,8 +37,9 @@ class SalesmanExpenseController {
             if (!id) {
                 return res.status(400).json({ error: 'User ID is required' });
             }
-            const { kilometers, expense_date, expense_amount, expense_description, expense_type, images } = req.body;
+            const { remarks, kilometers, expense_date, expense_amount, expense_description, expense_type, images } = req.body;
             const salesmanExpense = await SalesmanExpense.create({
+                remarks,
                 kilometers,
                 expense_date,
                 expense_amount,
@@ -75,8 +71,9 @@ class SalesmanExpenseController {
             if (!id) {
                 return res.status(400).json({ error: 'Salesman expense ID is required' });
             }
-            const { kilometers, status, expense_date, expense_amount, expense_description, expense_type } = req.body;
+            const { remarks, kilometers, status, expense_date, expense_amount, expense_description, expense_type } = req.body;
             const salesmanExpense = await SalesmanExpense.update({
+                remarks,
                 kilometers,
                 status,
                 expense_date,
