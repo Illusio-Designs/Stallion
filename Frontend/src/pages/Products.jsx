@@ -4,6 +4,7 @@ import ProductCard from '../components/ProductCard';
 import { isLoggedIn } from '../services/authService';
 import {
   getProducts,
+  getFeaturedProducts,
   getGenders,
   getShapes,
   getFrameTypes,
@@ -216,8 +217,23 @@ const Products = ({ onPageChange }) => {
           selectedBrands
         });
         console.log('Built filters object:', filters);
-        // Fetch all products with high limit to get total count
-        const productsData = await getProducts(1, 3000, filters);
+        
+        // TEMPORARY FIX: Use getFeaturedProducts since backend /products/ endpoint 
+        // is not filtering by status correctly
+        const allProductsData = await getFeaturedProducts('all');
+        
+        console.log('[Products] All products from featured:', allProductsData?.length || 0);
+        
+        // Filter by status client-side
+        let productsData = allProductsData;
+        if (Array.isArray(allProductsData)) {
+          productsData = allProductsData.filter(product => {
+            const status = (product.status || '').toLowerCase().trim();
+            return status === 'active' || status === 'published';
+          });
+        }
+        
+        console.log('[Products] Active products:', productsData?.length || 0);
         
         setAllProducts(productsData || []);
         setTotalResults(productsData?.length || 0);
