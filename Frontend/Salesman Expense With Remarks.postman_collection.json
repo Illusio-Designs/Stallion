@@ -1,0 +1,694 @@
+{
+  "info": {
+    "_postman_id": "5c09fd2d-9f5a-4041-bf99-0eaef02cd729",
+    "name": "Salesman Expense",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "48027432"
+  },
+  "item": [
+    {
+      "name": "getSalesmanExpenses",
+      "protocolProfileBehavior": {
+        "disableBodyPruning": true
+      },
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": ""
+        },
+        "url": {
+          "raw": "{{baseUrl}}/salesman_expenses/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "salesman_expenses",
+            ""
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/salesman_expenses/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "salesman_expenses",
+                ""
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Access-Control-Allow-Credentials",
+              "value": "true"
+            },
+            {
+              "key": "Access-Control-Allow-Methods",
+              "value": "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
+            },
+            {
+              "key": "Access-Control-Allow-Headers",
+              "value": "*"
+            },
+            {
+              "key": "Access-Control-Expose-Headers",
+              "value": "Content-Range, X-Content-Range"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "332"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"14c-z/FDjs5EilVzWlWl9aIvdMdrQ7I\""
+            },
+            {
+              "key": "Date",
+              "value": "Sat, 14 Feb 2026 11:26:10 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "[\n    {\n        \"id\": \"df4a4270-1848-4caa-b729-5b27bc00d460\",\n        \"salesman_id\": \"fb65034b-6453-4d1b-b609-95ae947727b4\",\n        \"expense_date\": \"2026-02-13T18:30:00.000Z\",\n        \"expense_amount\": \"100.00\",\n        \"expense_description\": \"food\",\n        \"expense_type\": \"travel\",\n        \"images\": [],\n        \"status\": \"pending\",\n        \"created_at\": \"2026-02-14T11:26:03.000Z\",\n        \"updated_at\": \"2026-02-14T11:26:03.000Z\"\n    }\n]"
+        }
+      ]
+    },
+    {
+      "name": "createSalesmanExpense",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"expense_date\": \"2026-02-14T00:00:00\",\n    \"expense_amount\": 100,\n    \"expense_description\": \"food\",\n    \"expense_type\": \"travel\",\n    \"images\": [],\n    \"remarks\": \"for lunch\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/salesman_expenses/",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "salesman_expenses",
+            ""
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"expense_date\": \"2026-02-14T00:00:00\",\n    \"expense_amount\": 100,\n    \"expense_description\": \"food\",\n    \"expense_type\": \"travel\",\n    \"images\": [],\n    \"remarks\": \"for lunch\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/salesman_expenses/",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "salesman_expenses",
+                ""
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Access-Control-Allow-Credentials",
+              "value": "true"
+            },
+            {
+              "key": "Access-Control-Allow-Methods",
+              "value": "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
+            },
+            {
+              "key": "Access-Control-Allow-Headers",
+              "value": "*"
+            },
+            {
+              "key": "Access-Control-Expose-Headers",
+              "value": "Content-Range, X-Content-Range"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "347"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"15b-6RrnnJA8Rjz6/dNtc/tRbAg9E4g\""
+            },
+            {
+              "key": "Date",
+              "value": "Mon, 09 Mar 2026 11:02:10 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"f022d238-2583-41d8-a8c8-1bf15578697e\",\n    \"remarks\": \"for lunch\",\n    \"expense_date\": \"2026-02-13T18:30:00.000Z\",\n    \"expense_amount\": 100,\n    \"expense_description\": \"food\",\n    \"expense_type\": \"travel\",\n    \"images\": [],\n    \"salesman_id\": \"8772a009-80cc-4ec1-8191-07466f725373\",\n    \"status\": \"pending\",\n    \"created_at\": \"2026-03-09T11:02:10.431Z\",\n    \"updated_at\": \"2026-03-09T11:02:10.432Z\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "uploadImages",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "bill_file",
+              "type": "file",
+              "uuid": "fa9f3829-f9e7-4d0c-9e9a-38ffc180346c",
+              "src": [
+                "postman-cloud:///1f0f5c9d-9f9b-4e20-bcbd-6c605b102ebf",
+                "postman-cloud:///1f0f5c9d-9e1a-4240-9fed-01f81f6898ff"
+              ]
+            }
+          ]
+        },
+        "url": {
+          "raw": "{{baseUrl}}/salesman_expenses/upload-images",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "salesman_expenses",
+            "upload-images"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200",
+          "originalRequest": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "bill_file",
+                  "type": "file",
+                  "uuid": "fa9f3829-f9e7-4d0c-9e9a-38ffc180346c",
+                  "src": [
+                    "postman-cloud:///1f0f5c9d-9f9b-4e20-bcbd-6c605b102ebf",
+                    "postman-cloud:///1f0f5c9d-9e1a-4240-9fed-01f81f6898ff"
+                  ]
+                }
+              ],
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/salesman_expenses/upload-images",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "salesman_expenses",
+                "upload-images"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Access-Control-Allow-Credentials",
+              "value": "true"
+            },
+            {
+              "key": "Access-Control-Allow-Methods",
+              "value": "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
+            },
+            {
+              "key": "Access-Control-Allow-Headers",
+              "value": "*"
+            },
+            {
+              "key": "Access-Control-Expose-Headers",
+              "value": "Content-Range, X-Content-Range"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "548"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"224-PqGlKjNblmqMwK8fZ7uzoIPZgGg\""
+            },
+            {
+              "key": "Date",
+              "value": "Sat, 14 Feb 2026 11:38:34 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"df4a4270-1848-4caa-b729-5b27bc00d460\",\n    \"salesman_id\": \"fb65034b-6453-4d1b-b609-95ae947727b4\",\n    \"expense_date\": \"2026-02-13T18:30:00.000Z\",\n    \"expense_amount\": \"100.00\",\n    \"expense_description\": \"food\",\n    \"expense_type\": \"travel\",\n    \"images\": [\n        \"/Users/hardyh8/Business/Projects/Stallion/intensefocus/Backendjs/uploads/bills/product_6-1771069114350.png\",\n        \"/Users/hardyh8/Business/Projects/Stallion/intensefocus/Backendjs/uploads/bills/product_2-1771069114350.png\"\n    ],\n    \"status\": \"approved\",\n    \"created_at\": \"2026-02-14T11:26:03.000Z\",\n    \"updated_at\": \"2026-02-14T11:38:34.000Z\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "updateSalesmanExpense",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "PUT",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"status\": \"approved\",\n    \"remarks\": \"off day\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/salesman_expenses/f022d238-2583-41d8-a8c8-1bf15578697e",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "salesman_expenses",
+            "f022d238-2583-41d8-a8c8-1bf15578697e"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200",
+          "originalRequest": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"approved\",\n    \"remarks\": \"off day\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/salesman_expenses/f022d238-2583-41d8-a8c8-1bf15578697e",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "salesman_expenses",
+                "f022d238-2583-41d8-a8c8-1bf15578697e"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Access-Control-Allow-Credentials",
+              "value": "true"
+            },
+            {
+              "key": "Access-Control-Allow-Methods",
+              "value": "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
+            },
+            {
+              "key": "Access-Control-Allow-Headers",
+              "value": "*"
+            },
+            {
+              "key": "Access-Control-Expose-Headers",
+              "value": "Content-Range, X-Content-Range"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "369"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"171-1v1IN6gsjer+dPCVg6XdKaIZtsU\""
+            },
+            {
+              "key": "Date",
+              "value": "Mon, 09 Mar 2026 11:02:55 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"id\": \"f022d238-2583-41d8-a8c8-1bf15578697e\",\n    \"salesman_id\": \"8772a009-80cc-4ec1-8191-07466f725373\",\n    \"expense_date\": \"2026-02-13T18:30:00.000Z\",\n    \"expense_amount\": \"100.00\",\n    \"expense_description\": \"food\",\n    \"expense_type\": \"travel\",\n    \"images\": [],\n    \"status\": \"approved\",\n    \"kilometers\": null,\n    \"remarks\": \"off day\",\n    \"created_at\": \"2026-03-09T11:02:10.000Z\",\n    \"updated_at\": \"2026-03-09T11:02:55.000Z\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "deleteSalesmanExpense",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "DELETE",
+        "header": [],
+        "body": {
+          "mode": "raw",
+          "raw": ""
+        },
+        "url": {
+          "raw": "{{baseUrl}}/salesman_expenses/df4a4270-1848-4caa-b729-5b27bc00d460",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "salesman_expenses",
+            "df4a4270-1848-4caa-b729-5b27bc00d460"
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200",
+          "originalRequest": {
+            "method": "DELETE",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": ""
+            },
+            "url": {
+              "raw": "{{baseUrl}}/salesman_expenses/df4a4270-1848-4caa-b729-5b27bc00d460",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "salesman_expenses",
+                "df4a4270-1848-4caa-b729-5b27bc00d460"
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Access-Control-Allow-Credentials",
+              "value": "true"
+            },
+            {
+              "key": "Access-Control-Allow-Methods",
+              "value": "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
+            },
+            {
+              "key": "Access-Control-Allow-Headers",
+              "value": "*"
+            },
+            {
+              "key": "Access-Control-Expose-Headers",
+              "value": "Content-Range, X-Content-Range"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "51"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"33-syMOL7yf88uaoe28Wh+fAoBDNWE\""
+            },
+            {
+              "key": "Date",
+              "value": "Sat, 14 Feb 2026 12:04:54 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "{\n    \"message\": \"Salesman expense deleted successfully\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "getAdminSalesmanExpenses",
+      "request": {
+        "auth": {
+          "type": "bearer",
+          "bearer": [
+            {
+              "key": "token",
+              "value": "{{token}}",
+              "type": "string"
+            }
+          ]
+        },
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/salesman_expenses/admin/:salesman_id",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "salesman_expenses",
+            "admin",
+            ":salesman_id"
+          ],
+          "variable": [
+            {
+              "key": "salesman_id",
+              "value": "fb65034b-6453-4d1b-b609-95ae947727b4"
+            }
+          ]
+        }
+      },
+      "response": [
+        {
+          "name": "200",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/salesman_expenses/admin/:salesman_id",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "salesman_expenses",
+                "admin",
+                ":salesman_id"
+              ],
+              "variable": [
+                {
+                  "key": "salesman_id",
+                  "value": "fb65034b-6453-4d1b-b609-95ae947727b4"
+                }
+              ]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "_postman_previewlanguage": null,
+          "header": [
+            {
+              "key": "X-Powered-By",
+              "value": "Express"
+            },
+            {
+              "key": "Access-Control-Allow-Credentials",
+              "value": "true"
+            },
+            {
+              "key": "Access-Control-Allow-Methods",
+              "value": "GET, POST, PUT, DELETE, PATCH, OPTIONS, HEAD"
+            },
+            {
+              "key": "Access-Control-Allow-Headers",
+              "value": "*"
+            },
+            {
+              "key": "Access-Control-Expose-Headers",
+              "value": "Content-Range, X-Content-Range"
+            },
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            },
+            {
+              "key": "Content-Length",
+              "value": "830"
+            },
+            {
+              "key": "ETag",
+              "value": "W/\"33e-hKZ5KEiiQKQO+MEY6lWnaC/jd20\""
+            },
+            {
+              "key": "Date",
+              "value": "Sat, 07 Mar 2026 12:29:10 GMT"
+            },
+            {
+              "key": "Connection",
+              "value": "keep-alive"
+            },
+            {
+              "key": "Keep-Alive",
+              "value": "timeout=5"
+            }
+          ],
+          "cookie": [],
+          "body": "[\n    {\n        \"id\": \"4091cff1-09ee-41aa-9a98-e6566946a81b\",\n        \"salesman_id\": \"fb65034b-6453-4d1b-b609-95ae947727b4\",\n        \"expense_date\": \"2026-02-10T18:30:00.000Z\",\n        \"expense_amount\": \"100.00\",\n        \"expense_description\": \"kilometers\",\n        \"expense_type\": \"fuel\",\n        \"images\": [],\n        \"status\": \"pending\",\n        \"kilometers\": 150,\n        \"created_at\": \"2026-02-14T13:28:08.000Z\",\n        \"updated_at\": \"2026-02-14T13:37:57.000Z\"\n    },\n    {\n        \"id\": \"5eb52c2d-e842-4237-8fba-d83d1ae34fcb\",\n        \"salesman_id\": \"fb65034b-6453-4d1b-b609-95ae947727b4\",\n        \"expense_date\": \"2026-02-14T12:29:18.000Z\",\n        \"expense_amount\": \"100.00\",\n        \"expense_description\": \"food\",\n        \"expense_type\": \"hotel\",\n        \"images\": [\n            \"uploads/bills/scaled_pexels-fauxels-3184328-1771073360734.jpg\",\n            \"uploads/bills/scaled_pexels-yankrukov-8197544-1771073360736.jpg\"\n        ],\n        \"status\": \"pending\",\n        \"kilometers\": null,\n        \"created_at\": \"2026-02-14T12:32:23.000Z\",\n        \"updated_at\": \"2026-02-14T12:49:20.000Z\"\n    }\n]"
+        }
+      ]
+    }
+  ]
+}

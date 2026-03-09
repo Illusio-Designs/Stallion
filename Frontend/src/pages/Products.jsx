@@ -222,15 +222,29 @@ const Products = ({ onPageChange }) => {
         // is not filtering by status correctly
         const allProductsData = await getFeaturedProducts('all');
         
+        console.log('[Products] Raw response from getFeaturedProducts:', allProductsData);
+        console.log('[Products] Is array?', Array.isArray(allProductsData));
         console.log('[Products] All products from featured:', allProductsData?.length || 0);
         
         // Filter by status client-side
         let productsData = allProductsData;
         if (Array.isArray(allProductsData)) {
+          console.log('[Products] First 3 products before filter:', allProductsData.slice(0, 3).map(p => ({
+            id: p.product_id,
+            model: p.model_no,
+            status: p.status
+          })));
+          
           productsData = allProductsData.filter(product => {
             const status = (product.status || '').toLowerCase().trim();
             return status === 'active' || status === 'published';
           });
+          
+          console.log('[Products] First 3 products after filter:', productsData.slice(0, 3).map(p => ({
+            id: p.product_id,
+            model: p.model_no,
+            status: p.status
+          })));
         }
         
         console.log('[Products] Active products:', productsData?.length || 0);
