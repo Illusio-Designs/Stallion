@@ -258,15 +258,16 @@
 /* Collection Filters */
 .collection-filters {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap; /* Changed from wrap to nowrap for horizontal scroll */
   gap: 12px 35px;
   max-width: 1400px;
   margin: 0 auto 50px;
   overflow-x: auto;
   overflow-y: hidden;
   padding-bottom: 15px;
-  max-height: 100px; /* Limit to approximately 2 rows, then scroll */
+  /* Removed max-height to allow all items to show */
   justify-content: flex-start;
+  scroll-behavior: smooth; /* Smooth scrolling */
 }
 
 /* Show scrollbar when content overflows */

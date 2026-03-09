@@ -53,6 +53,8 @@ const Home = ({ onPageChange }) => {
         const collectionsData = await getCollections();
         // Handle both array response and object with data property
         const collectionsArray = Array.isArray(collectionsData) ? collectionsData : (collectionsData?.data || []);
+        console.log('[Home] Collections fetched:', collectionsArray.length, 'collections');
+        console.log('[Home] Collections data:', collectionsArray);
         setCollections(collectionsArray);
       } catch (error) {
         console.error('Error fetching collections:', error);
