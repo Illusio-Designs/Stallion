@@ -8,6 +8,7 @@ export const ALL_PAGES = {
   DASHBOARD: 'dashboard',
   PRODUCTS: 'dashboard-products',
   ORDERS: 'orders',
+  EXPENSES: 'expenses',
   TRAY: 'tray',
   EVENTS: 'events',
   PARTY: 'party',
@@ -35,7 +36,7 @@ export const ROLE_PERMISSIONS = {
     ALL_PAGES.SETTINGS,
   ],
   'expense_manager': [
-    // Not specified, but likely analytics or a future expense page
+    ALL_PAGES.EXPENSES,
     ALL_PAGES.ANALYTICS,
     ALL_PAGES.SETTINGS,
   ],
@@ -44,6 +45,7 @@ export const ROLE_PERMISSIONS = {
     ALL_PAGES.DASHBOARD,
     ALL_PAGES.PRODUCTS,
     ALL_PAGES.ORDERS,
+    ALL_PAGES.EXPENSES,
     ALL_PAGES.TRAY,
     ALL_PAGES.EVENTS,
     ALL_PAGES.PARTY,
@@ -66,6 +68,7 @@ export const ROLE_PERMISSIONS = {
   ],
   'sales_manager': [
     ALL_PAGES.SALESMEN,
+    ALL_PAGES.EXPENSES,
     ALL_PAGES.SETTINGS,
   ],
   'distributor_manager': [
@@ -86,6 +89,7 @@ export const ROLE_PERMISSIONS = {
   'salesman': [
     ALL_PAGES.DASHBOARD,
     ALL_PAGES.ORDERS,
+    ALL_PAGES.EXPENSES,
     ALL_PAGES.ANALYTICS, // Reports
     ALL_PAGES.PARTY,
     ALL_PAGES.SETTINGS,

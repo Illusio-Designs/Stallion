@@ -36,6 +36,7 @@ import DashboardEvents from './DashboardEvents';
 import AnalyticsReports from './AnalyticsReports';
 import DashboardSupport from './DashboardSupport';
 import DashboardSettings from './DashboardSettings';
+import DashboardExpenses from './DashboardExpenses';
 
 const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   const router = useRouter();
@@ -69,7 +70,7 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   const getLayoutFromPage = (page) => {
     if (['login', 'register'].includes(page)) {
       return 'auth';
-    } else if (['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings'].includes(page)) {
+    } else if (['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings', 'expenses'].includes(page)) {
       return 'dashboard';
     }
     return 'public';
@@ -102,7 +103,7 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   // Update URL when page or layout changes
   const handlePageChange = (page, productId = null) => {
     if (page === currentPage && productId === currentProductId) return;
-    const dashboardTabs = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings'];
+    const dashboardTabs = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings', 'expenses'];
     // For dashboard tabs, keep the same /dashboard route and switch ?tab=
     let url;
     if (dashboardTabs.includes(page)) {
@@ -130,7 +131,7 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
 
   const renderPage = () => {
     // Check if this is a dashboard page that requires role-based access
-    const dashboardPages = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings'];
+    const dashboardPages = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings', 'expenses'];
     const isDashboardPage = dashboardPages.includes(currentPage);
     
     // If it's a dashboard page, check role-based access
@@ -200,6 +201,8 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
         return <DashboardSupport />;
       case 'settings':
         return <DashboardSettings />;
+      case 'expenses':
+        return <DashboardExpenses />;
       
       default:
         return <Home onPageChange={handlePageChange} />;
