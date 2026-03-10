@@ -2,6 +2,7 @@
 
 const { DataTypes } = require('sequelize');
 const sequelize = require('../constants/database');
+const Salesman = require('./Salesman');
 
 const SalesmanExpense = sequelize.define('SalesmanExpense', {
     id: {
@@ -56,6 +57,12 @@ const SalesmanExpense = sequelize.define('SalesmanExpense', {
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at'
+});
+
+SalesmanExpense.belongsTo(Salesman, {
+    foreignKey: 'salesman_id',
+    targetKey: 'salesman_id',
+    as: 'salesman',
 });
 
 module.exports = SalesmanExpense;

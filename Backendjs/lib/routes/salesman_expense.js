@@ -5,6 +5,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { billUpload } = require('../constants/multer');
 
 router.get('/', authenticateToken, salesmanExpenseController.getSalesmanExpenses);
+router.get('/admin/all', authenticateToken, salesmanExpenseController.getAllAdminSalesmanExpenses);
 router.get('/admin/:salesman_id', authenticateToken, salesmanExpenseController.getAdminSalesmanExpenses);
 router.post('/', authenticateToken, salesmanExpenseController.createSalesmanExpense);
 router.put('/:id', authenticateToken, salesmanExpenseController.updateSalesmanExpense);
