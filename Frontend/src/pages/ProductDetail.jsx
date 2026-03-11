@@ -336,8 +336,6 @@ const ProductDetail = ({ productId: propProductId = null }) => {
         lenseColour: lensColor?.lens_color || lensColor?.name || 'N/A',
         lenseMaterial: lensMaterial?.lens_material || lensMaterial?.name || 'N/A',
         size: model.size_mm || 'N/A',
-        mrp: formatPrice(model.mrp),
-        whp: formatPrice(model.whp),
         qty: formatQty(model.total_qty || model.warehouse_qty || 0),
         image: getImageUrl(model.image_urls, model.image_url),
       };
@@ -603,14 +601,6 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                   <div className="detail-item">
                     <span className="detail-label">Size:</span>
                     <span className="detail-value">{variation.size}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">MRP:</span>
-                    <span className="detail-value">{variation.mrp}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-label">WHP:</span>
-                    <span className="detail-value">{variation.whp}</span>
                   </div>
                   {/* QTY label/value as a normal detail cell */}
                   <div className="detail-item">
