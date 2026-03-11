@@ -29,6 +29,55 @@ const Products = ({ onPageChange }) => {
     }
   }, []);
 
+  // Get search query from URL and listen for real-time changes
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  useEffect(() => {
+    // Get initial search from URL
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const search = urlParams.get('search');
+      if (search) {
+        setSearchQuery(search);
+      }
+    }
+
+    // Listen for real-time search changes
+    const handleSearchChange = (event) => {
+      const newSearch = event.detail.search || '';
+      console.log('Search change event received:', newSearch);
+      setSearchQuery(newSearch);
+      setPage(1); // Reset to first page when search changes
+      
+      // Update URL
+      const url = new URL(window.location);
+      if (newSearch.trim()) {
+        url.searchParams.set('search', newSearch.trim());
+      } else {
+        url.searchParams.delete('search');
+      }
+      window.history.replaceState({}, '', url);
+    };
+
+    // Listen for custom search change events
+    window.addEventListener('searchChange', handleSearchChange);
+    
+    // Listen for URL changes (back/forward buttons)
+    const handlePopState = () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const search = urlParams.get('search') || '';
+      setSearchQuery(search);
+      setPage(1);
+    };
+    
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      window.removeEventListener('searchChange', handleSearchChange);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, []);
+
   const [selectedBrands, setSelectedBrands] = useState([]); // Array of brand IDs
   const [selectedFrameMaterials, setSelectedFrameMaterials] = useState([]); // Array of frame_material_id
   const [selectedShapes, setSelectedShapes] = useState([]); // Array of shape_id
@@ -267,17 +316,40 @@ const Products = ({ onPageChange }) => {
     fetchAllProducts();
   }, [limit]); // Remove buildFilters dependency to get all products initially
 
-  // Update displayed products when page changes
+  // Update displayed products when page changes or search query changes
   useEffect(() => {
     console.log('[Products Pagination] Page:', page, 'Limit:', limit);
     console.log('[Products Pagination] Total products:', allProducts.length);
+    console.log('[Products Search] Search query:', searchQuery);
+    
+    let filteredProducts = allProducts;
+    
+    // Apply search filter if search query exists
+    if (searchQuery && searchQuery.trim()) {
+      console.log('Applying search filter for:', searchQuery);
+      filteredProducts = allProducts.filter(product => {
+        const modelNo = (product.model_no || '').toLowerCase();
+        const matches = modelNo.includes(searchQuery.toLowerCase());
+        if (matches) {
+          console.log('Product matches:', product.model_no);
+        }
+        return matches;
+      });
+      console.log('[Products Search] Filtered products by search:', filteredProducts.length);
+    }
+    
     const startIndex = (page - 1) * limit;
     const endIndex = startIndex + limit;
-    const slicedProducts = allProducts.slice(startIndex, endIndex);
+    const slicedProducts = filteredProducts.slice(startIndex, endIndex);
     console.log('[Products Pagination] Showing products:', startIndex, 'to', endIndex);
     console.log('[Products Pagination] Sliced products count:', slicedProducts.length);
+    
     setProducts(slicedProducts);
-  }, [page, allProducts, limit]);
+    
+    // Update total results and pages based on filtered products
+    setTotalResults(filteredProducts.length);
+    setTotalPages(Math.ceil(filteredProducts.length / limit));
+  }, [page, allProducts, limit, searchQuery]);
 
   const handleReset = () => {
     setSelectedBrands([]);
@@ -715,7 +787,29 @@ const Products = ({ onPageChange }) => {
         {/* Products Grid */}
         <main className="products-main">
           <div className="products-header">
-            <h2>{loading ? '' : `${totalResults} results`}</h2>
+            <h2>
+              {loading ? '' : searchQuery ? 
+                `${totalResults} results for "${searchQuery}"` : 
+                `${totalResults} results`
+              }
+            </h2>
+            {searchQuery && (
+              <button 
+                className="clear-search-btn"
+                onClick={() => {
+                  setSearchQuery('');
+                  setPage(1);
+                  // Update URL to remove search parameter
+                  if (typeof window !== 'undefined') {
+                    const url = new URL(window.location);
+                    url.searchParams.delete('search');
+                    window.history.replaceState({}, '', url);
+                  }
+                }}
+              >
+                Clear Search
+              </button>
+            )}
           </div>
           <div className="products-grid-container">
             {loading ? (
@@ -743,8 +837,11 @@ const Products = ({ onPageChange }) => {
                 );
               })
             ) : (
-              <div style={{ padding: '40px', textAlign: 'center' }}>
-                No products found
+              <div style={{ padding: '40px', textAlign: 'center', color: 'white', gridColumn: '1 / -1' }}>
+                {searchQuery ? 
+                  `No products found for "${searchQuery}"` : 
+                  'No products found'
+                }
               </div>
             )}
           </div>
