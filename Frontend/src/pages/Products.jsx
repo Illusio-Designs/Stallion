@@ -206,42 +206,53 @@ const Products = ({ onPageChange }) => {
       try {
         console.log('Fetching all products...');
         
-        // Try getProducts with null filters to get ALL products (including all statuses)
-        const allProductsData = await getProducts(1, 1000, null);
+        let allProducts = [];
+        let currentPage = 1;
+        let hasMorePages = true;
+        const pageLimit = 100; // Get 100 products per page
         
-        console.log('[Products] Raw response from getProducts:', allProductsData);
-        console.log('[Products] Is array?', Array.isArray(allProductsData));
-        console.log('[Products] All products count:', allProductsData?.length || 0);
-        
-        // Handle both array response and object with data property
-        const productsArray = Array.isArray(allProductsData) ? allProductsData : (allProductsData?.data || []);
-        
-        // Filter by status client-side to show only active products
-        let productsData = productsArray;
-        if (Array.isArray(productsArray)) {
-          console.log('[Products] All products before status filter:', productsArray.length);
-          console.log('[Products] First 5 products before filter:', productsArray.slice(0, 5).map(p => ({
-            id: p.product_id,
-            model: p.model_no,
-            status: p.status
-          })));
+        // Keep fetching pages until we get all products
+        while (hasMorePages && currentPage <= 50) { // Safety limit of 50 pages
+          console.log(`Fetching page ${currentPage}...`);
           
-          productsData = productsArray.filter(product => {
-            const status = (product.status || '').toLowerCase().trim();
-            return status === 'active' || status === 'published';
-          });
+          const pageData = await getProducts(currentPage, pageLimit, null);
+          const productsArray = Array.isArray(pageData) ? pageData : (pageData?.data || []);
           
-          console.log('[Products] Active products after filter:', productsData.length);
-          console.log('[Products] First 5 active products:', productsData.slice(0, 5).map(p => ({
-            id: p.product_id,
-            model: p.model_no,
-            status: p.status
-          })));
+          console.log(`Page ${currentPage} returned ${productsArray.length} products`);
+          
+          if (productsArray.length === 0) {
+            // No more products, stop fetching
+            hasMorePages = false;
+          } else {
+            allProducts = [...allProducts, ...productsArray];
+            
+            // If we got fewer products than the limit, this is the last page
+            if (productsArray.length < pageLimit) {
+              hasMorePages = false;
+            } else {
+              currentPage++;
+            }
+          }
         }
         
-        setAllProducts(productsData || []);
-        setTotalResults(productsData?.length || 0);
-        setTotalPages(Math.ceil((productsData?.length || 0) / limit));
+        console.log('[Products] Total products fetched:', allProducts.length);
+        
+        // Filter by status client-side to show only active products
+        const activeProducts = allProducts.filter(product => {
+          const status = (product.status || '').toLowerCase().trim();
+          return status === 'active';
+        });
+        
+        console.log('[Products] Active products after filter:', activeProducts.length);
+        console.log('[Products] Sample active products:', activeProducts.slice(0, 3).map(p => ({
+          id: p.product_id,
+          model: p.model_no,
+          status: p.status
+        })));
+        
+        setAllProducts(activeProducts);
+        setTotalResults(activeProducts.length);
+        setTotalPages(Math.ceil(activeProducts.length / limit));
       } catch (err) {
         console.error('Error fetching products:', err);
         setError(err.message || 'Failed to fetch products');
