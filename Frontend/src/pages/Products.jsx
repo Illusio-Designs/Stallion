@@ -47,7 +47,7 @@ const Products = ({ onPageChange }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const limit = 20; // Products per page
+  const limit = 21; // Products per page
   
   // Filter options from API
   const [brandsData, setBrandsData] = useState([]);
