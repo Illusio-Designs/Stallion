@@ -204,34 +204,23 @@ const Products = ({ onPageChange }) => {
       setError(null);
       
       try {
-        const filters = buildFilters();
-        console.log('Selected filters state:', {
-          selectedGender,
-          selectedColorCode,
-          selectedShapes,
-          selectedLensColor,
-          selectedFrameColor,
-          selectedType,
-          selectedLensMaterial,
-          selectedFrameMaterials,
-          selectedBrands
-        });
-        console.log('Built filters object:', filters);
+        console.log('Fetching all products...');
         
-        // Use getFeaturedProducts('all') like the home page does - this gets ALL active products
-        const allProductsData = await getFeaturedProducts('all');
+        // Try getProducts with null filters to get ALL products (including all statuses)
+        const allProductsData = await getProducts(1, 1000, null);
         
-        console.log('[Products] Raw response from getFeaturedProducts:', allProductsData);
+        console.log('[Products] Raw response from getProducts:', allProductsData);
         console.log('[Products] Is array?', Array.isArray(allProductsData));
-        console.log('[Products] All products from featured:', allProductsData?.length || 0);
+        console.log('[Products] All products count:', allProductsData?.length || 0);
         
-        // Handle both array response and object with data property (like home page does)
+        // Handle both array response and object with data property
         const productsArray = Array.isArray(allProductsData) ? allProductsData : (allProductsData?.data || []);
         
-        // Filter by status client-side (like home page does)
+        // Filter by status client-side to show only active products
         let productsData = productsArray;
         if (Array.isArray(productsArray)) {
-          console.log('[Products] First 3 products before filter:', productsArray.slice(0, 3).map(p => ({
+          console.log('[Products] All products before status filter:', productsArray.length);
+          console.log('[Products] First 5 products before filter:', productsArray.slice(0, 5).map(p => ({
             id: p.product_id,
             model: p.model_no,
             status: p.status
@@ -242,14 +231,13 @@ const Products = ({ onPageChange }) => {
             return status === 'active' || status === 'published';
           });
           
-          console.log('[Products] First 3 products after filter:', productsData.slice(0, 3).map(p => ({
+          console.log('[Products] Active products after filter:', productsData.length);
+          console.log('[Products] First 5 active products:', productsData.slice(0, 5).map(p => ({
             id: p.product_id,
             model: p.model_no,
             status: p.status
           })));
         }
-        
-        console.log('[Products] Active products:', productsData?.length || 0);
         
         setAllProducts(productsData || []);
         setTotalResults(productsData?.length || 0);
@@ -266,7 +254,7 @@ const Products = ({ onPageChange }) => {
     };
     
     fetchAllProducts();
-  }, [buildFilters, limit]);
+  }, [limit]); // Remove buildFilters dependency to get all products initially
 
   // Update displayed products when page changes
   useEffect(() => {
