@@ -218,38 +218,26 @@ const Products = ({ onPageChange }) => {
         });
         console.log('Built filters object:', filters);
         
-        // TEMPORARY FIX: Use getFeaturedProducts since backend /products/ endpoint 
-        // is not filtering by status correctly
-        const allProductsData = await getFeaturedProducts('all');
+        // Use getProducts with proper pagination to get all products
+        const allProductsData = await getProducts(1, 1000, filters); // Get first 1000 products
         
-        console.log('[Products] Raw response from getFeaturedProducts:', allProductsData);
+        console.log('[Products] Raw response from getProducts:', allProductsData);
         console.log('[Products] Is array?', Array.isArray(allProductsData));
-        console.log('[Products] All products from featured:', allProductsData?.length || 0);
+        console.log('[Products] All products count:', allProductsData?.length || 0);
         
-        // Filter by status client-side
-        let productsData = allProductsData;
+        let productsData = allProductsData || [];
+        
         if (Array.isArray(allProductsData)) {
-          console.log('[Products] First 3 products before filter:', allProductsData.slice(0, 3).map(p => ({
-            id: p.product_id,
-            model: p.model_no,
-            status: p.status
-          })));
-          
-          productsData = allProductsData.filter(product => {
-            const status = (product.status || '').toLowerCase().trim();
-            return status === 'active' || status === 'published';
-          });
-          
-          console.log('[Products] First 3 products after filter:', productsData.slice(0, 3).map(p => ({
+          console.log('[Products] First 3 products:', allProductsData.slice(0, 3).map(p => ({
             id: p.product_id,
             model: p.model_no,
             status: p.status
           })));
         }
         
-        console.log('[Products] Active products:', productsData?.length || 0);
+        console.log('[Products] Final products count:', productsData?.length || 0);
         
-        setAllProducts(productsData || []);
+        setAllProducts(productsData);
         setTotalResults(productsData?.length || 0);
         setTotalPages(Math.ceil((productsData?.length || 0) / limit));
       } catch (err) {
