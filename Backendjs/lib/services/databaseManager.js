@@ -357,6 +357,8 @@ class DatabaseManager {
             require('../models/event');
             require('../models/Order');
             require('../models/SalesmanExpense');
+            require('../models/SalesmanTargets');
+            require('../models/SalesmanCheckIns');
 
             // List of tables that are manually managed (should not be auto-synced)
             const manuallyManagedTables = ['users', 'roles', 'user_roles', 'audit_logs'];
@@ -366,7 +368,7 @@ class DatabaseManager {
             const modelSyncOrder = ['Country', 'State', 'Cities', 'Zone', 'Party', 'Distributor', 'Salesman',
                 'ColorCode', 'FrameColor', 'FrameMaterial', 'FrameType', 'Gender', 'LensColor',
                 'LensMaterial', 'Shape', 'Brand', 'Collection', 'Product', 'Tray', 'SalesmanTray',
-                'TrayProducts', 'Event', 'Order', 'OrderOperation', 'SalesmanExpense'];
+                'TrayProducts', 'Event', 'Order', 'OrderOperation', 'SalesmanExpense', 'SalesmanTargets', 'SalesmanCheckIns'];
 
             // Sync all models except the manually managed ones
             console.log('🔄 Syncing Sequelize models (excluding manually managed tables)...');

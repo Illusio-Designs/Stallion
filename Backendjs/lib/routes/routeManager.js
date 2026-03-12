@@ -29,6 +29,8 @@ const trayProductsRoutes = require('./tray_products');
 const eventRoutes = require('./event');
 const orderRoutes = require('./order');
 const salesmanExpenseRoutes = require('./salesman_expense');
+const salesmanTargetsRoutes = require('./salesman_targets');
+const salesmanCheckInsRoutes = require('./salesman_checkins');
 
 router.use((req, res, next) => {
     const timestamp = new Date();
@@ -65,6 +67,8 @@ router.use('/tray_products', trayProductsRoutes);
 router.use('/events', eventRoutes);
 router.use('/orders', orderRoutes);
 router.use('/salesman_expenses', salesmanExpenseRoutes);
+router.use('/salesman_targets', salesmanTargetsRoutes);
+router.use('/salesman_checkins', salesmanCheckInsRoutes);
 
 // API documentation route
 router.get('/docs', (req, res) => {

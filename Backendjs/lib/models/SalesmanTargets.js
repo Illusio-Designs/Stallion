@@ -1,10 +1,8 @@
-
-
 const { DataTypes } = require('sequelize');
 const sequelize = require('../constants/database');
 const Salesman = require('./Salesman');
 
-const SalesmanExpense = sequelize.define('SalesmanExpense', {
+const SalesmanTargets = sequelize.define('SalesmanTargets', {
     id: {
         type: DataTypes.UUID,
         primaryKey: true,
@@ -16,53 +14,45 @@ const SalesmanExpense = sequelize.define('SalesmanExpense', {
         defaultValue: DataTypes.UUIDV4,
         references: {
             model: 'salesmen',
-            key: 'user_id'
+            key: 'salesman_id'
         }
     },
-    expense_date: {
-        type: DataTypes.DATE,
-        allowNull: false
-    },
-    expense_amount: {
+    target_amount: {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false
     },
-    expense_description: {
-        type: DataTypes.TEXT,
-        allowNull: true
-    },
-    expense_type: {
-        type: DataTypes.ENUM('fuel', 'hotel', 'travel', 'other'),
+    target_date: {
+        type: DataTypes.DATE,
         allowNull: false
     },
-    images: {
-        type: DataTypes.JSON,
+    order_type: {
+        type: DataTypes.ENUM('party_order', 'distributor_order', 'event_order', 'visit_order', 'whatsapp_order'),
         allowNull: true
     },
-    status: {
-        type: DataTypes.ENUM('pending', 'approved', 'rejected'),
+    target_status: {
+        type: DataTypes.ENUM('pending', 'completed', 'cancelled'),
         allowNull: false,
         defaultValue: 'pending'
     },
-    kilometers: {
-        type: DataTypes.INTEGER,
+    target_description: {
+        type: DataTypes.TEXT,
         allowNull: true
     },
-    remarks: {
+    target_remarks: {
         type: DataTypes.TEXT,
         allowNull: true
     }
 }, {
-    tableName: 'salesman_expense',
+    tableName: 'salesman_targets',
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at'
 });
 
-SalesmanExpense.belongsTo(Salesman, {
+SalesmanTargets.belongsTo(Salesman, {
     foreignKey: 'salesman_id',
-    targetKey: 'user_id',
+    targetKey: 'salesman_id',
     as: 'salesman',
 });
 
-module.exports = SalesmanExpense;
+module.exports = SalesmanTargets;
