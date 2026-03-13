@@ -2451,7 +2451,7 @@ const DashboardProducts = () => {
                                     if (imgEnv) return imgEnv.replace(/\/$/, '');
                                     const apiEnv = process.env.NEXT_PUBLIC_API_URL || '';
                                     if (apiEnv) return apiEnv.replace(/\/api\/?$/, '').replace(/\/$/, '');
-                                    return 'https://stallion.nishree.com';
+                                    return 'https://api.stallioneyewear.in';
                                   };
                                   const base = getImageBase();
                                   fallbackUrl = originalUrl.startsWith('/') ? `${base}${originalUrl}` : `${base}/uploads/products/${originalUrl}`;
