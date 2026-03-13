@@ -1163,8 +1163,8 @@ const DashboardProducts = () => {
       const apiEnv = process.env.NEXT_PUBLIC_API_URL || '';
       if (apiEnv) return apiEnv.replace(/\/api\/?$/, '').replace(/\/$/, '');
 
-      // Default to live API URL
-      return 'https://stallion.nishree.com';
+      // Use the correct API server URL where images are actually served
+      return 'https://api.stallioneyewear.in';
     };
 
     const base = getImageBase();
