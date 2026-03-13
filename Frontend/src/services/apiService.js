@@ -3475,24 +3475,45 @@ export const getAllUploads = async () => {
         });
         
         // Handle different response formats
+        let images = [];
         if (Array.isArray(response)) {
-          return response;
-        }
-        if (response && Array.isArray(response.data)) {
-          return response.data;
-        }
-        if (response && Array.isArray(response.images)) {
-          return response.images;
-        }
-        if (response && response.files && Array.isArray(response.files)) {
-          return response.files;
-        }
-        if (response && response.uploads && Array.isArray(response.uploads)) {
-          return response.uploads;
+          images = response;
+        } else if (response && Array.isArray(response.data)) {
+          images = response.data;
+        } else if (response && Array.isArray(response.images)) {
+          images = response.images;
+        } else if (response && response.files && Array.isArray(response.files)) {
+          images = response.files;
+        } else if (response && response.uploads && Array.isArray(response.uploads)) {
+          images = response.uploads;
+        } else {
+          // If we got a response but it's not in expected format, return empty array
+          return [];
         }
         
-        // If we got a response but it's not in expected format, return empty array
-        return [];
+        // Fix image URLs to use the correct base URL
+        const fixedImages = images.map(image => {
+          const fixedImage = { ...image };
+          
+          // Fix the main image URL
+          if (fixedImage.url && fixedImage.url.startsWith('/uploads/products/')) {
+            fixedImage.url = `https://api.stallioneyewear.in${fixedImage.url}`;
+          }
+          
+          // Fix image_url if it exists
+          if (fixedImage.image_url && fixedImage.image_url.startsWith('/uploads/products/')) {
+            fixedImage.image_url = `https://api.stallioneyewear.in${fixedImage.image_url}`;
+          }
+          
+          // Fix path if it exists and is relative
+          if (fixedImage.path && fixedImage.path.startsWith('/uploads/products/')) {
+            fixedImage.path = `https://api.stallioneyewear.in${fixedImage.path}`;
+          }
+          
+          return fixedImage;
+        });
+        
+        return fixedImages;
       } catch (error) {
         lastError = error;
         // If it's a 404, try next endpoint
