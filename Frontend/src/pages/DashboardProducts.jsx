@@ -3071,15 +3071,7 @@ const DashboardProducts = () => {
                 {loading ? 'Attaching...' : `Attach Selected (${selectedImageIds.size})`}
               </button>
             )}
-            <button 
-              className="ui-btn ui-btn--primary" 
-              onClick={() => {
-                imageInputRef.current?.click();
-              }}
-              disabled={loading || uploadingImage}
-            >
-              Upload New Image
-            </button>
+            {/* Removed "Upload New Image" button to avoid image_urls.push error */}
           </>
         )}
       >
