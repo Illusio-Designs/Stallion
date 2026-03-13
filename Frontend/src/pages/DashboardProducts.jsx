@@ -2466,7 +2466,7 @@ const DashboardProducts = () => {
                                 setInvalidImageUrls(prev => new Set([...prev, originalUrl]));
                               }
                               
-                              img.style.display = 'none';
+                              // Don't hide the image, just show error message
                               const errorDiv = img.nextElementSibling;
                               if (errorDiv) {
                                 errorDiv.style.display = 'flex';
@@ -3184,7 +3184,7 @@ const DashboardProducts = () => {
                           onError={(e) => {
                             // Mark this image URL as invalid
                             setInvalidImageUrls(prev => new Set([...prev, item.image_url]));
-                            e.target.style.display = 'none';
+                            // Don't hide the image, just show error message
                             const errorDiv = e.target.nextElementSibling;
                             if (errorDiv) {
                               errorDiv.style.display = 'flex';
