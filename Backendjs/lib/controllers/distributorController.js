@@ -3,6 +3,9 @@ const AuditLog = require('../models/AuditLog');
 const User = require('../models/User');
 const { Op } = require('sequelize');
 const Party = require('../models/Party');
+const Zone = require('../models/Zone');
+const DistributorZones = require('../models/DistributorZones');
+
 class DistributorController {
     async getDistributor(req, res) {
         try {
@@ -14,7 +17,8 @@ class DistributorController {
             if (!distributor) {
                 return res.status(404).json({ error: 'Distributor not found' });
             }
-            res.status(200).json(distributor);
+            const distributorZones = await DistributorZones.findAll({ where: { distributor_id: distributor.distributor_id } });
+            res.status(200).json({ ...distributor.toJSON(), zones: distributorZones });
         }
         catch (error) {
             res.status(500).json({ error: error.message });
@@ -40,19 +44,30 @@ class DistributorController {
 
     async getDistributors(req, res) {
         try {
-            const distributors = await Distributor.findAll({ where: { is_active: true } });
+            const { country_id } = req.body;
+            console.log("country_id", country_id);
+            const distributors = await Distributor.findAll({ where: { is_active: true, country_id: country_id } });
             if (!distributors || distributors.length === 0) {
                 return res.status(404).json({ error: 'Distributors not found' });
             }
-            res.status(200).json(distributors);
+            console.log("distributors", distributors.length);
+            const distributorZones = await DistributorZones.findAll({ where: { distributor_id: distributors.map(distributor => distributor.distributor_id) } });
+            const response = distributors.map(distributor => {
+                return {
+                    ...distributor.toJSON(),
+                    zones: distributorZones.filter(zone => zone.distributor_id === distributor.distributor_id).map(zone => zone.toJSON())
+                }
+            });
+            res.status(200).json(response);
         } catch (error) {
+            console.log("error", error);
             res.status(500).json({ error: error.message });
         }
     }
     async createDistributor(req, res) {
         try {
             const user = req.user;
-            const { distributor_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, territory, commission_rate } = req.body;
+            const { distributor_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zones, pincode, gstin, pan, territory, commission_rate } = req.body;
 
             // Find existing user by email or phone
             const whereConditions = [];
@@ -84,7 +99,6 @@ class DistributorController {
                 country_id,
                 state_id,
                 city_id,
-                zone_id,
                 pincode,
                 gstin,
                 pan,
@@ -97,6 +111,17 @@ class DistributorController {
                 is_active: true
             });
 
+            for (const zone of zones) {
+                const existingZone = await Zone.findOne({ where: { id: zone } });
+                if (!existingZone) {
+                    return res.status(404).json({ error: 'Zone not found' });
+                }
+                await DistributorZones.create({
+                    distributor_id: distributor.distributor_id,
+                    zone_id: existingZone.id
+                });
+            }
+
             await AuditLog.create({
                 user_id: user.user_id,
                 action: 'create',
@@ -108,8 +133,8 @@ class DistributorController {
                 ip_address: req.ip,
                 created_at: new Date()
             });
-
-            res.status(200).json(distributor);
+            const distributorZones = await DistributorZones.findAll({ where: { distributor_id: distributor.distributor_id } });
+            res.status(200).json({ ...distributor.toJSON(), zones: distributorZones });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -120,9 +145,13 @@ class DistributorController {
             if (!id) {
                 return res.status(400).json({ error: 'Distributor ID is required' });
             }
-            const { distributor_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, territory, commission_rate, is_active } = req.body;
+            const { distributor_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zones, pincode, gstin, pan, territory, commission_rate, is_active } = req.body;
             const user = req.user;
-            const distributor = await Distributor.update({
+            const distributor = await Distributor.findOne({ where: { distributor_id: id } });
+            if (!distributor) {
+                return res.status(404).json({ error: 'Distributor not found' });
+            }
+            const updatedDistributor = await Distributor.update({
                 distributor_name: distributor_name || distributor.distributor_name,
                 trade_name: trade_name || distributor.trade_name,
                 contact_person: contact_person || distributor.contact_person,
@@ -132,7 +161,6 @@ class DistributorController {
                 country_id: country_id || distributor.country_id,
                 state_id: state_id || distributor.state_id,
                 city_id: city_id || distributor.city_id,
-                zone_id: zone_id || distributor.zone_id,
                 pincode: pincode || distributor.pincode,
                 gstin: gstin || distributor.gstin,
                 pan: pan || distributor.pan,
@@ -142,8 +170,19 @@ class DistributorController {
                 updated_at: new Date(),
                 updated_by: user.user_id
             }, { where: { distributor_id: id } });
-            if (!distributor) {
+            if (!updatedDistributor) {
                 return res.status(404).json({ error: 'Distributor not found' });
+            }
+            await DistributorZones.destroy({ where: { distributor_id: id } });
+            for (const zone of zones) {
+                const existingZone = await Zone.findOne({ where: { id: zone } });
+                if (!existingZone) {
+                    return res.status(404).json({ error: 'Zone not found' });
+                }
+                await DistributorZones.create({
+                    distributor_id: id,
+                    zone_id: existingZone.id
+                });
             }
             await AuditLog.create({
                 user_id: user.user_id,
@@ -167,6 +206,7 @@ class DistributorController {
             if (!id) {
                 return res.status(400).json({ error: 'Distributor ID is required' });
             }
+            await DistributorZones.destroy({ where: { distributor_id: id } });
             const distributor = await Distributor.destroy({ where: { distributor_id: id } });
             if (!distributor) {
                 return res.status(404).json({ error: 'Distributor not found' });

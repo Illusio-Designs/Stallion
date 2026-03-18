@@ -13,7 +13,7 @@ const Gender = require('../models/Gender');
 const { PRODUCT_IMAGE_UPLOAD_DIR } = require('../constants/multer');
 const path = require('path');
 const fs = require('fs');
-const { Op } = require('sequelize');
+const { Op, Sequelize } = require('sequelize');
 
 class ProductController {
     async getFeaturedProducts(req, res) {
@@ -247,6 +247,66 @@ class ProductController {
                 created_at: new Date()
             });
             res.status(200).json({ message: 'Product deleted successfully' });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    async deleteProductImage(req, res) {
+        try {
+            const file_name = req.params.file_name;
+            if (!file_name) {
+                return res.status(400).json({ error: 'Product image File name is required' });
+            }
+            const uploadsPath = path.join(__dirname, '..', '..', 'uploads', PRODUCT_IMAGE_UPLOAD_DIR, file_name);
+            if (!fs.existsSync(uploadsPath)) {
+                return res.status(404).json({ error: 'Product image not found' });
+            }
+            const withPath = `uploads/${PRODUCT_IMAGE_UPLOAD_DIR}/${file_name}`;
+            console.log("withPath", withPath);
+            // MySQL JSON columns don't support LIKE reliably; use JSON_CONTAINS for JSON arrays,
+            // plus a fallback LIKE for any legacy string storage.
+            const product = await Product.findOne({
+                where: {
+                    [Op.or]: [
+                        Sequelize.where(
+                            Sequelize.fn('JSON_CONTAINS', Sequelize.col('image_urls'), JSON.stringify(withPath)),
+                            1
+                        ),
+                        { image_urls: { [Op.like]: `%${withPath}%` } },
+                    ],
+                },
+            });
+            if (product) {
+                console.log("product found", product.product_id);
+                const rawUrls = product.image_urls;
+                console.log("rawUrls", rawUrls);
+                let image_urls = [];
+                if (Array.isArray(rawUrls)) {
+                    image_urls = rawUrls;
+                } else if (typeof rawUrls === 'string') {
+                    try {
+                        const parsed = JSON.parse(rawUrls);
+                        image_urls = Array.isArray(parsed) ? parsed : [];
+                    } catch (_) {
+                        image_urls = [];
+                    }
+                }
+                console.log("image_urls", image_urls);
+                const normalize = (p) => (typeof p === 'string' ? p.replace(/^\/+/, '') : '');
+                const target1 = normalize(withPath);
+                const target2 = normalize(`/${withPath}`);
+                console.log("target1", target1);
+                console.log("target2", target2);
+                const filtered = image_urls.filter((url) => {
+                    const u = normalize(url);
+                    return !(u === target1 || u === target2 || u.endsWith(`/${file_name}`));
+                });
+                console.log("filtered", filtered);
+                await Product.update({ image_urls: filtered }, { where: { product_id: product.product_id } });
+            }
+            fs.unlinkSync(uploadsPath);
+            res.status(200).json({ message: 'Product image deleted successfully' });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

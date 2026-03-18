@@ -6,6 +6,7 @@ const Salesman = require('../models/Salesman');
 const UserRole = require('../models/UserRole');
 const Role = require('../models/Role');
 const { Op } = require('sequelize');
+const DistributorZones = require('../models/DistributorZones');
 class PartyController {
     async getPartie(req, res) {
         try {
@@ -124,8 +125,8 @@ class PartyController {
                         return res.status(404).json({ error: 'Distributor record not found for this user' });
                     }
                 }
-
-                zone_id = distributor.zone_id;
+                const distributorZones = await DistributorZones.findAll({ where: { distributor_id: distributor.distributor_id } });
+                zone_id = distributorZones.map(zone => zone.zone_id);
 
             } else {
                 return res.status(400).json({ error: `Role '${roleName}' is not supported for this operation` });

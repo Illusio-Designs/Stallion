@@ -11,6 +11,7 @@ router.get('/images/all', authenticateToken, productController.getAllUploadedIma
 router.post('/create', authenticateToken, productController.createProduct);
 router.put('/:id', authenticateToken, productController.updateProduct);
 router.delete('/:id', authenticateToken, productController.deleteProduct);
+router.delete('/images/:file_name', authenticateToken, productController.deleteProductImage);
 router.post('/image-upload', authenticateToken, productImageUpload, productController.uploadProductImage);
 router.post('/bulk-upload',
     authenticateToken,

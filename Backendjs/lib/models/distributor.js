@@ -81,14 +81,6 @@ const Distributor = sequelize.define('Distributor', {
             key: 'id'
         }
     },
-    zone_id: {
-        type: DataTypes.UUID,
-        allowNull: true,
-        references: {
-            model: 'zones',
-            key: 'id'
-        }
-    },
     pincode: {
         type: DataTypes.STRING(10),
         allowNull: true
