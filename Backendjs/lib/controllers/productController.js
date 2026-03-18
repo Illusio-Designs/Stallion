@@ -278,32 +278,33 @@ class ProductController {
                 },
             });
             if (product) {
-                console.log("product found", product.product_id);
-                const rawUrls = product.image_urls;
-                console.log("rawUrls", rawUrls);
-                let image_urls = [];
-                if (Array.isArray(rawUrls)) {
-                    image_urls = rawUrls;
-                } else if (typeof rawUrls === 'string') {
-                    try {
-                        const parsed = JSON.parse(rawUrls);
-                        image_urls = Array.isArray(parsed) ? parsed : [];
-                    } catch (_) {
-                        image_urls = [];
-                    }
-                }
-                console.log("image_urls", image_urls);
-                const normalize = (p) => (typeof p === 'string' ? p.replace(/^\/+/, '') : '');
-                const target1 = normalize(withPath);
-                const target2 = normalize(`/${withPath}`);
-                console.log("target1", target1);
-                console.log("target2", target2);
-                const filtered = image_urls.filter((url) => {
-                    const u = normalize(url);
-                    return !(u === target1 || u === target2 || u.endsWith(`/${file_name}`));
-                });
-                console.log("filtered", filtered);
-                await Product.update({ image_urls: filtered }, { where: { product_id: product.product_id } });
+                return res.status(409).json({ message: 'Product image assigned to product.' });
+                // console.log("product found", product.product_id);
+                // const rawUrls = product.image_urls;
+                // console.log("rawUrls", rawUrls);
+                // let image_urls = [];
+                // if (Array.isArray(rawUrls)) {
+                //     image_urls = rawUrls;
+                // } else if (typeof rawUrls === 'string') {
+                //     try {
+                //         const parsed = JSON.parse(rawUrls);
+                //         image_urls = Array.isArray(parsed) ? parsed : [];
+                //     } catch (_) {
+                //         image_urls = [];
+                //     }
+                // }
+                // console.log("image_urls", image_urls);
+                // const normalize = (p) => (typeof p === 'string' ? p.replace(/^\/+/, '') : '');
+                // const target1 = normalize(withPath);
+                // const target2 = normalize(`/${withPath}`);
+                // console.log("target1", target1);
+                // console.log("target2", target2);
+                // const filtered = image_urls.filter((url) => {
+                //     const u = normalize(url);
+                //     return !(u === target1 || u === target2 || u.endsWith(`/${file_name}`));
+                // });
+                // console.log("filtered", filtered);
+                // await Product.update({ image_urls: filtered }, { where: { product_id: product.product_id } });
             }
             fs.unlinkSync(uploadsPath);
             res.status(200).json({ message: 'Product image deleted successfully' });
@@ -393,6 +394,20 @@ class ProductController {
 
             // Read all files from the directory
             const files = fs.readdirSync(uploadsPath);
+            // MySQL JSON column: filter products whose `image_urls` is a non-empty JSON array.
+            const allProducts = await Product.findAll({
+                where: Sequelize.where(
+                    Sequelize.fn('JSON_LENGTH', Sequelize.col('image_urls')),
+                    { [Op.gt]: 0 }
+                ),
+            });
+            const allProductImages = allProducts
+                .map((product) => product.image_urls)
+                .flat()
+                .filter((u) => typeof u === 'string');
+
+            const normalize = (p) => (typeof p === 'string' ? p.replace(/^\/+/, '') : '');
+            const assignedSet = new Set(allProductImages.map(normalize));
 
             // Filter only image files and get their details
             const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
@@ -404,13 +419,16 @@ class ProductController {
                 .map(file => {
                     const filePath = path.join(uploadsPath, file);
                     const stats = fs.statSync(filePath);
+                    const url = `/uploads/${PRODUCT_IMAGE_UPLOAD_DIR}/${file}`;
+                    const isAssigned = assignedSet.has(normalize(url));
                     return {
                         filename: file,
                         path: filePath,
-                        url: `/uploads/${PRODUCT_IMAGE_UPLOAD_DIR}/${file}`,
+                        url: url,
                         size: stats.size,
                         uploadedAt: stats.birthtime,
-                        modifiedAt: stats.mtime
+                        modifiedAt: stats.mtime,
+                        isAssigned: isAssigned
                     };
                 })
                 // Sort by upload date (newest first)
