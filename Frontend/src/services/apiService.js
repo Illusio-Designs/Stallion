@@ -838,24 +838,90 @@ export const getZones = async (cityId) => {
       includeAuth: true,
     });
     
-    // Ensure we always return an array
-    if (Array.isArray(response)) {
-      return response;
-    }
-    // Handle case where response might be wrapped in data property
-    if (response && Array.isArray(response.data)) {
-      return response.data;
-    }
-    // Return empty array if response is unexpected
+    if (Array.isArray(response)) return response;
+    if (response && Array.isArray(response.data)) return response.data;
     return [];
   } catch (error) {
-    // Handle "Zones not found" as a valid case (empty zones)
     if (error.message?.toLowerCase().includes('zones not found') ||
         error.message?.toLowerCase().includes('no zones found')) {
       return [];
     }
-    // Re-throw other errors
     throw error;
+  }
+};
+
+/**
+ * Get all zones by fetching across all cities for a given country
+ * Since there's no "get all zones" endpoint, we fetch zones for each city
+ * @param {string} countryId - Country ID (optional, defaults to India)
+ * @returns {Promise<Array>} Array of all zone objects (deduplicated)
+ */
+export const getAllZones = async (countryId) => {
+  try {
+    let targetCountryId = countryId;
+
+    // If no countryId provided, find India
+    if (!targetCountryId) {
+      const countries = await apiRequest('/countries', { method: 'GET', includeAuth: true });
+      const countriesArr = Array.isArray(countries) ? countries : (countries?.data || []);
+      const india = countriesArr.find(c =>
+        c.name?.toLowerCase() === 'india' || c.code?.toLowerCase() === 'in'
+      );
+      if (!india) return [];
+      targetCountryId = india.id;
+    }
+
+    // Step 1: get all states for the country
+    const statesResp = await apiRequest('/states/get', {
+      method: 'POST',
+      body: { country_id: targetCountryId },
+      includeAuth: true,
+    });
+    const statesArr = Array.isArray(statesResp) ? statesResp : (statesResp?.data || []);
+    if (statesArr.length === 0) return [];
+
+    // Step 2: get all cities for each state (parallel)
+    const cityResults = await Promise.all(
+      statesArr.map(state =>
+        apiRequest('/cities/get', {
+          method: 'POST',
+          body: { state_id: state.id },
+          includeAuth: true,
+        }).catch(() => [])
+      )
+    );
+    const allCities = cityResults.flatMap(r => Array.isArray(r) ? r : (r?.data || []));
+    if (allCities.length === 0) return [];
+
+    // Step 3: get zones for each city (parallel, in batches)
+    const batchSize = 10;
+    let allZones = [];
+    for (let i = 0; i < allCities.length; i += batchSize) {
+      const batch = allCities.slice(i, i + batchSize);
+      const zoneResults = await Promise.all(
+        batch.map(city =>
+          apiRequest('/zones/get', {
+            method: 'POST',
+            body: { city_id: city.id },
+            includeAuth: true,
+          }).catch(() => [])
+        )
+      );
+      const batchZones = zoneResults.flatMap(r => Array.isArray(r) ? r : (r?.data || []));
+      allZones = [...allZones, ...batchZones];
+    }
+
+    // Deduplicate by zone id
+    const seen = new Set();
+    return allZones.filter(z => {
+      const id = z.zone_id || z.id;
+      if (!id || seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  } catch (error) {
+    console.warn('[getAllZones] Failed to fetch all zones:', error.message);
+    return [];
   }
 };
 
@@ -1027,6 +1093,12 @@ export const getDistributors = async (countryId) => {
       console.log('[getDistributors] No distributors found for country, returning empty array');
       return [];
     }
+    // Backend DB issue - missing distributor_zones table, treat as empty result
+    if (errorMessage.includes('distributor_zones') || errorMessage.includes("doesn't exist") ||
+        errorText.includes('distributor_zones') || errorText.includes("doesn't exist")) {
+      console.warn('[getDistributors] Backend DB error (missing table), returning empty array:', error.message);
+      return [];
+    }
     // Re-throw other errors
     throw error;
   }
@@ -1063,7 +1135,7 @@ export const createDistributor = async (distributorData) => {
     country_id,
     state_id,
     city_id,
-    zone_id,
+    zones,
     pincode,
     gstin,
     pan,
@@ -1119,7 +1191,7 @@ export const createDistributor = async (distributorData) => {
     country_id: trimmedCountryId,
     state_id: state_id && String(state_id).trim() !== '' ? String(state_id).trim() : null,
     city_id: city_id && String(city_id).trim() !== '' ? String(city_id).trim() : null,
-    zone_id: zone_id && String(zone_id).trim() !== '' ? String(zone_id).trim() : null,
+    zones: Array.isArray(zones) ? zones : [],
     pincode: pincode ? String(pincode).trim() : '',
     gstin: gstin ? String(gstin) : '',
     pan: pan ? String(pan) : '',
@@ -1187,7 +1259,7 @@ export const updateDistributor = async (distributorId, distributorData) => {
     country_id,
     state_id,
     city_id,
-    zone_id,
+    zones,
     pincode,
     gstin,
     pan,
@@ -1246,7 +1318,7 @@ export const updateDistributor = async (distributorId, distributorData) => {
     country_id: trimmedCountryId,
     state_id: (state_id && String(state_id).trim() !== '') ? String(state_id).trim() : '',
     city_id: (city_id && String(city_id).trim() !== '') ? String(city_id).trim() : '',
-    zone_id: (zone_id && String(zone_id).trim() !== '') ? String(zone_id).trim() : '',
+    zones: Array.isArray(zones) ? zones : [],
     pincode: pincode ? String(pincode).trim() : '',
     gstin: gstin ? String(gstin).trim() : '',
     pan: pan ? String(pan).trim() : '',
@@ -3538,6 +3610,18 @@ export const getAllUploads = async () => {
     }
     throw error;
   }
+};
+
+/**
+ * Delete a product image file from the server
+ * @param {string} fileName - The filename (e.g. "image-1234567890.jpg")
+ * @returns {Promise<Object>} Response with message
+ */
+export const deleteProductImage = async (fileName) => {
+  return apiRequest(`/products/images/${encodeURIComponent(fileName)}`, {
+    method: 'DELETE',
+    includeAuth: true,
+  });
 };
 
 // ==================== TRAYS ENDPOINTS ====================

@@ -25,6 +25,7 @@ import {
   uploadProductImage,
   bulkUploadProducts,
   getAllUploads,
+  deleteProductImage,
   getTrays,
   getProductsInTray,
   deleteProductFromTray,
@@ -146,6 +147,7 @@ const DashboardProducts = () => {
   const [invalidImageUrls, setInvalidImageUrls] = useState(new Set()); // Track images that failed to load
   const [selectedImageIds, setSelectedImageIds] = useState(new Set()); // For multiple selection in modal
   const [allUploads, setAllUploads] = useState([]); // All uploaded images from API
+  const [productModelLoading, setProductModelLoading] = useState(false);
   const imageInputRef = useRef(null);
   
   // Related data for dropdowns
@@ -223,39 +225,30 @@ const DashboardProducts = () => {
       // Use the API service function which will try /products/images/all endpoint
       const data = await getAllUploads();
       
-      // Helper function to construct full URL in format: https://stallion.nishree.com/uploads/products/filename.webp
+      // Helper function to construct full URL using configured IMAGE_BASE_URL
+      const imageBaseUrl = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/$/, '');
       const constructFullUrl = (imagePath) => {
         if (!imagePath) return null;
         
-        // If already a full URL, return as is (but ensure it's the correct format)
+        // If already a full URL with /uploads/products/, extract path and rebuild with configured base
         if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-          // If it's already a full URL with correct format, return as is
-          if (imagePath.includes('/uploads/products/')) {
-            return imagePath;
+          const uploadsIdx = imagePath.indexOf('/uploads/products/');
+          if (uploadsIdx !== -1) {
+            return `${imageBaseUrl}${imagePath.substring(uploadsIdx).split('?')[0]}`;
           }
-          // If full URL but wrong path, extract filename and reconstruct
+          // Full URL but wrong path — extract filename and reconstruct
           const filename = imagePath.split('/').pop()?.split('?')[0];
-          return filename ? `https://stallion.nishree.com/uploads/products/${filename}` : imagePath;
+          return filename ? `${imageBaseUrl}/uploads/products/${filename}` : imagePath;
         }
         
-        // If it's a relative path starting with /uploads/products/, prepend base URL
+        // Relative path starting with /uploads/products/
         if (imagePath.startsWith('/uploads/products/')) {
-          return `https://stallion.nishree.com${imagePath}`;
+          return `${imageBaseUrl}${imagePath.split('?')[0]}`;
         }
         
-        // If it's just a filename (no slashes), construct full path
-        if (!imagePath.includes('/')) {
-          return `https://stallion.nishree.com/uploads/products/${imagePath}`;
-          }
-        
-        // If it's a relative path without leading slash, assume it's a filename
-        if (!imagePath.startsWith('/')) {
-          return `https://stallion.nishree.com/uploads/products/${imagePath}`;
-        }
-
-        // For other relative paths, try to extract filename and construct URL
+        // Just a filename or relative path — extract filename and construct
         const filename = imagePath.split('/').pop()?.split('?')[0];
-        return filename ? `https://stallion.nishree.com/uploads/products/${filename}` : null;
+        return filename ? `${imageBaseUrl}/uploads/products/${filename}` : null;
       };
       
       // Handle different response formats from the API
@@ -1124,50 +1117,46 @@ const DashboardProducts = () => {
   };
 
   // Helper function to convert image URLs to use live API
-  // Always ensures paths are in format: https://stallion.nishree.com/uploads/products/filename.jpg
+  // Normalizes any image URL to use the configured NEXT_PUBLIC_IMAGE_BASE_URL
+  // Extracts the filename and rebuilds: <IMAGE_BASE_URL>/uploads/products/<filename>
   const normalizeImageUrl = (url) => {
     if (!url) return null;
 
     // Temporary blob URLs render as-is
     if (url.startsWith('blob:')) return url;
 
-    // Absolute URLs - extract relative path if it contains /uploads/ to ensure /products/ segment
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      // Check if URL contains /uploads/ but might be missing /products/
-      const uploadsIndex = url.indexOf('/uploads/');
-      if (uploadsIndex !== -1) {
-        const pathAfterUploads = url.substring(uploadsIndex + '/uploads/'.length);
-        // If path doesn't start with 'products/', extract filename and reconstruct
-        if (!pathAfterUploads.startsWith('products/')) {
-          const filename = pathAfterUploads.split('/').pop().split('?')[0].split('#')[0];
-          const baseUrl = url.substring(0, url.indexOf('/uploads/'));
-          return `${baseUrl}/uploads/products/${filename}`;
-        }
-      }
-      return url; // Already has correct format or doesn't need normalization
-    }
-    
-    // For relative paths, use extractRelativePath to ensure /uploads/products/ format
-    const relativePath = extractRelativePath(url);
-    if (!relativePath) return null;
-
-    // Resolve base for images:
-    // 1) NEXT_PUBLIC_IMAGE_BASE_URL (if provided)
-    // 2) NEXT_PUBLIC_API_URL (strip /api)
-    // 3) fallback to live API URL
+    // Resolve configured image base
     const getImageBase = () => {
-      if (typeof window === 'undefined') return '';
+      if (typeof window === 'undefined') return 'https://api.stallioneyewear.in';
       const imgEnv = process.env.NEXT_PUBLIC_IMAGE_BASE_URL || '';
       if (imgEnv) return imgEnv.replace(/\/$/, '');
-
       const apiEnv = process.env.NEXT_PUBLIC_API_URL || '';
       if (apiEnv) return apiEnv.replace(/\/api\/?$/, '').replace(/\/$/, '');
-
-      // Use the correct API server URL where images are actually served
       return 'https://api.stallioneyewear.in';
     };
 
     const base = getImageBase();
+
+    // For absolute URLs: extract filename and rebuild with configured base
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      const uploadsIndex = url.indexOf('/uploads/');
+      if (uploadsIndex !== -1) {
+        const pathAfterUploads = url.substring(uploadsIndex); // e.g. /uploads/products/file.webp
+        // Ensure /products/ segment is present
+        if (pathAfterUploads.startsWith('/uploads/products/')) {
+          return `${base}${pathAfterUploads.split('?')[0]}`;
+        }
+        // Missing /products/ — extract filename and reconstruct
+        const filename = pathAfterUploads.split('/').pop().split('?')[0].split('#')[0];
+        return `${base}/uploads/products/${filename}`;
+      }
+      // No /uploads/ in URL — return as-is
+      return url;
+    }
+
+    // For relative paths, use extractRelativePath to ensure /uploads/products/ format
+    const relativePath = extractRelativePath(url);
+    if (!relativePath) return null;
     return `${base}${relativePath}`;
   };
 
@@ -1817,6 +1806,51 @@ const DashboardProducts = () => {
     }
   };
 
+  const handleUnassignImage = async (product, imageUrl) => {
+    if (!window.confirm('Unassign this image from the product?')) return;
+    try {
+      setProductModelLoading(true);
+      const currentUrls = parseImageUrls(product);
+      const filename = imageUrl.split('/').pop().split('?')[0];
+      const updatedUrls = currentUrls.filter(u => u.split('/').pop().split('?')[0] !== filename);
+      await updateProduct(product.product_id || product.id, {
+        model_no: product.model_no,
+        gender_id: product.gender_id || 0,
+        color_code_id: product.color_code_id || 0,
+        shape_id: product.shape_id || 0,
+        lens_color_id: product.lens_color_id || 0,
+        frame_color_id: product.frame_color_id || 0,
+        frame_type_id: product.frame_type_id || 0,
+        lens_material_id: product.lens_material_id || 0,
+        frame_material_id: product.frame_material_id || 0,
+        mrp: product.mrp || 0,
+        whp: product.whp || 0,
+        size_mm: product.size_mm || '',
+        brand_id: product.brand_id,
+        collection_id: product.collection_id,
+        warehouse_qty: product.warehouse_qty || 0,
+        tray_qty: product.tray_qty || 0,
+        total_qty: product.total_qty || 0,
+        status: product.status || 'draft',
+        image_urls: updatedUrls,
+      });
+      showSuccess('Image unassigned successfully');
+      await fetchProductsWithoutLoading();
+      // Refresh edit modal's product data if it's open for this product
+      if (editRow && (editRow.id === (product.product_id || product.id))) {
+        setEditRow(prev => ({
+          ...prev,
+          data: { ...prev.data, image_urls: updatedUrls }
+        }));
+      }
+      // Refresh product model modal state is removed — edit form handles images now
+    } catch (err) {
+      showError(`Failed to unassign image: ${err.message}`);
+    } finally {
+      setProductModelLoading(false);
+    }
+  };
+
   const columns = useMemo(() => ([
     { key: 'model_no', label: 'MODEL NO', width: '120px' },
     { key: 'gender_name', label: 'GENDER', width: '100px' },
@@ -2340,53 +2374,29 @@ const DashboardProducts = () => {
                         }}
                         onClick={async (e) => {
                           e.stopPropagation();
-                          if (!window.confirm(`Are you sure you want to delete this ${item.type === 'assigned' ? 'assigned' : 'unassigned'} image?`)) {
+
+                          // If image is assigned, block deletion and show notification
+                          if (item.type === 'assigned') {
+                            showError('This image is assigned to a product. Please unassign it first before deleting.');
+                            return;
+                          }
+
+                          if (!window.confirm('Are you sure you want to delete this image? This cannot be undone.')) {
                             return;
                           }
 
                           try {
                             setLoading(true);
-                            
-                            if (item.type === 'assigned') {
-                              // For assigned images, update the product to remove the image_url from database
-                              const product = item.productData;
-                              if (product && item.productId) {
-                                // Update product via API (without image_url since API doesn't support it)
-                                await updateProduct(item.productId, {
-                                  model_no: product.model_no,
-                                  gender_id: product.gender_id || 0,
-                                  color_code_id: product.color_code_id || 0,
-                                  shape_id: product.shape_id || 0,
-                                  lens_color_id: product.lens_color_id || 0,
-                                  frame_color_id: product.frame_color_id || 0,
-                                  frame_type_id: product.frame_type_id || 0,
-                                  lens_material_id: product.lens_material_id || 0,
-                                  frame_material_id: product.frame_material_id || 0,
-                                  mrp: product.mrp || 0,
-                                  whp: product.whp || 0,
-                                  size_mm: product.size_mm || '',
-                                  brand_id: product.brand_id,
-                                  collection_id: product.collection_id,
-                                  warehouse_qty: product.warehouse_qty || 0,
-                                  tray_qty: product.tray_qty || 0,
-                                  total_qty: product.total_qty || 0,
-                                  status: product.status || 'draft'
-                                });
-                                
-                                showSuccess('Product updated successfully');
-                                await fetchProductsWithoutLoading();
-                                await fetchRelatedData();
-                              }
-                            } else {
-                              // For unassigned images, remove from state and mark URL as invalid
-                              const imageUrl = item.image_url;
-                              setInvalidImageUrls(prev => new Set([...prev, imageUrl]));
-                              setOrphanedImages(prev => prev.filter(img => {
-                                const imgUrl = img.url || img.image_url;
-                                return imgUrl !== imageUrl && img.originalData !== item.originalData;
-                              }));
-                              showSuccess('Unassigned image removed successfully');
+                            // Extract filename from URL
+                            const imageUrl = item.image_url || item.url;
+                            const fileName = imageUrl ? imageUrl.split('/').pop().split('?')[0] : null;
+                            if (!fileName) {
+                              showError('Could not determine image filename.');
+                              return;
                             }
+                            await deleteProductImage(fileName);
+                            showSuccess('Image deleted successfully');
+                            await fetchAllUploads();
                           } catch (error) {
                             console.error('Error deleting image:', error);
                             showError(`Failed to delete image: ${error.message}`);
@@ -2969,6 +2979,55 @@ const DashboardProducts = () => {
               placeholder="Select status"
             />
           </div>
+
+          {/* Assigned Images Preview */}
+          {editRow && (() => {
+            const imgs = parseImageUrls(editRow.data);
+            return imgs.length > 0 ? (
+              <div className="form-group form-group--full">
+                <label className="ui-label">Assigned Images</label>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '6px' }}>
+                  {imgs.map((url, idx) => {
+                    const fullUrl = normalizeImageUrl(url);
+                    return (
+                      <div key={idx} style={{ position: 'relative', width: '100px' }}>
+                        <img
+                          src={fullUrl}
+                          alt={`Image ${idx + 1}`}
+                          style={{
+                            width: '100px', height: '75px', objectFit: 'cover',
+                            borderRadius: '6px', border: '1px solid #e5e7eb', display: 'block'
+                          }}
+                          onError={(e) => { e.target.style.opacity = '0.3'; }}
+                        />
+                        <button
+                          type="button"
+                          title="Unassign image"
+                          onClick={() => handleUnassignImage(editRow.data, url)}
+                          disabled={loading || productModelLoading}
+                          style={{
+                            position: 'absolute', top: '3px', right: '3px',
+                            background: '#f44336', color: '#fff', border: 'none',
+                            borderRadius: '50%', width: '20px', height: '20px',
+                            cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            lineHeight: 1, padding: 0
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              <div className="form-group form-group--full">
+                <label className="ui-label">Assigned Images</label>
+                <p style={{ color: '#aaa', fontSize: '13px', marginTop: '6px' }}>No images assigned to this product.</p>
+              </div>
+            );
+          })()}
         </form>
       </Modal>
       <Modal
@@ -3259,6 +3318,7 @@ const DashboardProducts = () => {
         style={{ display: 'none' }}
         disabled={uploadingImage}
       />
+
     </div>
   );
 };
