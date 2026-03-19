@@ -5,6 +5,10 @@ const User = require('../models/User');
 const Salesman = require('../models/Salesman');
 const UserRole = require('../models/UserRole');
 const Role = require('../models/Role');
+const Country = require('../models/Country');
+const State = require('../models/State');
+const Cities = require('../models/Cities');
+const Zone = require('../models/Zone');
 const { Op } = require('sequelize');
 const DistributorZones = require('../models/DistributorZones');
 class PartyController {
@@ -274,6 +278,131 @@ class PartyController {
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
+    }
+
+    /**
+     * Bulk create/update parties from parsed Excel/CSV rows.
+     * Each row has names for country, state, city, zone, distributor, salesman; resolve to IDs here.
+     */
+    async bulkUploadParty(parties, user, req) {
+        const result = { created: 0, updated: 0, errors: [] };
+        const userId = user && user.user_id ? user.user_id : null;
+
+        if (!userId) {
+            return { success: false, message: 'User not authenticated', data: result };
+        }
+
+        for (let i = 0; i < parties.length; i++) {
+            const row = parties[i];
+            const rowNum = i + 2; // 1-based + header row
+            try {
+                let country_id = null;
+                let state_id = null;
+                let city_id = null;
+                let zone_id = null;
+                let distributor_id = null;
+                let salesman_id = null;
+
+                if (row.country) {
+                    const country = await Country.findOne({ where: { name: { [Op.eq]: row.country } } });
+                    if (country) country_id = country.id;
+                }
+                if (row.state) {
+                    const state = await State.findOne({ where: { name: { [Op.eq]: row.state } } });
+                    if (state) state_id = state.id;
+                }
+                if (row.city && state_id) {
+                    const city = await Cities.findOne({ where: { name: { [Op.eq]: row.city }, state_id } });
+                    if (city) city_id = city.id;
+                } else if (row.city) {
+                    const city = await Cities.findOne({ where: { name: { [Op.eq]: row.city } } });
+                    if (city) city_id = city.id;
+                }
+                if (row.zone) {
+                    const zoneWhere = { name: { [Op.eq]: row.zone } };
+                    if (city_id) zoneWhere.city_id = city_id;
+                    if (state_id) zoneWhere.state_id = state_id;
+                    const zone = await Zone.findOne({ where: zoneWhere });
+                    if (zone) zone_id = zone.id;
+                }
+                if (row.distributor) {
+                    const dist = await Distributor.findOne({ where: { distributor_name: { [Op.eq]: row.distributor } } });
+                    if (dist) distributor_id = dist.distributor_id;
+                }
+                if (row.salesman) {
+                    const sm = await Salesman.findOne({ where: { full_name: { [Op.eq]: row.salesman } } });
+                    if (sm) salesman_id = sm.salesman_id;
+                }
+
+                const existing = await Party.findOne({
+                    where: {
+                        [Op.or]: [
+                            { party_name: row.party_name },
+                            ...(row.email ? [{ email: row.email }] : []),
+                        ],
+                    },
+                });
+
+                const payload = {
+                    party_name: row.party_name,
+                    trade_name: row.trade_name ?? null,
+                    contact_person: row.contact_person ?? null,
+                    email: row.email ?? null,
+                    phone: row.phone ?? null,
+                    address: row.address ?? null,
+                    country_id: country_id ?? null,
+                    state_id: state_id ?? null,
+                    city_id: city_id ?? null,
+                    zone_id: zone_id ?? null,
+                    pincode: row.pincode ?? null,
+                    gstin: row.gstin ?? null,
+                    pan: row.pan ?? null,
+                    is_active: row.active !== false,
+                    credit_days: row.credit_days ?? 0,
+                    prefered_courier: row.prefered_courier ?? null,
+                    distributor_id: distributor_id ?? null,
+                    salesman_id: salesman_id ?? null,
+                    updated_at: new Date(),
+                };
+
+                if (existing) {
+                    await Party.update(payload, { where: { party_id: existing.party_id } });
+                    result.updated++;
+                    await AuditLog.create({
+                        user_id: userId,
+                        action: 'update',
+                        description: 'Party updated via bulk upload',
+                        table_name: 'parties',
+                        record_id: existing.party_id,
+                        old_values: existing,
+                        new_values: payload,
+                        ip_address: req && req.ip,
+                        created_at: new Date(),
+                    });
+                } else {
+                    await Party.create({
+                        ...payload,
+                        created_by: userId,
+                        user_id: userId,
+                        created_at: new Date(),
+                    });
+                    result.created++;
+                }
+            } catch (err) {
+                result.errors.push({ row: rowNum, party_name: row.party_name, error: err.message });
+            }
+        }
+
+        const total = result.created + result.updated;
+        const message = result.errors.length === 0
+            ? `Bulk upload complete. Created: ${result.created}, Updated: ${result.updated}.`
+            : `Processed ${total} parties; ${result.errors.length} row(s) failed.`;
+
+        return {
+            success: result.errors.length < parties.length,
+            message,
+            data: result,
+        };
     }
 }
 

@@ -8,6 +8,7 @@ const rootDir = path.join(__dirname, '..', '..');
 
 const PRODUCT_UPLOAD_DIR = 'product_uploads';
 const PRODUCT_IMAGE_UPLOAD_DIR = 'products';
+const PARTY_UPLOAD_DIR = 'party_uploads';
 
 // Create upload directories if they don't exist
 const createUploadDirs = () => {
@@ -16,7 +17,8 @@ const createUploadDirs = () => {
     path.join(rootDir, 'uploads', PRODUCT_IMAGE_UPLOAD_DIR),
     path.join(rootDir, 'uploads', 'bills'),
     path.join(rootDir, 'uploads', 'sliders'),
-    path.join(rootDir, 'uploads', PRODUCT_UPLOAD_DIR)
+    path.join(rootDir, 'uploads', PRODUCT_UPLOAD_DIR),
+    path.join(rootDir, 'uploads', PARTY_UPLOAD_DIR)
   ];
 
   dirs.forEach(dir => {
@@ -203,6 +205,58 @@ const productFileUpload = (req, res, next) => {
   });
 };
 
+// Party file upload (Excel/CSV) - single file
+const partyUploadStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(rootDir, 'uploads', PARTY_UPLOAD_DIR);
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const nameWithoutExt = path.basename(file.originalname, ext);
+    const timestamp = Date.now();
+    cb(null, `${nameWithoutExt}-${timestamp}${ext}`);
+  }
+});
+
+const partyFileUploadBase = multer({
+  storage: partyUploadStorage,
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /csv|xlsx|xls/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetypes = [
+      'text/csv',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    ];
+    const mimetype = mimetypes.includes(file.mimetype) || extname;
+    if (mimetype && extname) return cb(null, true);
+    cb(new Error('Only CSV and Excel files (.csv, .xlsx, .xls) are allowed!'), false);
+  }
+}).single('file');
+
+const partyFileUpload = (req, res, next) => {
+  partyFileUploadBase(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ success: false, message: 'File too large. Maximum size is 10MB.' });
+        }
+        return res.status(400).json({ success: false, message: err.message });
+      }
+      return res.status(400).json({ success: false, message: err.message });
+    }
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No file uploaded. Please upload a file with the field name "file".'
+      });
+    }
+    next();
+  });
+};
+
 // Middleware to handle image compression and saving
 const processAndSaveImage = (uploadType = 'general') => {
   return async (req, res, next) => {
@@ -335,7 +389,9 @@ module.exports = {
   billUpload: processAndSaveImage('bill'),
   generalUpload: processAndSaveImage('general'),
   productFileUpload,
+  partyFileUpload,
   processAndSaveImage,
   PRODUCT_UPLOAD_DIR,
-  PRODUCT_IMAGE_UPLOAD_DIR
+  PRODUCT_IMAGE_UPLOAD_DIR,
+  PARTY_UPLOAD_DIR
 }; 
