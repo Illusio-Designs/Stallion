@@ -10,6 +10,7 @@ import {
   createParty,
   updateParty,
   deleteParty,
+  bulkUploadParties,
   getCountries,
   getStates,
   getCities,
@@ -31,6 +32,9 @@ const DashboardClients = () => {
   const [editRow, setEditRow] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [openBulkUpload, setOpenBulkUpload] = useState(false);
+  const [bulkFile, setBulkFile] = useState(null);
+  const [bulkUploading, setBulkUploading] = useState(false);
   const [parties, setParties] = useState([]);
   const [countries, setCountries] = useState([]);
   const [selectedCountryFilter, setSelectedCountryFilter] = useState(null); // For filter dropdown
@@ -432,6 +436,24 @@ const DashboardClients = () => {
   const handleAdd = () => {
     resetForm();
     setOpenAdd(true);
+  };
+
+  const handleBulkUpload = async () => {
+    if (!bulkFile) { showError('Please select a file first.'); return; }
+    try {
+      setBulkUploading(true);
+      const result = await bulkUploadParties(bulkFile);
+      const created = result?.data?.created ?? result?.created ?? 0;
+      const updated = result?.data?.updated ?? result?.updated ?? 0;
+      showSuccess(`Bulk upload complete. Created: ${created}, Updated: ${updated}.`);
+      setOpenBulkUpload(false);
+      setBulkFile(null);
+      if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter);
+    } catch (err) {
+      showError(`Bulk upload failed: ${err.message}`);
+    } finally {
+      setBulkUploading(false);
+    }
   };
 
   const handleEdit = async (row) => {
@@ -1121,13 +1143,12 @@ const DashboardClients = () => {
               rows={filteredRowsByTab}
               onAddNew={handleAdd}
               addNewText="Add New Party"
-              onImport={() => {
-                setError(null);
-                if (selectedCountryFilter) {
-                  fetchPartiesForCountry(selectedCountryFilter);
-                }
-              }}
-              importText="Refresh Data"
+              onImport={() => setOpenBulkUpload(true)}
+              importText="Bulk Upload"
+              secondaryActions={[{
+                label: 'Refresh',
+                onClick: () => { setError(null); if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter); }
+              }]}
               showFilter={true}
               filterContent={
                 <div>
@@ -1612,6 +1633,40 @@ const DashboardClients = () => {
             />
           </div>
         </form>
+      </Modal>
+
+      {/* Bulk Upload Modal */}
+      <Modal
+        open={openBulkUpload}
+        onClose={() => { setOpenBulkUpload(false); setBulkFile(null); }}
+        title="Bulk Upload Parties"
+        footer={(
+          <>
+            <button className="ui-btn ui-btn--secondary" onClick={() => { setOpenBulkUpload(false); setBulkFile(null); }} disabled={bulkUploading}>
+              Cancel
+            </button>
+            <button className="ui-btn ui-btn--primary" onClick={handleBulkUpload} disabled={bulkUploading || !bulkFile}>
+              {bulkUploading ? 'Uploading...' : 'Upload'}
+            </button>
+          </>
+        )}
+      >
+        <div style={{ padding: '8px 0' }}>
+          <p style={{ marginBottom: '16px', color: '#555', fontSize: '14px' }}>
+            Upload an Excel or CSV file to bulk create/update parties.
+          </p>
+          <input
+            type="file"
+            accept=".xlsx,.xls,.csv"
+            className="ui-input"
+            onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
+          />
+          {bulkFile && (
+            <p style={{ marginTop: '8px', fontSize: '13px', color: '#666' }}>
+              Selected: {bulkFile.name}
+            </p>
+          )}
+        </div>
       </Modal>
     </div>
   );

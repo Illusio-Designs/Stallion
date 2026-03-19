@@ -1850,6 +1850,28 @@ export const deleteParty = async (partyId) => {
 };
 
 /**
+ * Bulk upload parties from Excel/CSV file
+ * @param {File} file - Excel or CSV file
+ * @returns {Promise<Object>} Response with created/updated counts
+ */
+export const bulkUploadParties = async (file) => {
+  const baseUrl = getBaseURL();
+  const fullUrl = `${baseUrl}/parties/bulk-upload`;
+  const formData = new FormData();
+  formData.append('file', file);
+  const token = getAuthToken();
+  const headers = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const response = await fetch(fullUrl, {
+    method: 'POST',
+    headers,
+    credentials: 'include',
+    body: formData,
+  });
+  return await handleResponse(response);
+};
+
+/**
  * Get parties by zone ID
  * Zone ID is extracted from authorization token (no body parameters needed)
  * @returns {Promise<Array>} Array of party objects
