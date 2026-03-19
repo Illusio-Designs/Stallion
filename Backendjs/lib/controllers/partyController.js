@@ -284,7 +284,7 @@ class PartyController {
      * Bulk create/update parties from parsed Excel/CSV rows.
      * Each row has names for country, state, city, zone, distributor, salesman; resolve to IDs here.
      */
-    async bulkUploadParty(parties, user, req) {
+    async bulkUploadParty(parties, user, req, res) {
         const result = { created: 0, updated: 0, errors: [] };
         const userId = user && user.user_id ? user.user_id : null;
 
@@ -305,18 +305,46 @@ class PartyController {
 
                 if (row.country) {
                     const country = await Country.findOne({ where: { name: { [Op.eq]: row.country } } });
-                    if (country) country_id = country.id;
+                    if (country) { country_id = country.id; }
+                    else {
+                        return {
+                            success: false,
+                            message: row.country + ' Country not found',
+                            data: null,
+                        };
+                    }
                 }
                 if (row.state) {
                     const state = await State.findOne({ where: { name: { [Op.eq]: row.state } } });
                     if (state) state_id = state.id;
+                    else {
+                        return {
+                            success: false,
+                            message: row.state + ' State not found',
+                            data: null,
+                        };
+                    }
                 }
                 if (row.city && state_id) {
                     const city = await Cities.findOne({ where: { name: { [Op.eq]: row.city }, state_id } });
                     if (city) city_id = city.id;
+                    else {
+                        return {
+                            success: false,
+                            message: row.city + ' City not found',
+                            data: null,
+                        };
+                    }
                 } else if (row.city) {
                     const city = await Cities.findOne({ where: { name: { [Op.eq]: row.city } } });
                     if (city) city_id = city.id;
+                    else {
+                        return {
+                            success: false,
+                            message: row.city + ' City not found',
+                            data: null,
+                        };
+                    }
                 }
                 if (row.zone) {
                     const zoneWhere = { name: { [Op.eq]: row.zone } };
@@ -324,14 +352,35 @@ class PartyController {
                     if (state_id) zoneWhere.state_id = state_id;
                     const zone = await Zone.findOne({ where: zoneWhere });
                     if (zone) zone_id = zone.id;
+                    else {
+                        return {
+                            success: false,
+                            message: row.zone + ' Zone not found',
+                            data: null,
+                        };
+                    }
                 }
                 if (row.distributor) {
                     const dist = await Distributor.findOne({ where: { distributor_name: { [Op.eq]: row.distributor } } });
                     if (dist) distributor_id = dist.distributor_id;
+                    else {
+                        return {
+                            success: false,
+                            message: row.distributor + ' Distributor not found',
+                            data: null,
+                        };
+                    }
                 }
                 if (row.salesman) {
                     const sm = await Salesman.findOne({ where: { full_name: { [Op.eq]: row.salesman } } });
                     if (sm) salesman_id = sm.salesman_id;
+                    else {
+                        return {
+                            success: false,
+                            message: row.salesman + ' Salesman not found',
+                            data: null,
+                        };
+                    }
                 }
 
                 const existing = await Party.findOne({

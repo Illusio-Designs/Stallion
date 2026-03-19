@@ -111,7 +111,7 @@ const parsePartyFile = async (req, res, next) => {
         req.parties = parties;
         req.filePaths = [filePath];
 
-        const result = await partyController.bulkUploadParty(parties, req.user, req);
+        const result = await partyController.bulkUploadParty(parties, req.user, req, res);
 
         if (req.filePaths && req.filePaths.length > 0) {
             req.filePaths.forEach((fp) => {
