@@ -2131,9 +2131,9 @@ export const createSalesman = async (salesmanData) => {
     phone: trimmedPhone,
     address: address ? String(address).trim() : '',
     country_id: trimmedCountryId,
-    state_id: state_id && String(state_id).trim() !== '' ? String(state_id).trim() : '',
-    city_id: city_id && String(city_id).trim() !== '' ? String(city_id).trim() : '',
-    zone_preference: zone_preference ? String(zone_preference).trim() : '',
+    state_id: state_id && String(state_id).trim() !== '' ? String(state_id).trim() : null,
+    city_id: city_id && String(city_id).trim() !== '' ? String(city_id).trim() : null,
+    zone_id: zone_preference && String(zone_preference).trim() !== '' ? String(zone_preference).trim() : null,
     joining_date: joining_date || new Date().toISOString(),
   };
   

@@ -880,6 +880,11 @@ const DashboardProducts = () => {
       setOpenImageSelectModal(false);
       setImageTargetProduct(null);
       setSelectedImageIds(new Set()); // Clear selection
+      // Refresh editRow if the edit modal is open for this product
+      setEditRow(prev => {
+        if (!prev || prev.id !== productId) return prev;
+        return { ...prev, data: { ...prev.data, image_urls: updatedImageUrls } };
+      });
     } catch (error) {
       console.error('Error attaching image:', error);
       const message = `Failed to attach image: ${error.message}`;
@@ -1018,6 +1023,11 @@ const DashboardProducts = () => {
       setOpenImageSelectModal(false);
       setImageTargetProduct(null);
       setSelectedImageIds(new Set());
+      // Refresh editRow if the edit modal is open for this product
+      setEditRow(prev => {
+        if (!prev || prev.id !== productId) return prev;
+        return { ...prev, data: { ...prev.data, image_urls: updatedImageUrls } };
+      });
     } catch (error) {
       console.error('Error attaching images:', error);
       const message = `Failed to attach images: ${error.message}`;
@@ -2987,51 +2997,61 @@ const DashboardProducts = () => {
             />
           </div>
 
-          {/* Assigned Images Preview */}
+          {/* Assigned Images Preview + Assign Button */}
           {editRow && (() => {
             const imgs = parseImageUrls(editRow.data);
-            return imgs.length > 0 ? (
+            return (
               <div className="form-group form-group--full">
-                <label className="ui-label">Assigned Images</label>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginTop: '6px' }}>
-                  {imgs.map((url, idx) => {
-                    const fullUrl = normalizeImageUrl(url);
-                    return (
-                      <div key={idx} style={{ position: 'relative', width: '100px' }}>
-                        <img
-                          src={fullUrl}
-                          alt={`Image ${idx + 1}`}
-                          style={{
-                            width: '100px', height: '75px', objectFit: 'cover',
-                            borderRadius: '6px', border: '1px solid #e5e7eb', display: 'block'
-                          }}
-                          onError={(e) => { e.target.style.opacity = '0.3'; }}
-                        />
-                        <button
-                          type="button"
-                          title="Unassign image"
-                          onClick={() => handleUnassignImage(editRow.data, url)}
-                          disabled={loading || productModelLoading}
-                          style={{
-                            position: 'absolute', top: '3px', right: '3px',
-                            background: '#f44336', color: '#fff', border: 'none',
-                            borderRadius: '50%', width: '20px', height: '20px',
-                            cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
-                            display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            lineHeight: 1, padding: 0
-                          }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    );
-                  })}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                  <label className="ui-label" style={{ margin: 0 }}>Assigned Images</label>
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn--secondary"
+                    style={{ fontSize: '13px', padding: '6px 14px' }}
+                    disabled={loading || productModelLoading}
+                    onClick={() => handleAttachImage(editRow)}
+                  >
+                    + Assign Image
+                  </button>
                 </div>
-              </div>
-            ) : (
-              <div className="form-group form-group--full">
-                <label className="ui-label">Assigned Images</label>
-                <p style={{ color: '#aaa', fontSize: '13px', marginTop: '6px' }}>No images assigned to this product.</p>
+                {imgs.length > 0 ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                    {imgs.map((url, idx) => {
+                      const fullUrl = normalizeImageUrl(url);
+                      return (
+                        <div key={idx} style={{ position: 'relative', width: '100px' }}>
+                          <img
+                            src={fullUrl}
+                            alt={`Image ${idx + 1}`}
+                            style={{
+                              width: '100px', height: '75px', objectFit: 'cover',
+                              borderRadius: '6px', border: '1px solid #e5e7eb', display: 'block'
+                            }}
+                            onError={(e) => { e.target.style.opacity = '0.3'; }}
+                          />
+                          <button
+                            type="button"
+                            title="Unassign image"
+                            onClick={() => handleUnassignImage(editRow.data, url)}
+                            disabled={loading || productModelLoading}
+                            style={{
+                              position: 'absolute', top: '3px', right: '3px',
+                              background: '#f44336', color: '#fff', border: 'none',
+                              borderRadius: '50%', width: '20px', height: '20px',
+                              cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              lineHeight: 1, padding: 0
+                            }}
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p style={{ color: '#aaa', fontSize: '13px', margin: 0 }}>No images assigned. Click "+ Assign Image" to add.</p>
+                )}
               </div>
             );
           })()}
