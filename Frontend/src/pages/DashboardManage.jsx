@@ -1705,7 +1705,7 @@ const DashboardManage = () => {
                   </div>
                 ) : null
               }
-              loading={loading || (activeTab === 'Zone' && zoneCitiesLoading)}
+              loading={loading}
             />
           </div>
         </div>
