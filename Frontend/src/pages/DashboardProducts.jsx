@@ -1835,15 +1835,22 @@ const DashboardProducts = () => {
         image_urls: updatedUrls,
       });
       showSuccess('Image unassigned successfully');
-      await fetchProductsWithoutLoading();
+      // Optimistically update products state so unuploadedRows recomputes immediately
+      const productId = product.product_id || product.id;
+      setProducts(prev => prev.map(p =>
+        (p.product_id || p.id) === productId
+          ? { ...p, image_urls: updatedUrls }
+          : p
+      ));
       // Refresh edit modal's product data if it's open for this product
-      if (editRow && (editRow.id === (product.product_id || product.id))) {
+      if (editRow && (editRow.id === productId)) {
         setEditRow(prev => ({
           ...prev,
           data: { ...prev.data, image_urls: updatedUrls }
         }));
       }
-      // Refresh product model modal state is removed — edit form handles images now
+      // Background refresh to sync with server
+      fetchProductsWithoutLoading();
     } catch (err) {
       showError(`Failed to unassign image: ${err.message}`);
     } finally {
