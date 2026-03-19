@@ -60,6 +60,22 @@ export default function TableWithControls({
   // Filter menu state
   const [filterOpen, setFilterOpen] = useState(false);
   const filterBtnRef = useRef(null);
+  const filterPopoverRef = useRef(null);
+
+  // Close filter popover on outside click
+  useEffect(() => {
+    if (!filterOpen) return;
+    const handleOutsideClick = (e) => {
+      if (
+        filterBtnRef.current && !filterBtnRef.current.contains(e.target) &&
+        filterPopoverRef.current && !filterPopoverRef.current.contains(e.target)
+      ) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    return () => document.removeEventListener('mousedown', handleOutsideClick);
+  }, [filterOpen]);
 
   const filteredRows = useMemo(() => {
     if (!query) return rows;
@@ -193,8 +209,8 @@ export default function TableWithControls({
                 </button>
                 {filterOpen && filterContent && (
                   <div
+                    ref={filterPopoverRef}
                     className="ui-filter-popover"
-                    tabIndex="-1"
                     style={{
                       position: 'absolute',
                       right: 0,
@@ -207,8 +223,6 @@ export default function TableWithControls({
                       padding: 16,
                       zIndex: 50,
                     }}
-                    onBlur={() => setFilterOpen(false)}
-                    onClick={(e) => e.stopPropagation()}
                   >
                     {filterContent}
                   </div>

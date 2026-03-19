@@ -17,6 +17,7 @@ import {
   updateCity,
   deleteCity,
   getZones,
+  getAllZones,
   createZone,
   updateZone,
   deleteZone,
@@ -75,6 +76,7 @@ const DashboardManage = () => {
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
+  const [allZones, setAllZones] = useState([]); // all zones unfiltered
   const [colorCodes, setColorCodes] = useState([]);
   const [frameColors, setFrameColors] = useState([]);
   const [frameMaterials, setFrameMaterials] = useState([]);
@@ -141,7 +143,6 @@ const DashboardManage = () => {
   const lastFetchedTabRef = useRef('');
   const fetchingStatesRef = useRef(false);
   const fetchingCitiesRef = useRef(false);
-  const fetchingZonesRef = useRef(false);
 
   // Fetch data based on active tab
   useEffect(() => {
@@ -170,7 +171,6 @@ const DashboardManage = () => {
     // Reset default filter flags when tab changes
     if (activeTab !== 'State') defaultFilterSetRef.current.State = false;
     if (activeTab !== 'City') defaultFilterSetRef.current.City = false;
-    if (activeTab !== 'Zone') defaultFilterSetRef.current.Zone = false;
   }, [activeTab]);
   
   useEffect(() => {
@@ -304,156 +304,8 @@ const DashboardManage = () => {
     }
   }, [cityStateFilter, activeTab]);
   
-  // Fetch states for India when Zone tab loads
-  useEffect(() => {
-    if (countries.length > 0 && activeTab === 'Zone' && states.length === 0) {
-      // Find India by name or code
-      const india = countries.find(c => 
-        c.name?.toLowerCase() === 'india' || 
-        c.code?.toLowerCase() === 'in'
-      );
-      if (india) {
-        // Prevent multiple simultaneous calls
-        if (fetchingStatesRef.current) {
-          return;
-        }
-        
-        fetchingStatesRef.current = true;
-        getStates(india.id)
-          .then((statesData) => {
-            setStates(statesData || []);
-          })
-          .catch((error) => {
-            // Silently handle "States not found" - it's a valid case
-            if (error.message?.toLowerCase().includes('states not found') ||
-                error.message?.toLowerCase().includes('no states found')) {
-              setStates([]);
-            } else if (!error.message?.toLowerCase().includes('token expired') && 
-                       !error.message?.toLowerCase().includes('unauthorized')) {
-              console.error('Error fetching states for Zone tab:', error);
-              setStates([]);
-            }
-          })
-          .finally(() => {
-            fetchingStatesRef.current = false;
-          });
-      }
-    }
-  }, [countries, activeTab, states.length]);
-  
-  // Fetch cities from ALL states when Zone tab is active (so filter shows all cities)
-  const zoneCitiesFetchedRef = useRef(false);
-  const [zoneCitiesLoading, setZoneCitiesLoading] = useState(false);
-  
-  useEffect(() => {
-    // Reset flag when leaving Zone tab
-    if (activeTab !== 'Zone') {
-      zoneCitiesFetchedRef.current = false;
-      setZoneCitiesLoading(false);
-    }
-  }, [activeTab]);
-  
-  useEffect(() => {
-    if (states.length > 0 && activeTab === 'Zone' && !zoneCitiesFetchedRef.current) {
-      // Prevent multiple simultaneous calls
-      if (fetchingCitiesRef.current) {
-        return;
-      }
-      
-      fetchingCitiesRef.current = true;
-      zoneCitiesFetchedRef.current = true;
-      setZoneCitiesLoading(true);
-      
-      // Fetch cities for all states and combine them
-      const fetchAllCities = async () => {
-        try {
-          const allCitiesPromises = states.map(state => 
-            getCities(state.id)
-              .then(citiesData => citiesData || [])
-              .catch(error => {
-                // Silently handle "Cities not found" for individual states
-                if (error.message?.toLowerCase().includes('cities not found') ||
-                    error.message?.toLowerCase().includes('no cities found')) {
-                  return [];
-                } else if (!error.message?.toLowerCase().includes('token expired') && 
-                           !error.message?.toLowerCase().includes('unauthorized')) {
-                  console.warn(`Error fetching cities for state ${state.name}:`, error);
-                }
-                return [];
-              })
-          );
-          
-          const citiesArrays = await Promise.all(allCitiesPromises);
-          // Flatten and combine all cities
-          const allCities = citiesArrays.flat();
-          setCities(allCities);
-        } catch (error) {
-          console.error('Error fetching cities for Zone tab:', error);
-          setCities([]);
-        } finally {
-          fetchingCitiesRef.current = false;
-          setZoneCitiesLoading(false);
-        }
-      };
-      
-      fetchAllCities();
-    }
-  }, [states, activeTab]);
-  
-  useEffect(() => {
-    if (cities.length > 0 && activeTab === 'Zone' && !zoneCityFilter && !defaultFilterSetRef.current.Zone) {
-      // Find Bombay/Mumbai by name
-      const bombay = cities.find(c => 
-        c.name?.toLowerCase() === 'bombay' || 
-        c.name?.toLowerCase() === 'mumbai'
-      );
-      if (bombay) {
-        setZoneCityFilter(bombay.id);
-        defaultFilterSetRef.current.Zone = true;
-      }
-    }
-  }, [cities, activeTab, zoneCityFilter]);
-  
-  // Fetch zones when city filter changes in Zone tab
-  useEffect(() => {
-    // Only fetch if we have a valid city filter and we're on Zone tab
-    if (activeTab === 'Zone' && zoneCityFilter && cities.length > 0) {
-      // Prevent multiple simultaneous calls
-      if (fetchingZonesRef.current) {
-        return;
-      }
-      
-      // Verify the city exists in our cities list
-      const cityExists = cities.some(c => c.id === zoneCityFilter);
-      if (!cityExists) {
-        return;
-      }
-      
-      fetchingZonesRef.current = true;
-      getZones(zoneCityFilter)
-        .then((zonesData) => {
-          setZones(zonesData || []);
-        })
-        .catch((error) => {
-          // Silently handle "Zones not found" - it's a valid case (city has no zones)
-          if (error.message?.toLowerCase().includes('zones not found') ||
-              error.message?.toLowerCase().includes('no zones found')) {
-            setZones([]);
-            // Don't log this as an error - it's expected for cities without zones
-          } else if (!error.message?.toLowerCase().includes('token expired') && 
-                     !error.message?.toLowerCase().includes('unauthorized')) {
-            console.error('Error fetching zones:', error);
-            setZones([]);
-          }
-        })
-        .finally(() => {
-          fetchingZonesRef.current = false;
-        });
-    } else if (activeTab === 'Zone' && !zoneCityFilter) {
-      // Clear zones when filter is cleared
-      setZones([]);
-    }
-  }, [zoneCityFilter, activeTab, cities]);
+  // Reset zone city filter when leaving Zone tab
+  const [zoneCitiesLoading] = useState(false);
 
   // Update dropdown options when data changes
   useEffect(() => {
@@ -570,13 +422,26 @@ const DashboardManage = () => {
           break;
         
         case 'Zone':
-          // Only fetch countries, states/cities/zones will be fetched for default selections
-          const countriesForZones = await getCountries().catch(() => []);
+          // Fetch all zones directly, and cities for the filter dropdown
+          const [allZonesData, countriesForZones] = await Promise.all([
+            getAllZones().catch(() => []),
+            getCountries().catch(() => []),
+          ]);
+          setAllZones(allZonesData || []);
+          setZones(allZonesData || []);
           setCountries(countriesForZones || []);
-          // Don't fetch states/cities/zones here - wait for default selections
-          setStates([]);
-          setCities([]);
-          setZones([]);
+          // Fetch cities for filter dropdown (all cities from India)
+          const indiaForZone = (countriesForZones || []).find(c =>
+            c.name?.toLowerCase() === 'india' || c.code?.toLowerCase() === 'in'
+          );
+          if (indiaForZone) {
+            const statesForZone = await getStates(indiaForZone.id).catch(() => []);
+            const allCitiesPromises = (statesForZone || []).map(s =>
+              getCities(s.id).catch(() => [])
+            );
+            const citiesArrays = await Promise.all(allCitiesPromises);
+            setCities(citiesArrays.flat());
+          }
           break;
         
         case 'Color Codes':
@@ -755,7 +620,7 @@ const DashboardManage = () => {
       });
     });
     
-    zones.forEach(zone => {
+    allZones.forEach(zone => {
       const city = cities.find(c => c.id === zone.city_id);
       allRows.push({
         id: zone.id,
@@ -868,7 +733,7 @@ const DashboardManage = () => {
     });
     
     return allRows;
-  }, [countries, states, cities, zones, colorCodes, frameColors, frameMaterials, frameTypes, genders, lensColors, lensMaterials, shapes, brands, collections]);
+  }, [countries, states, cities, allZones, colorCodes, frameColors, frameMaterials, frameTypes, genders, lensColors, lensMaterials, shapes, brands, collections]);
 
   const columns = useMemo(() => {
     // Different columns for different tabs
@@ -957,7 +822,7 @@ const DashboardManage = () => {
       filtered = filtered.filter(row => row.data?.state_id === cityStateFilter);
     }
     
-    // Apply city filter for Zone tab
+    // Apply city filter for Zone tab (optional — shows all if no filter)
     if (activeTab === 'Zone' && zoneCityFilter) {
       filtered = filtered.filter(row => row.data?.city_id === zoneCityFilter);
     }
