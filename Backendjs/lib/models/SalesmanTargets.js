@@ -41,6 +41,10 @@ const SalesmanTargets = sequelize.define('SalesmanTargets', {
     target_remarks: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    completed_amount: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true
     }
 }, {
     tableName: 'salesman_targets',

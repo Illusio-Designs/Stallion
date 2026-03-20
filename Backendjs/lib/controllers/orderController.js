@@ -12,6 +12,7 @@ const OrderOperation = require('../models/OrderOperation');
 const Zone = require('../models/Zone');
 const User = require('../models/User');
 const { Op } = require('sequelize');
+const salesmanTargetsController = require('./salesmanTargetsController');
 
 // Helper function to reverse an order operation (does not depend on controller instance)
 async function reverseOrderOperation(orderId) {
@@ -451,6 +452,9 @@ class OrderController {
                 order_id: order.order_id,
                 ...orderOperationData
             });
+            if (req.user.role === 'salesman') {
+                await salesmanTargetsController.updateTargetFromOrder(order);
+            }
             console.log("order_total type", typeof orderTotal);
             console.log("order_total", orderTotal);
             console.log("order order_total type", typeof order.order_total);

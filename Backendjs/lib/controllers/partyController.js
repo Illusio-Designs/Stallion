@@ -39,6 +39,19 @@ class PartyController {
         }
     }
 
+    async getPartiesBySalesmanId(req, res) {
+        try {
+            const salesman_id = req.params.salesman_id;
+            const parties = await Party.findAll({ where: { salesman_id: salesman_id } });
+            if (!parties || parties.length === 0) {
+                return res.status(404).json({ error: 'Parties not found' });
+            }
+            res.status(200).json(parties);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async getPartiesByZoneId(req, res) {
         try {
             const user = req.user;
