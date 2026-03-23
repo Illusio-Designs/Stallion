@@ -369,7 +369,7 @@ class DatabaseManager {
             const modelSyncOrder = ['Country', 'State', 'Cities', 'Zone', 'Party', 'Distributor', 'Salesman',
                 'ColorCode', 'FrameColor', 'FrameMaterial', 'FrameType', 'Gender', 'LensColor',
                 'LensMaterial', 'Shape', 'Brand', 'Collection', 'Product', 'Tray', 'SalesmanTray',
-                'TrayProducts', 'Event', 'Order', 'OrderOperation', 'SalesmanExpense', 'SalesmanTargets', 'SalesmanCheckIns', 'DistributorZones'];
+                'TrayProducts', 'Event', 'Order', 'OrderOperation', 'SalesmanExpense', 'SalesmanTargets', 'SalesmanCheckIns', 'DistributorZones', 'SalesmanZones'];
 
             // Sync all models except the manually managed ones
             console.log('🔄 Syncing Sequelize models (excluding manually managed tables)...');
