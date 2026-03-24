@@ -6,15 +6,23 @@ class SalesmanTargetsController {
 
     async createSalesmanTarget(req, res) {
         try {
-            const { completed_amount, salesman_id, target_amount, target_date, order_type, target_description, target_remarks } = req.body;
-            if (!salesman_id || !target_amount || !target_date || !target_description || !target_remarks) {
+            const { start_date, end_date, completed_amount, salesman_id, target_amount, order_type, target_description, target_remarks } = req.body;
+            if (!salesman_id || !target_amount || !target_description || !target_remarks || !start_date || !end_date) {
                 return res.status(400).json({ error: 'All fields are required' });
             }
+            const startDate = new Date(start_date);
+            const endDate = new Date(end_date);
+            if (startDate > endDate) {
+                return res.status(400).json({ error: 'Start date must be before end date' });
+            }
+            console.log("startDate", startDate);
+            console.log("endDate", endDate);
             const salesmanTarget = await SalesmanTargets.create({
                 salesman_id,
+                start_date: startDate,
+                end_date: endDate,
                 completed_amount,
                 target_amount,
-                target_date,
                 order_type,
                 target_status: 'pending',
                 target_description,
@@ -66,10 +74,10 @@ class SalesmanTargetsController {
 
             const salesmanTargets = await SalesmanTargets.findAll({
                 where: {
-                    salesman_id: salesman_id, 
-                    // Use date range logic: update targets whose target_date is
+                    salesman_id: salesman_id,
+                    // Use date range logic: update targets whose end_date is
                     // on/after the order_date (not strict equality).
-                    target_date: { [Op.gte]: order_date }
+                    end_date: { [Op.gte]: new Date(order_date) }
                 }
             });
             if (!salesmanTargets || salesmanTargets.length === 0) {
@@ -96,11 +104,30 @@ class SalesmanTargetsController {
     async updateSalesmanTarget(req, res) {
         try {
             const { id } = req.params;
-            const { completed_amount, target_amount, target_date, order_type, target_description, target_remarks } = req.body;
+            const { completed_amount, target_amount, start_date, end_date, order_type, target_description, target_remarks } = req.body;
+            let startDate = null;
+            let endDate = null;
+            if (start_date && end_date) {
+                startDate = new Date(start_date);
+                endDate = new Date(end_date);
+                if (startDate > endDate) {
+                    return res.status(400).json({ error: 'Start date must be before end date' });
+                }
+            }
+            if (start_date) {
+                startDate = new Date(start_date);
+            }
+            if (end_date) {
+                endDate = new Date(end_date);
+            }
+            if (startDate && endDate && startDate > endDate) {
+                return res.status(400).json({ error: 'Start date must be before end date' });
+            }
             const salesmanTarget = await SalesmanTargets.update({
                 completed_amount,
                 target_amount,
-                target_date,
+                start_date,
+                end_date,
                 order_type,
                 target_description,
                 target_remarks,

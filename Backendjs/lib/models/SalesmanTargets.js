@@ -17,12 +17,16 @@ const SalesmanTargets = sequelize.define('SalesmanTargets', {
             key: 'salesman_id'
         }
     },
-    target_amount: {
-        type: DataTypes.DECIMAL(10, 2),
+    start_date: {
+        type: DataTypes.DATE,
         allowNull: false
     },
-    target_date: {
+    end_date: {
         type: DataTypes.DATE,
+        allowNull: false
+    },
+    target_amount: {
+        type: DataTypes.DECIMAL(10, 2),
         allowNull: false
     },
     order_type: {
