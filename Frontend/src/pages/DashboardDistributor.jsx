@@ -149,7 +149,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
 };
 
 const DashboardDistributor = () => {
-  const [activeTab, setActiveTab] = useState('All');
+
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -449,13 +449,6 @@ const DashboardDistributor = () => {
       isActive: distributor.is_active !== false,
     }));
   }, [distributors, selectedCountryFilter]);
-
-  const filteredRowsByTab = useMemo(() => {
-    if (activeTab === 'All') return rows;
-    if (activeTab === 'Activate') return rows.filter(r => r.isActive);
-    if (activeTab === 'Deactivate') return rows.filter(r => !r.isActive);
-    return rows;
-  }, [rows, activeTab]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -1094,19 +1087,6 @@ const DashboardDistributor = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
-        <div className="dash-row">
-          <div className="order-tabs-container">
-            {['All', 'Activate', 'Deactivate'].map(tab => (
-              <button
-                key={tab}
-                className={`order-tab ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </div>
         {error && (
           <div className="dash-row">
             <div className="dash-card full">
@@ -1142,7 +1122,7 @@ const DashboardDistributor = () => {
             <TableWithControls
               title="Distributors"
               columns={columns}
-              rows={filteredRowsByTab}
+              rows={rows}
               onAddNew={handleAdd}
               addNewText="Add New Distributor"
               onImport={() => {

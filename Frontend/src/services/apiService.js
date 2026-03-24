@@ -1917,6 +1917,17 @@ export const getPartiesByZoneId = async () => {
 // ==================== SALESMEN ENDPOINTS ====================
 
 /**
+ * Get current logged-in salesman's profile (includes zones)
+ * @returns {Promise<Object>} Salesman object with zones array
+ */
+export const getSalesmanProfile = async () => {
+  return apiRequest('/salesman', {
+    method: 'GET',
+    includeAuth: true,
+  });
+};
+
+/**
  * Get salesmen by country
  * @param {string} countryId - Country ID (UUID)
  * @returns {Promise<Array>} Array of salesman objects

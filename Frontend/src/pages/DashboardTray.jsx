@@ -84,6 +84,7 @@ const DashboardTray = () => {
   const [collections, setCollections] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
   const [editProductStatus, setEditProductStatus] = useState(TrayProductStatus.ALLOTED);
   const [openEditProduct, setOpenEditProduct] = useState(false);
@@ -299,6 +300,7 @@ const DashboardTray = () => {
       await fetchTrays(); // Refresh tray list to update product count
       setSelectedProducts([]);
       setProductDropdownOpen(false);
+      setProductSearch('');
     } catch (err) {
       const message = err.message || 'Failed to add products to tray';
       setError(message);
@@ -494,13 +496,14 @@ const DashboardTray = () => {
                         <div className="form-group" style={{ position: 'relative' }}>
                           <label className="ui-label" style={{ marginBottom: '8px' }}>Select Products</label>
                           <div style={{ position: 'relative' }}>
+                            {/* Trigger button */}
                             <button
                               type="button"
-                              onClick={() => setProductDropdownOpen(!productDropdownOpen)}
+                              onClick={() => { setProductDropdownOpen(!productDropdownOpen); if (productDropdownOpen) setProductSearch(''); }}
                               style={{
                                 width: '100%',
                                 padding: '10px 12px',
-                                border: '1px solid #e5e7eb',
+                                border: `1px solid ${productDropdownOpen ? '#3b82f6' : '#e5e7eb'}`,
                                 borderRadius: '8px',
                                 backgroundColor: '#fff',
                                 cursor: 'pointer',
@@ -513,16 +516,18 @@ const DashboardTray = () => {
                               }}
                             >
                               <span>
-                                {selectedProducts.length === 0 
-                                  ? 'Select Products' 
+                                {selectedProducts.length === 0
+                                  ? 'Select products to add'
                                   : `${selectedProducts.length} product(s) selected`}
                               </span>
                               <span style={{ fontSize: '12px', color: '#666' }}>
                                 {productDropdownOpen ? '▲' : '▼'}
                               </span>
                             </button>
+
                             {productDropdownOpen && (
                               <>
+                                {/* Dropdown panel */}
                                 <div
                                   style={{
                                     position: 'absolute',
@@ -531,21 +536,59 @@ const DashboardTray = () => {
                                     right: 0,
                                     marginTop: '4px',
                                     border: '1px solid #e5e7eb',
-                                    borderRadius: '8px',
+                                    borderRadius: '10px',
                                     backgroundColor: '#fff',
-                                    maxHeight: '300px',
-                                    overflowY: 'auto',
-                                    zIndex: 1000,
-                                    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                                    zIndex: 1001,
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    height: '270px'
                                   }}
                                 >
-                                  {allProducts.length === 0 ? (
-                                    <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
-                                      No products available
-                                    </div>
-                                  ) : (
-                                    <div style={{ padding: '8px' }}>
-                                      {allProducts.map((p) => {
+                                  {/* Search bar — sticky top */}
+                                  <div style={{ padding: '10px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
+                                    <input
+                                      type="text"
+                                      placeholder="🔍  Search by model, brand or collection..."
+                                      value={productSearch}
+                                      onChange={(e) => setProductSearch(e.target.value)}
+                                      onClick={(e) => e.stopPropagation()}
+                                      autoFocus
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px 10px',
+                                        border: '1px solid #e5e7eb',
+                                        borderRadius: '6px',
+                                        fontSize: '13px',
+                                        outline: 'none',
+                                        boxSizing: 'border-box',
+                                        backgroundColor: '#f9fafb'
+                                      }}
+                                    />
+                                  </div>
+
+                                  {/* Product list — scrollable */}
+                                  <div style={{ overflowY: 'auto', flex: 1, padding: '6px' }}>
+                                    {allProducts.length === 0 ? (
+                                      <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>
+                                        No products available
+                                      </div>
+                                    ) : (() => {
+                                      const filtered = allProducts.filter((p) => {
+                                        if (!productSearch.trim()) return true;
+                                        const q = productSearch.toLowerCase();
+                                        return (
+                                          (p.model_no || '').toLowerCase().includes(q) ||
+                                          (p.brand_name || '').toLowerCase().includes(q) ||
+                                          (p.collection_name || '').toLowerCase().includes(q)
+                                        );
+                                      });
+                                      if (filtered.length === 0) return (
+                                        <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>
+                                          No products match "{productSearch}"
+                                        </div>
+                                      );
+                                      return filtered.map((p) => {
                                         const productId = p.id || p.product_id;
                                         const productIdStr = String(productId);
                                         const isSelected = selectedProducts.includes(productIdStr);
@@ -555,88 +598,88 @@ const DashboardTray = () => {
                                             style={{
                                               display: 'flex',
                                               alignItems: 'center',
-                                              padding: '10px 12px',
+                                              padding: '9px 10px',
                                               borderRadius: '6px',
                                               cursor: 'pointer',
-                                              backgroundColor: isSelected ? '#e3f2fd' : 'transparent',
-                                              transition: 'background-color 0.2s'
+                                              backgroundColor: isSelected ? '#eff6ff' : 'transparent',
+                                              borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
+                                              marginBottom: '2px',
+                                              transition: 'all 0.15s'
                                             }}
-                                            onMouseEnter={(e) => {
-                                              e.currentTarget.style.backgroundColor = isSelected ? '#bbdefb' : '#f5f5f5';
-                                            }}
-                                            onMouseLeave={(e) => {
-                                              e.currentTarget.style.backgroundColor = isSelected ? '#e3f2fd' : 'transparent';
-                                            }}
+                                            onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#f5f5f5'; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? '#eff6ff' : 'transparent'; }}
                                           >
                                             <input
                                               type="checkbox"
                                               checked={isSelected}
                                               onChange={(e) => {
                                                 if (e.target.checked) {
-                                                  setSelectedProducts([...selectedProducts, productIdStr]);
+                                                  setSelectedProducts(prev => [...prev, productIdStr]);
                                                 } else {
-                                                  setSelectedProducts(selectedProducts.filter(id => id !== productIdStr));
+                                                  setSelectedProducts(prev => prev.filter(id => id !== productIdStr));
                                                 }
                                               }}
-                                              style={{
-                                                marginRight: '12px',
-                                                width: '18px',
-                                                height: '18px',
-                                                cursor: 'pointer',
-                                                accentColor: '#3b82f6'
-                                              }}
+                                              style={{ marginRight: '10px', width: '16px', height: '16px', cursor: 'pointer', accentColor: '#3b82f6', flexShrink: 0 }}
                                             />
-                                            <span style={{ fontSize: '14px', color: '#333' }}>
-                                              {`${p.model_no || 'N/A'} - ${p.brand_name || ''} ${p.collection_name || ''}`.trim() || 'Product'}
+                                            <span style={{ fontSize: '13px', color: '#333', lineHeight: 1.4 }}>
+                                              <strong style={{ color: '#111' }}>{p.model_no || 'N/A'}</strong>
+                                              {(p.brand_name || p.collection_name) && (
+                                                <span style={{ color: '#888', marginLeft: '6px' }}>
+                                                  {[p.brand_name, p.collection_name].filter(Boolean).join(' · ')}
+                                                </span>
+                                              )}
                                             </span>
                                           </label>
                                         );
-                                      })}
+                                      });
+                                    })()}
+                                  </div>
+
+                                  {/* Footer with actions — sticky bottom */}
+                                  <div style={{
+                                    padding: '10px 12px',
+                                    borderTop: '1px solid #f0f0f0',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    flexShrink: 0,
+                                    backgroundColor: '#fafafa',
+                                    borderRadius: '0 0 10px 10px'
+                                  }}>
+                                    <span style={{ fontSize: '12px', color: '#888' }}>
+                                      {selectedProducts.length > 0 ? `${selectedProducts.length} selected` : 'None selected'}
+                                    </span>
+                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                      {selectedProducts.length > 0 && (
+                                        <button
+                                          type="button"
+                                          className="ui-btn ui-btn--secondary"
+                                          onClick={(e) => { e.stopPropagation(); setSelectedProducts([]); }}
+                                          style={{ padding: '6px 14px', fontSize: '13px' }}
+                                        >
+                                          Clear
+                                        </button>
+                                      )}
+                                      <button
+                                        type="button"
+                                        className="ui-btn ui-btn--primary"
+                                        disabled={saving || selectedProducts.length === 0}
+                                        onClick={(e) => { e.stopPropagation(); handleAddProduct(); }}
+                                        style={{ padding: '6px 16px', fontSize: '13px' }}
+                                      >
+                                        {saving ? 'Adding...' : `Add ${selectedProducts.length > 0 ? selectedProducts.length : ''} Product${selectedProducts.length !== 1 ? 's' : ''}`}
+                                      </button>
                                     </div>
-                                  )}
+                                  </div>
                                 </div>
+                                {/* Backdrop — rendered after panel so panel stays on top */}
                                 <div
-                                  style={{
-                                    position: 'fixed',
-                                    top: 0,
-                                    left: 0,
-                                    right: 0,
-                                    bottom: 0,
-                                    zIndex: 999
-                                  }}
-                                  onClick={() => setProductDropdownOpen(false)}
+                                  style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+                                  onClick={() => { setProductDropdownOpen(false); setProductSearch(''); }}
                                 />
                               </>
                             )}
                           </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
-                          {selectedProducts.length > 0 && (
-                            <button 
-                              className="ui-btn ui-btn--secondary" 
-                              onClick={() => {
-                                setSelectedProducts([]);
-                                setProductDropdownOpen(false);
-                              }}
-                              style={{ 
-                                padding: '10px 24px',
-                                whiteSpace: 'nowrap'
-                              }}
-                            >
-                              Clear Selection
-                            </button>
-                          )}
-                          <button 
-                            className="ui-btn ui-btn--primary" 
-                            disabled={saving || selectedProducts.length === 0} 
-                            onClick={handleAddProduct}
-                            style={{ 
-                              padding: '10px 24px',
-                              whiteSpace: 'nowrap'
-                            }}
-                          >
-                            Add {selectedProducts.length > 0 ? `${selectedProducts.length} ` : ''}Product{selectedProducts.length !== 1 ? 's' : ''}
-                          </button>
                         </div>
                       </div>
                     </div>

@@ -16,9 +16,20 @@ import {
   getAllZones,
   register,
   getRoles,
+  getAllSalesmanCheckins,
+  getSalesmanCheckins,
+  createSalesmanCheckin,
+  updateSalesmanCheckin,
+  deleteSalesmanCheckin,
+  getAllSalesmanTargets,
+  getSalesmanTargets,
+  createSalesmanTarget,
+  updateSalesmanTarget,
+  deleteSalesmanTarget,
+  getParties,
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
-import { getUser } from '../services/authService';
+import { getUser, getUserRole } from '../services/authService';
 
 // Multi-select zones dropdown (same design as distributor page)
 const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled = false }) => {
@@ -135,18 +146,41 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
 };
 
 const DashboardSuppliers = () => {
+  const isSalesman = getUserRole() === 'salesman';
   const [activeTab, setActiveTab] = useState('All');
+  const [mainTab, setMainTab] = useState(isSalesman ? 'Check-ins' : 'Salesmen');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [salesmen, setSalesmen] = useState([]);
   const [countries, setCountries] = useState([]);
-  const [selectedCountryFilter, setSelectedCountryFilter] = useState(null); // For filter dropdown
-  const [hasSearched, setHasSearched] = useState(false); // Track if we've searched for salesmen
+  const [selectedCountryFilter, setSelectedCountryFilter] = useState(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
+  const [zoneParties, setZoneParties] = useState([]); // parties for salesman's zones
+  const [mySalesmanId, setMySalesmanId] = useState(''); // current salesman's own salesman_id
+  const [allPartiesLookup, setAllPartiesLookup] = useState([]); // all parties for name lookup in tables
+
+  // Check-ins state
+  const [checkins, setCheckins] = useState([]);
+  const [checkinsLoading, setCheckinsLoading] = useState(false);
+  const [openCheckinModal, setOpenCheckinModal] = useState(false);
+  const [editCheckin, setEditCheckin] = useState(null);
+  const [checkinForm, setCheckinForm] = useState({
+    salesman_id: '', check_in_date: '', party_id: '', latitude: '', longitude: '', check_in_remarks: '',
+  });
+
+  // Targets state
+  const [targets, setTargets] = useState([]);
+  const [targetsLoading, setTargetsLoading] = useState(false);
+  const [openTargetModal, setOpenTargetModal] = useState(false);
+  const [editTarget, setEditTarget] = useState(null);
+  const [targetForm, setTargetForm] = useState({
+    salesman_id: '', target_amount: '', target_date: '', order_type: '', target_description: '', target_remarks: '',
+  });
   
   const [formData, setFormData] = useState({
     employee_code: '',
@@ -317,6 +351,100 @@ const DashboardSuppliers = () => {
     }
   };
 
+  const fetchZoneParties = async () => {
+    try {
+      const currentUser = getUser();
+      const currentUserId = currentUser?.id || currentUser?.user_id;
+
+      // Step 1: fetch all countries to iterate salesmen
+      const countriesData = await getCountries();
+      const countriesArr = Array.isArray(countriesData) ? countriesData : [];
+
+      // Step 2: find the current user's salesman record across all countries
+      let mySalesman = null;
+      for (const country of countriesArr) {
+        try {
+          const salesmenData = await getSalesmen(country.id);
+          const found = (salesmenData || []).find(s =>
+            s.user_id === currentUserId || s.userId === currentUserId
+          );
+          if (found) { mySalesman = found; break; }
+        } catch { /* skip country on error */ }
+      }
+
+      if (!mySalesman) {
+        console.warn('[fetchZoneParties] Could not find salesman record for current user');
+        setZoneParties([]);
+        return;
+      }
+
+      console.log('[fetchZoneParties] Found salesman record:', mySalesman.full_name, 'zones:', mySalesman.zones?.length);
+
+      // Store the salesman's own ID for use in check-in/target submissions
+      const salesmanRecordId = mySalesman.id || mySalesman.salesman_id;
+      setMySalesmanId(salesmanRecordId || '');
+
+      // Step 3: collect zone IDs from the salesman's zones array
+      const salesmanZones = Array.isArray(mySalesman.zones) ? mySalesman.zones : [];
+      const zoneIds = salesmanZones
+        .map(z => String(z.zone_id || z.id || '').trim())
+        .filter(Boolean);
+
+      // Step 4: fetch all parties for the salesman's country
+      const allParties = await getParties(mySalesman.country_id);
+      const partiesArr = Array.isArray(allParties) ? allParties : [];
+      console.log('[fetchZoneParties] Total parties for country:', partiesArr.length, '| Salesman zones:', zoneIds);
+
+      // Store all parties for name lookup in the table
+      setAllPartiesLookup(partiesArr);
+
+      // Step 5: filter by zone — if no zones assigned, show all parties for the country
+      const filtered = zoneIds.length > 0
+        ? partiesArr.filter(p => {
+            const partyZoneId = String(p.zone_id || p.zoneId || '').trim();
+            return zoneIds.includes(partyZoneId);
+          })
+        : partiesArr;
+
+      console.log('[fetchZoneParties] Filtered parties:', filtered.length);
+      if (partiesArr.length > 0 && filtered.length === 0 && zoneIds.length > 0) {
+        console.warn('[fetchZoneParties] No match — sample party zone_ids:',
+          partiesArr.slice(0, 5).map(p => ({ name: p.party_name, zone_id: p.zone_id || p.zoneId }))
+        );
+      }
+      setZoneParties(filtered);
+    } catch (error) {
+      console.error('Failed to load zone parties:', error);
+      setZoneParties([]);
+    }
+  };
+
+  const fetchCheckins = async () => {
+    setCheckinsLoading(true);
+    try {
+      const data = await getAllSalesmanCheckins();
+      setCheckins(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to load check-ins:', error);
+      setCheckins([]);
+    } finally {
+      setCheckinsLoading(false);
+    }
+  };
+
+  const fetchTargets = async () => {
+    setTargetsLoading(true);
+    try {
+      const data = await getAllSalesmanTargets();
+      setTargets(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error('Failed to load targets:', error);
+      setTargets([]);
+    } finally {
+      setTargetsLoading(false);
+    }
+  };
+
   // Set India as default country filter (only once when countries are loaded)
   useEffect(() => {
     if (countries.length > 0 && !selectedCountryFilter && !hasSetDefaultCountry.current) {
@@ -376,6 +504,45 @@ const DashboardSuppliers = () => {
     }
   }, [formData.state_id]);
 
+  // Fetch checkins/targets when switching to those tabs
+  useEffect(() => {
+    if (mainTab === 'Check-ins') {
+      fetchCheckins();
+      // For admin: fetch all parties for name lookup
+      if (!isSalesman) {
+        getParties().then(data => setAllPartiesLookup(Array.isArray(data) ? data : [])).catch(() => {});
+      }
+    }
+    if (mainTab === 'Targets') fetchTargets();
+  }, [mainTab]);
+
+  // For salesman: load zone parties on mount
+  useEffect(() => {
+    if (isSalesman) {
+      fetchZoneParties();
+      fetchCheckins();
+    }
+  }, []);
+
+  // Lookup maps for resolving IDs to names in tables
+  const partyNameMap = useMemo(() => {
+    const map = {};
+    allPartiesLookup.forEach(p => {
+      const id = p.party_id || p.id;
+      if (id) map[id] = p.party_name || p.name || id;
+    });
+    return map;
+  }, [allPartiesLookup]);
+
+  const salesmanNameMap = useMemo(() => {
+    const map = {};
+    salesmen.forEach(s => {
+      const id = s.id || s.salesman_id;
+      if (id) map[id] = s.full_name || id;
+    });
+    return map;
+  }, [salesmen]);
+
   const columns = useMemo(() => ([
     { key: 'employee_code', label: 'EMPLOYEE CODE' },
     { key: 'full_name', label: 'NAME' },
@@ -390,33 +557,15 @@ const DashboardSuppliers = () => {
   ]), []);
 
   const rows = useMemo(() => {
-    // CRITICAL: Backend returns wrong data, so we MUST filter strictly by country_id
     let filteredSalesmen = [];
-    
     if (selectedCountryFilter) {
       const cleanFilterId = String(selectedCountryFilter).trim();
-      // Only show salesmen that EXACTLY match the selected country
       filteredSalesmen = salesmen.filter(salesman => {
         if (!salesman) return false;
         const salesmanCountryId = String(salesman.country_id || salesman.countryId || '').trim();
-        const matches = salesmanCountryId === cleanFilterId;
-        
-        if (!matches && salesman.full_name) {
-          console.warn('[rows] ❌ Filtering out salesman with wrong country:', {
-            name: salesman.full_name,
-            salesman_country_id: salesmanCountryId,
-            selected_country_id: cleanFilterId
-          });
-        }
-        return matches;
+        return salesmanCountryId === cleanFilterId;
       });
-      console.log('[rows] ✅ Displaying', filteredSalesmen.length, 'salesmen for country:', cleanFilterId, 'out of', salesmen.length, 'total');
-    } else {
-      // If no country selected (All Countries), show nothing
-      filteredSalesmen = [];
-      console.log('[rows] No country selected, showing no salesmen');
     }
-    
     return filteredSalesmen.map(salesman => ({
       ...salesman,
       isActive: salesman.is_active !== false,
@@ -877,23 +1026,168 @@ const DashboardSuppliers = () => {
     }
   };
 
+  // ---- Check-in handlers ----
+  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', latitude: '', longitude: '', check_in_remarks: '' });
+
+  const handleCheckinSubmit = async (e) => {
+    e.preventDefault();
+    if (!checkinForm.party_id) {
+      showError('Please select a party before saving.');
+      return;
+    }
+    try {
+      setCheckinsLoading(true);
+      // Auto-capture location and date for salesman
+      let latitude = checkinForm.latitude;
+      let longitude = checkinForm.longitude;
+      const checkInDate = new Date().toISOString().split('T')[0];
+
+      if (isSalesman && navigator.geolocation) {
+        await new Promise((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => { latitude = String(pos.coords.latitude); longitude = String(pos.coords.longitude); resolve(); },
+            () => resolve() // proceed even if denied
+          );
+        });
+      }
+
+      const currentUser = getUser();
+      const payload = {
+        salesman_id: isSalesman
+          ? (mySalesmanId || currentUser?.salesman_id || checkinForm.salesman_id)
+          : checkinForm.salesman_id,
+        check_in_date: checkInDate,
+        party_id: checkinForm.party_id,
+        latitude,
+        longitude,
+        check_in_remarks: checkinForm.check_in_remarks,
+      };
+      if (editCheckin) {
+        await updateSalesmanCheckin(editCheckin.id, payload);
+        showSuccess('Check-in updated successfully');
+      } else {
+        await createSalesmanCheckin(payload);
+        showSuccess('Check-in created successfully');
+      }
+      setOpenCheckinModal(false);
+      setEditCheckin(null);
+      resetCheckinForm();
+      fetchCheckins();
+    } catch (error) {
+      showError(`Failed to save check-in: ${error.message}`);
+    } finally {
+      setCheckinsLoading(false);
+    }
+  };
+
+  const handleCheckinEdit = (row) => {
+    setEditCheckin(row);
+    setCheckinForm({
+      salesman_id: row.salesman_id || '',
+      check_in_date: row.check_in_date ? row.check_in_date.split('T')[0] : '',
+      party_id: row.party_id || '',
+      latitude: row.latitude || '',
+      longitude: row.longitude || '',
+      check_in_remarks: row.check_in_remarks || '',
+    });
+    setOpenCheckinModal(true);
+  };
+
+  const handleCheckinDelete = async (row) => {
+    if (!window.confirm('Delete this check-in?')) return;
+    try {
+      await deleteSalesmanCheckin(row.id);
+      showSuccess('Check-in deleted successfully');
+      setCheckins(prev => prev.filter(c => c.id !== row.id));
+    } catch (error) {
+      showError(`Failed to delete check-in: ${error.message}`);
+    }
+  };
+
+  // ---- Target handlers ----
+  const resetTargetForm = () => setTargetForm({ salesman_id: '', target_amount: '', target_date: '', order_type: '', target_description: '', target_remarks: '' });
+
+  const handleTargetSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      setTargetsLoading(true);
+      const currentUser = getUser();
+      const payload = {
+        salesman_id: isSalesman
+          ? (mySalesmanId || currentUser?.salesman_id || targetForm.salesman_id)
+          : targetForm.salesman_id,
+        target_amount: parseFloat(targetForm.target_amount) || 0,
+        target_date: targetForm.target_date,
+        order_type: targetForm.order_type || undefined,
+        target_description: targetForm.target_description,
+        target_remarks: targetForm.target_remarks,
+      };
+      if (editTarget) {
+        await updateSalesmanTarget(editTarget.id, payload);
+        showSuccess('Target updated successfully');
+      } else {
+        await createSalesmanTarget(payload);
+        showSuccess('Target created successfully');
+      }
+      setOpenTargetModal(false);
+      setEditTarget(null);
+      resetTargetForm();
+      fetchTargets();
+    } catch (error) {
+      showError(`Failed to save target: ${error.message}`);
+    } finally {
+      setTargetsLoading(false);
+    }
+  };
+
+  const handleTargetEdit = (row) => {
+    setEditTarget(row);
+    setTargetForm({
+      salesman_id: row.salesman_id || '',
+      target_amount: row.target_amount || '',
+      target_date: row.target_date ? row.target_date.split('T')[0] : '',
+      order_type: row.order_type || '',
+      target_description: row.target_description || '',
+      target_remarks: row.target_remarks || '',
+    });
+    setOpenTargetModal(true);
+  };
+
+  const handleTargetDelete = async (row) => {
+    if (!window.confirm('Delete this target?')) return;
+    try {
+      await deleteSalesmanTarget(row.id);
+      showSuccess('Target deleted successfully');
+      setTargets(prev => prev.filter(t => t.id !== row.id));
+    } catch (error) {
+      showError(`Failed to delete target: ${error.message}`);
+    }
+  };
+
   return (
     <div className="dash-page">
       <div className="dash-container">
+        {/* Main tabs */}
         <div className="dash-row">
           <div className="order-tabs-container">
-            {['All', 'Activate', 'Deactivate'].map(tab => (
+            {(isSalesman
+              ? ['Check-ins']
+              : ['Salesmen', 'Check-ins', 'Targets']
+            ).map(tab => (
               <button
                 key={tab}
-                className={`order-tab ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
+                className={`order-tab ${mainTab === tab ? 'active' : ''}`}
+                onClick={() => setMainTab(tab)}
               >
                 {tab}
               </button>
             ))}
           </div>
         </div>
-        {error && (
+
+        {/* Sub-tabs for Salesmen tab removed - show all salesmen by default */}
+
+        {error && mainTab === 'Salesmen' && (
           <div className="dash-row">
             <div className="dash-card full">
               <div style={{ 
@@ -923,12 +1217,15 @@ const DashboardSuppliers = () => {
             </div>
           </div>
         )}
+
+        {/* Salesmen Table - admin only */}
+        {!isSalesman && mainTab === 'Salesmen' && (
         <div className="dash-row">
           <div className="dash-card full">
             <TableWithControls
               title="Salesmen"
               columns={columns}
-              rows={filteredRowsByTab}
+              rows={rows}
               onAddNew={handleAdd}
               addNewText="Add New Salesman"
               onImport={() => {
@@ -955,15 +1252,10 @@ const DashboardSuppliers = () => {
                     value={selectedCountryFilter || ''}
                     onChange={(value) => {
                       const newCountryId = value || null;
-                      console.log('[Filter] Country selection changed from', selectedCountryFilter, 'to', newCountryId);
-                      // Clear salesmen immediately when changing countries
                       setSalesmen([]);
                       setHasSearched(false);
-                      // Update state - useEffect will handle fetching or clearing
                       setSelectedCountryFilter(newCountryId);
-                      // If "All Countries" is selected (empty), ensure salesmen are cleared
                       if (!newCountryId) {
-                        console.log('[Filter] All Countries selected - clearing salesmen');
                         setSalesmen([]);
                         setHasSearched(false);
                         setLoading(false);
@@ -978,6 +1270,67 @@ const DashboardSuppliers = () => {
             />
           </div>
         </div>
+        )}
+
+        {/* Check-ins Table */}
+        {mainTab === 'Check-ins' && (
+        <div className="dash-row">
+          <div className="dash-card full">
+            <TableWithControls
+              title="Salesman Check-ins"
+              columns={[
+                ...(!isSalesman ? [{ key: 'salesman_id', label: 'SALESMAN', render: (v) => salesmanNameMap[v] || v || '-' }] : []),
+                { key: 'check_in_date', label: 'DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                { key: 'party_id', label: 'PARTY', render: (v) => partyNameMap[v] || v || '-' },
+                { key: 'check_in_remarks', label: 'REMARKS' },
+                ...(isSalesman ? [{ key: 'action', label: 'ACTION', render: (_v, row) => (
+                  <RowActions onEdit={() => handleCheckinEdit(row)} onDelete={() => handleCheckinDelete(row)} />
+                )}] : []),
+              ]}
+              rows={checkins}
+              onAddNew={isSalesman ? () => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); } : undefined}
+              addNewText="Add Check-in"
+              onImport={fetchCheckins}
+              importText="Refresh"
+              loading={checkinsLoading}
+            />
+          </div>
+        </div>
+        )}
+
+        {/* Targets Table - admin only */}
+        {!isSalesman && mainTab === 'Targets' && (
+        <div className="dash-row">
+          <div className="dash-card full">
+            <TableWithControls
+              title="Salesman Targets"
+              columns={[
+                ...(!isSalesman ? [{ key: 'salesman_id', label: 'SALESMAN', render: (v) => salesmanNameMap[v] || v || '-' }] : []),
+                { key: 'target_amount', label: 'TARGET AMOUNT', render: (v) => v ? `₹${parseFloat(v).toLocaleString('en-IN')}` : '-' },
+                { key: 'target_date', label: 'TARGET DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
+                { key: 'target_status', label: 'STATUS', render: (v) => (
+                  <span style={{
+                    padding: '2px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 600,
+                    background: v === 'pending' ? '#fff3cd' : '#d4edda',
+                    color: v === 'pending' ? '#856404' : '#155724',
+                  }}>{v || 'pending'}</span>
+                )},
+                { key: 'target_description', label: 'DESCRIPTION' },
+                ...(!isSalesman ? [{ key: 'action', label: 'ACTION', render: (_v, row) => (
+                  <RowActions onEdit={() => handleTargetEdit(row)} onDelete={() => handleTargetDelete(row)} />
+                )}] : []),
+              ]}
+              rows={targets}
+              onAddNew={!isSalesman ? () => { resetTargetForm(); setEditTarget(null); setOpenTargetModal(true); } : undefined}
+              addNewText="Set Target"
+              onImport={fetchTargets}
+              importText="Refresh"
+              loading={targetsLoading}
+            />
+          </div>
+        </div>
+        )}
       </div>
       <Modal
         open={openAdd}
@@ -1342,6 +1695,105 @@ const DashboardSuppliers = () => {
               value={formData.address}
               onChange={(e) => handleInputChange('address', e.target.value)}
             />
+          </div>
+        </form>
+      </Modal>
+
+      {/* Check-in Modal - salesman only */}
+      {isSalesman && (
+      <Modal
+        open={openCheckinModal}
+        onClose={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}
+        title={editCheckin ? 'Edit Check-in' : 'Add Check-in'}
+        footer={(
+          <>
+            <button className="ui-btn ui-btn--secondary" onClick={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}>Cancel</button>
+            <button className="ui-btn ui-btn--primary" onClick={handleCheckinSubmit} disabled={checkinsLoading}>
+              {checkinsLoading ? 'Saving...' : 'Save'}
+            </button>
+          </>
+        )}
+      >
+        <form className="ui-form" onSubmit={handleCheckinSubmit}>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Party</label>
+            <DropdownSelector
+              options={[
+                { value: '', label: 'Select Party' },
+                ...zoneParties.map(p => ({ value: p.party_id || p.id, label: p.party_name || p.name || p.party_id }))
+              ]}
+              value={checkinForm.party_id}
+              onChange={(v) => setCheckinForm(prev => ({ ...prev, party_id: v }))}
+              placeholder="Select Party"
+              className="ui-dropdown-custom--full-width"
+            />
+          </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Remarks</label>
+            <input className="ui-input" placeholder="Check-in remarks" value={checkinForm.check_in_remarks} onChange={(e) => setCheckinForm(prev => ({ ...prev, check_in_remarks: e.target.value }))} />
+          </div>
+        </form>
+      </Modal>
+      )}
+
+      {/* Target Modal */}
+      <Modal
+        open={openTargetModal}
+        onClose={() => { setOpenTargetModal(false); setEditTarget(null); resetTargetForm(); }}
+        title={editTarget ? 'Edit Target' : 'Set Target'}
+        footer={(
+          <>
+            <button className="ui-btn ui-btn--secondary" onClick={() => { setOpenTargetModal(false); setEditTarget(null); resetTargetForm(); }}>Cancel</button>
+            <button className="ui-btn ui-btn--primary" onClick={handleTargetSubmit} disabled={targetsLoading}>
+              {targetsLoading ? 'Saving...' : 'Save'}
+            </button>
+          </>
+        )}
+      >
+        <form className="ui-form" onSubmit={handleTargetSubmit}>
+          {!isSalesman && (
+            <div className="form-group form-group--full">
+              <label className="ui-label">Salesman</label>
+              <DropdownSelector
+                options={[
+                  { value: '', label: 'Select Salesman' },
+                  ...salesmen.map(s => ({ value: s.id || s.salesman_id, label: s.full_name }))
+                ]}
+                value={targetForm.salesman_id}
+                onChange={(v) => setTargetForm(prev => ({ ...prev, salesman_id: v }))}
+                placeholder="Select Salesman"
+                className="ui-dropdown-custom--full-width"
+              />
+            </div>
+          )}
+          <div className="form-group">
+            <label className="ui-label">Target Amount (₹)</label>
+            <input className="ui-input" type="number" placeholder="e.g. 10000" value={targetForm.target_amount} onChange={(e) => setTargetForm(prev => ({ ...prev, target_amount: e.target.value }))} required />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">Target Date</label>
+            <input className="ui-input" type="date" value={targetForm.target_date} onChange={(e) => setTargetForm(prev => ({ ...prev, target_date: e.target.value }))} required />
+          </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Order Type</label>
+            <DropdownSelector
+              options={[
+                { value: '', label: 'Overall (no specific type)' },
+                { value: 'party_order', label: 'Party Order' },
+              ]}
+              value={targetForm.order_type}
+              onChange={(v) => setTargetForm(prev => ({ ...prev, order_type: v }))}
+              placeholder="Select Order Type"
+              className="ui-dropdown-custom--full-width"
+            />
+          </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Description</label>
+            <input className="ui-input" placeholder="Target description" value={targetForm.target_description} onChange={(e) => setTargetForm(prev => ({ ...prev, target_description: e.target.value }))} />
+          </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Remarks</label>
+            <input className="ui-input" placeholder="Target remarks" value={targetForm.target_remarks} onChange={(e) => setTargetForm(prev => ({ ...prev, target_remarks: e.target.value }))} />
           </div>
         </form>
       </Modal>
