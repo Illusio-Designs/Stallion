@@ -15,6 +15,7 @@ import {
   getSalesmen,
   getEvents,
   getProducts,
+  getProductById,
   getCountries,
   getPartyById
 } from '../services/apiService';
@@ -53,6 +54,7 @@ const mapUITabToApiStatus = (tab) => {
 const DashboardOrders = () => {
   const [editRow, setEditRow] = useState(null);
   const [editStatus, setEditStatus] = useState('PENDING');
+  const [viewRow, setViewRow] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
   const [dateRange, setDateRange] = useState('Feb 24, 2023 - Mar 15, 2023');
@@ -730,6 +732,95 @@ const DashboardOrders = () => {
     }
   };
 
+  // Handle download order as PDF
+  const handleDownload = async (row) => {
+    const order = row.originalOrder;
+    const orderItems = parseOrderItems(order?.order_items);
+
+    // Fetch all products with high limit to resolve names
+    let allProducts = products;
+    if (allProducts.length < 100) {
+      try {
+        const fetched = await getProducts(1, 3000, {});
+        if (Array.isArray(fetched) && fetched.length > 0) allProducts = fetched;
+      } catch { /* use existing products state */ }
+    }
+
+    const resolvedItems = orderItems.map((item) => {
+      if (item.product?.model_no) return { ...item, _resolvedName: item.product.model_no };
+      if (item.product?.product_name) return { ...item, _resolvedName: item.product.product_name };
+      if (item.product_name) return { ...item, _resolvedName: item.product_name };
+      const found = allProducts.find(p => (p.product_id || p.id) === item.product_id);
+      return { ...item, _resolvedName: found?.model_no || found?.product_name || found?.name || item.product_id || 'N/A' };
+    });
+
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF();
+
+    const formatValue = (val) => String(val || '').replace('₹', 'Rs.');
+
+    // Header
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ORDER DETAILS', 14, 20);
+    doc.setDrawColor(200, 200, 200);
+    doc.line(14, 24, 196, 24);
+
+    // Order info
+    doc.setFontSize(11);
+    const info = [
+      ['Order ID',    row.orderId],
+      ['Order Type',  row.orderType],
+      ['Party Name',  row.client],
+      ['Status',      row.status],
+      ['Total Value', formatValue(row.value)],
+    ];
+    let y = 32;
+    info.forEach(([label, value]) => {
+      doc.setFont('helvetica', 'bold');
+      doc.text(`${label}:`, 14, y);
+      doc.setFont('helvetica', 'normal');
+      doc.text(String(value || 'N/A'), 60, y);
+      y += 8;
+    });
+
+    // Items section
+    y += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text('Order Items', 14, y);
+    doc.line(14, y + 2, 196, y + 2);
+    y += 10;
+
+    if (resolvedItems.length === 0) {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(11);
+      doc.text('No items', 14, y);
+    } else {
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('#',       14, y);
+      doc.text('Product', 24, y);
+      doc.text('Qty',    130, y);
+      doc.text('Price',  160, y);
+      y += 6;
+      doc.setDrawColor(180, 180, 180);
+      doc.line(14, y, 196, y);
+      y += 5;
+
+      doc.setFont('helvetica', 'normal');
+      resolvedItems.forEach((item, i) => {
+        doc.text(String(i + 1), 14, y);
+        doc.text(String(item._resolvedName).substring(0, 45), 24, y);
+        doc.text(String(item.quantity), 130, y);
+        doc.text(`Rs.${item.price}`, 160, y);
+        y += 7;
+      });
+    }
+
+    doc.save(`${row.orderId}.pdf`);
+  };
+
   const columns = useMemo(() => ([
     { key: 'orderId', label: 'ORDER ID' },
     { key: 'orderType', label: 'ORDER TYPE' },
@@ -740,13 +831,12 @@ const DashboardOrders = () => {
     { key: 'value', label: 'VALUE' },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions 
-        onView={() => console.log('view', row)} 
+        onView={() => setViewRow(row)} 
         onEdit={() => {
           setEditRow(row);
           setEditStatus(row?.status || 'PENDING');
         }} 
-        onDownload={() => console.log('download', row)} 
-        onDelete={() => handleDelete(row)} 
+        onDownload={() => handleDownload(row)} 
       />
     ) },
   ]), []);
@@ -827,6 +917,59 @@ const DashboardOrders = () => {
           </div>
         </div>
       </div>
+
+      {/* View Order Modal */}
+      <Modal open={!!viewRow} onClose={() => setViewRow(null)} title="Order Details" footer={(
+        <Button onClick={() => setViewRow(null)}>Close</Button>
+      )}>
+        {viewRow && (() => {
+          const order = viewRow.originalOrder;
+          const orderItems = parseOrderItems(order?.order_items);
+          return (
+            <div className="ui-form">
+              <div className="form-group">
+                <label className="ui-label">Order ID</label>
+                <input className="ui-input" value={viewRow.orderId || ''} disabled />
+              </div>
+              <div className="form-group">
+                <label className="ui-label">Order Type</label>
+                <input className="ui-input" value={viewRow.orderType || ''} disabled />
+              </div>
+              <div className="form-group">
+                <label className="ui-label">Party Name</label>
+                <input className="ui-input" value={viewRow.client || ''} disabled />
+              </div>
+              <div className="form-group">
+                <label className="ui-label">Status</label>
+                <input className="ui-input" value={viewRow.status || ''} disabled />
+              </div>
+              <div className="form-group">
+                <label className="ui-label">Total Value</label>
+                <input className="ui-input" value={viewRow.value || ''} disabled />
+              </div>
+              <div className="form-group">
+                <label className="ui-label">Order Items</label>
+                <div style={{ border: '1px solid #E0E0E0', borderRadius: '8px', padding: '12px' }}>
+                  {orderItems.length === 0 ? (
+                    <p style={{ color: '#999', margin: 0 }}>No items</p>
+                  ) : orderItems.map((item, i) => (
+                    <div key={i} style={{ padding: '6px 0', borderBottom: i < orderItems.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
+                      <span style={{ fontWeight: 500 }}>{item.product?.model_no || item.product?.product_name || item.product_name || products.find(p => (p.product_id || p.id) === item.product_id)?.model_no || products.find(p => (p.product_id || p.id) === item.product_id)?.product_name || item.product_id || 'Unknown'}</span>
+                      {' — '}Qty: {item.quantity} | Price: ₹{item.price}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {order?.order_notes && (
+                <div className="form-group">
+                  <label className="ui-label">Notes</label>
+                  <textarea className="ui-input" value={order.order_notes} disabled rows="2" />
+                </div>
+              )}
+            </div>
+          );
+        })()}
+      </Modal>
 
       {/* Edit Order Status Modal */}
       <Modal open={!!editRow} onClose={() => {
