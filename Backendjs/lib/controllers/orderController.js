@@ -13,6 +13,7 @@ const Zone = require('../models/Zone');
 const User = require('../models/User');
 const { Op } = require('sequelize');
 const salesmanTargetsController = require('./salesmanTargetsController');
+const DistributorZones = require('../models/DistributorZones');
 
 // Helper function to reverse an order operation (does not depend on controller instance)
 async function reverseOrderOperation(orderId) {
