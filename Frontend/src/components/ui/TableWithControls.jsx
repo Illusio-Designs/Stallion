@@ -199,6 +199,7 @@ export default function TableWithControls({
                   className="ui-pill"
                   ref={filterBtnRef}
                   title="Filters"
+                  onMouseDown={e => e.stopPropagation()}
                   onClick={() => setFilterOpen((v) => !v)}
                   style={{ borderRadius: "50%", padding: "8px 6px" }}
                 >
@@ -211,6 +212,7 @@ export default function TableWithControls({
                   <div
                     ref={filterPopoverRef}
                     className="ui-filter-popover"
+                    onMouseDown={e => e.stopPropagation()}
                     style={{
                       position: 'absolute',
                       right: 0,

@@ -324,7 +324,7 @@ const Cart = ({ onPageChange = null }) => {
   const calculateSubtotal = () => {
     return cartItems.reduce((total, item) => {
       // Extract numeric value from whp (e.g., "₹2,090" -> 2090)
-      const price = parseFloat(item.whp.replace(/[₹,]/g, "")) || 0;
+      const price = parseFloat(String(item.whp || item.mrp || 0).replace(/[₹,]/g, "")) || 0;
       return total + price * item.quantity;
     }, 0);
   };
@@ -398,7 +398,7 @@ const Cart = ({ onPageChange = null }) => {
         const quantity = editingQuantities[item.id] !== undefined 
           ? parseInt(editingQuantities[item.id], 10) || item.quantity 
           : item.quantity;
-        const price = parseFloat(item.whp.replace(/[₹,]/g, "")) || 0;
+        const price = parseFloat(String(item.whp || item.mrp || 0).replace(/[₹,]/g, "")) || 0;
         
         return {
           product_id: item.id,
@@ -1191,7 +1191,7 @@ const Cart = ({ onPageChange = null }) => {
                       </div>
                     </div>
                     <div className="item-subtotal">
-                      {formatPrice(parseFloat(item.whp.replace(/[₹,]/g, '')) * (parseInt(editingQuantities[item.id], 10) > 0 ? parseInt(editingQuantities[item.id], 10) : item.quantity))}
+                      {formatPrice(parseFloat(String(item.whp || item.mrp || 0).replace(/[₹,]/g, '')) * (parseInt(editingQuantities[item.id], 10) > 0 ? parseInt(editingQuantities[item.id], 10) : item.quantity))}
                     </div>
                     <div className="item-remove">
                       <button
