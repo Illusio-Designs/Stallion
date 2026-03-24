@@ -253,7 +253,12 @@ class OrderController {
                     console.log("zone", zone);
                     return res.status(404).json({ error: 'Zone not found' });
                 }
-                const distributor = await Distributor.findOne({ where: { zone_id: zone_id } });
+                const distributorZone = await DistributorZones.findOne({ where: { zone_id: zone_id } });
+                if (!distributorZone) {
+                    console.log("distributorZone", distributorZone);
+                    return res.status(404).json({ error: 'Distributor zone not found' });
+                }
+                const distributor = await Distributor.findOne({ where: { distributor_id: distributorZone.distributor_id } });
                 if (!distributor) {
                     console.log("distributor", distributor);
                     return res.status(404).json({ error: 'Distributor not found' });
