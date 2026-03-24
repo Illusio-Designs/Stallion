@@ -179,7 +179,7 @@ const DashboardSuppliers = () => {
   const [openTargetModal, setOpenTargetModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [targetForm, setTargetForm] = useState({
-    salesman_id: '', target_amount: '', target_date: '', order_type: '', target_description: '', target_remarks: '',
+    salesman_id: '', target_amount: '', start_date: '', end_date: '', order_type: '', target_description: '', target_remarks: '',
   });
   
   const [formData, setFormData] = useState({
@@ -1105,7 +1105,7 @@ const DashboardSuppliers = () => {
   };
 
   // ---- Target handlers ----
-  const resetTargetForm = () => setTargetForm({ salesman_id: '', target_amount: '', target_date: '', order_type: '', target_description: '', target_remarks: '' });
+  const resetTargetForm = () => setTargetForm({ salesman_id: '', target_amount: '', start_date: '', end_date: '', order_type: '', target_description: '', target_remarks: '' });
 
   const handleTargetSubmit = async (e) => {
     e.preventDefault();
@@ -1117,7 +1117,8 @@ const DashboardSuppliers = () => {
           ? (mySalesmanId || currentUser?.salesman_id || targetForm.salesman_id)
           : targetForm.salesman_id,
         target_amount: parseFloat(targetForm.target_amount) || 0,
-        target_date: targetForm.target_date,
+        start_date: targetForm.start_date,
+        end_date: targetForm.end_date,
         order_type: targetForm.order_type || undefined,
         target_description: targetForm.target_description,
         target_remarks: targetForm.target_remarks,
@@ -1145,7 +1146,8 @@ const DashboardSuppliers = () => {
     setTargetForm({
       salesman_id: row.salesman_id || '',
       target_amount: row.target_amount || '',
-      target_date: row.target_date ? row.target_date.split('T')[0] : '',
+      start_date: row.start_date ? row.start_date.split('T')[0] : '',
+      end_date: row.end_date ? row.end_date.split('T')[0] : '',
       order_type: row.order_type || '',
       target_description: row.target_description || '',
       target_remarks: row.target_remarks || '',
@@ -1307,7 +1309,8 @@ const DashboardSuppliers = () => {
               columns={[
                 ...(!isSalesman ? [{ key: 'salesman_id', label: 'SALESMAN', render: (v) => salesmanNameMap[v] || v || '-' }] : []),
                 { key: 'target_amount', label: 'TARGET AMOUNT', render: (v) => v ? `₹${parseFloat(v).toLocaleString('en-IN')}` : '-' },
-                { key: 'target_date', label: 'TARGET DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                { key: 'start_date', label: 'START DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                { key: 'end_date', label: 'END DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
                 { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
                 { key: 'target_status', label: 'STATUS', render: (v) => (
                   <span style={{
@@ -1771,8 +1774,12 @@ const DashboardSuppliers = () => {
             <input className="ui-input" type="number" placeholder="e.g. 10000" value={targetForm.target_amount} onChange={(e) => setTargetForm(prev => ({ ...prev, target_amount: e.target.value }))} required />
           </div>
           <div className="form-group">
-            <label className="ui-label">Target Date</label>
-            <input className="ui-input" type="date" value={targetForm.target_date} onChange={(e) => setTargetForm(prev => ({ ...prev, target_date: e.target.value }))} required />
+            <label className="ui-label">Start Date</label>
+            <input className="ui-input" type="date" value={targetForm.start_date} onChange={(e) => setTargetForm(prev => ({ ...prev, start_date: e.target.value }))} required />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">End Date</label>
+            <input className="ui-input" type="date" value={targetForm.end_date} onChange={(e) => setTargetForm(prev => ({ ...prev, end_date: e.target.value }))} required />
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Order Type</label>

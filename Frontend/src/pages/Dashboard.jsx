@@ -303,20 +303,21 @@ const Dashboard = () => {
               <table style={{width:'100%', borderCollapse:'separate', borderSpacing:0}}>
                 <thead>
                   <tr>
-                    {['TARGET AMOUNT','TARGET DATE','ORDER TYPE','STATUS','DESCRIPTION','REMARKS'].map(h => (
+                    {['TARGET AMOUNT','START DATE','END DATE','ORDER TYPE','STATUS','DESCRIPTION','REMARKS'].map(h => (
                       <th key={h} style={{textAlign:'left', padding:'10px 0', fontSize:11, color:'#000', borderBottom:'1px solid #E0E0E0', fontWeight:'600'}}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {targetsLoading ? (
-                    <tr><td colSpan="6" style={{padding:'16px', textAlign:'center', color:'#6b7280', fontSize:'13px'}}>Loading targets...</td></tr>
+                    <tr><td colSpan="7" style={{padding:'16px', textAlign:'center', color:'#6b7280', fontSize:'13px'}}>Loading targets...</td></tr>
                   ) : targets.length === 0 ? (
-                    <tr><td colSpan="6" style={{padding:'16px', textAlign:'center', color:'#6b7280', fontSize:'13px'}}>No targets assigned yet</td></tr>
+                    <tr><td colSpan="7" style={{padding:'16px', textAlign:'center', color:'#6b7280', fontSize:'13px'}}>No targets assigned yet</td></tr>
                   ) : targets.map((t, i) => (
                     <tr key={i}>
                       <td style={{padding:'10px 0', fontSize:'13px', fontWeight:'600'}}>₹{parseFloat(t.target_amount || 0).toLocaleString('en-IN')}</td>
-                      <td style={{padding:'10px 0', fontSize:'13px'}}>{t.target_date ? new Date(t.target_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'}) : '-'}</td>
+                      <td style={{padding:'10px 0', fontSize:'13px'}}>{t.start_date ? new Date(t.start_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'}) : '-'}</td>
+                      <td style={{padding:'10px 0', fontSize:'13px'}}>{t.end_date ? new Date(t.end_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'}) : '-'}</td>
                       <td style={{padding:'10px 0', fontSize:'13px'}}>{t.order_type || 'Overall'}</td>
                       <td style={{padding:'10px 0'}}>
                         <span style={{
