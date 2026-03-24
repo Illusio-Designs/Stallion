@@ -13,12 +13,126 @@ import {
   getCountries,
   getStates,
   getCities,
-  getZones,
+  getAllZones,
   register,
   getRoles,
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 import { getUser } from '../services/authService';
+
+// Multi-select zones dropdown (same design as distributor page)
+const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled = false }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const dropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const filtered = searchQuery
+    ? zones.filter(z => (z.zone_name || z.name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    : zones;
+
+  const allIds = zones.map(z => z.zone_id || z.id);
+  const allSelected = allIds.length > 0 && allIds.every(id => selectedZones.includes(id));
+
+  const displayValue = selectedZones.length === 0
+    ? 'Select Zones'
+    : selectedZones.length === allIds.length
+      ? 'All Zones'
+      : `${selectedZones.length} zone${selectedZones.length > 1 ? 's' : ''} selected`;
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+        setSearchQuery('');
+      }
+    };
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) {
+      setTimeout(() => searchInputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
+  const toggleZone = (zoneId) => {
+    const updated = selectedZones.includes(zoneId)
+      ? selectedZones.filter(id => id !== zoneId)
+      : [...selectedZones, zoneId];
+    onChange(updated);
+  };
+
+  const toggleAll = (e) => {
+    e.stopPropagation();
+    onChange(allSelected ? [] : [...allIds]);
+  };
+
+  return (
+    <div
+      ref={dropdownRef}
+      className={`ui-dropdown-custom ui-dropdown-custom--full-width ${isOpen ? 'ui-dropdown-custom--open' : ''} ${disabled ? 'ui-dropdown-custom--disabled' : ''}`}
+    >
+      <div className="ui-dropdown-custom__trigger" onClick={() => !disabled && setIsOpen(o => !o)}>
+        <span className={`ui-dropdown-custom__value ${selectedZones.length === 0 ? 'ui-dropdown-custom__value--placeholder' : ''}`}>
+          {displayValue}
+        </span>
+        <svg className="ui-dropdown-custom__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </div>
+      {isOpen && !disabled && (
+        <div className="ui-dropdown-custom__menu">
+          <div className="ui-dropdown-custom__search">
+            <input
+              ref={searchInputRef}
+              type="text"
+              className="ui-dropdown-custom__search-input"
+              placeholder="Search zones..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+          <div
+            className="ui-dropdown-custom__option"
+            style={{ borderBottom: '1px solid #e0e0e0', fontWeight: 600 }}
+            onClick={toggleAll}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} onClick={(e) => e.stopPropagation()} style={{ accentColor: '#181265', cursor: 'pointer' }} />
+              {allSelected ? 'Uncheck All' : 'Check All'}
+            </span>
+          </div>
+          <div className="ui-dropdown-custom__options">
+            {filtered.length === 0 ? (
+              <div className="ui-dropdown-custom__no-results">
+                {zones.length === 0 ? 'No zones available' : 'No results found'}
+              </div>
+            ) : filtered.map(zone => {
+              const zoneId = zone.zone_id || zone.id;
+              const zoneName = zone.zone_name || zone.name || '';
+              const isChecked = selectedZones.includes(zoneId);
+              return (
+                <div
+                  key={zoneId}
+                  className={`ui-dropdown-custom__option ${isChecked ? 'ui-dropdown-custom__option--selected' : ''}`}
+                  onClick={() => toggleZone(zoneId)}
+                >
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <input type="checkbox" checked={isChecked} onChange={() => toggleZone(zoneId)} onClick={(e) => e.stopPropagation()} style={{ accentColor: '#181265', cursor: 'pointer' }} />
+                    {zoneName}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const DashboardSuppliers = () => {
   const [activeTab, setActiveTab] = useState('All');
@@ -45,7 +159,7 @@ const DashboardSuppliers = () => {
     country_id: '',
     state_id: '',
     city_id: '',
-    zone_preference: '',
+    zones: [],
     joining_date: '',
   });
 
@@ -193,13 +307,9 @@ const DashboardSuppliers = () => {
     }
   };
 
-  const fetchZones = async (cityId) => {
-    if (!cityId) {
-      setZones([]);
-      return;
-    }
+  const fetchZones = async () => {
     try {
-      const zonesData = await getZones(cityId);
+      const zonesData = await getAllZones();
       setZones(zonesData || []);
     } catch (error) {
       console.error('Failed to load zones:', error);
@@ -227,6 +337,7 @@ const DashboardSuppliers = () => {
     if (selectedCountryFilter) {
       console.log('[Filter] Country changed, fetching salesmen for:', selectedCountryFilter);
       fetchSalesmenForCountry(selectedCountryFilter);
+      fetchZones();
     } else {
       // If no country selected (All Countries), clear salesmen
       console.log('[Filter] No country selected (All Countries), clearing salesmen');
@@ -239,18 +350,15 @@ const DashboardSuppliers = () => {
   useEffect(() => {
     if (formData.country_id) {
       fetchStates(formData.country_id);
-      // Only reset dependent fields if country actually changed by user (not during edit initialization)
       if (!isInitializingEditRef.current && prevCountryIdRef.current !== '' && prevCountryIdRef.current !== formData.country_id) {
-        setFormData(prev => ({ ...prev, state_id: '', city_id: '', zone_preference: '' }));
+        setFormData(prev => ({ ...prev, state_id: '', city_id: '' }));
         setCities([]);
-        setZones([]);
       }
       prevCountryIdRef.current = formData.country_id;
     } else {
       setStates([]);
       if (!isInitializingEditRef.current) {
         setCities([]);
-        setZones([]);
       }
       prevCountryIdRef.current = '';
     }
@@ -261,28 +369,12 @@ const DashboardSuppliers = () => {
     if (formData.state_id) {
       fetchCities(formData.state_id);
       if (!isInitializingEditRef.current) {
-        setFormData(prev => ({ ...prev, city_id: '', zone_preference: '' }));
-        setZones([]);
+        setFormData(prev => ({ ...prev, city_id: '' }));
       }
     } else {
       setCities([]);
-      if (!isInitializingEditRef.current) {
-        setZones([]);
-      }
     }
   }, [formData.state_id]);
-
-  // Fetch zones when city changes
-  useEffect(() => {
-    if (formData.city_id) {
-      fetchZones(formData.city_id);
-      if (!isInitializingEditRef.current) {
-        setFormData(prev => ({ ...prev, zone_preference: '' }));
-      }
-    } else {
-      setZones([]);
-    }
-  }, [formData.city_id]);
 
   const columns = useMemo(() => ([
     { key: 'employee_code', label: 'EMPLOYEE CODE' },
@@ -354,12 +446,11 @@ const DashboardSuppliers = () => {
       country_id: '',
       state_id: '',
       city_id: '',
-      zone_preference: '',
+      zones: [],
       joining_date: '',
     });
     setStates([]);
     setCities([]);
-    setZones([]);
     prevCountryIdRef.current = '';
   };
 
@@ -394,7 +485,7 @@ const DashboardSuppliers = () => {
       country_id: row.country_id || '',
       state_id: row.state_id || '',
       city_id: row.city_id || '',
-      zone_preference: row.zone_preference || '',
+      zones: Array.isArray(row.zones) ? row.zones.map(z => z.zone_id || z.id || z) : [],
       joining_date: row.joining_date ? row.joining_date.split('T')[0] : '',
     });
     setEditRow(row);
@@ -404,9 +495,6 @@ const DashboardSuppliers = () => {
       await fetchStates(row.country_id);
       if (row.state_id) {
         await fetchCities(row.state_id);
-        if (row.city_id) {
-          await fetchZones(row.city_id);
-        }
       }
     }
     
@@ -612,18 +700,24 @@ const DashboardSuppliers = () => {
       const trimmedReportingManager = formData.reporting_manager ? String(formData.reporting_manager).trim() : '';
       
       const dataToSend = {
-        user_id: editRow?.user_id || currentUserId, // Use existing user_id for update, or current user ID for create
+        user_id: editRow?.user_id || currentUserId,
         employee_code: formData.employee_code.trim(),
         alternate_phone: formData.alternate_phone ? formData.alternate_phone.trim() : '',
         full_name: formData.full_name.trim(),
-        reporting_manager: trimmedReportingManager !== '' ? trimmedReportingManager : null, // Send null instead of empty string
+        reporting_manager: trimmedReportingManager !== '' ? trimmedReportingManager : null,
         email: formData.email.trim(),
         phone: formData.phone.trim(),
         address: formData.address ? formData.address.trim() : '',
         country_id: formData.country_id,
         state_id: formData.state_id || '',
         city_id: formData.city_id || '',
-        zone_preference: formData.zone_preference || '',
+        zones: Array.isArray(formData.zones) ? formData.zones : [],
+        zone_preference: Array.isArray(formData.zones) && formData.zones.length > 0
+          ? formData.zones.map(zid => {
+              const z = zones.find(z => (z.zone_id || z.id) === zid);
+              return z ? (z.zone_name || z.name || '') : '';
+            }).filter(Boolean).join(', ')
+          : '',
         joining_date: formData.joining_date ? new Date(formData.joining_date).toISOString() : new Date().toISOString(),
       };
 
@@ -1014,21 +1108,12 @@ const DashboardSuppliers = () => {
               className="ui-dropdown-custom--full-width"
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Zone Preference</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Zone' },
-                ...zones.map(zone => ({
-                  value: zone.id,
-                  label: zone.name
-                }))
-              ]}
-              value={formData.zone_preference || ''}
-              onChange={(value) => handleInputChange('zone_preference', value || '')}
-              placeholder="Select Zone"
-              disabled={!formData.city_id}
-              className="ui-dropdown-custom--full-width"
+          <div className="form-group form-group--full">
+            <label className="ui-label">Zones</label>
+            <ZonesMultiDropdown
+              zones={zones}
+              selectedZones={formData.zones}
+              onChange={(selected) => handleInputChange('zones', selected)}
             />
           </div>
           <div className="form-group">
@@ -1206,21 +1291,12 @@ const DashboardSuppliers = () => {
               className="ui-dropdown-custom--full-width"
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Zone Preference</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Zone' },
-                ...zones.map(zone => ({
-                  value: zone.id,
-                  label: zone.name
-                }))
-              ]}
-              value={formData.zone_preference || ''}
-              onChange={(value) => handleInputChange('zone_preference', value || '')}
-              placeholder="Select Zone"
-              disabled={!formData.city_id}
-              className="ui-dropdown-custom--full-width"
+          <div className="form-group form-group--full">
+            <label className="ui-label">Zones</label>
+            <ZonesMultiDropdown
+              zones={zones}
+              selectedZones={formData.zones}
+              onChange={(selected) => handleInputChange('zones', selected)}
             />
           </div>
           <div className="form-group">

@@ -1,3 +1,4 @@
+
 /**
  * API Service
  * Centralized API service for all backend endpoints
@@ -2039,8 +2040,13 @@ export const getSalesmen = async (countryId) => {
         errorText.includes('no salesmen found') ||
         errorText.includes('salesman not found') ||
         error.statusCode === 404) {
-      // Return empty array for "not found" cases - this is a valid state
       console.log('[getSalesmen] No salesmen found for country, returning empty array');
+      return [];
+    }
+    // Handle missing salesman_zones table - backend DB issue, return empty array gracefully
+    if (errorMessage.includes('salesman_zones') || errorMessage.includes("doesn't exist") ||
+        errorText.includes('salesman_zones') || errorText.includes("doesn't exist")) {
+      console.warn('[getSalesmen] Backend DB error (missing salesman_zones table), returning empty array:', error.message);
       return [];
     }
     // Re-throw other errors
@@ -2122,6 +2128,8 @@ export const createSalesman = async (salesmanData) => {
     }
   }
   
+  const zonesArray = Array.isArray(salesmanData.zones) ? salesmanData.zones : [];
+
   const requestBody = {
     user_id: trimmedUserId,
     employee_code: trimmedEmployeeCode,
@@ -2133,7 +2141,8 @@ export const createSalesman = async (salesmanData) => {
     country_id: trimmedCountryId,
     state_id: state_id && String(state_id).trim() !== '' ? String(state_id).trim() : null,
     city_id: city_id && String(city_id).trim() !== '' ? String(city_id).trim() : null,
-    zone_id: zone_preference && String(zone_preference).trim() !== '' ? String(zone_preference).trim() : null,
+    zones: zonesArray,
+    zone_preference: salesmanData.zone_preference || '',
     joining_date: joining_date || new Date().toISOString(),
   };
   
@@ -2264,6 +2273,8 @@ export const updateSalesman = async (salesmanId, salesmanData) => {
     }
   }
   
+  const zonesArray = Array.isArray(salesmanData.zones) ? salesmanData.zones : [];
+
   const requestBody = {
     user_id: trimmedUserId,
     employee_code: trimmedEmployeeCode,
@@ -2275,7 +2286,8 @@ export const updateSalesman = async (salesmanId, salesmanData) => {
     country_id: trimmedCountryId,
     state_id: state_id && String(state_id).trim() !== '' ? String(state_id).trim() : '',
     city_id: city_id && String(city_id).trim() !== '' ? String(city_id).trim() : '',
-    zone_preference: zone_preference ? String(zone_preference).trim() : '',
+    zones: zonesArray,
+    zone_preference: salesmanData.zone_preference || '',
     joining_date: joining_date || new Date().toISOString(),
   };
   
