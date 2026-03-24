@@ -338,6 +338,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
         size: model.size_mm || 'N/A',
         qty: formatQty(model.total_qty || model.warehouse_qty || 0),
         image: getImageUrl(model.image_urls, model.image_url),
+        mrp: formatPrice(model.mrp),
+        whp: formatPrice(model.whp),
       };
     });
 
