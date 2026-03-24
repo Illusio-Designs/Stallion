@@ -329,12 +329,8 @@ const Cart = ({ onPageChange = null }) => {
     }, 0);
   };
 
-  const calculateTax = () => {
-    return 500; // Fixed tax as per image
-  };
-
   const calculateTotal = () => {
-    return calculateSubtotal() + calculateTax();
+    return calculateSubtotal();
   };
 
   const formatPrice = (amount) => {
@@ -1313,12 +1309,6 @@ const Cart = ({ onPageChange = null }) => {
                 <span className="breakdown-label">Subtotal:</span>
                 <span className="breakdown-value">
                   {formatPrice(calculateSubtotal())}
-                </span>
-              </div>
-              <div className="breakdown-item">
-                <span className="breakdown-label">Tax:</span>
-                <span className="breakdown-value">
-                  {formatPrice(calculateTax())}
                 </span>
               </div>
               <div className="breakdown-item total">
