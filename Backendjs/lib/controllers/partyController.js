@@ -11,6 +11,7 @@ const Cities = require('../models/Cities');
 const Zone = require('../models/Zone');
 const { Op } = require('sequelize');
 const DistributorZones = require('../models/DistributorZones');
+
 class PartyController {
     async getPartie(req, res) {
         try {
@@ -39,6 +40,55 @@ class PartyController {
         }
     }
 
+
+    async getMyParties(req, res) {
+        try {
+            const user = req.user;
+            if (!user) {
+                return res.status(400).json({ error: 'User is required' });
+            }
+            let parties = [];
+            const userRole = await UserRole.findOne({ where: { user_id: user.user_id } });
+            if (!userRole) {
+                return res.status(404).json({ error: 'User role not found' });
+            }
+            const role = await Role.findOne({ where: { role_id: userRole.role_id } });
+            if (!role) {
+                return res.status(404).json({ error: 'Role not found' });
+            }
+            const roleName = role.role_name.toLowerCase();
+            console.log("roleName", roleName);
+            if (roleName === 'party') {
+                const party = await Party.findOne({ where: { user_id: user.user_id } });
+                if (!party) {
+                    return res.status(404).json({ error: 'Party not found' });
+                }
+                parties = [party];
+            } else if (roleName === 'salesman') {
+                const salesman = await Salesman.findOne({ where: { user_id: user.user_id } });
+                if (!salesman) {
+                    return res.status(404).json({ error: 'Salesman not found' });
+                }
+                console.log("salesman", salesman.salesman_id);
+                parties = await Party.findAll({ where: { salesman_id: salesman.salesman_id } });
+            } else if (roleName === 'distributor') {
+                const distributor = await Distributor.findOne({ where: { user_id: user.user_id } });
+                if (!distributor) {
+                    return res.status(404).json({ error: 'Distributor not found' });
+                }
+                console.log("distributor", distributor.distributor_id);
+                parties = await Party.findAll({ where: { distributor_id: distributor.distributor_id } });
+            } else {
+                return res.status(400).json({ error: `Role '${roleName}' is not supported for this operation` });
+            }
+            if (!parties || parties.length === 0) {
+                return res.status(404).json({ error: 'Parties not found' });
+            }
+            res.status(200).json(parties);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
     async getPartiesBySalesmanId(req, res) {
         try {
             const salesman_id = req.params.salesman_id;
