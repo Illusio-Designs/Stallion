@@ -919,9 +919,8 @@ const DashboardClients = () => {
             throw new Error('Failed to create user account. User ID not returned.');
           }
 
-          // Create party (backend should link user_id based on phone/email)
-          // The backend should automatically link the user account created above
-          const newParty = await createParty(dataToSend);
+          // Create party linked to the new user account
+          const newParty = await createParty({ ...dataToSend, user_id: newUserId });
           showSuccess('Party created successfully!');
           
           // Optimistically add to table if it matches the current filter

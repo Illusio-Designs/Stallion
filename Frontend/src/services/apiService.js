@@ -1632,6 +1632,7 @@ export const createParty = async (partyData) => {
     pan,
     credit_days,
     prefered_courier,
+    user_id,
   } = partyData;
   
   // Helper functions to get validated UUIDs
@@ -1674,6 +1675,7 @@ const getCityId = () => {
       ? Number(credit_days) 
       : undefined,
     prefered_courier: prefered_courier ? String(prefered_courier) : undefined,
+    user_id: (user_id && isValidUUID(user_id)) ? String(user_id).trim() : undefined,
   };
   
   // Validate that all required fields are present (no undefined)
