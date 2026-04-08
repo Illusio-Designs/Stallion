@@ -905,8 +905,6 @@ const DashboardOrders = () => {
               title="Order Overview"
               columns={columns}
               rows={filteredRowsByTab}
-              onAddNew={() => setCreateModalOpen(true)}
-              addNewText="Create Order"
               onImport={() => console.log('import orders')}
               importText="Import All Orders Data"
               dateRange={dateRange}
