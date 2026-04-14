@@ -38,16 +38,14 @@ export const useTokenMonitor = (isDashboard = false) => {
         if (!currentPath.includes('/login')) {
           setTimeout(() => {
             window.location.href = '/login';
-            // Reset flag after redirect
             setTimeout(() => {
               window.__hasShownLogoutNotification = false;
-            }, 1000);
-          }, 500);
+            }, 500);
+          }, 100);
         } else {
-          // Reset flag if already on login page
           setTimeout(() => {
             window.__hasShownLogoutNotification = false;
-          }, 1000);
+          }, 500);
         }
         
         // Clear the interval since we're logging out

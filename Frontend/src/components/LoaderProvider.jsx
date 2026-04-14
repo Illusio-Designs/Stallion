@@ -1,7 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
-import Loader from './Loader';
+import React, { createContext, useContext } from 'react';
 
 const LoaderContext = createContext();
 
@@ -14,19 +12,7 @@ export const useLoaderContext = () => {
 };
 
 const LoaderProvider = ({ children }) => {
-  const [isLoading, setIsLoading] = useState(true); // Show loader on initial mount
-  const pathname = usePathname();
-
-  useEffect(() => {
-    setIsLoading(true);
-    const timer = setTimeout(() => {
-      setIsLoading(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [pathname]);
-
-  // Only render loader or content
-  return isLoading ? <Loader isLoading={true} /> : <>{children}</>;
+  return <>{children}</>;
 };
 
 export default LoaderProvider;

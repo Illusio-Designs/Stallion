@@ -151,13 +151,13 @@ const handleResponse = async (response) => {
       if (!currentPath.includes('/login')) {
         setTimeout(() => {
           window.location.href = '/login';
-        }, 500); // Small delay to ensure notification is visible
+        }, 100); // Small delay to ensure notification is visible
       } else {
         // Reset flag if already on login page
         setTimeout(() => {
           isRedirecting = false;
           window.__hasShownLogoutNotification = false;
-        }, 1000);
+        }, 500);
       }
     }
     
@@ -234,13 +234,13 @@ const apiRequest = async (endpoint, options = {}) => {
       if (!currentPath.includes('/login')) {
         setTimeout(() => {
           window.location.href = '/login';
-        }, 500);
+        }, 100);
       }
       
       setTimeout(() => {
         isRedirecting = false;
         window.__hasShownLogoutNotification = false;
-      }, 1000);
+      }, 500);
       
       // Throw error to prevent the API call
       const error = new Error('Token not found. Please login again.');

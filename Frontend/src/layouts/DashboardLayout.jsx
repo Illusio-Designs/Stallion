@@ -5,15 +5,6 @@ import DashboardSidebar from '../components/DashboardSidebar';
 import DashboardFooter from '../components/DashboardFooter';
 import { useTokenMonitor } from '../hooks/useTokenMonitor';
 
-// Import Instrument Sans font in dashboard pages (font-face is best, but for now add Google font via link in head for demonstration)
-if (typeof window !== 'undefined' && !document.getElementById('instrument-sans-font')) {
-  const link = document.createElement('link');
-  link.id = 'instrument-sans-font';
-  link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap';
-  document.head.appendChild(link);
-}
-
 const DashboardLayout = ({ children, currentPage, onPageChange }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
 

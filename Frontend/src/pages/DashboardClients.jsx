@@ -797,9 +797,6 @@ const DashboardClients = () => {
         // Wrap in async IIFE to prevent any errors from bubbling up
         (async () => {
           try {
-            // Small delay to help backend initialize properly
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
             try {
               const updatedParty = await updateParty(partyId.trim(), dataToSend);
               

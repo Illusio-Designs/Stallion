@@ -1,42 +1,40 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
-import { flushSync } from 'react-dom';
 import AuthLayout from '../layouts/AuthLayout';
 import PublicLayout from '../layouts/PublicLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
 import '../styles/globals.css';
-import Loader from '../components/Loader';
 import { getUserRole, isLoggedIn } from '../services/authService';
 import { hasPageAccess } from '../utils/rolePermissions';
 
-// Auth Pages
-import Login from './Login';
-import Register from './Register';
+// Auth Pages - lazy loaded
+const Login = lazy(() => import('./Login'));
+const Register = lazy(() => import('./Register'));
 
-// Public Pages
-import Home from './Home';
-import About from './About';
-import Cart from './Cart';
-import Products from './Products';
-import ProductDetail from './ProductDetail';
-import PrivacyPolicy from './PrivacyPolicy';
+// Public Pages - lazy loaded
+const Home = lazy(() => import('./Home'));
+const About = lazy(() => import('./About'));
+const Cart = lazy(() => import('./Cart'));
+const Products = lazy(() => import('./Products'));
+const ProductDetail = lazy(() => import('./ProductDetail'));
+const PrivacyPolicy = lazy(() => import('./PrivacyPolicy'));
 
-// Dashboard Pages
-import Dashboard from './Dashboard';
-import DashboardProducts from './DashboardProducts';
-import DashboardOrders from './DashboardOrders';
-import DashboardClients from './DashboardClients';
-import DashboardSuppliers from './DashboardSuppliers';
-import DashboardDistributor from './DashboardDistributor';
-import DashboardOfficeTeam from './DashboardOfficeTeam';
-import DashboardManage from './DashboardManage';
-import DashboardTray from './DashboardTray';
-import DashboardEvents from './DashboardEvents';
-import AnalyticsReports from './AnalyticsReports';
-import DashboardSupport from './DashboardSupport';
-import DashboardSettings from './DashboardSettings';
-import DashboardExpenses from './DashboardExpenses';
+// Dashboard Pages - lazy loaded
+const Dashboard = lazy(() => import('./Dashboard'));
+const DashboardProducts = lazy(() => import('./DashboardProducts'));
+const DashboardOrders = lazy(() => import('./DashboardOrders'));
+const DashboardClients = lazy(() => import('./DashboardClients'));
+const DashboardSuppliers = lazy(() => import('./DashboardSuppliers'));
+const DashboardDistributor = lazy(() => import('./DashboardDistributor'));
+const DashboardOfficeTeam = lazy(() => import('./DashboardOfficeTeam'));
+const DashboardManage = lazy(() => import('./DashboardManage'));
+const DashboardTray = lazy(() => import('./DashboardTray'));
+const DashboardEvents = lazy(() => import('./DashboardEvents'));
+const AnalyticsReports = lazy(() => import('./AnalyticsReports'));
+const DashboardSupport = lazy(() => import('./DashboardSupport'));
+const DashboardSettings = lazy(() => import('./DashboardSettings'));
+const DashboardExpenses = lazy(() => import('./DashboardExpenses'));
 
 const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   const router = useRouter();
@@ -121,12 +119,9 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
     // Determine layout based on page
     const layout = getLayoutFromPage(page);
 
-    // Delay rendering new page for 2 seconds to show loader first
-    setTimeout(() => {
-      setCurrentPage(page);
-      setCurrentProductId(productId);
-      setCurrentLayout(layout);
-    }, 2000);
+    setCurrentPage(page);
+    setCurrentProductId(productId);
+    setCurrentLayout(layout);
   };
 
   const renderPage = () => {
@@ -225,7 +220,9 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
 
   return (
     <div className="app">
-      {renderLayout()}
+      <Suspense fallback={null}>
+        {renderLayout()}
+      </Suspense>
     </div>
   );
 };

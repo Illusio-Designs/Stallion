@@ -947,7 +947,7 @@ const DashboardDistributor = () => {
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
               const { checkUser } = await import('../services/apiService');
-              await new Promise(resolve => setTimeout(resolve, 500 * (attempt + 1))); // Wait 500ms, 1s, 1.5s
+              await new Promise(resolve => setTimeout(resolve, 100 * (attempt + 1))); // Wait 100ms, 200ms, 300ms
               const checkResponse = await checkUser(phoneNumber, { autoSendOTP: false });
               console.log(`[Create Distributor] User verification attempt ${attempt + 1}:`, checkResponse);
               if (checkResponse && !checkResponse.error) {
@@ -1023,7 +1023,7 @@ const DashboardDistributor = () => {
           }
           
           // Wait a moment and verify user can be found
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          await new Promise(resolve => setTimeout(resolve, 200));
           
           try {
             const { checkUser } = await import('../services/apiService');
