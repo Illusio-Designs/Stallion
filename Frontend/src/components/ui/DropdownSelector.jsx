@@ -10,6 +10,7 @@ export default function DropdownSelector({
   className = '',
   disabled = false,
   searchable = true, // Enable search by default
+  onOpen, // Called when the dropdown is opened (use to lazy-load options)
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,10 +64,13 @@ export default function DropdownSelector({
 
   const handleToggle = () => {
     if (!disabled) {
-      setIsOpen(!isOpen);
-      if (isOpen) {
+      if (!isOpen) {
+        // Opening: give the parent a chance to lazy-load the options
+        onOpen?.();
+      } else {
         setSearchQuery(''); // Reset search when closing
       }
+      setIsOpen(!isOpen);
     }
   };
 

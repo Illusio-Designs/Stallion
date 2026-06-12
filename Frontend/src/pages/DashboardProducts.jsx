@@ -137,9 +137,6 @@ const DashboardProducts = () => {
   // Server-side pagination for the Products listing (load 20 at a time)
   const [productPage, setProductPage] = useState(1);
   const [productPageCount, setProductPageCount] = useState(1);
-  // Attribute/lookup data is loaded once (it's needed to display names and to
-  // power the Add/Edit form). Cached at the service layer.
-  const [relatedLoaded, setRelatedLoaded] = useState(false);
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [openBulkUpload, setOpenBulkUpload] = useState(false);
@@ -332,26 +329,39 @@ const DashboardProducts = () => {
     }
   };
 
-  // Load attribute/lookup data once (brands, collections, genders, etc.).
-  // Used both to display attribute names in the table and to populate the
-  // Add/Edit form dropdowns. Results are cached at the service layer.
-  const ensureRelatedData = async () => {
-    if (relatedLoaded) return;
-    await fetchRelatedData();
-    setRelatedLoaded(true);
+  // Per-attribute lazy loaders. Each lookup (brands, genders, shapes, ...) is
+  // fetched only the FIRST time its dropdown is opened in the Add/Edit form -
+  // never on the listing page load. Guarded so it runs once per attribute.
+  const lookupLoaded = useRef({});
+  const loadLookup = async (key, fetcher, setter) => {
+    if (lookupLoaded.current[key]) return;
+    lookupLoaded.current[key] = true;
+    try {
+      const data = await fetcher();
+      setter(data || []);
+    } catch (e) {
+      lookupLoaded.current[key] = false; // allow retry on next open
+      console.error(`Failed to load ${key}:`, e);
+    }
   };
+  const loadBrands = () => loadLookup('brands', getBrands, setBrands);
+  const loadCollections = () => loadLookup('collections', getCollections, setCollections);
+  const loadGenders = () => loadLookup('genders', getGenders, setGenders);
+  const loadColorCodes = () => loadLookup('colorCodes', getColorCodes, setColorCodes);
+  const loadShapes = () => loadLookup('shapes', getShapes, setShapes);
+  const loadLensColors = () => loadLookup('lensColors', getLensColors, setLensColors);
+  const loadFrameColors = () => loadLookup('frameColors', getFrameColors, setFrameColors);
+  const loadFrameTypes = () => loadLookup('frameTypes', getFrameTypes, setFrameTypes);
+  const loadLensMaterials = () => loadLookup('lensMaterials', getLensMaterials, setLensMaterials);
+  const loadFrameMaterials = () => loadLookup('frameMaterials', getFrameMaterials, setFrameMaterials);
 
   // Lightweight paginated fetch for the Products listing tab.
-  // Fetches only ONE page (20) of products instead of the whole catalog.
+  // Fetches only ONE page (20) of products - NO attribute lookups on listing.
   const fetchProductsPage = async (targetPage = 1) => {
     try {
       setLoading(true);
       setError(null);
-      // Fetch the page of products and ensure lookup data is available (cached).
-      const [data] = await Promise.all([
-        getProducts(targetPage, PRODUCTS_PER_PAGE, null),
-        ensureRelatedData(),
-      ]);
+      const data = await getProducts(targetPage, PRODUCTS_PER_PAGE, null);
       const list = Array.isArray(data) ? data : [];
       setProducts(list);
       setProductPage(targetPage);
@@ -915,7 +925,6 @@ const DashboardProducts = () => {
       
       // Refresh products to get updated values
       await fetchProductsWithoutLoading();
-      await fetchRelatedData();
       await fetchAllUploads(); // Refresh the images list in the modal
 
       showSuccess(`Image attached to product ${product.model_no || 'successfully'}!`);
@@ -1053,7 +1062,6 @@ const DashboardProducts = () => {
       
       // Refresh products to get updated values
       await fetchProductsWithoutLoading();
-      await fetchRelatedData();
       await fetchAllUploads(); // Refresh the images list in the modal
 
       const skippedCount = newImagePaths.length - uniqueNewPaths.length;
@@ -1102,25 +1110,25 @@ const DashboardProducts = () => {
         product_id: product.product_id || product.id,
         model_no: product.model_no || '',
         gender_id: product.gender_id || '',
-        gender_name: gender?.gender_name || gender?.name || 'N/A',
+        gender_name: gender?.gender_name || gender?.name || product.gender_name || product.gender?.gender_name || 'N/A',
         color_code_id: product.color_code_id || '',
-        color_code_name: colorCode?.color_code || colorCode?.name || 'N/A',
+        color_code_name: colorCode?.color_code || colorCode?.name || product.color_code_name || product.color_code?.color_code || 'N/A',
         shape_id: product.shape_id || '',
-        shape_name: shape?.shape_name || shape?.name || 'N/A',
+        shape_name: shape?.shape_name || shape?.name || product.shape_name || product.shape?.shape_name || 'N/A',
         lens_color_id: product.lens_color_id || '',
-        lens_color_name: lensColor?.lens_color || lensColor?.name || 'N/A',
+        lens_color_name: lensColor?.lens_color || lensColor?.name || product.lens_color_name || product.lens_color?.lens_color || 'N/A',
         frame_color_id: product.frame_color_id || '',
-        frame_color_name: frameColor?.frame_color || frameColor?.name || 'N/A',
+        frame_color_name: frameColor?.frame_color || frameColor?.name || product.frame_color_name || product.frame_color?.frame_color || 'N/A',
         frame_type_id: product.frame_type_id || '',
-        frame_type_name: frameType?.frame_type || frameType?.name || 'N/A',
+        frame_type_name: frameType?.frame_type || frameType?.name || product.frame_type_name || product.frame_type?.frame_type || 'N/A',
         lens_material_id: product.lens_material_id || '',
-        lens_material_name: lensMaterial?.lens_material || lensMaterial?.name || 'N/A',
+        lens_material_name: lensMaterial?.lens_material || lensMaterial?.name || product.lens_material_name || product.lens_material?.lens_material || 'N/A',
         frame_material_id: product.frame_material_id || '',
-        frame_material_name: frameMaterial?.frame_material || frameMaterial?.name || 'N/A',
+        frame_material_name: frameMaterial?.frame_material || frameMaterial?.name || product.frame_material_name || product.frame_material?.frame_material || 'N/A',
         brand_id: product.brand_id || '',
-        brand: brand?.brand_name || 'N/A',
+        brand: brand?.brand_name || product.brand_name || product.brand?.brand_name || 'N/A',
         collection_id: product.collection_id || '',
-        collection: collection?.collection_name || 'N/A',
+        collection: collection?.collection_name || product.collection_name || product.collection?.collection_name || 'N/A',
         mrp: product.mrp || '0.00',
         mrp_formatted: `₹${parseFloat(product.mrp || 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
         whp: product.whp || '0.00',
@@ -1737,13 +1745,13 @@ const DashboardProducts = () => {
   };
 
   const handleAdd = () => {
-    ensureRelatedData(); // make sure dropdown options are loaded
+    // Attribute lookups load lazily when each dropdown is opened (onOpen).
     resetForm();
     setOpenAdd(true);
   };
 
   const handleEdit = (row) => {
-    ensureRelatedData(); // make sure dropdown options are loaded
+    // Attribute lookups load lazily when each dropdown is opened (onOpen).
     const product = row.data;
     setFormData({
       model_no: product.model_no || '',
@@ -2085,7 +2093,6 @@ const DashboardProducts = () => {
         }
         
         await fetchProductsWithoutLoading();
-        await fetchRelatedData();
       }
       
       // Handle orphaned images (uploaded without product_id)
@@ -2243,7 +2250,6 @@ const DashboardProducts = () => {
       
       // Refresh products list
       await fetchProductsWithoutLoading();
-      await fetchRelatedData();
       
       // Clear selection and close modal after 3 seconds
       setTimeout(() => {
@@ -2657,6 +2663,7 @@ const DashboardProducts = () => {
               value={formData.brand_id}
               onChange={(value) => handleInputChange('brand_id', value)}
               placeholder="Select brand"
+              onOpen={loadBrands}
             />
           </div>
           <div className="form-group">
@@ -2669,6 +2676,7 @@ const DashboardProducts = () => {
               value={formData.collection_id}
               onChange={(value) => handleInputChange('collection_id', value)}
               placeholder="Select collection"
+              onOpen={loadCollections}
             />
           </div>
           <div className="form-group">
@@ -2681,6 +2689,7 @@ const DashboardProducts = () => {
               value={formData.gender_id}
               onChange={(value) => handleInputChange('gender_id', value)}
               placeholder="Select gender"
+              onOpen={loadGenders}
             />
           </div>
           <div className="form-group">
@@ -2693,6 +2702,7 @@ const DashboardProducts = () => {
               value={formData.color_code_id}
               onChange={(value) => handleInputChange('color_code_id', value)}
               placeholder="Select color code"
+              onOpen={loadColorCodes}
             />
           </div>
           <div className="form-group">
@@ -2705,6 +2715,7 @@ const DashboardProducts = () => {
               value={formData.shape_id}
               onChange={(value) => handleInputChange('shape_id', value)}
               placeholder="Select shape"
+              onOpen={loadShapes}
             />
           </div>
           <div className="form-group">
@@ -2717,6 +2728,7 @@ const DashboardProducts = () => {
               value={formData.lens_color_id}
               onChange={(value) => handleInputChange('lens_color_id', value)}
               placeholder="Select lens color"
+              onOpen={loadLensColors}
             />
           </div>
           <div className="form-group">
@@ -2729,6 +2741,7 @@ const DashboardProducts = () => {
               value={formData.frame_color_id}
               onChange={(value) => handleInputChange('frame_color_id', value)}
               placeholder="Select frame color"
+              onOpen={loadFrameColors}
             />
           </div>
           <div className="form-group">
@@ -2741,6 +2754,7 @@ const DashboardProducts = () => {
               value={formData.frame_type_id}
               onChange={(value) => handleInputChange('frame_type_id', value)}
               placeholder="Select frame type"
+              onOpen={loadFrameTypes}
             />
           </div>
           <div className="form-group">
@@ -2753,6 +2767,7 @@ const DashboardProducts = () => {
               value={formData.lens_material_id}
               onChange={(value) => handleInputChange('lens_material_id', value)}
               placeholder="Select lens material"
+              onOpen={loadLensMaterials}
             />
           </div>
           <div className="form-group">
@@ -2765,6 +2780,7 @@ const DashboardProducts = () => {
               value={formData.frame_material_id}
               onChange={(value) => handleInputChange('frame_material_id', value)}
               placeholder="Select frame material"
+              onOpen={loadFrameMaterials}
             />
           </div>
           <div className="form-group">
@@ -2877,6 +2893,7 @@ const DashboardProducts = () => {
               value={formData.brand_id}
               onChange={(value) => handleInputChange('brand_id', value)}
               placeholder="Select brand"
+              onOpen={loadBrands}
             />
           </div>
           <div className="form-group">
@@ -2889,6 +2906,7 @@ const DashboardProducts = () => {
               value={formData.collection_id}
               onChange={(value) => handleInputChange('collection_id', value)}
               placeholder="Select collection"
+              onOpen={loadCollections}
             />
           </div>
           <div className="form-group">
@@ -2901,6 +2919,7 @@ const DashboardProducts = () => {
               value={formData.gender_id}
               onChange={(value) => handleInputChange('gender_id', value)}
               placeholder="Select gender"
+              onOpen={loadGenders}
             />
           </div>
           <div className="form-group">
@@ -2913,6 +2932,7 @@ const DashboardProducts = () => {
               value={formData.color_code_id}
               onChange={(value) => handleInputChange('color_code_id', value)}
               placeholder="Select color code"
+              onOpen={loadColorCodes}
             />
           </div>
           <div className="form-group">
@@ -2925,6 +2945,7 @@ const DashboardProducts = () => {
               value={formData.shape_id}
               onChange={(value) => handleInputChange('shape_id', value)}
               placeholder="Select shape"
+              onOpen={loadShapes}
             />
           </div>
           <div className="form-group">
@@ -2937,6 +2958,7 @@ const DashboardProducts = () => {
               value={formData.lens_color_id}
               onChange={(value) => handleInputChange('lens_color_id', value)}
               placeholder="Select lens color"
+              onOpen={loadLensColors}
             />
           </div>
           <div className="form-group">
@@ -2949,6 +2971,7 @@ const DashboardProducts = () => {
               value={formData.frame_color_id}
               onChange={(value) => handleInputChange('frame_color_id', value)}
               placeholder="Select frame color"
+              onOpen={loadFrameColors}
             />
           </div>
           <div className="form-group">
@@ -2961,6 +2984,7 @@ const DashboardProducts = () => {
               value={formData.frame_type_id}
               onChange={(value) => handleInputChange('frame_type_id', value)}
               placeholder="Select frame type"
+              onOpen={loadFrameTypes}
             />
           </div>
           <div className="form-group">
@@ -2973,6 +2997,7 @@ const DashboardProducts = () => {
               value={formData.lens_material_id}
               onChange={(value) => handleInputChange('lens_material_id', value)}
               placeholder="Select lens material"
+              onOpen={loadLensMaterials}
             />
           </div>
           <div className="form-group">
@@ -2985,6 +3010,7 @@ const DashboardProducts = () => {
               value={formData.frame_material_id}
               onChange={(value) => handleInputChange('frame_material_id', value)}
               placeholder="Select frame material"
+              onOpen={loadFrameMaterials}
             />
           </div>
           <div className="form-group">

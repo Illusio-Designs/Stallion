@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import '../styles/pages/Products.css';
 import ProductCard from '../components/ProductCard';
 import { isLoggedIn } from '../services/authService';
@@ -10,7 +10,6 @@ import {
   getFrameTypes,
   getLensMaterials,
   getFrameMaterials,
-  getColorCodes,
   getLensColors,
   getFrameColors,
   getBrands
@@ -103,7 +102,6 @@ const Products = ({ onPageChange }) => {
   const [shapesData, setShapesData] = useState([]);
   const [lensColorsData, setLensColorsData] = useState([]);
   const [frameColorsData, setFrameColorsData] = useState([]);
-  const [colorCodesData, setColorCodesData] = useState([]);
   const [lensMaterialsData, setLensMaterialsData] = useState([]);
   const [frameMaterialsData, setFrameMaterialsData] = useState([]);
   const [frameTypesData, setFrameTypesData] = useState([]);
@@ -140,37 +138,38 @@ const Products = ({ onPageChange }) => {
   };
 
 
-  // Fetch filter options on mount
+  // Lazy filter loaders: each filter's options are fetched only the first time
+  // its sidebar section is expanded - not all at once on page load.
+  const filterLoaded = useRef({});
+  const filterLoaders = {
+    brands: [getBrands, setBrandsData],
+    frameMaterial: [getFrameMaterials, setFrameMaterialsData],
+    shape: [getShapes, setShapesData],
+    type: [getFrameTypes, setFrameTypesData],
+    gender: [getGenders, setGendersData],
+    lensColor: [getLensColors, setLensColorsData],
+    lensMaterial: [getLensMaterials, setLensMaterialsData],
+    frameColor: [getFrameColors, setFrameColorsData],
+  };
+  const loadFilterData = async (section) => {
+    const entry = filterLoaders[section];
+    if (!entry || filterLoaded.current[section]) return;
+    filterLoaded.current[section] = true;
+    try {
+      const data = await entry[0]();
+      entry[1](data || []);
+    } catch (err) {
+      filterLoaded.current[section] = false; // allow retry
+      console.error(`Failed to load ${section} filter options:`, err);
+    }
+  };
+
+  // Load only the section(s) expanded by default (brands) on mount.
   useEffect(() => {
-    const fetchFilterOptions = async () => {
-      try {
-        const [brands, genders, shapes, frameTypes, lensMaterials, frameMaterials, colorCodes, lensColors, frameColors] = await Promise.all([
-          getBrands().catch(() => []),
-          getGenders().catch(() => []),
-          getShapes().catch(() => []),
-          getFrameTypes().catch(() => []),
-          getLensMaterials().catch(() => []),
-          getFrameMaterials().catch(() => []),
-          getColorCodes().catch(() => []),
-          getLensColors().catch(() => []),
-          getFrameColors().catch(() => [])
-        ]);
-        
-        setBrandsData(brands || []);
-        setGendersData(genders || []);
-        setShapesData(shapes || []);
-        setFrameTypesData(frameTypes || []);
-        setLensMaterialsData(lensMaterials || []);
-        setFrameMaterialsData(frameMaterials || []);
-        setColorCodesData(colorCodes || []);
-        setLensColorsData(lensColors || []);
-        setFrameColorsData(frameColors || []);
-      } catch (err) {
-        console.error('Error fetching filter options:', err);
-      }
-    };
-    
-    fetchFilterOptions();
+    Object.keys(expandedSections).forEach((s) => {
+      if (expandedSections[s]) loadFilterData(s);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Build filter object for API - Only include fields with actual values
@@ -351,10 +350,11 @@ const Products = ({ onPageChange }) => {
   };
 
   const toggleSection = (section) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
+    setExpandedSections(prev => {
+      const next = { ...prev, [section]: !prev[section] };
+      if (next[section]) loadFilterData(section); // fetch options on first expand
+      return next;
+    });
   };
 
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);

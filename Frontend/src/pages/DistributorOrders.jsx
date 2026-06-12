@@ -109,8 +109,15 @@ const DistributorOrders = () => {
   // Fetch orders on mount
   useEffect(() => {
     fetchOrders();
-    fetchInitialData();
   }, []);
+
+  // Load create-order form data (products) only when the create modal opens.
+  useEffect(() => {
+    if (createModalOpen && products.length === 0) {
+      fetchInitialData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createModalOpen]);
 
   // Update distributor_id when user data changes
   useEffect(() => {
