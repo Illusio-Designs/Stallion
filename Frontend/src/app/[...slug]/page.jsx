@@ -2,6 +2,7 @@
 import { Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import App from '../../pages/App';
+import Loader from '../../components/Loader';
 
 function DynamicPageContent() {
   const pathname = usePathname();
@@ -21,7 +22,7 @@ function DynamicPageContent() {
 
 export default function DynamicPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<Loader isLoading={true} />}>
       <DynamicPageContent />
     </Suspense>
   );

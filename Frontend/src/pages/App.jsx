@@ -4,6 +4,7 @@ import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import AuthLayout from '../layouts/AuthLayout';
 import PublicLayout from '../layouts/PublicLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
+import Loader from '../components/Loader';
 import '../styles/globals.css';
 import { getUserRole, isLoggedIn } from '../services/authService';
 import { hasPageAccess } from '../utils/rolePermissions';
@@ -220,7 +221,7 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
 
   return (
     <div className="app">
-      <Suspense fallback={null}>
+      <Suspense fallback={<Loader isLoading={true} />}>
         {renderLayout()}
       </Suspense>
     </div>

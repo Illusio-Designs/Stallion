@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import '../styles/pages/Home.css';
 import ProductCard from '../components/ProductCard';
+import Skeleton from '../components/ui/Skeleton';
 import { getFeaturedProducts, getCollections } from '../services/apiService';
 import { isLoggedIn } from '../services/authService';
 
@@ -180,9 +181,9 @@ const Home = ({ onPageChange }) => {
 
         <div className="collection-filters">
           {loadingCollections ? (
-            <div className="white-loader-container" style={{ padding: '1rem' }}>
-              <div className="white-loader"></div>
-            </div>
+            Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={`filter-skeleton-${i}`} width={96} height={36} radius={18} style={{ marginRight: 8 }} />
+            ))
           ) : (
             filters.map((filter) => (
               <button
@@ -198,9 +199,13 @@ const Home = ({ onPageChange }) => {
 
         <div className="products-grid">
           {loadingProducts ? (
-            <div style={{ gridColumn: '1 / -1' }} className="white-loader-container">
-              <div className="white-loader"></div>
-            </div>
+            Array.from({ length: 8 }).map((_, i) => (
+              <div key={`home-product-skeleton-${i}`} style={{ padding: 8 }}>
+                <Skeleton width="100%" height={180} radius={12} />
+                <Skeleton width="70%" height={16} style={{ marginTop: 12, display: 'block' }} />
+                <Skeleton width="40%" height={14} style={{ marginTop: 8, display: 'block' }} />
+              </div>
+            ))
           ) : featuredProducts.length > 0 ? (
             featuredProducts.map((product) => {
               // Helper function to construct full URL in format: https://stallion.nishree.com/uploads/products/filename.webp
