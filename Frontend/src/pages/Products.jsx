@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import '../styles/pages/Products.css';
 import ProductCard from '../components/ProductCard';
+import Skeleton from '../components/ui/Skeleton';
 import { isLoggedIn } from '../services/authService';
 import {
   getProducts,
@@ -776,9 +777,13 @@ const Products = ({ onPageChange }) => {
           </div>
           <div className="products-grid-container">
             {loading ? (
-              <div className="white-loader-container" style={{ gridColumn: '1 / -1' }}>
-                <div className="white-loader"></div>
-              </div>
+              Array.from({ length: limit }).map((_, i) => (
+                <div key={`product-skeleton-${i}`} style={{ padding: 8 }}>
+                  <Skeleton width="100%" height={180} radius={12} />
+                  <Skeleton width="70%" height={16} style={{ marginTop: 12, display: 'block' }} />
+                  <Skeleton width="40%" height={14} style={{ marginTop: 8, display: 'block' }} />
+                </div>
+              ))
             ) : error ? (
               <div style={{ padding: '40px', textAlign: 'center', color: 'red' }}>
                 Error: {error}

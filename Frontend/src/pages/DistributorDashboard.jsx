@@ -1,7 +1,9 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import Skeleton from '../components/ui/Skeleton';
 import '../styles/pages/dashboard.css';
 import { getOrders } from '../services/apiService';
 import { getUser } from '../services/authService';
+import { showError } from '../services/notificationService';
 import StatusBadge from '../components/ui/StatusBadge';
 import RowActions from '../components/ui/RowActions';
 
@@ -29,6 +31,7 @@ const DistributorDashboard = () => {
       setOrders(distributorOrders);
     } catch (error) {
       console.error('Failed to fetch orders:', error);
+      showError('Could not load orders. Please try again.');
       setOrders([]);
     } finally {
       setLoading(false);
@@ -76,19 +79,19 @@ const DistributorDashboard = () => {
         <div className="dash-row orders-summary">
           <div className="dash-card metric orders-card">
             <h4>Total Orders</h4>
-            <div className="metric-value">{loading ? 'Loading...' : `${summaryStats.totalOrders} Orders`}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
           </div>
           <div className="dash-card metric orders-card">
             <h4>Pending Orders</h4>
-            <div className="metric-value">{loading ? 'Loading...' : summaryStats.pendingOrders}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
           </div>
           <div className="dash-card metric orders-card">
             <h4>Completed Orders</h4>
-            <div className="metric-value">{loading ? 'Loading...' : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
           </div>
           <div className="dash-card metric orders-card">
             <h4>Total Revenue</h4>
-            <div className="metric-value">{loading ? 'Loading...' : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
           </div>
         </div>
 

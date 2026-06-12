@@ -1,4 +1,6 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import Skeleton from '../components/ui/Skeleton';
+import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
 import { getOrders, getProducts, getSalesmanTargets, getSalesmanProfile, getParties } from '../services/apiService';
@@ -67,6 +69,7 @@ const Dashboard = () => {
         }
       } catch (error) {
         console.error('Failed to fetch orders:', error);
+        showError('Could not load dashboard data. Please try again.');
         setOrders([]);
       } finally {
         setLoading(false);
@@ -186,28 +189,28 @@ const Dashboard = () => {
           <div className="dash-card metric">
             <h4>Total Sales (This Month)</h4>
             <div className="metric-value">
-              {loading ? 'Loading...' : `₹${stats.totalSales.toLocaleString('en-IN')}`}
+              {loading ? <Skeleton width={90} height={24} /> : `₹${stats.totalSales.toLocaleString('en-IN')}`}
             </div>
             <div className="metric-sub green">↑ 12% vs last month</div>
           </div>
           <div className="dash-card metric">
             <h4>Total Orders</h4>
             <div className="metric-value">
-              {loading ? 'Loading...' : `${stats.totalOrders} Orders`}
+              {loading ? <Skeleton width={90} height={24} /> : `${stats.totalOrders} Orders`}
             </div>
             <div className="metric-sub">Retail {stats.retailOrders} | Bulk {stats.bulkOrders}</div>
           </div>
           <div className="dash-card metric">
             <h4>Active Clients</h4>
             <div className="metric-value">
-              {loading ? 'Loading...' : stats.activeClients}
+              {loading ? <Skeleton width={90} height={24} /> : stats.activeClients}
             </div>
             <div className="metric-sub">Optical Stores + Enterprises</div>
           </div>
           <div className="dash-card metric">
             <h4>Pending Payments</h4>
             <div className="metric-value">
-              {loading ? 'Loading...' : `₹${stats.pendingPayments.toLocaleString('en-IN')}`}
+              {loading ? <Skeleton width={90} height={24} /> : `₹${stats.pendingPayments.toLocaleString('en-IN')}`}
             </div>
             <div className="metric-sub red">↓ 10% vs last month</div>
           </div>

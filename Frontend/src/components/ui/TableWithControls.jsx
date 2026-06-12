@@ -3,7 +3,7 @@ import React, { useMemo, useState, useRef, useEffect } from "react";
 import Button from "./Button";
 import DropdownSelector from "./DropdownSelector";
 import Pagination from "./Pagination";
-import LoadingSpinner from "./LoadingSpinner";
+import { SkeletonRows } from "./Skeleton";
 import "../../styles/components/ui.css";
 
 export default function TableWithControls({
@@ -317,18 +317,14 @@ export default function TableWithControls({
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td
-                  colSpan={
-                    (selectable ? 1 : 0) +
-                    (showSerialNumber && visible.has('__serialNumber') ? 1 : 0) +
-                    columns.filter((c) => visible.has(c.key)).length
-                  }
-                  style={{ padding: 0, border: 'none' }}
-                >
-                  <LoadingSpinner />
-                </td>
-              </tr>
+              <SkeletonRows
+                rows={Math.min(pageSize, 8)}
+                cols={
+                  (selectable ? 1 : 0) +
+                  (showSerialNumber && visible.has('__serialNumber') ? 1 : 0) +
+                  columns.filter((c) => visible.has(c.key)).length
+                }
+              />
             ) : pageRows.length === 0 ? (
               <tr>
                 <td
