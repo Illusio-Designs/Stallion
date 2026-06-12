@@ -160,10 +160,9 @@ const DashboardTray = () => {
   };
 
   useEffect(() => {
+    // Only the trays are needed on load. Products/brands/collections are used
+    // by the "assign-products" tab and are fetched on demand when it opens.
     fetchTrays();
-    fetchAllProducts();
-    fetchBrands();
-    fetchCollections();
   }, []);
 
   const resetForm = () => setForm({ tray_name: '', tray_status: TrayStatus.AVAILABLE });
