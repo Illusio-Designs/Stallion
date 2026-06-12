@@ -125,7 +125,7 @@ const Breadcrumb = ({ currentPage, onPageChange }) => {
           ))}
         </div>
         {showActions && (
-          <div className="header-actions">
+          <div className="breadcrumb-actions">
             <div className="view-toggle">
               <button
                 className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}

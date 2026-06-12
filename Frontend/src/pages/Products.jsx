@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import '../styles/pages/Products.css';
+import '../styles/components/filter-chips.css';
 import ProductCard from '../components/ProductCard';
 import Skeleton from '../components/ui/Skeleton';
 import { isLoggedIn } from '../services/authService';
@@ -248,6 +249,48 @@ const Products = ({ onPageChange }) => {
   // Stable string key for the active filters so the fetch effect only re-runs
   // when the filter values actually change (not on every render).
   const filtersKey = useMemo(() => JSON.stringify(buildFilters()), [buildFilters]);
+
+  // Build the list of active-filter chips (label + how to remove it).
+  const activeFilterChips = useMemo(() => {
+    const chips = [];
+    const labelFor = (data, id, idKeys, labelKeys) => {
+      const item = (data || []).find(d => idKeys.some(k => String(d[k]) === String(id)));
+      return item ? (labelKeys.map(k => item[k]).find(Boolean) || id) : id;
+    };
+    // Multi-select filters
+    const multi = [
+      { ids: selectedGender, data: gendersData, idKeys: ['gender_id', 'id'], labelKeys: ['gender_name', 'name'], setter: setSelectedGender, prefix: 'gender' },
+      { ids: selectedShapes, data: shapesData, idKeys: ['shape_id', 'id'], labelKeys: ['shape_name', 'name'], setter: setSelectedShapes, prefix: 'shape' },
+      { ids: selectedBrands, data: brandsData, idKeys: ['brand_id', 'id'], labelKeys: ['brand_name', 'name'], setter: setSelectedBrands, prefix: 'brand' },
+      { ids: selectedLensMaterial, data: lensMaterialsData, idKeys: ['lens_material_id', 'id'], labelKeys: ['lens_material', 'name'], setter: setSelectedLensMaterial, prefix: 'lensmat' },
+      { ids: selectedFrameMaterials, data: frameMaterialsData, idKeys: ['frame_material_id', 'id'], labelKeys: ['frame_material', 'name'], setter: setSelectedFrameMaterials, prefix: 'framemat' },
+    ];
+    multi.forEach(({ ids, data, idKeys, labelKeys, setter, prefix }) => {
+      (ids || []).forEach(id => {
+        chips.push({
+          key: `${prefix}-${id}`,
+          label: labelFor(data, id, idKeys, labelKeys),
+          remove: () => setter(prev => prev.filter(x => x !== id)),
+        });
+      });
+    });
+    // Single-select filters
+    const single = [
+      { id: selectedType, data: frameTypesData, idKeys: ['frame_type_id', 'id'], labelKeys: ['frame_type', 'name'], setter: setSelectedType, prefix: 'frametype' },
+      { id: selectedLensColor, data: lensColorsData, idKeys: ['lens_color_id', 'id'], labelKeys: ['lens_color', 'name'], setter: setSelectedLensColor, prefix: 'lenscolor' },
+      { id: selectedFrameColor, data: frameColorsData, idKeys: ['frame_color_id', 'id'], labelKeys: ['frame_color', 'name'], setter: setSelectedFrameColor, prefix: 'framecolor' },
+    ];
+    single.forEach(({ id, data, idKeys, labelKeys, setter, prefix }) => {
+      if (id != null) {
+        chips.push({
+          key: `${prefix}-${id}`,
+          label: labelFor(data, id, idKeys, labelKeys),
+          remove: () => setter(null),
+        });
+      }
+    });
+    return chips;
+  }, [selectedGender, selectedShapes, selectedBrands, selectedLensMaterial, selectedFrameMaterials, selectedType, selectedLensColor, selectedFrameColor, gendersData, shapesData, brandsData, lensMaterialsData, frameMaterialsData, frameTypesData, lensColorsData, frameColorsData]);
 
   // Fetch the current page of products from the server (20/page).
   // Attribute filters are sent to the backend instead of fetching the whole
@@ -775,6 +818,20 @@ const Products = ({ onPageChange }) => {
               </button>
             )}
           </div>
+
+          {activeFilterChips.length > 0 && (
+            <div className="active-filters">
+              <span className="active-filters__label">Filters:</span>
+              {activeFilterChips.map(chip => (
+                <button key={chip.key} className="filter-chip" onClick={chip.remove} title={`Remove ${chip.label}`}>
+                  {chip.label}
+                  <span className="filter-chip__x" aria-hidden="true">&times;</span>
+                </button>
+              ))}
+              <button className="filter-chip-clear" onClick={handleReset}>Clear all</button>
+            </div>
+          )}
+
           <div className="products-grid-container">
             {loading ? (
               Array.from({ length: limit }).map((_, i) => (
