@@ -492,65 +492,16 @@ const Cart = ({ onPageChange = null }) => {
             
             const userPhone = normalizePhone(user.phone);
             
-            // Collect ALL parties from ALL countries (before filtering)
-            // The backend returns parties even for wrong countries, so we collect them all
-            const allPartiesMap = new Map(); // Use Map to avoid duplicates by party_id
-            
-            // Helper function to make API call directly
-            const fetchPartiesRaw = async (countryId) => {
-              const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'https://stallion.nishree.com/api';
-              const url = baseUrl.endsWith('/api') ? `${baseUrl}/parties/get` : `${baseUrl}/api/parties/get`;
-              const token = localStorage.getItem('token');
-              
-              const response = await fetch(url, {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  ...(token && { 'Authorization': `Bearer ${token}` })
-                },
-                body: JSON.stringify({ country_id: countryId })
-              });
-              
-              if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-              }
-              
-              return await response.json();
-            };
-            
-            for (const country of countriesList) {
-              try {
-                const countryId = country.id || country.country_id;
-                if (!countryId) continue;
-                
-                // Make direct API call to get raw response (before getParties filters it)
-                const response = await fetchPartiesRaw(countryId);
-                
-                // Collect all parties from raw response (before filtering)
-                let partiesArray = [];
-                if (Array.isArray(response)) {
-                  partiesArray = response;
-                } else if (response && Array.isArray(response.data)) {
-                  partiesArray = response.data;
-                }
-                
-                // Add all parties to map (keyed by party_id to avoid duplicates)
-                partiesArray.forEach(p => {
-                  if (p) {
-                    const pId = p.id || p.party_id;
-                    if (pId && !allPartiesMap.has(pId)) {
-                      allPartiesMap.set(pId, p);
-                    }
-                  }
-                });
-              } catch (err) {
-                console.warn(`[Cart] Failed to fetch parties for country ${country.id}:`, err);
-              }
+            // Fetch all parties in a single call. getParties() with no country
+            // argument returns every party unfiltered - no need to loop countries.
+            let allParties = [];
+            try {
+              const partiesResp = await getParties();
+              allParties = Array.isArray(partiesResp) ? partiesResp : [];
+            } catch (err) {
+              console.warn('[Cart] Failed to fetch parties:', err);
             }
-            
-            // Now search through all collected parties (without country filtering)
-            const allParties = Array.from(allPartiesMap.values());
-            console.log(`[Cart] Collected ${allParties.length} unique parties from all countries`);
+            console.log(`[Cart] Collected ${allParties.length} parties`);
             
             const partyData = allParties.find(p => {
               const partyPhone = normalizePhone(p.phone || p.phoneNumber);
@@ -598,93 +549,28 @@ const Cart = ({ onPageChange = null }) => {
                 }
               }
               
-              // Always fetch all distributors to get distributor_id
+              // Resolve the distributor for this party.
               try {
-                console.log('[Cart] Fetching all distributors...');
-                const allDistributorsMap = new Map(); // Use Map to avoid duplicates
-                
-                // Get party's country_id to prioritize fetching distributors for that country
                 const partyCountryId = partyData?.country_id || null;
-                
-                // Fetch distributors for all countries
-                for (const country of countriesList) {
-                  try {
-                    const countryId = country.id || country.country_id;
-                    if (!countryId) continue;
-                    
-                    const distributorsData = await getDistributors(countryId);
-                    
-                    // Add all distributors to map (keyed by distributor_id to avoid duplicates)
-                    if (Array.isArray(distributorsData)) {
-                      distributorsData.forEach(d => {
-                        if (d) {
-                          const dId = d.distributor_id || d.id;
-                          if (dId && !allDistributorsMap.has(dId)) {
-                            allDistributorsMap.set(dId, d);
-                          }
-                        }
-                      });
-                    }
-                  } catch (err) {
-                    console.warn(`[Cart] Failed to fetch distributors for country ${country.id}:`, err);
-                  }
-                }
-                
-                const allDistributors = Array.from(allDistributorsMap.values());
-                console.log(`[Cart] Collected ${allDistributors.length} unique distributors from all countries`);
-                
-                // Find distributor by ID from party data
+
                 if (partyDistributorId) {
-                  const distributorData = allDistributors.find(d => {
-                    const dId = d.distributor_id || d.id;
-                    return dId && String(dId) === String(partyDistributorId);
-                  });
-                  
-                  if (distributorData) {
-                    distributorId = distributorData.distributor_id || distributorData.id || null;
-                    console.log('[Cart] Found distributor_id from all distributors:', distributorId);
+                  // Party already has a distributor - use it directly, no fetch needed.
+                  distributorId = partyDistributorId;
+                  console.log('[Cart] Using distributor_id from party:', distributorId);
+                } else if (partyCountryId) {
+                  // Fetch distributors for the party's country only (not every country).
+                  const distributorsInPartyCountry = await getDistributors(partyCountryId);
+                  if (Array.isArray(distributorsInPartyCountry) && distributorsInPartyCountry.length > 0) {
+                    distributorId = distributorsInPartyCountry[0].distributor_id || distributorsInPartyCountry[0].id || null;
+                    console.log('[Cart] Using distributor from party country:', distributorId);
                   } else {
-                    // If not found, use the one from party data
-                    distributorId = partyDistributorId;
-                    console.log('[Cart] Distributor not found in all distributors list, using party distributor_id:', distributorId);
+                    console.warn('[Cart] No distributor found in party country');
                   }
                 } else {
-                  // If no distributor_id from party, find distributor by party's country
-                  if (partyCountryId) {
-                    // Filter distributors by party's country
-                    const distributorsInPartyCountry = allDistributors.filter(d => {
-                      const dCountryId = d.country_id || d.countryId;
-                      return dCountryId && String(dCountryId) === String(partyCountryId);
-                    });
-                    
-                    console.log(`[Cart] Found ${distributorsInPartyCountry.length} distributors in party's country`);
-                    
-                    if (distributorsInPartyCountry.length > 0) {
-                      // Use the first distributor from the party's country
-                      distributorId = distributorsInPartyCountry[0].distributor_id || distributorsInPartyCountry[0].id || null;
-                      console.log('[Cart] Using distributor from party country:', distributorId);
-                    } else {
-                      console.warn('[Cart] No distributor found in party country, trying all distributors...');
-                      // Fallback: use first distributor from all countries if none found in party country
-                      if (allDistributors.length > 0) {
-                        distributorId = allDistributors[0].distributor_id || allDistributors[0].id || null;
-                        console.log('[Cart] Using first available distributor as fallback:', distributorId);
-                      } else {
-                        console.error('[Cart] No distributors found at all');
-                      }
-                    }
-                  } else {
-                    // If party has no country_id, use first available distributor
-                    if (allDistributors.length > 0) {
-                      distributorId = allDistributors[0].distributor_id || allDistributors[0].id || null;
-                      console.log('[Cart] Party has no country_id, using first available distributor:', distributorId);
-                    } else {
-                      console.error('[Cart] No distributors found and party has no country_id');
-                    }
-                  }
+                  console.warn('[Cart] Party has no distributor_id or country_id');
                 }
               } catch (err) {
-                console.error('[Cart] Failed to fetch all distributors:', err);
+                console.error('[Cart] Failed to resolve distributor:', err);
                 // Fallback to distributor_id from party data if available
                 if (partyDistributorId) {
                   distributorId = partyDistributorId;
@@ -752,69 +638,11 @@ const Cart = ({ onPageChange = null }) => {
                                    partyData?.distributor?.id ||
                                    null;
               
-              // Fetch all distributors to get distributor_id
+              // The party already carries its distributor_id - use it directly
+              // instead of fetching distributors across every country.
               if (partyDistributorId) {
-                try {
-                  console.log('[Cart] Fetching all distributors for selected party...');
-                  // Fetch countries if not already available
-                  let countriesList = countries;
-                  if (!countriesList || countriesList.length === 0) {
-                    countriesList = await getCountries();
-                    setCountries(countriesList);
-                  }
-                  
-                  const allDistributorsMap = new Map(); // Use Map to avoid duplicates
-                  
-                  // Fetch distributors for all countries
-                  for (const country of countriesList) {
-                    try {
-                      const countryId = country.id || country.country_id;
-                      if (!countryId) continue;
-                      
-                      const distributorsData = await getDistributors(countryId);
-                      
-                      // Add all distributors to map (keyed by distributor_id to avoid duplicates)
-                      if (Array.isArray(distributorsData)) {
-                        distributorsData.forEach(d => {
-                          if (d) {
-                            const dId = d.distributor_id || d.id;
-                            if (dId && !allDistributorsMap.has(dId)) {
-                              allDistributorsMap.set(dId, d);
-                            }
-                          }
-                        });
-                      }
-                    } catch (err) {
-                      console.warn(`[Cart] Failed to fetch distributors for country ${country.id}:`, err);
-                    }
-                  }
-                  
-                  const allDistributors = Array.from(allDistributorsMap.values());
-                  console.log(`[Cart] Collected ${allDistributors.length} unique distributors from all countries`);
-                  
-                  // Find distributor by ID from party data
-                  const distributorData = allDistributors.find(d => {
-                    const dId = d.distributor_id || d.id;
-                    return dId && String(dId) === String(partyDistributorId);
-                  });
-                  
-                  if (distributorData) {
-                    const distributorId = distributorData.distributor_id || distributorData.id || null;
-                    orderData.distributor_id = distributorId;
-                    console.log('[Cart] Found distributor_id from all distributors:', distributorId);
-                  } else {
-                    // If not found, use the one from party data
-                    orderData.distributor_id = partyDistributorId;
-                    console.log('[Cart] Distributor not found in all distributors list, using party distributor_id:', partyDistributorId);
-                  }
-                } catch (err) {
-                  console.warn('[Cart] Failed to fetch all distributors:', err);
-                  // Fallback to distributor_id from party data
-                  if (partyDistributorId) {
-                    orderData.distributor_id = partyDistributorId;
-                    console.log('[Cart] Using distributor_id from party data:', partyDistributorId);
-                  }
-                }
+                orderData.distributor_id = partyDistributorId;
+                console.log('[Cart] Using distributor_id from party:', partyDistributorId);
               }
             }
           } catch (err) {

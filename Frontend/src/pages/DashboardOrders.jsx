@@ -16,8 +16,7 @@ import {
   getEvents,
   getProducts,
   getProductById,
-  getCountries,
-  getPartyById
+  getCountries
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 import { getUserRole, getUser } from '../services/authService';
@@ -144,26 +143,18 @@ const DashboardOrders = () => {
       )];
       
       if (uniquePartyIds.length > 0) {
-        // Fetch party names in parallel
-        const partyNamePromises = uniquePartyIds.map(async (partyId) => {
-          try {
-            const partyData = await getPartyById(partyId);
-            return {
-              partyId,
-              partyName: partyData?.party_name || partyData?.name || 'N/A'
-            };
-          } catch (err) {
-            console.error(`Failed to fetch party ${partyId}:`, err);
-            return { partyId, partyName: 'N/A' };
-          }
-        });
-        
-        const partyNames = await Promise.all(partyNamePromises);
-        const newPartyNamesMap = { ...partyNamesMap };
-        partyNames.forEach(({ partyId, partyName }) => {
-          newPartyNamesMap[partyId] = partyName;
-        });
-        setPartyNamesMap(newPartyNamesMap);
+        try {
+          // One call for all parties instead of one getPartyById per order (N+1)
+          const allParties = await getParties();
+          const newPartyNamesMap = { ...partyNamesMap };
+          (allParties || []).forEach((p) => {
+            const id = p.id || p.party_id;
+            if (id) newPartyNamesMap[id] = p.party_name || p.name || 'N/A';
+          });
+          setPartyNamesMap(newPartyNamesMap);
+        } catch (err) {
+          console.error('Failed to fetch party names:', err);
+        }
       }
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Failed to fetch orders';
