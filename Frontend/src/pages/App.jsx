@@ -6,20 +6,34 @@ import PublicLayout from '../layouts/PublicLayout';
 import DashboardLayout from '../layouts/DashboardLayout';
 import Loader from '../components/Loader';
 import '../styles/globals.css';
+// Eager-load shared + dashboard page styles so they apply on first paint.
+// The dashboard page JS stays lazy; only the (small) CSS is loaded upfront,
+// which avoids the unstyled-content flash when a lazy page chunk renders.
+import '../styles/components/ui.css';
+import '../styles/pages/dashboard-layout.css';
+import '../styles/pages/dashboard.css';
+import '../styles/pages/dashboard-products.css';
+import '../styles/pages/dashboard-orders.css';
+import '../styles/pages/dashboard-clients.css';
+import '../styles/pages/dashboard-suppliers.css';
+import '../styles/pages/dashboard-analytics.css';
+import '../styles/pages/dashboard-expenses.css';
+import '../styles/pages/dashboard-settings.css';
+import '../styles/pages/dashboard-support.css';
 import { getUserRole, isLoggedIn } from '../services/authService';
 import { hasPageAccess } from '../utils/rolePermissions';
 
-// Auth Pages - lazy loaded
-const Login = lazy(() => import('./Login'));
-const Register = lazy(() => import('./Register'));
-
-// Public Pages - lazy loaded
-const Home = lazy(() => import('./Home'));
-const About = lazy(() => import('./About'));
-const Cart = lazy(() => import('./Cart'));
-const Products = lazy(() => import('./Products'));
-const ProductDetail = lazy(() => import('./ProductDetail'));
-const PrivacyPolicy = lazy(() => import('./PrivacyPolicy'));
+// Auth + Public pages are imported eagerly so their CSS ships in the main
+// bundle and is applied on first paint (no unstyled flash on reload / direct
+// navigation). Dashboard pages stay lazy (behind auth) to keep this bundle lean.
+import Login from './Login';
+import Register from './Register';
+import Home from './Home';
+import About from './About';
+import Cart from './Cart';
+import Products from './Products';
+import ProductDetail from './ProductDetail';
+import PrivacyPolicy from './PrivacyPolicy';
 
 // Dashboard Pages - lazy loaded
 const Dashboard = lazy(() => import('./Dashboard'));
