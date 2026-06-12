@@ -7,6 +7,7 @@ import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import {
   getSalesmen,
+  getSalesmanProfile,
   createSalesman,
   updateSalesman,
   deleteSalesman,
@@ -353,26 +354,15 @@ const DashboardSuppliers = () => {
 
   const fetchZoneParties = async () => {
     try {
-      const currentUser = getUser();
-      const currentUserId = currentUser?.id || currentUser?.user_id;
-
-      // Step 1: fetch all countries to iterate salesmen
-      const countriesData = await getCountries();
-      const countriesArr = Array.isArray(countriesData) ? countriesData : [];
-
-      // Step 2: find the current user's salesman record across all countries
+      // Fetch the current user's salesman record directly instead of looping
+      // every country and calling getSalesmen for each one.
       let mySalesman = null;
-      for (const country of countriesArr) {
-        try {
-          const salesmenData = await getSalesmen(country.id);
-          const found = (salesmenData || []).find(s =>
-            s.user_id === currentUserId || s.userId === currentUserId
-          );
-          if (found) { mySalesman = found; break; }
-        } catch { /* skip country on error */ }
-      }
+      try {
+        const profile = await getSalesmanProfile();
+        mySalesman = profile?.data || profile || null;
+      } catch { /* no salesman profile */ }
 
-      if (!mySalesman) {
+      if (!mySalesman || !(mySalesman.id || mySalesman.salesman_id)) {
         console.warn('[fetchZoneParties] Could not find salesman record for current user');
         setZoneParties([]);
         return;

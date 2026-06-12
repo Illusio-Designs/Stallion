@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
-import { getOrders, getProducts, getSalesmanTargets, getSalesmen, getCountries, getPartyById } from '../services/apiService';
+import { getOrders, getProducts, getSalesmanTargets, getSalesmanProfile, getParties } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
 
 const Dashboard = () => {
@@ -54,15 +54,16 @@ const Dashboard = () => {
             .map(o => o.party_id)
         )];
         if (missingPartyIds.length > 0) {
-          const entries = await Promise.all(
-            missingPartyIds.map(async id => {
-              try {
-                const p = await getPartyById(id);
-                return [id, p?.party_name || p?.name || id];
-              } catch { return [id, id]; }
-            })
-          );
-          setPartyNamesMap(Object.fromEntries(entries));
+          try {
+            // One call for all parties instead of one getPartyById per order (N+1)
+            const allParties = await getParties();
+            const map = {};
+            (allParties || []).forEach(p => {
+              const id = p.id || p.party_id;
+              if (id) map[id] = p.party_name || p.name || id;
+            });
+            setPartyNamesMap(map);
+          } catch { /* leave party ids unresolved */ }
         }
       } catch (error) {
         console.error('Failed to fetch orders:', error);
@@ -80,18 +81,14 @@ const Dashboard = () => {
     const fetchTargets = async () => {
       try {
         setTargetsLoading(true);
-        const currentUserId = user?.id || user?.user_id;
-        const countriesData = await getCountries();
-        const countriesArr = Array.isArray(countriesData) ? countriesData : [];
-        let foundSalesmanId = null;
-        for (const country of countriesArr) {
+        // Prefer the salesman_id already on the user object; otherwise fetch the
+        // current salesman's profile directly - no need to loop every country.
+        let foundSalesmanId = user?.salesman_id || null;
+        if (!foundSalesmanId) {
           try {
-            const salesmenData = await getSalesmen(country.id);
-            const found = (salesmenData || []).find(s =>
-              s.user_id === currentUserId || s.userId === currentUserId
-            );
-            if (found) { foundSalesmanId = found.id || found.salesman_id; break; }
-          } catch { /* skip */ }
+            const profile = await getSalesmanProfile();
+            foundSalesmanId = profile?.id || profile?.salesman_id || null;
+          } catch { /* no salesman profile */ }
         }
         if (foundSalesmanId) {
           setMySalesmanId(foundSalesmanId);
