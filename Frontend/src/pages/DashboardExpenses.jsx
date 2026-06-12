@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
@@ -453,25 +454,25 @@ const DashboardExpenses = () => {
         <div className="dash-row expenses-summary">
           <div className="dash-card">
             <h4>Total Expenses</h4>
-            <div className="metric-value">{loading ? 'Loading...' : summaryStats.totalExpenses}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.totalExpenses}</div>
             <div className="metric-sub">₹{summaryStats.totalAmount.toLocaleString('en-IN')}</div>
           </div>
           
           <div className="dash-card">
             <h4>Pending</h4>
-            <div className="metric-value">{loading ? 'Loading...' : summaryStats.pendingExpenses}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingExpenses}</div>
             <div className="metric-sub">Awaiting Approval</div>
           </div>
           
           <div className="dash-card">
             <h4>Approved</h4>
-            <div className="metric-value">{loading ? 'Loading...' : summaryStats.approvedExpenses}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.approvedExpenses}</div>
             <div className="metric-sub">₹{summaryStats.approvedAmount.toLocaleString('en-IN')}</div>
           </div>
           
           <div className="dash-card">
             <h4>Rejected</h4>
-            <div className="metric-value">{loading ? 'Loading...' : summaryStats.rejectedExpenses}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.rejectedExpenses}</div>
             <div className="metric-sub">Need Review</div>
           </div>
         </div>

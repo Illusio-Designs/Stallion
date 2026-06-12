@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
@@ -396,19 +397,19 @@ const DistributorOrders = () => {
         <div className="dash-row orders-summary">
           <div className="dash-card metric orders-card">
             <h4>Total Orders</h4>
-            <div className="metric-value">{loading ? 'Loading...' : `${summaryStats.totalOrders} Orders`}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
           </div>
           <div className="dash-card metric orders-card">
             <h4>Pending Orders</h4>
-            <div className="metric-value">{loading ? 'Loading...' : summaryStats.pendingOrders}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
           </div>
           <div className="dash-card metric orders-card">
             <h4>Completed Orders</h4>
-            <div className="metric-value">{loading ? 'Loading...' : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
           </div>
           <div className="dash-card metric orders-card">
             <h4>Total Revenue</h4>
-            <div className="metric-value">{loading ? 'Loading...' : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
+            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
           </div>
         </div>
 
