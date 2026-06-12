@@ -1,0 +1,56 @@
+/* Active filter chips shown above the product grid */
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-4);
+}
+
+.active-filters__label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-right: var(--space-1);
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 12px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+.filter-chip:hover {
+  background: var(--color-primary-soft);
+  border-color: var(--color-primary);
+}
+.filter-chip__x {
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.6;
+}
+.filter-chip:hover .filter-chip__x {
+  opacity: 1;
+}
+
+.filter-chip-clear {
+  padding: 6px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-error);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+.filter-chip-clear:hover {
+  text-decoration: underline;
+}

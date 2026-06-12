@@ -13,6 +13,14 @@
   width: 100%;
 }
 
+/* Right-side actions (view toggle / continue shopping).
+   Renamed from .header-actions to avoid clashing with the Header's global class. */
+.breadcrumb-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .breadcrumb-content {
   display: flex;
   align-items: center;

@@ -1,9 +1,32 @@
-/* Product card actions: eye (view) icon + quantity selector + add to cart */
+/* ===== Product card polish (applies on Home + Products grids) ===== */
+.product-card {
+  border-radius: var(--radius-lg);
+  transition: transform var(--transition), box-shadow var(--transition);
+  will-change: transform;
+}
+.product-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Image: keep a steady frame and add a subtle zoom on hover */
+.product-card .product-image {
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+.product-card .product-image img {
+  transition: transform var(--transition);
+}
+.product-card:hover .product-image img {
+  transform: scale(1.05);
+}
+
+/* ===== Card actions: eye (view) icon + quantity selector + add to cart ===== */
 .pc-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
   width: 100%;
   flex-wrap: wrap;
 }
@@ -13,70 +36,73 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
+  width: 42px;
+  height: 42px;
   flex: 0 0 auto;
-  border: 1px solid #181265;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #181265;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-primary);
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
 }
 .pc-icon-btn:hover {
-  background: #181265;
-  color: #ffffff;
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+.pc-icon-btn:active {
+  transform: scale(0.94);
 }
 
 /* Quantity selector */
 .pc-qty {
   display: inline-flex;
   align-items: center;
-  height: 40px;
+  height: 42px;
   flex: 0 0 auto;
-  border: 1px solid #d9d9e3;
-  border-radius: 8px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
   overflow: hidden;
-  background: #ffffff;
+  background: var(--color-surface);
 }
 .pc-qty-btn {
-  width: 32px;
+  width: 34px;
   height: 100%;
   border: none;
-  background: #f4f5fb;
-  color: #181265;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
   font-size: 18px;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background var(--transition-fast);
 }
 .pc-qty-btn:hover {
-  background: #e7e8f5;
+  background: var(--color-primary-soft-hover);
 }
 .pc-qty-value {
-  min-width: 34px;
+  min-width: 36px;
   text-align: center;
   font-size: 14px;
   font-weight: 600;
-  color: #181265;
+  color: var(--color-primary);
 }
 
 /* Add to cart button */
 .pc-add-btn {
   flex: 1 1 120px;
-  height: 40px;
+  height: 42px;
   border: none;
-  border-radius: 8px;
-  background: #181265;
-  color: #ffffff;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.04em;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.05s ease;
+  transition: background var(--transition-fast), transform var(--transition-fast);
 }
 .pc-add-btn:hover {
-  background: #241a8a;
+  background: var(--color-primary-hover);
 }
 .pc-add-btn:active {
   transform: translateY(1px);
