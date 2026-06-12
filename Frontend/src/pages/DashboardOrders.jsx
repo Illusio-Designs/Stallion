@@ -195,8 +195,16 @@ const DashboardOrders = () => {
   // Fetch orders on mount
   useEffect(() => {
     fetchOrders();
-    fetchInitialData();
   }, []);
+
+  // Load create-order form data (countries + products) only when the create
+  // modal opens - not on page load, since the listing doesn't need them.
+  useEffect(() => {
+    if (createModalOpen && countries.length === 0) {
+      fetchInitialData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [createModalOpen]);
 
   // Fetch initial data for dropdowns
   const fetchInitialData = async () => {
