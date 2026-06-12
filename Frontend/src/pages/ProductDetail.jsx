@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import "../styles/pages/ProductDetail.css";
+import Skeleton from "../components/ui/Skeleton";
 import { addToCart } from "../services/cartService";
 import { showAddToCartSuccess } from "../services/notificationService";
 import {
@@ -516,15 +517,20 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   const displayVariation = getDisplayVariation();
   const needsSlider = viewMode === "grid" && needsSliderArrows; // Only need slider arrows for >3 variations
 
-  // Show loading state
+  // Show loading state (shimmer placeholder mimicking the detail layout)
   if (loading) {
     return (
       <div className="product-detail-page">
-        <div style={{ padding: '40px', textAlign: 'center' }}>
-          <div className="white-loader-container">
-            <div className="white-loader"></div>
+        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', padding: 24 }}>
+          <Skeleton width={420} height={360} radius={16} style={{ maxWidth: '100%', flex: '1 1 320px' }} />
+          <div style={{ flex: '1 1 320px', minWidth: 280 }}>
+            <Skeleton width="60%" height={28} style={{ display: 'block', marginBottom: 16 }} />
+            <Skeleton width="40%" height={20} style={{ display: 'block', marginBottom: 24 }} />
+            {Array.from({ length: 6 }).map((_, i) => (
+              <Skeleton key={`pd-skeleton-${i}`} width={`${80 - i * 6}%`} height={14} style={{ display: 'block', marginBottom: 12 }} />
+            ))}
+            <Skeleton width={160} height={44} radius={10} style={{ display: 'block', marginTop: 24 }} />
           </div>
-          <p>Loading product details...</p>
         </div>
       </div>
     );

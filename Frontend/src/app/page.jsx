@@ -2,6 +2,7 @@
 import { Suspense } from 'react';
 import { usePathname } from 'next/navigation';
 import App from '../pages/App';
+import Loader from '../components/Loader';
 
 function AppWrapper() {
   const pathname = usePathname();
@@ -11,7 +12,7 @@ function AppWrapper() {
 
 export default function HomePage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<Loader isLoading={true} />}>
       <AppWrapper />
     </Suspense>
   );
