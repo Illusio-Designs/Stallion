@@ -307,6 +307,8 @@ const Home = ({ onPageChange }) => {
                   productId={productId}
                   productName={productName}
                   productImage={fullImageUrl}
+                  whp={product.whp}
+                  mrp={product.mrp}
                   onViewMore={handleViewMore}
                 />
               );

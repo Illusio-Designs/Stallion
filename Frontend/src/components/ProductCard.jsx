@@ -1,17 +1,23 @@
 import React, { useState } from 'react';
+import '../styles/components/ProductCard.css';
+import { addToCart } from '../services/cartService';
+import { showAddToCartSuccess } from '../services/notificationService';
 
-const ProductCard = ({ 
-  productId, 
-  productName, 
-  productImage, 
+const ProductCard = ({
+  productId,
+  productName,
+  productImage,
+  whp,
+  mrp,
   colors = [
     { color: '#000000', name: 'Black' },
     { color: '#E5E5E5', name: 'Grey' },
     { color: '#FFB6C1', name: 'Pink' }
   ],
-  onViewMore 
+  onViewMore
 }) => {
   const [activeColor, setActiveColor] = useState(0);
+  const [qty, setQty] = useState(1);
 
   const handleColorClick = (colorIndex) => {
     setActiveColor(colorIndex);
@@ -22,6 +28,19 @@ const ProductCard = ({
       // Pass both productId and model_no (productName is model_no)
       onViewMore(productId, productName);
     }
+  };
+
+  const handleAddToCart = () => {
+    addToCart({
+      id: productId,
+      name: productName,
+      image: imageUrl,
+      lenseColour: colors[activeColor]?.name || '',
+      whp: whp != null ? whp : 0,
+      mrp: mrp != null ? mrp : 0,
+      quantity: qty,
+    });
+    showAddToCartSuccess(productName, qty);
   };
 
   // Construct image URL - extract filename from path and use the specified format
@@ -93,11 +112,29 @@ const ProductCard = ({
           ></div>
         ))}
       </div>
-      <div className="button-container">
-        <button className="view-more-button" onClick={handleViewMoreClick}>
-          VIEW MORE
+      <div className="pc-actions">
+        <button
+          type="button"
+          className="pc-icon-btn"
+          onClick={handleViewMoreClick}
+          title="View details"
+          aria-label="View product details"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8S1 12 1 12Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
         </button>
-        <button className="view-more-button-border"></button>
+
+        <div className="pc-qty" role="group" aria-label="Quantity selector">
+          <button type="button" className="pc-qty-btn" onClick={() => setQty(q => Math.max(1, q - 1))} aria-label="Decrease quantity">&minus;</button>
+          <span className="pc-qty-value">{qty}</span>
+          <button type="button" className="pc-qty-btn" onClick={() => setQty(q => q + 1)} aria-label="Increase quantity">+</button>
+        </div>
+
+        <button type="button" className="pc-add-btn" onClick={handleAddToCart}>
+          ADD TO CART
+        </button>
       </div>
     </div>
   );
