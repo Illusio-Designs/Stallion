@@ -874,7 +874,7 @@ export const getZones = async (cityId) => {
  * @param {string} countryId - Country ID (optional, defaults to India)
  * @returns {Promise<Array>} Array of all zone objects (deduplicated)
  */
-export const getAllZones = async (countryId) => {
+const fetchAllZonesUncached = async (countryId) => {
   try {
     let targetCountryId = countryId;
 
@@ -944,6 +944,20 @@ export const getAllZones = async (countryId) => {
 };
 
 /**
+ * Get all zones for a country (cached).
+ *
+ * There is no "get all zones" endpoint, so this walks states -> cities -> zones,
+ * which is expensive. The result is cached so that cascade runs at most once per
+ * session/country instead of on every page mount. Invalidated on zone mutations.
+ *
+ * @param {string} [countryId] - Country ID (defaults to India)
+ * @returns {Promise<Array>}
+ */
+export const getAllZones = async (countryId) => {
+  return getCached(`allZones:${countryId || 'default'}`, () => fetchAllZonesUncached(countryId), TTL_LOOKUP);
+};
+
+/**
  * Create zone
  * @param {Object} zoneData - Zone data
  * @param {string} zoneData.name - Zone name
@@ -956,11 +970,13 @@ export const getAllZones = async (countryId) => {
  */
 export const createZone = async (zoneData) => {
   const { name, description, city_id, state_id, country_id, zone_code } = zoneData;
-  return apiRequest('/zones/', {
+  const result = await apiRequest('/zones/', {
     method: 'POST',
     body: { name, description, city_id, state_id, country_id, zone_code },
     includeAuth: true,
   });
+  invalidateCache('allZones:');
+  return result;
 };
 
 /**
@@ -977,11 +993,13 @@ export const createZone = async (zoneData) => {
  */
 export const updateZone = async (zoneId, zoneData) => {
   const { name, description, city_id, state_id, country_id, zone_code } = zoneData;
-  return apiRequest(`/zones/${zoneId}`, {
+  const result = await apiRequest(`/zones/${zoneId}`, {
     method: 'PUT',
     body: { name, description, city_id, state_id, country_id, zone_code },
     includeAuth: true,
   });
+  invalidateCache('allZones:');
+  return result;
 };
 
 /**
@@ -990,10 +1008,12 @@ export const updateZone = async (zoneId, zoneData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const deleteZone = async (zoneId) => {
-  return apiRequest(`/zones/${zoneId}`, {
+  const result = await apiRequest(`/zones/${zoneId}`, {
     method: 'DELETE',
     includeAuth: true,
   });
+  invalidateCache('allZones:');
+  return result;
 };
 
 // ==================== DISTRIBUTOR ENDPOINTS ====================
