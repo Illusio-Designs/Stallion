@@ -2,9 +2,9 @@ import React, { useState, useRef, useEffect } from "react";
 import "../styles/pages/ProductDetail.css";
 import { addToCart } from "../services/cartService";
 import { showAddToCartSuccess } from "../services/notificationService";
-import { 
-  getProductModels, 
-  getProducts,
+import {
+  getProductModels,
+  getProductById,
   getBrands,
   getGenders,
   getShapes,
@@ -103,36 +103,38 @@ const ProductDetail = ({ productId: propProductId = null }) => {
     });
   }, []);
 
-  // Fetch lookup data on component mount
-  useEffect(() => {
-    const fetchLookupData = async () => {
-      try {
-        const [brandsData, gendersData, shapesData, frameColorsData, lensColorsData, frameMaterialsData, lensMaterialsData, frameTypesData] = await Promise.all([
-          getBrands().catch(() => []),
-          getGenders().catch(() => []),
-          getShapes().catch(() => []),
-          getFrameColors().catch(() => []),
-          getLensColors().catch(() => []),
-          getFrameMaterials().catch(() => []),
-          getLensMaterials().catch(() => []),
-          getFrameTypes().catch(() => [])
-        ]);
-        
-        setBrands(brandsData || []);
-        setGenders(gendersData || []);
-        setShapes(shapesData || []);
-        setFrameColors(frameColorsData || []);
-        setLensColors(lensColorsData || []);
-        setFrameMaterials(frameMaterialsData || []);
-        setLensMaterials(lensMaterialsData || []);
-        setFrameTypes(frameTypesData || []);
-      } catch (err) {
-        console.error('Error fetching lookup data:', err);
-      }
-    };
-    
-    fetchLookupData();
-  }, []);
+  // Lookup tables are fetched lazily and ONLY when the product models don't
+  // already include the attribute names (see the effect that watches rawModels).
+  // Fetched once, in parallel, and cached at the service layer.
+  const lookupsLoadedRef = useRef(false);
+  const ensureLookups = async () => {
+    if (lookupsLoadedRef.current) return;
+    lookupsLoadedRef.current = true;
+    try {
+      const [brandsData, gendersData, shapesData, frameColorsData, lensColorsData, frameMaterialsData, lensMaterialsData, frameTypesData] = await Promise.all([
+        getBrands().catch(() => []),
+        getGenders().catch(() => []),
+        getShapes().catch(() => []),
+        getFrameColors().catch(() => []),
+        getLensColors().catch(() => []),
+        getFrameMaterials().catch(() => []),
+        getLensMaterials().catch(() => []),
+        getFrameTypes().catch(() => [])
+      ]);
+
+      setBrands(brandsData || []);
+      setGenders(gendersData || []);
+      setShapes(shapesData || []);
+      setFrameColors(frameColorsData || []);
+      setLensColors(lensColorsData || []);
+      setFrameMaterials(frameMaterialsData || []);
+      setLensMaterials(lensMaterialsData || []);
+      setFrameTypes(frameTypesData || []);
+    } catch (err) {
+      lookupsLoadedRef.current = false; // allow retry
+      console.error('Error fetching lookup data:', err);
+    }
+  };
 
   const handleViewModeChange = (mode) => {
     setViewMode(mode);
@@ -326,15 +328,15 @@ const ProductDetail = ({ productId: propProductId = null }) => {
       return {
         id: model.product_id || model.id || index + 1,
         name: model.model_no || 'Safety Goggles',
-        brand: brand?.brand_name || brand?.name || 'N/A',
+        brand: model.brand_name || model.brand?.brand_name || brand?.brand_name || brand?.name || 'N/A',
         model: model.model_no || 'Model',
-        type: frameType?.frame_type || frameType?.name || 'N/A',
-        gender: gender?.gender_name || gender?.name || 'N/A',
-        shape: shape?.shape_name || shape?.name || 'N/A',
-        frameColour: frameColor?.frame_color || frameColor?.name || 'N/A',
-        frameMaterial: frameMaterial?.frame_material || frameMaterial?.name || 'N/A',
-        lenseColour: lensColor?.lens_color || lensColor?.name || 'N/A',
-        lenseMaterial: lensMaterial?.lens_material || lensMaterial?.name || 'N/A',
+        type: model.frame_type_name || model.frame_type?.frame_type || frameType?.frame_type || frameType?.name || 'N/A',
+        gender: model.gender_name || model.gender?.gender_name || gender?.gender_name || gender?.name || 'N/A',
+        shape: model.shape_name || model.shape?.shape_name || shape?.shape_name || shape?.name || 'N/A',
+        frameColour: model.frame_color_name || model.frame_color?.frame_color || frameColor?.frame_color || frameColor?.name || 'N/A',
+        frameMaterial: model.frame_material_name || model.frame_material?.frame_material || frameMaterial?.frame_material || frameMaterial?.name || 'N/A',
+        lenseColour: model.lens_color_name || model.lens_color?.lens_color || lensColor?.lens_color || lensColor?.name || 'N/A',
+        lenseMaterial: model.lens_material_name || model.lens_material?.lens_material || lensMaterial?.lens_material || lensMaterial?.name || 'N/A',
         size: model.size_mm || 'N/A',
         qty: formatQty(model.total_qty || model.warehouse_qty || 0),
         image: getImageUrl(model.image_urls, model.image_url),
@@ -375,13 +377,10 @@ const ProductDetail = ({ productId: propProductId = null }) => {
           try {
             setLoading(true);
             setError(null);
-            // Fetch products to find the one with matching product_id
-            const products = await getProducts(1, 100, null);
-            const product = products.find(p => {
-              // Handle both UUID string and number IDs
-              const pId = p.product_id || p.id;
-              return String(pId) === String(currentProductId);
-            });
+            // Fetch the single product directly by id (instead of pulling a page
+            // of products and searching) to resolve its model_no.
+            const resp = await getProductById(currentProductId);
+            const product = resp?.data || resp;
             if (product && product.model_no) {
               setModelNo(product.model_no);
               // Fetch product models with the found model_no
@@ -425,6 +424,24 @@ const ProductDetail = ({ productId: propProductId = null }) => {
       transformProductModels(rawModels);
     }
   }, [rawModels, transformProductModels]);
+
+  // Fetch the lookup tables ONLY if the product models don't already include
+  // the attribute names. If the API returns names, no lookup calls are made.
+  useEffect(() => {
+    if (rawModels.length === 0) return;
+    const allHaveNames = rawModels.every(m =>
+      (m.brand_name || m.brand?.brand_name) &&
+      (m.gender_name || m.gender?.gender_name) &&
+      (m.shape_name || m.shape?.shape_name) &&
+      (m.frame_type_name || m.frame_type?.frame_type) &&
+      (m.frame_color_name || m.frame_color?.frame_color) &&
+      (m.lens_color_name || m.lens_color?.lens_color) &&
+      (m.frame_material_name || m.frame_material?.frame_material) &&
+      (m.lens_material_name || m.lens_material?.lens_material)
+    );
+    if (!allHaveNames) ensureLookups();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawModels]);
 
   const currentProduct = productVariations[selectedVariation] || null;
   const totalVariations = productVariations.length;
