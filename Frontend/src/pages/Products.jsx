@@ -800,6 +800,8 @@ const Products = ({ onPageChange }) => {
                     productId={productId}
                     productName={productName}
                     productImage={productImage}
+                    whp={product.whp}
+                    mrp={product.mrp}
                     onViewMore={handleViewMore}
                   />
                 );

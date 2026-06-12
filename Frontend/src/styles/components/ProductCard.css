@@ -1,0 +1,83 @@
+/* Product card actions: eye (view) icon + quantity selector + add to cart */
+.pc-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+/* Eye / view icon button */
+.pc-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  border: 1px solid #181265;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #181265;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.pc-icon-btn:hover {
+  background: #181265;
+  color: #ffffff;
+}
+
+/* Quantity selector */
+.pc-qty {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  flex: 0 0 auto;
+  border: 1px solid #d9d9e3;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+.pc-qty-btn {
+  width: 32px;
+  height: 100%;
+  border: none;
+  background: #f4f5fb;
+  color: #181265;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.pc-qty-btn:hover {
+  background: #e7e8f5;
+}
+.pc-qty-value {
+  min-width: 34px;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #181265;
+}
+
+/* Add to cart button */
+.pc-add-btn {
+  flex: 1 1 120px;
+  height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: #181265;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.05s ease;
+}
+.pc-add-btn:hover {
+  background: #241a8a;
+}
+.pc-add-btn:active {
+  transform: translateY(1px);
+}
