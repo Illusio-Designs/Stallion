@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import '../styles/pages/Products.css';
 import ProductCard from '../components/ProductCard';
 import { isLoggedIn } from '../services/authService';
@@ -90,13 +90,12 @@ const Products = ({ onPageChange }) => {
   
   // Products display
   const [products, setProducts] = useState([]);
-  const [allProducts, setAllProducts] = useState([]); // Store all products for pagination
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
-  const limit = 21; // Products per page
+  const limit = 20; // Products per page (server-side pagination)
   
   // Filter options from API
   const [brandsData, setBrandsData] = useState([]);
@@ -246,110 +245,74 @@ const Products = ({ onPageChange }) => {
     selectedBrands
   ]);
 
-  // Fetch all products when filters change (not page)
+  // Stable string key for the active filters so the fetch effect only re-runs
+  // when the filter values actually change (not on every render).
+  const filtersKey = useMemo(() => JSON.stringify(buildFilters()), [buildFilters]);
+
+  // Fetch the current page of products from the server (20/page).
+  // Attribute filters are sent to the backend instead of fetching the whole
+  // catalogue and filtering client-side.
   useEffect(() => {
-    const fetchAllProducts = async () => {
+    let cancelled = false;
+
+    const fetchPage = async () => {
       setLoading(true);
       setError(null);
-      
       try {
-        console.log('Fetching all products...');
-        
-        let allProducts = [];
-        let currentPage = 1;
-        let hasMorePages = true;
-        const pageLimit = 100; // Get 100 products per page
-        
-        // Keep fetching pages until we get all products
-        while (hasMorePages && currentPage <= 50) { // Safety limit of 50 pages
-          console.log(`Fetching page ${currentPage}...`);
-          
-          const pageData = await getProducts(currentPage, pageLimit, null);
-          const productsArray = Array.isArray(pageData) ? pageData : (pageData?.data || []);
-          
-          console.log(`Page ${currentPage} returned ${productsArray.length} products`);
-          
-          if (productsArray.length === 0) {
-            // No more products, stop fetching
-            hasMorePages = false;
-          } else {
-            allProducts = [...allProducts, ...productsArray];
-            
-            // If we got fewer products than the limit, this is the last page
-            if (productsArray.length < pageLimit) {
-              hasMorePages = false;
-            } else {
-              currentPage++;
-            }
+        const filters = buildFilters();
+        const isActive = (p) => (p.status || '').toLowerCase().trim() === 'active';
+
+        if (searchQuery && searchQuery.trim()) {
+          // The products API has no text-search parameter, so model_no search is
+          // resolved client-side. This bounded loop only runs during an explicit
+          // search (not on normal browsing), and respects the active filters.
+          const q = searchQuery.trim().toLowerCase();
+          let collected = [];
+          let p = 1;
+          let more = true;
+          while (more && p <= 50) {
+            const data = await getProducts(p, 100, filters);
+            const arr = Array.isArray(data) ? data : (data?.data || []);
+            collected = collected.concat(
+              arr.filter((pr) => isActive(pr) && (pr.model_no || '').toLowerCase().includes(q))
+            );
+            more = arr.length === 100;
+            p += 1;
           }
+          if (cancelled) return;
+          const start = (page - 1) * limit;
+          setProducts(collected.slice(start, start + limit));
+          setTotalResults(collected.length);
+          setTotalPages(Math.max(1, Math.ceil(collected.length / limit)));
+        } else {
+          // Normal browse / attribute filtering: true server-side pagination.
+          const data = await getProducts(page, limit, filters);
+          const arr = Array.isArray(data) ? data : (data?.data || []);
+          if (cancelled) return;
+          const activeArr = arr.filter(isActive);
+          setProducts(activeArr);
+          // The API returns a plain array with no total count, so treat a full
+          // page as a signal that at least one more page may exist.
+          setTotalPages(arr.length === limit ? page + 1 : page);
+          setTotalResults(activeArr.length);
         }
-        
-        console.log('[Products] Total products fetched:', allProducts.length);
-        
-        // Filter by status client-side to show only active products
-        const activeProducts = allProducts.filter(product => {
-          const status = (product.status || '').toLowerCase().trim();
-          return status === 'active';
-        });
-        
-        console.log('[Products] Active products after filter:', activeProducts.length);
-        console.log('[Products] Sample active products:', activeProducts.slice(0, 3).map(p => ({
-          id: p.product_id,
-          model: p.model_no,
-          status: p.status
-        })));
-        
-        setAllProducts(activeProducts);
-        setTotalResults(activeProducts.length);
-        setTotalPages(Math.ceil(activeProducts.length / limit));
       } catch (err) {
+        if (cancelled) return;
         console.error('Error fetching products:', err);
         setError(err.message || 'Failed to fetch products');
-        setAllProducts([]);
+        setProducts([]);
         setTotalResults(0);
         setTotalPages(1);
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
-    
-    fetchAllProducts();
-  }, [limit]); // Remove buildFilters dependency to get all products initially
 
-  // Update displayed products when page changes or search query changes
-  useEffect(() => {
-    console.log('[Products Pagination] Page:', page, 'Limit:', limit);
-    console.log('[Products Pagination] Total products:', allProducts.length);
-    console.log('[Products Search] Search query:', searchQuery);
-    
-    let filteredProducts = allProducts;
-    
-    // Apply search filter if search query exists
-    if (searchQuery && searchQuery.trim()) {
-      console.log('Applying search filter for:', searchQuery);
-      filteredProducts = allProducts.filter(product => {
-        const modelNo = (product.model_no || '').toLowerCase();
-        const matches = modelNo.includes(searchQuery.toLowerCase());
-        if (matches) {
-          console.log('Product matches:', product.model_no);
-        }
-        return matches;
-      });
-      console.log('[Products Search] Filtered products by search:', filteredProducts.length);
-    }
-    
-    const startIndex = (page - 1) * limit;
-    const endIndex = startIndex + limit;
-    const slicedProducts = filteredProducts.slice(startIndex, endIndex);
-    console.log('[Products Pagination] Showing products:', startIndex, 'to', endIndex);
-    console.log('[Products Pagination] Sliced products count:', slicedProducts.length);
-    
-    setProducts(slicedProducts);
-    
-    // Update total results and pages based on filtered products
-    setTotalResults(filteredProducts.length);
-    setTotalPages(Math.ceil(filteredProducts.length / limit));
-  }, [page, allProducts, limit, searchQuery]);
+    fetchPage();
+    return () => { cancelled = true; };
+    // buildFilters is intentionally excluded; filtersKey captures its value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, searchQuery, filtersKey, limit]);
 
   const handleReset = () => {
     setSelectedBrands([]);
@@ -788,9 +751,9 @@ const Products = ({ onPageChange }) => {
         <main className="products-main">
           <div className="products-header">
             <h2>
-              {loading ? '' : searchQuery ? 
-                `${totalResults} results for "${searchQuery}"` : 
-                `${totalResults} results`
+              {loading ? '' : searchQuery ?
+                `${totalResults} results for "${searchQuery}"` :
+                'Products'
               }
             </h2>
             {searchQuery && (
