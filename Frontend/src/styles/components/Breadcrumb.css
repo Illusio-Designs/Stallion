@@ -1,7 +1,9 @@
 /* Breadcrumb Styles */
 .breadcrumb {
-  background: #0d0a34;
-  padding: 100px 5% 0;
+  background: var(--color-primary);
+  /* Clear the fixed header (var(--header-height)) so the breadcrumb sits
+     below the nav with a gap, instead of sliding underneath it. */
+  padding: calc(var(--header-height) + var(--space-4)) 5% var(--space-4);
   position: relative;
   z-index: 999;
 }
@@ -10,6 +12,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: var(--space-4);
   width: 100%;
 }
 
@@ -18,85 +21,118 @@
 .breadcrumb-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
+  flex-shrink: 0;
 }
 
 .breadcrumb-content {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 16px;
-  color: rgba(255, 255, 255, 0.8);
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 0;
   flex-wrap: wrap;
 }
 
+.breadcrumb-crumb {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+
+/* Crumb items: clickable links are <button>, current page is <span>.
+   Reset native button styling so both render identically. */
 .breadcrumb-item {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: rgba(255, 255, 255, 0.92);
+  background: none;
+  border: none;
+  padding: var(--space-1) var(--space-2);
+  margin: 0;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: color 0.3s ease;
-  color: white;
+  transition: color var(--transition), background-color var(--transition);
 }
 
-.breadcrumb-item:hover {
-  color: rgba(255, 255, 255, 0.8);
+button.breadcrumb-item:hover {
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.1);
 }
 
+button.breadcrumb-item:active {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+button.breadcrumb-item:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.65);
+}
+
+/* Current page: muted, non-interactive, allowed to wrap fully. */
 .breadcrumb-item.active {
-  color: rgba(255, 255, 255, 0.8);
+  max-width: none;
+  white-space: normal;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: var(--font-weight-semibold);
   cursor: default;
 }
 
 .breadcrumb-separator {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.6);
-  margin: 0 4px;
-}
-
-/* Make separators smaller on very small screens to save space */
-@media (max-width: 426px) {
-  .breadcrumb-separator svg {
-    width: 14px;
-    height: 14px;
-  }
-  .breadcrumb-separator {
-    margin: 0 3px;
-  }
-}
-
-/* Truncate very long breadcrumb items */
-.breadcrumb-item {
-  max-width: 240px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.breadcrumb-item.active {
-  max-width: none;
-  white-space: normal;
-  font-weight: 600;
+  color: rgba(255, 255, 255, 0.45);
+  flex-shrink: 0;
 }
 
 /* Continue Shopping Button */
 .continue-shopping-action {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .continue-shopping-btn {
-  background: #ffffff;
-  color: #181265;
-  padding: 12px 40px;
-  border-radius: 5px;
-  font-size: 18px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  padding: var(--space-2) var(--space-6);
+  border: none;
+  border-radius: var(--radius-md);
+  font-family: inherit;
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
   white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--transition), color var(--transition), box-shadow var(--transition);
 }
 
 .continue-shopping-btn:hover {
-  background: #181265;
-  color: #ffffff;
+  background: var(--color-accent);
+  color: var(--color-text-on-accent);
+}
+
+.continue-shopping-btn:active {
+  transform: scale(0.98);
+}
+
+.continue-shopping-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
 }
 
 .breadcrumb-with-continue .breadcrumb-container {
@@ -104,47 +140,55 @@
 }
 
 /* Responsive */
-@media (max-width: 768px) {
-  .breadcrumb-content {
-    font-size: 13px;
-  }
-}
-
-/* Additional breakpoints for better breadcrumb responsiveness */
 @media (max-width: 1024px) {
   .breadcrumb-content {
-    font-size: 15px;
-    flex-wrap: wrap;
+    font-size: var(--text-base);
   }
 }
 
-@media (max-width: 426px) {
+@media (max-width: 768px) {
+  .breadcrumb-content {
+    font-size: var(--text-sm);
+  }
+}
+
+/* Collapse onto its own row, shrink chrome on small screens */
+@media (max-width: 480px) {
+  .breadcrumb {
+    padding-top: calc(var(--header-height) + var(--space-2));
+  }
   .breadcrumb-container {
     flex-direction: column;
     align-items: flex-start;
-    gap: 10px;
+    gap: var(--space-3);
   }
   .breadcrumb-content {
-    font-size: 12px;
-    gap: 6px;
+    font-size: var(--text-sm);
+    gap: 2px;
+  }
+  .breadcrumb-item {
+    max-width: 150px;
+    padding: var(--space-1);
+  }
+  .breadcrumb-separator svg {
+    width: 14px;
+    height: 14px;
+  }
+  .continue-shopping-action,
+  .breadcrumb-actions {
+    width: 100%;
   }
   .continue-shopping-btn {
-    padding: 8px 18px;
-    font-size: 14px;
+    width: 100%;
   }
 }
 
-@media (max-width: 384px) {
-  .breadcrumb-content {
-    font-size: 12px;
-  }
-}
-
-@media (max-width: 320px) {
+@media (max-width: 360px) {
   .breadcrumb {
-    padding: 8px 4% 0;
+    padding-left: 4%;
+    padding-right: 4%;
   }
-  .breadcrumb-content {
-    font-size: 11px;
+  .breadcrumb-item {
+    max-width: 110px;
   }
 }

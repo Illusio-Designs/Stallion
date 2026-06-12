@@ -1,38 +1,46 @@
 /* Dashboard Support page styles */
 .support {
-  padding: 20px !important;
+  padding: var(--space-6) !important;
 }
 
 .support-header {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  margin-bottom: 18px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-6);
 }
 
+/* h4 heading (JSX uses .support-title; legacy selector kept for safety) */
+.support-title,
 .support-header h4 {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #000000;
+  font-size: var(--text-lg);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
 }
 
 .support-subtitle {
-  margin: 5px 0 0;
-  color: #98a2b3;
-  font-size: 0.9rem;
+  margin: var(--space-2) 0 0;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
 }
 
 .support-form {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: var(--space-5);
 }
+
 .support-form .form-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
+
 .support-form .ui-input,
 .support-form .ui-select,
 .support-form textarea.ui-input {
@@ -41,7 +49,7 @@
 
 .support-form .ui-label {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .support-form textarea.ui-input {
@@ -53,5 +61,26 @@
 .support-form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: var(--space-3);
+}
+
+/* Responsive: single column form, no overflow at 375px */
+@media (max-width: 560px) {
+  .support-form {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+}
+
+@media (max-width: 480px) {
+  .support {
+    padding: var(--space-5) !important;
+  }
+  .support-header {
+    margin-bottom: var(--space-5);
+  }
+  .support .support-actions,
+  .support-form-actions {
+    flex-wrap: wrap;
+  }
 }

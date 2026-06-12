@@ -4,6 +4,7 @@ import ProductCard from '../components/ProductCard';
 import Skeleton from '../components/ui/Skeleton';
 import { getFeaturedProducts, getCollections } from '../services/apiService';
 import { isLoggedIn } from '../services/authService';
+import { productPath } from '../utils/dashboardRoutes';
 
 const Home = ({ onPageChange }) => {
   const [activeFilter, setActiveFilter] = useState('ALL');
@@ -18,28 +19,15 @@ const Home = ({ onPageChange }) => {
   };
 
   const handleViewMore = (productId, modelNo) => {
-    // Check authentication before redirecting
+    if (typeof window === 'undefined') return;
+    // Clean product route: /product/<model_no>
+    const target = productPath(modelNo);
+    // Product detail requires auth — send to login with the product as returnUrl.
     if (!isLoggedIn()) {
-      // Get current URL to use as return URL, add fromHome=true to indicate coming from home
-      const returnUrl = `/product-detail?id=${productId}${modelNo ? `&model_no=${encodeURIComponent(modelNo)}` : ''}&fromHome=true`;
-      if (typeof window !== 'undefined') {
-        window.location.href = `/login?returnUrl=${encodeURIComponent(returnUrl)}`;
-      }
+      window.location.href = `/login?returnUrl=${encodeURIComponent(target)}`;
       return;
     }
-    
-    // User is authenticated, proceed with navigation
-    // Add fromHome=true to indicate coming from home page
-    if (onPageChange) {
-      // For onPageChange, we need to pass the full URL with query params
-      if (typeof window !== 'undefined') {
-        const url = `/product-detail?id=${productId}${modelNo ? `&model_no=${encodeURIComponent(modelNo)}` : ''}&fromHome=true`;
-        window.location.href = url;
-      }
-    } else if (typeof window !== 'undefined') {
-      const url = `/product-detail?id=${productId}${modelNo ? `&model_no=${encodeURIComponent(modelNo)}` : ''}&fromHome=true`;
-      window.location.href = url;
-    }
+    window.location.href = target;
   };
 
   const toggleFaq = (index) => {
@@ -122,10 +110,11 @@ const Home = ({ onPageChange }) => {
     }
   ];
 
-  // Build filters array with "ALL" option and collections
+  // Build filters array: "ALL" + the first 5 collections (6 chips total).
+  // Home is a teaser — the full list lives on the Shop page via "VIEW ALL".
   const filters = [
     { id: 'ALL', name: 'ALL' },
-    ...collections.map(collection => ({
+    ...collections.slice(0, 5).map(collection => ({
       id: collection.collection_id || collection.id,
       name: collection.collection_name || 'Unnamed Collection'
     }))
@@ -141,10 +130,15 @@ const Home = ({ onPageChange }) => {
           <img src="/images/banners/spacs.webp" alt="Eyewear" className="hero-side-image" />
         </div>
         <div className="hero-content">
-          <h1>Bulk Safety Goggles Supply For Industries & Enterprises</h1>
+          <h1>Bulk Safety Goggles Supply For Industries &amp; Enterprises</h1>
           <p>Certified eye protection solutions for businesses, delivered at scale with competitive pricing and reliable supply chain support.</p>
-          <button className="cta-button">SHOP NOW</button>
-          <button className="cta-button-border"></button>
+          <button
+            type="button"
+            className="cta-button"
+            onClick={() => onPageChange ? onPageChange('products') : (window.location.href = '/products')}
+          >
+            Shop Now
+          </button>
         </div>
         <div className="banner-slider">
         <div className="infinite-slider">
@@ -169,7 +163,7 @@ const Home = ({ onPageChange }) => {
       <section className="collection-section">
         <div className="collection-header">
           <h2>Our Collection</h2>
-          <button className="view-all-button" onClick={() => onPageChange ? onPageChange('products') : (window.location.href = '/products')}>
+          <button type="button" className="view-all-button" onClick={() => onPageChange ? onPageChange('products') : (window.location.href = '/products')}>
             VIEW ALL
             <div className="arrow-with-star">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -187,8 +181,10 @@ const Home = ({ onPageChange }) => {
           ) : (
             filters.map((filter) => (
               <button
+                type="button"
                 key={filter.id}
                 className={`filter-btn ${activeFilter === filter.id ? 'active' : ''}`}
+                aria-pressed={activeFilter === filter.id}
                 onClick={() => handleFilterClick(filter.id)}
               >
                 {filter.name}
@@ -208,35 +204,6 @@ const Home = ({ onPageChange }) => {
             ))
           ) : featuredProducts.length > 0 ? (
             featuredProducts.map((product) => {
-              // Helper function to construct full URL in format: https://stallion.nishree.com/uploads/products/filename.webp
-              const constructFullUrl = (imagePath) => {
-                if (!imagePath) return null;
-                
-                // If already a full URL, return as is
-                if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-                  return imagePath;
-                }
-                
-                // If it's a relative path starting with /uploads/products/, prepend base URL
-                if (imagePath.startsWith('/uploads/products/')) {
-                  return `https://stallion.nishree.com${imagePath}`;
-                }
-                
-                // If it's just a filename (no slashes), construct full path
-                if (!imagePath.includes('/')) {
-                  return `https://stallion.nishree.com/uploads/products/${imagePath}`;
-                }
-                
-                // If it's a relative path without leading slash, assume it's a filename
-                if (!imagePath.startsWith('/')) {
-                  return `https://stallion.nishree.com/uploads/products/${imagePath}`;
-                }
-                
-                // For other relative paths, try to extract filename and construct URL
-                const filename = imagePath.split('/').pop()?.split('?')[0];
-                return filename ? `https://stallion.nishree.com/uploads/products/${filename}` : null;
-              };
-
               // Parse image_urls - handle both array and JSON string formats
               const parseImageUrls = (imageUrls) => {
                 if (!imageUrls) return null;
@@ -314,8 +281,15 @@ const Home = ({ onPageChange }) => {
               );
             })
           ) : (
-            <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: '2rem' }}>
-              No featured products available
+            <div className="ui-state ui-state--empty home-products-empty">
+              <div className="ui-state__icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M3 7l9-4 9 4v10l-9 4-9-4V7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                  <path d="M3 7l9 4 9-4M12 11v10" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
+                </svg>
+              </div>
+              <p className="ui-state__title">No products in this collection yet</p>
+              <p className="ui-state__desc">Try another collection or browse the full catalogue.</p>
             </div>
           )}
         </div>
@@ -374,17 +348,23 @@ const Home = ({ onPageChange }) => {
         <div className="faq-container">
           {faqs.map((faq, index) => (
             <div key={index} className="faq-item">
-              <div className="faq-question" onClick={() => toggleFaq(index)}>
-                <div className="faq-question-content">
+              <button
+                type="button"
+                className="faq-question"
+                aria-expanded={expandedFaq === index}
+                aria-controls={`faq-answer-${index}`}
+                onClick={() => toggleFaq(index)}
+              >
+                <span className="faq-question-content">
                   <span className="faq-number">{String(index + 1).padStart(2, '0')}</span>
-                  <h3>{faq.question}</h3>
-                </div>
-                <button className="faq-toggle">
-                  {expandedFaq === index ? '-' : '+'}
-                </button>
-              </div>
+                  <span className="faq-question-text">{faq.question}</span>
+                </span>
+                <span className="faq-toggle" aria-hidden="true">
+                  {expandedFaq === index ? '−' : '+'}
+                </span>
+              </button>
               {expandedFaq === index && (
-                <div className="faq-answer">
+                <div className="faq-answer" id={`faq-answer-${index}`} role="region">
                   <p>{faq.answer}</p>
                 </div>
               )}

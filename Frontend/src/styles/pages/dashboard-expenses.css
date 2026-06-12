@@ -1,46 +1,59 @@
+/* ==========================================================================
+   Dashboard · Expenses (shared stylesheet)
+   Restyled to the Stallion design system. Selectors preserved.
+   ========================================================================== */
+
+/* --- Summary cards ------------------------------------------------------- */
 .expenses-summary {
   display: grid;
   grid-template-columns: repeat(12, 1fr);
-  gap: 12px;
-  margin-bottom: 2rem;
+  gap: var(--space-4);
+  margin-bottom: var(--space-8);
 }
 
 .expenses-summary .dash-card {
-  grid-column: span 3; /* Each card takes 3 columns out of 12 = 4 cards per row */
-  padding: 1.5rem;
+  grid-column: span 3; /* 4 cards per row on 12-col grid */
+  padding: var(--space-6);
 }
 
 .expenses-summary .metric-value {
-  font-size: 2rem;
-  font-weight: 600;
-  margin: 0.5rem 0;
-  color: var(--text-primary, #1a1a1a);
+  font-size: var(--text-2xl);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+  margin: var(--space-2) 0;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
 }
 
 .expenses-summary .metric-sub {
-  font-size: 0.875rem;
-  color: var(--text-secondary, #666);
-  margin-top: 0.5rem;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin-top: var(--space-2);
+  font-variant-numeric: tabular-nums;
 }
 
+/* --- Modal form scaffolding --------------------------------------------- */
 .modal-form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-4);
 }
 
+/* --- Expense detail rows ------------------------------------------------- */
 .expense-details {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-1);
 }
 
 .detail-row {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 0.75rem 0;
-  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  gap: var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .detail-row:last-child {
@@ -48,148 +61,204 @@
 }
 
 .detail-row strong {
-  font-weight: 600;
-  color: var(--text-primary, #1a1a1a);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted);
   min-width: 120px;
 }
 
 .detail-row span {
-  color: var(--text-secondary, #666);
+  color: var(--color-text);
   text-align: right;
   flex: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Status text → soft badge pills -------------------------------------- */
+.status-pending,
+.status-approved,
+.status-rejected {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-label);
+  line-height: var(--leading-tight);
 }
 
 .status-pending {
-  color: #f59e0b;
-  font-weight: 600;
+  color: var(--color-warning);
+  background-color: var(--color-warning-soft);
 }
 
 .status-approved {
-  color: #10b981;
-  font-weight: 600;
+  color: var(--color-success);
+  background-color: var(--color-success-soft);
 }
 
 .status-rejected {
-  color: #ef4444;
-  font-weight: 600;
+  color: var(--color-error);
+  background-color: var(--color-error-soft);
 }
 
+/* --- Admin actions block ------------------------------------------------- */
 .admin-actions {
-  margin-top: 1.5rem;
-  padding-top: 1.5rem;
-  border-top: 2px solid var(--border-color, #e0e0e0);
+  margin-top: var(--space-6);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--color-border-strong);
 }
 
 .admin-actions h4 {
-  margin: 0 0 1rem 0;
-  font-size: 1rem;
-  font-weight: 600;
-  color: var(--text-primary, #1a1a1a);
+  margin: 0 0 var(--space-4) 0;
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
 }
 
 .action-buttons {
   display: flex;
-  gap: 0.5rem;
-  margin-bottom: 1rem;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
   flex-wrap: wrap;
 }
 
+/* --- Uploaded bills ------------------------------------------------------ */
 .uploaded-bills {
-  margin-top: 1rem;
+  margin-top: var(--space-4);
 }
 
 .uploaded-bills strong {
   display: block;
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: var(--text-primary, #1a1a1a);
+  margin-bottom: var(--space-2);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
 }
 
+/* --- Generic form group (modal fields) ---------------------------------- */
 .form-group {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: var(--space-2);
 }
 
 .form-group label {
-  font-weight: 500;
-  font-size: 0.875rem;
-  color: var(--text-primary, #1a1a1a);
+  font-weight: var(--font-weight-medium);
+  font-size: var(--text-sm);
+  color: var(--color-text);
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
-  padding: 0.75rem;
-  border: 1px solid var(--border-color, #e0e0e0);
-  border-radius: 0.375rem;
-  font-size: 0.875rem;
+  padding: 0 var(--space-3);
+  min-height: 40px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-base);
   font-family: inherit;
-  transition: border-color 0.2s;
+  transition: border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.form-group input::placeholder,
+.form-group textarea::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.form-group input:hover,
+.form-group select:hover,
+.form-group textarea:hover {
+  border-color: var(--color-grey-400);
 }
 
 .form-group input:focus,
 .form-group select:focus,
-.form-group textarea:focus {
+.form-group textarea:focus,
+.form-group input:focus-visible,
+.form-group select:focus-visible,
+.form-group textarea:focus-visible {
   outline: none;
-  border-color: var(--primary-color, #007bff);
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
 }
 
 .form-group input:disabled,
 .form-group select:disabled,
 .form-group textarea:disabled {
-  background-color: var(--bg-disabled, #f5f5f5);
+  background-color: var(--color-surface-muted);
+  color: var(--color-text-subtle);
   cursor: not-allowed;
 }
 
 .form-group textarea {
+  padding: var(--space-3);
   resize: vertical;
   min-height: 80px;
+  line-height: var(--leading-normal);
 }
 
+/* --- File list ----------------------------------------------------------- */
 .file-list {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.5rem;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
 }
 
 .file-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.5rem;
-  background-color: var(--bg-light, #f8f9fa);
-  border-radius: 0.25rem;
-  font-size: 0.875rem;
-  color: var(--text-secondary, #666);
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-surface-muted);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 
 .file-size {
-  font-size: 0.75rem;
-  color: var(--text-muted, #999);
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
+  font-variant-numeric: tabular-nums;
 }
 
 .file-preview-section {
-  margin-top: 0.5rem;
+  margin-top: var(--space-2);
 }
 
+/* --- Image preview grid -------------------------------------------------- */
 .image-preview-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 1rem;
-  margin-top: 0.5rem;
+  gap: var(--space-4);
+  margin-top: var(--space-2);
 }
 
 .image-preview-container {
   position: relative;
   cursor: pointer;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  border: 1px solid var(--border-color, #e0e0e0);
+  border: 1px solid var(--color-border);
+  transition: box-shadow var(--transition), border-color var(--transition);
 }
 
-.image-preview-container:hover .image-preview-overlay {
+.image-preview-container:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-sm);
+}
+
+.image-preview-container:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.image-preview-container:hover .image-preview-overlay,
+.image-preview-container:focus-visible .image-preview-overlay {
   opacity: 1;
 }
 
@@ -198,62 +267,66 @@
   height: 150px;
   object-fit: cover;
   display: block;
-  transition: transform 0.2s;
+  transition: transform var(--transition);
 }
 
 .image-preview-container:hover .bill-preview {
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 
 .image-preview-overlay {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  inset: 0;
+  background: rgba(24, 18, 101, 0.72);
   display: flex;
   align-items: center;
   justify-content: center;
   opacity: 0;
-  transition: opacity 0.2s;
-  color: white;
-  font-size: 0.875rem;
+  transition: opacity var(--transition);
+  color: var(--color-text-on-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
   text-align: center;
-  padding: 0.5rem;
+  padding: var(--space-2);
 }
 
+/* --- Modal action bar ---------------------------------------------------- */
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 1rem;
-  margin-top: 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--border-color, #e0e0e0);
+  gap: var(--space-3);
+  margin-top: var(--space-6);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--color-border);
 }
 
+/* --- Card header --------------------------------------------------------- */
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border-color, #e0e0e0);
+  gap: var(--space-4);
+  padding: var(--space-6);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .card-header h3 {
   margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: var(--text-primary, #1a1a1a);
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
 }
 
+/* --- Responsive: tablet -------------------------------------------------- */
 @media (max-width: 768px) {
   .expenses-summary {
-    grid-template-columns: repeat(6, 1fr); /* 2 cards per row on tablets */
+    grid-template-columns: repeat(6, 1fr); /* 2 cards per row */
   }
-  
+
   .expenses-summary .dash-card {
-    grid-column: span 3; /* Each card takes 3 columns out of 6 = 2 cards per row */
+    grid-column: span 3;
   }
 
   .image-preview-grid {
@@ -274,7 +347,7 @@
 
   .card-header {
     flex-direction: column;
-    gap: 1rem;
+    gap: var(--space-4);
     align-items: stretch;
   }
 
@@ -285,23 +358,24 @@
   .file-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 0.25rem;
+    gap: var(--space-1);
   }
 }
 
+/* --- Responsive: mobile (375px-safe) ------------------------------------- */
 @media (max-width: 480px) {
   .expenses-summary {
-    grid-template-columns: 1fr; /* Single column on mobile */
-    gap: 1rem;
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
   }
-  
+
   .expenses-summary .dash-card {
     grid-column: span 1;
-    padding: 1rem;
+    padding: var(--space-5);
   }
 
   .expenses-summary .metric-value {
-    font-size: 1.5rem;
+    font-size: var(--text-xl);
   }
 
   .image-preview-grid {

@@ -1,0 +1,170 @@
+/* ==========================================================================
+   Dashboard · Suppliers / Salesmen
+   --------------------------------------------------------------------------
+   Page-scoped polish for the Suppliers area: the Salesmen table, the
+   Check-ins and Targets tables, and their add/edit modals. This page follows
+   the SAME table + form contract as the Clients page.
+
+   Structural primitives (.dash-*, .ui-table, .ui-form, .ui-dropdown-custom,
+   phone-input-*) are styled in dashboard.css / ui.css — this sheet only
+   refines the things the Suppliers page needs: calm rows, graceful truncation
+   of long names / emails / remarks, a normalised filter label, quiet modal
+   help text, and a tidy multi-select zones dropdown.
+
+   Tokens only. Hairline borders + soft shadows already come from the shared
+   table — we add NO new heavy lines here. Truncation never touches the ACTION
+   column (cells that host .ui-row-actions / interactive controls).
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   Calm rows + graceful truncation
+   The Salesmen / Check-ins / Targets tables render bare text in <td>. Long
+   names, emails, remarks and descriptions should ellipsize on one line rather
+   than wrap into tall, ragged rows. We cap the natural width and clip with an
+   ellipsis, but explicitly opt OUT any cell hosting row actions or other
+   controls so buttons and badges are never clipped.
+   -------------------------------------------------------------------------- */
+.dash-card .ui-table tbody td {
+  max-width: 0;                 /* let the column distribute; ellipsis kicks in */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
+}
+
+/* Secondary columns read as muted so the primary identity stands out. */
+.dash-card .ui-table tbody td:nth-child(n + 3) {
+  color: var(--color-text-muted);
+}
+
+/* The ACTION column (and any cell carrying interactive or status content)
+   must never truncate or clip — restore overflow + auto width and keep
+   controls and badges aligned. */
+.dash-card .ui-table tbody td:has(.ui-row-actions),
+.dash-card .ui-table tbody td:has(.ui-btn),
+.dash-card .ui-table tbody td:has(.ui-badge),
+.dash-card .ui-table tbody td:has(button) {
+  max-width: none;
+  overflow: visible;
+  white-space: nowrap;
+  text-overflow: clip;
+  color: var(--color-text);
+}
+
+/* Status badges (Targets STATUS column) sit calmly inline. Keep them from
+   being stretched by the truncation rules above. */
+.dash-card .ui-table tbody td .ui-badge {
+  display: inline-flex;
+  vertical-align: middle;
+  max-width: 100%;
+}
+
+/* Target amount / dates read as tabular numerals for a steadier column. */
+.dash-card .ui-table tbody td {
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Truncation helper classes
+   Available for any cell renderer that wants explicit, labelled truncation
+   (e.g. a salesman identity cell). Single source of ellipsis behaviour so
+   future renderers don't reinvent it.
+   -------------------------------------------------------------------------- */
+.supplier-cell {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.supplier-cell--name {
+  color: var(--color-text);
+  font-weight: var(--font-weight-medium);
+}
+
+.supplier-cell--meta {
+  margin-top: var(--space-1);
+  color: var(--color-text-subtle);
+  font-size: var(--text-sm);
+}
+
+.supplier-cell--email {
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --------------------------------------------------------------------------
+   Filter popover label
+   The "Filter by Country" label rendered above the country dropdown should
+   match the system's uppercase meta-label treatment instead of a bold 14px
+   inline style. Scoped to the table's filter region so it doesn't leak.
+   -------------------------------------------------------------------------- */
+.dash-card .ui-table__controls label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   In-modal helper / hint text
+   Normalise any <small> inside a form-group to the tertiary meta token +
+   rhythm so cascading-dropdown hints read as quiet help, not body copy.
+   -------------------------------------------------------------------------- */
+.ui-form .form-group small {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+  color: var(--color-text-subtle);
+}
+
+/* --------------------------------------------------------------------------
+   Zones multi-select dropdown
+   The Zones field uses .ui-dropdown-custom with an inline-styled "Check All /
+   Uncheck All" header row and per-option checkboxes. The component primitive
+   already provides the trigger / menu / option states; here we only ensure
+   the checkbox + label sit on a comfortable 4/8 rhythm, the brand accent is
+   applied to the native checkbox, and the header row reads as a quiet
+   hairline-separated control rather than a heavy line.
+   -------------------------------------------------------------------------- */
+.ui-dropdown-custom__option input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}
+
+/* Keyboard focus on the in-option checkbox stays visible. */
+.ui-dropdown-custom__option input[type="checkbox"]:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* Comfortable spacing for the label that sits beside each checkbox. */
+.ui-dropdown-custom__option > span {
+  gap: var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
+}
+
+/* --------------------------------------------------------------------------
+   Responsive — keep the tables readable at 375px without horizontal overflow
+   beyond the table's own managed scroll, and keep rows tappable.
+   -------------------------------------------------------------------------- */
+@media (max-width: 560px) {
+  .dash-card .ui-table tbody td {
+    font-size: var(--text-sm);
+  }
+}

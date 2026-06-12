@@ -1,0 +1,376 @@
+/* ==========================================================================
+   Dashboard · Products
+   --------------------------------------------------------------------------
+   Shared stylesheet for the Products management screens (listing, media
+   gallery, create/edit + bulk-upload modals).
+
+   This sheet only ADDS product-specific helper selectors — it never renames
+   or removes a class the JSX already references. All values come from the
+   design tokens in app/globals.css (no off-palette hex, 4/8 spacing rhythm,
+   one radius system, hairline borders + soft shadows, visible focus rings,
+   reduced-motion friendly).
+
+   NOTE FOR THE JSX-OWNING UNIT (css pass cannot touch JSX):
+   The media-gallery cards, image grid and the modal banners in
+   DashboardProducts.jsx are currently rendered with INLINE styles containing
+   hard-coded hex (#fee, #e5e7eb, #666, box-shadows, etc.). Inline styles win
+   over any stylesheet, so they can't be modernised from here. The classes
+   below (.product-media-grid, .product-media-card, .product-thumb,
+   .product-banner--*, .product-gallery-empty …) are drop-in replacements:
+   swap the inline `style={{…}}` for these className hooks and the page picks
+   up the tokenised brand styling automatically.
+   ========================================================================== */
+
+/* --- Page-scoped media gallery grid -------------------------------------- */
+/* Scoped under .dash-page so these helpers can never leak to other screens. */
+
+.dash-page .product-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-6);                 /* 24px */
+  padding: var(--space-6);
+}
+
+@media (max-width: 480px) {
+  .dash-page .product-media-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: var(--space-4);               /* 16px */
+    padding: var(--space-4);
+  }
+}
+
+/* --- Media card ----------------------------------------------------------- */
+/* Quiet surface + hairline border + soft shadow — never heavy border AND
+   heavy shadow together. Hover lifts with transform/opacity only. */
+
+.dash-page .product-media-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-xs);
+  transition:
+    transform var(--transition),
+    box-shadow var(--transition),
+    border-color var(--transition);
+}
+
+.dash-page .product-media-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-md);
+}
+
+/* Selected / active state for cards that act as a choosable tile */
+.dash-page .product-media-card.is-selected {
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+
+/* Keyboard focus for interactive (focusable) cards */
+.dash-page .product-media-card:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+
+/* --- Thumbnail (fixed aspect, never distorts) ----------------------------- */
+
+.dash-page .product-thumb {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  display: block;
+  object-fit: contain;
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Compact square thumbnail (e.g. table cell / modal tile) */
+.dash-page .product-thumb--sm {
+  width: 48px;
+  height: 48px;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+}
+
+/* Placeholder shown when a product has no image */
+.dash-page .product-thumb--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* --- Card meta block ------------------------------------------------------ */
+
+.dash-page .product-media-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);                 /* 4px */
+  padding: var(--space-4);             /* 16px */
+}
+
+.dash-page .product-media-title {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dash-page .product-media-sub {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: var(--leading-snug);
+}
+
+/* Tiny uppercase meta label */
+.dash-page .product-media-label {
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+}
+
+/* --- Assignment status pill (assigned vs unassigned) ---------------------- */
+/* Mirrors the StatusBadge soft-tinted pill language. */
+
+.dash-page .product-media-status {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  border-radius: var(--radius-pill);
+}
+
+.dash-page .product-media-status--assigned {
+  background: var(--color-success-soft);
+  color: var(--color-success);
+}
+
+.dash-page .product-media-status--unassigned {
+  background: var(--color-warning-soft);
+  color: var(--color-warning);
+}
+
+/* --- Card overlay action (e.g. delete on hover) --------------------------- */
+
+.dash-page .product-media-remove {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.dash-page .product-media-card:hover .product-media-remove,
+.dash-page .product-media-remove:focus-visible {
+  opacity: 1;
+}
+
+.dash-page .product-media-remove:hover {
+  color: var(--color-error);
+  border-color: var(--color-error);
+  background: var(--color-error-soft);
+}
+
+.dash-page .product-media-remove:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring-error);
+}
+
+.dash-page .product-media-remove:active {
+  transform: scale(0.94);
+}
+
+/* --- Inline banner (replaces the inline-styled error/success boxes) ------- */
+
+.dash-page .product-banner {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--color-text);
+  background: var(--color-surface-muted);
+}
+
+.dash-page .product-banner--error {
+  background: var(--color-error-soft);
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.dash-page .product-banner--success {
+  background: var(--color-success-soft);
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
+.dash-page .product-banner__detail {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  opacity: 0.85;
+}
+
+.dash-page .product-banner__close {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font-size: var(--text-lg);
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.dash-page .product-banner__close:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.dash-page .product-banner__close:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+/* --- Gallery empty state -------------------------------------------------- */
+/* Spans the whole grid; reuse the canonical .ui-state markup where possible,
+   this is the lightweight inline fallback for the gallery grid cell. */
+
+.dash-page .product-gallery-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: var(--space-10) var(--space-4);
+  color: var(--color-text-muted);
+  font-size: var(--text-base);
+}
+
+/* --- Modal image-pick grid (attach-image modal) --------------------------- */
+
+.dash-page .product-pick-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: var(--space-3);                 /* 12px */
+}
+
+.dash-page .product-pick-tile {
+  position: relative;
+  display: block;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-muted);
+  cursor: pointer;
+  transition:
+    border-color var(--transition-fast),
+    box-shadow var(--transition-fast),
+    transform var(--transition-fast);
+}
+
+.dash-page .product-pick-tile > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.dash-page .product-pick-tile:hover {
+  border-color: var(--color-border-strong);
+}
+
+.dash-page .product-pick-tile:focus-visible {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+
+.dash-page .product-pick-tile:active {
+  transform: scale(0.97);
+}
+
+.dash-page .product-pick-tile.is-selected {
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+}
+
+/* Selected check marker on a picked tile */
+.dash-page .product-pick-tile.is-selected::after {
+  content: "";
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 18px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* --- Selected-file note in bulk-upload modal ------------------------------ */
+
+.dash-page .product-file-note {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  line-height: var(--leading-snug);
+}
+
+/* --- Motion: respect reduced-motion -------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .dash-page .product-media-card,
+  .dash-page .product-media-card:hover,
+  .dash-page .product-media-remove,
+  .dash-page .product-pick-tile {
+    transition: none;
+    transform: none;
+  }
+}

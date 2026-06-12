@@ -946,7 +946,24 @@ const Cart = ({ onPageChange = null }) => {
 
             {cartItems.length === 0 ? (
               <div className="empty-cart">
-                <p>Your cart is empty</p>
+                <span className="empty-cart__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="9" cy="21" r="1" />
+                    <circle cx="20" cy="21" r="1" />
+                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                  </svg>
+                </span>
+                <p className="empty-cart__title">Your cart is empty</p>
+                <p className="empty-cart__desc">
+                  Looks like you haven&apos;t added anything yet. Browse our collection to find your next pair.
+                </p>
+                <button
+                  type="button"
+                  className="checkout-btn empty-cart__action"
+                  onClick={() => handlePageChange('products')}
+                >
+                  Browse Products
+                </button>
               </div>
             ) : (
               <div className="cart-items">
@@ -979,9 +996,11 @@ const Cart = ({ onPageChange = null }) => {
                     <div className="item-qty">
                       <div className="quantity-selector-cart">
                         <button
+                          type="button"
                           className="qty-btn-cart minus"
                           onClick={() => handleQuantityDecrease(item.id)}
                           disabled={item.quantity <= 1}
+                          aria-label="Decrease quantity"
                         >
                           -
                         </button>
@@ -989,6 +1008,9 @@ const Cart = ({ onPageChange = null }) => {
                           className="qty-number-cart"
                           type="number"
                           step="1"
+                          min="1"
+                          inputMode="numeric"
+                          aria-label={`Quantity for ${getDisplayName(item)}`}
                           value={editingQuantities[item.id] !== undefined ? editingQuantities[item.id] : item.quantity}
                           onChange={e => {
                             setEditingQuantities(q => ({ ...q, [item.id]: e.target.value }));
@@ -1007,8 +1029,10 @@ const Cart = ({ onPageChange = null }) => {
                           }}
                         />
                         <button
+                          type="button"
                           className="qty-btn-cart plus"
                           onClick={() => handleQuantityIncrease(item.id)}
+                          aria-label="Increase quantity"
                         >
                           +
                         </button>
@@ -1019,9 +1043,11 @@ const Cart = ({ onPageChange = null }) => {
                     </div>
                     <div className="item-remove">
                       <button
+                        type="button"
                         className="remove-btn"
                         onClick={() => handleRemoveItem(item.id)}
                         title="Remove item"
+                        aria-label={`Remove ${getDisplayName(item)} from cart`}
                       >
                         ×
                       </button>
@@ -1148,10 +1174,13 @@ const Cart = ({ onPageChange = null }) => {
             </div>
 
             <button
+              type="button"
               className="checkout-btn"
               onClick={handleCheckout}
               disabled={loading}
+              aria-busy={loading}
             >
+              {loading && <span className="checkout-btn__spinner" aria-hidden="true" />}
               {loading ? 'PLACING ORDER...' : 'CHECKOUT'}
             </button>
           </div>

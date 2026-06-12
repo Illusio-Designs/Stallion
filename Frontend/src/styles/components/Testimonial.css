@@ -1,40 +1,64 @@
 /* Testimonial Component Styles */
 .testimonial {
-  background: white;
-  padding: 30px;
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s, box-shadow 0.3s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  margin: 0;
+  background: var(--color-surface);
+  padding: var(--space-8);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--transition), box-shadow var(--transition);
 }
 
 .testimonial:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+}
+
+/* Decorative opening quote mark */
+.testimonial-quote-mark {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-6);
+  font-size: var(--text-2xl);
+  line-height: 1;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary-soft-hover);
+  pointer-events: none;
+  user-select: none;
 }
 
 .testimonial-content {
-  margin-bottom: 20px;
+  margin: 0;
+  flex: 1;
 }
 
 .testimonial-content p {
-  font-style: italic;
-  color: #555;
-  line-height: 1.6;
-  font-size: 1rem;
+  margin: 0;
+  color: var(--color-text);
+  line-height: var(--leading-normal);
+  font-size: var(--text-md);
 }
 
 .testimonial-author {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: var(--space-4);
 }
 
 .author-image {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-pill);
   overflow: hidden;
   flex-shrink: 0;
+  background: var(--color-primary-soft);
 }
 
 .author-image img {
@@ -43,15 +67,31 @@
   object-fit: cover;
 }
 
+/* Avatar fallback when no image is provided */
+.author-initials {
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-label);
+  color: var(--color-primary);
+}
+
 .author-info h4 {
-  margin: 0 0 5px 0;
-  color: #2c3e50;
-  font-size: 1.1rem;
+  margin: 0 0 var(--space-1) 0;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
 }
 
 .author-info p {
   margin: 0;
-  color: #7f8c8d;
-  font-size: 0.9rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-snug);
 }
 
+@media (max-width: 480px) {
+  .testimonial {
+    padding: var(--space-6);
+  }
+}

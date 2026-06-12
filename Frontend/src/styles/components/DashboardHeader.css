@@ -1,14 +1,12 @@
-/* Dashboard Header Styles aligned to design */
+/* Dashboard Header — calm surface, hairline base */
 .dashboard-header {
   position: sticky;
   top: 0;
   z-index: 5;
-  background: #ffffff;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
 }
-.dashboard-header.expanded {
-  margin-left: 0;
-}
+.dashboard-header.expanded,
 .dashboard-header.collapsed {
   margin-left: 0;
 }
@@ -17,69 +15,128 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 20px;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-5);
+  min-height: var(--header-height);
 }
 
 .dashboard-title {
-  font-size: 16px;
-  color: #000000;
-  font-weight: 600;
+  font-size: var(--text-md);
+  color: var(--color-text);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dashboard-header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* Back to shop — secondary indigo pill, full state set */
+.dashboard-back-shop {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-4);
+  min-height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background var(--transition), transform var(--transition-fast);
+}
+.dashboard-back-shop:hover {
+  background: var(--color-primary-hover);
+}
+.dashboard-back-shop:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dashboard-back-shop:active {
+  background: var(--color-primary-active);
+  transform: scale(0.98);
+}
+.dashboard-back-shop svg {
+  flex-shrink: 0;
 }
 
 .dashboard-search-bar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: 1px solid #e0e0e0;
-  border-radius: 16px;
-  padding: 6px 12px;
+  gap: var(--space-2);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  transition: border-color var(--transition), box-shadow var(--transition);
+}
+.dashboard-search-bar:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: var(--focus-ring);
+  background: var(--color-surface);
 }
 .dashboard-search-bar input {
   border: none;
   outline: none;
   background: transparent;
-  color: #000000;
+  color: var(--color-text);
   width: 100%;
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 .dashboard-search-bar input::placeholder {
-  font-family: Spoof Trial;
-  color: #00000099;
+  color: var(--color-text-subtle);
 }
 .dashboard-search-icon {
-  color: #000000;
+  color: var(--color-text-subtle);
+  flex-shrink: 0;
 }
 
 .dashboard-action-icons {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: var(--space-2);
 }
+
 .dashboard-icon-btn {
   background: transparent;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  color: var(--color-text-muted);
+  transition: background var(--transition), color var(--transition);
 }
 .dashboard-icon-btn:hover {
-  background: #f5f6f9;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+.dashboard-icon-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dashboard-icon-btn:active {
+  transform: scale(0.96);
 }
 .dashboard-icon-image {
   width: 18px;
+  height: 18px;
+  object-fit: contain;
 }
 
-/* Header tooltips (match sidebar style) */
-.dashboard-icon-btn.has-tooltip {
+/* Header tooltips */
+.dashboard-icon-btn.has-tooltip,
+.dashboard-avatar-btn.has-tooltip {
   position: relative;
 }
 .header-tooltip {
@@ -87,24 +144,26 @@
   bottom: -36px;
   left: 50%;
   transform: translateX(-50%) translateY(-6px);
-  background: #0d0a34;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  padding: 6px 10px;
-  border-radius: 8px;
-  font-size: 12px;
+  background: var(--color-grey-900);
+  color: var(--color-text-on-primary);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
   white-space: nowrap;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity var(--transition-fast), transform var(--transition-fast);
+  z-index: 50;
+  box-shadow: var(--shadow-md);
 }
 .dashboard-icon-btn.has-tooltip:hover .header-tooltip,
-.dashboard-avatar-btn.has-tooltip:hover .header-tooltip {
+.dashboard-icon-btn.has-tooltip:focus-visible .header-tooltip,
+.dashboard-avatar-btn.has-tooltip:hover .header-tooltip,
+.dashboard-avatar-btn.has-tooltip:focus-visible .header-tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
 }
-.dashboard-icon-btn.has-tooltip .header-tooltip::after,
-.dashboard-avatar-btn.has-tooltip .header-tooltip::after {
+.header-tooltip::after {
   content: "";
   position: absolute;
   top: -6px;
@@ -112,35 +171,88 @@
   transform: translateX(-50%);
   border-style: solid;
   border-width: 6px;
-  border-color: transparent transparent #0d0a34 transparent;
+  border-color: transparent transparent var(--color-grey-900) transparent;
 }
 
 /* Avatar */
 .dashboard-avatar-btn {
-  background: transparent;
-  border: 1px solid #e7e9ee;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  background: var(--color-primary-soft);
+  border: 1px solid var(--color-border);
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-pill);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  overflow: visible; /* allow tooltip to render outside circle */
+  overflow: visible;
+  transition: box-shadow var(--transition), border-color var(--transition);
 }
-.dashboard-avatar-btn.has-tooltip {
-  position: relative;
+.dashboard-avatar-btn:hover {
+  border-color: var(--color-border-strong);
+}
+.dashboard-avatar-btn:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 .dashboard-avatar-image {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
 }
 .dashboard-avatar-initials {
-  font-size: 14px;
-  font-weight: 600;
-  color: #000000;
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+/* User dropdown menu */
+.dashboard-user-menu {
+  position: relative;
+}
+.dashboard-user-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + var(--space-2));
+  min-width: 184px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: var(--space-1);
+  z-index: 100;
+}
+.dashboard-user-dropdown .dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  min-height: 40px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-base);
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  transition: background var(--transition), color var(--transition);
+}
+.dashboard-user-dropdown .dropdown-item:hover {
+  background: var(--color-surface-muted);
+}
+.dashboard-user-dropdown .dropdown-item:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.dashboard-user-dropdown .dropdown-item:active {
+  background: var(--color-primary-soft);
+}
+.dashboard-user-dropdown .dropdown-item--danger {
+  color: var(--color-error);
+}
+.dashboard-user-dropdown .dropdown-item--danger:hover {
+  background: var(--color-error-soft);
 }
 
 .dashboard-nav-menu {
@@ -148,7 +260,29 @@
 }
 
 @media (max-width: 768px) {
+  .dashboard-header-content {
+    padding: var(--space-3) var(--space-4);
+  }
   .dashboard-search-bar {
     display: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-back-shop {
+    padding: var(--space-2);
+  }
+  .dashboard-back-shop__label {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-icon-btn,
+  .dashboard-avatar-btn,
+  .dashboard-back-shop,
+  .header-tooltip,
+  .dashboard-user-dropdown .dropdown-item {
+    transition: none;
   }
 }

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import '../styles/components/Breadcrumb.css';
 import '../styles/pages/ProductDetail.css';
 import { getSharedViewMode, setSharedViewMode as updateSharedViewMode, registerViewModeSetter } from '../pages/ProductDetail';
+import { parseProductPath } from '../utils/dashboardRoutes';
 
 const Breadcrumb = ({ currentPage, onPageChange }) => {
   const [viewMode, setViewMode] = useState(getSharedViewMode());
@@ -19,12 +20,11 @@ const Breadcrumb = ({ currentPage, onPageChange }) => {
   // Get model_no from URL and check if coming from home
   useEffect(() => {
     if (currentPage === 'product-detail' && typeof window !== 'undefined') {
+      // Clean route /product/<model_no>, with legacy ?model_no= fallback.
+      const fromPath = parseProductPath(window.location.pathname);
       const urlParams = new URLSearchParams(window.location.search);
-      const modelNoParam = urlParams.get('model_no');
-      const fromHomeParam = urlParams.get('fromHome');
-      
-      setModelNo(modelNoParam);
-      setFromHome(fromHomeParam === 'true');
+      setModelNo(fromPath || urlParams.get('model_no'));
+      setFromHome(false); // Always Home > Shop > Product
     } else {
       setModelNo(null);
       setFromHome(false);
@@ -103,27 +103,40 @@ const Breadcrumb = ({ currentPage, onPageChange }) => {
   };
 
   return (
-    <nav className={`breadcrumb ${showActions ? 'breadcrumb-with-actions' : ''} ${showContinueShopping ? 'breadcrumb-with-continue' : ''}`}>
+    <nav
+      className={`breadcrumb ${showActions ? 'breadcrumb-with-actions' : ''} ${showContinueShopping ? 'breadcrumb-with-continue' : ''}`}
+      aria-label="Breadcrumb"
+    >
       <div className="breadcrumb-container">
-        <div className="breadcrumb-content">
-          {breadcrumbItems.map((item, index) => (
-            <React.Fragment key={item.id}>
-              {index > 0 && (
-                <span className="breadcrumb-separator">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M9 18L15 12L9 6" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                </span>
-              )}
-              <span 
-                className={`breadcrumb-item ${currentPage === item.id ? 'active' : ''}`}
-                onClick={() => currentPage !== item.id && onPageChange(item.id)}
-              >
-                {item.text}
-              </span>
-            </React.Fragment>
-          ))}
-        </div>
+        <ol className="breadcrumb-content">
+          {breadcrumbItems.map((item, index) => {
+            const isCurrent = item.isLast || index === breadcrumbItems.length - 1 || currentPage === item.id;
+            return (
+              <li className="breadcrumb-crumb" key={item.id}>
+                {index > 0 && (
+                  <span className="breadcrumb-separator" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </span>
+                )}
+                {isCurrent ? (
+                  <span className="breadcrumb-item active" aria-current="page" title={item.text}>
+                    {item.text}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    className="breadcrumb-item"
+                    onClick={() => onPageChange(item.id)}
+                  >
+                    {item.text}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ol>
         {showActions && (
           <div className="breadcrumb-actions">
             <div className="view-toggle">

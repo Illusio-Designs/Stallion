@@ -1,29 +1,13 @@
-'use client';
-import { Suspense } from 'react';
-import { usePathname, useSearchParams } from 'next/navigation';
-import App from '../../pages/App';
-import Loader from '../../components/Loader';
+import DynamicClient from './DynamicClient';
+import { metadataForSlug } from '../../utils/pageMeta';
 
-function DynamicPageContent() {
-  const pathname = usePathname();
-  const searchParams = useSearchParams();
-  
-  // Extract page from pathname and query - handle dashboard tabs via ?tab=
-  let page = pathname === '/' ? 'home' : (pathname.slice(1) || 'home');
-  if (pathname === '/dashboard') {
-    page = searchParams.get('tab') || 'dashboard';
-  }
-  
-  // Extract productId from query params if available
-  const productId = searchParams.get('id') ? parseInt(searchParams.get('id')) : null;
-  
-  return <App initialPage={page} productId={productId} />;
+// Server component: emits per-route SEO metadata from the path segments,
+// then renders the client routing logic.
+export async function generateMetadata({ params }) {
+  const { slug } = await params;
+  return metadataForSlug(slug);
 }
 
 export default function DynamicPage() {
-  return (
-    <Suspense fallback={<Loader isLoading={true} />}>
-      <DynamicPageContent />
-    </Suspense>
-  );
+  return <DynamicClient />;
 }

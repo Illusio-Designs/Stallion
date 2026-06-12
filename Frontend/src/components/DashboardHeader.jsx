@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import '../styles/components/DashboardHeader.css';
 import { FiMaximize, FiMinimize } from 'react-icons/fi';
+import Tooltip from './ui/Tooltip';
 import { logout as authLogout, getUser } from '../services/authService';
 import { showLogoutSuccess } from '../services/notificationService';
 import { getUsers } from '../services/apiService';
@@ -153,17 +154,26 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed }) => {
     };
   }, []);
 
-  // Close user dropdown when clicking outside
+  // Close user dropdown when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setIsUserDropdownOpen(false);
       }
     };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setIsUserDropdownOpen(false);
+      }
+    };
     if (isUserDropdownOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
     }
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
   }, [isUserDropdownOpen]);
 
   const initials = useMemo(() => {
@@ -192,27 +202,12 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed }) => {
         <div className="dashboard-title">Welcome {userName}</div>
 
         <div className="dashboard-header-actions">
-          <a
-            href="/products"
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              padding: '7px 16px',
-              borderRadius: '8px',
-              background: '#181265',
-              color: '#fff',
-              fontSize: '13px',
-              fontWeight: '600',
-              textDecoration: 'none',
-              whiteSpace: 'nowrap',
-            }}
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <a href="/products" className="dashboard-back-shop">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
               <polyline points="9 22 9 12 15 12 15 22"/>
             </svg>
-            Back to Shop
+            <span className="dashboard-back-shop__label">Back to Shop</span>
           </a>
           <div className="dashboard-search-bar">
             <svg className="dashboard-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -232,55 +227,37 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed }) => {
           </div>
 
           <div className="dashboard-action-icons">
-            <button className="dashboard-icon-btn has-tooltip" aria-label="Notifications">
-              <img src="/images/icons/bell.webp" alt="Notifications" className="dashboard-icon-image" />
-              <span className="header-tooltip">Notifications</span>
-            </button>
-            <button className="dashboard-icon-btn has-tooltip" aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} onClick={toggleFullscreen}>
-              {isFullscreen ? <FiMinimize size={20} /> : <FiMaximize size={20} />}
-              <span className="header-tooltip">{isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'}</span>
-            </button>
-            <div className="dashboard-user-menu" ref={userMenuRef} style={{ position: 'relative' }}>
+            <Tooltip label="Notifications" placement="bottom">
+              <button className="dashboard-icon-btn" aria-label="Notifications">
+                <img src="/images/icons/bell.webp" alt="Notifications" className="dashboard-icon-image" />
+              </button>
+            </Tooltip>
+            <Tooltip label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} placement="bottom">
+              <button className="dashboard-icon-btn" aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} onClick={toggleFullscreen}>
+                {isFullscreen ? <FiMinimize size={20} /> : <FiMaximize size={20} />}
+              </button>
+            </Tooltip>
+            <div className="dashboard-user-menu" ref={userMenuRef}>
               <button
                 className="dashboard-avatar-btn has-tooltip"
                 onClick={() => setIsUserDropdownOpen((v) => !v)}
                 aria-label="User Menu"
+                aria-haspopup="menu"
+                aria-expanded={isUserDropdownOpen}
                 title="User Menu"
               >
                 {avatarUrl ? (
                   <img src={avatarUrl} alt={userName} className="dashboard-avatar-image" />
                 ) : (
-                  <span className="dashboard-avatar-initials">{initials}</span>
+                  <span className="dashboard-avatar-initials">{initials || 'U'}</span>
                 )}
                 <span className="header-tooltip">User Menu</span>
               </button>
               {isUserDropdownOpen && (
-                <div
-                  className="dashboard-user-dropdown"
-                  style={{
-                    position: 'absolute',
-                    right: 0,
-                    top: 'calc(100% + 8px)',
-                    minWidth: 180,
-                    background: '#fff',
-                    border: '1px solid #E0E0E0',
-                    borderRadius: 10,
-                    boxShadow: '0 2px 12px rgba(24,18,101,.07)',
-                    padding: 8,
-                    zIndex: 100,
-                  }}
-                >
+                <div className="dashboard-user-dropdown" role="menu">
                   <button
                     className="dropdown-item"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '8px 10px',
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: 'pointer',
-                      borderRadius: 8,
-                    }}
+                    role="menuitem"
                     onClick={() => {
                       setIsUserDropdownOpen(false);
                       onPageChange('settings');
@@ -289,16 +266,8 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed }) => {
                     Edit Profile
                   </button>
                   <button
-                    className="dropdown-item"
-                    style={{
-                      width: '100%',
-                      textAlign: 'left',
-                      padding: '8px 10px',
-                      border: 'none',
-                      background: 'transparent',
-                      cursor: 'pointer',
-                      borderRadius: 8,
-                    }}
+                    className="dropdown-item dropdown-item--danger"
+                    role="menuitem"
                     onClick={() => {
                       setIsUserDropdownOpen(false);
                       authLogout();

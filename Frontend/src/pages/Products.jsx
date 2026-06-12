@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import '../styles/pages/Products.css';
 import '../styles/components/filter-chips.css';
+import { productPath } from '../utils/dashboardRoutes';
 import ProductCard from '../components/ProductCard';
 import Skeleton from '../components/ui/Skeleton';
 import { isLoggedIn } from '../services/authService';
@@ -401,14 +402,20 @@ const Products = ({ onPageChange }) => {
     });
   };
 
+  // Allow Enter/Space to activate elements that are divs-with-onClick.
+  const onKeyActivate = (fn) => (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      fn();
+    }
+  };
+
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
 
   const handleViewMore = (productId, modelNo) => {
-    // Products page already requires authentication, so just navigate
-    // Add fromHome=false (or omit it) to indicate coming from products page
+    // Clean product route: /product/<model_no>
     if (typeof window !== 'undefined') {
-      const url = `/product-detail?id=${productId}${modelNo ? `&model_no=${encodeURIComponent(modelNo)}` : ''}`;
-      window.location.href = url;
+      window.location.href = productPath(modelNo);
     }
   };
 
@@ -514,12 +521,12 @@ const Products = ({ onPageChange }) => {
     <>
       <div className="filter-header">
         <h2>Filter</h2>
-        <button className="reset-button" onClick={handleReset}>RESET</button>
+        <button type="button" className="reset-button" onClick={handleReset}>Reset</button>
       </div>
 
       {/* Brands Filter */}
       <div className="filter-section">
-        <div className="filter-section-header" onClick={() => toggleSection('brands')}>
+        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.brands} onClick={() => toggleSection('brands')} onKeyDown={onKeyActivate(() => toggleSection('brands'))}>
           <h3>Brands</h3>
           <span className={`chevron ${expandedSections.brands ? 'expanded' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -549,7 +556,7 @@ const Products = ({ onPageChange }) => {
 
       {/* Frame Material Filter */}
       <div className="filter-section">
-        <div className="filter-section-header" onClick={() => toggleSection('frameMaterial')}>
+        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.frameMaterial} onClick={() => toggleSection('frameMaterial')} onKeyDown={onKeyActivate(() => toggleSection('frameMaterial'))}>
           <h3>Frame Material</h3>
           <span className={`chevron ${expandedSections.frameMaterial ? 'expanded' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -579,7 +586,7 @@ const Products = ({ onPageChange }) => {
 
       {/* Shape Filter */}
       <div className="filter-section">
-        <div className="filter-section-header" onClick={() => toggleSection('shape')}>
+        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.shape} onClick={() => toggleSection('shape')} onKeyDown={onKeyActivate(() => toggleSection('shape'))}>
           <h3>Shape</h3>
           <span className={`chevron ${expandedSections.shape ? 'expanded' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -609,7 +616,7 @@ const Products = ({ onPageChange }) => {
 
       {/* Frame Type Filter */}
       <div className="filter-section">
-        <div className="filter-section-header" onClick={() => toggleSection('type')}>
+        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.type} onClick={() => toggleSection('type')} onKeyDown={onKeyActivate(() => toggleSection('type'))}>
           <h3>Frame Type</h3>
           <span className={`chevron ${expandedSections.type ? 'expanded' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -640,7 +647,7 @@ const Products = ({ onPageChange }) => {
 
       {/* Gender Filter */}
       <div className="filter-section">
-        <div className="filter-section-header" onClick={() => toggleSection('gender')}>
+        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.gender} onClick={() => toggleSection('gender')} onKeyDown={onKeyActivate(() => toggleSection('gender'))}>
           <h3>Gender</h3>
           <span className={`chevron ${expandedSections.gender ? 'expanded' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -670,7 +677,7 @@ const Products = ({ onPageChange }) => {
 
       {/* Lens Colour Filter */}
       <div className="filter-section">
-        <div className="filter-section-header" onClick={() => toggleSection('lensColor')}>
+        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.lensColor} onClick={() => toggleSection('lensColor')} onKeyDown={onKeyActivate(() => toggleSection('lensColor'))}>
           <h3>Lens Colour</h3>
           <span className={`chevron ${expandedSections.lensColor ? 'expanded' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -688,9 +695,14 @@ const Products = ({ onPageChange }) => {
                 return (
                   <div
                     key={colorId}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedLensColor === colorId}
+                    aria-label={colorName}
                     className={`color-swatch ${selectedLensColor === colorId ? 'active' : ''}`}
                     style={{ backgroundColor: colorHex }}
                     onClick={() => setSelectedLensColor(selectedLensColor === colorId ? null : colorId)}
+                    onKeyDown={onKeyActivate(() => setSelectedLensColor(selectedLensColor === colorId ? null : colorId))}
                     title={colorName}
                   ></div>
                 );
@@ -702,7 +714,7 @@ const Products = ({ onPageChange }) => {
 
       {/* Lens Material Filter */}
       <div className="filter-section">
-        <div className="filter-section-header" onClick={() => toggleSection('lensMaterial')}>
+        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.lensMaterial} onClick={() => toggleSection('lensMaterial')} onKeyDown={onKeyActivate(() => toggleSection('lensMaterial'))}>
           <h3>Lens Material</h3>
           <span className={`chevron ${expandedSections.lensMaterial ? 'expanded' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -732,7 +744,7 @@ const Products = ({ onPageChange }) => {
 
       {/* Frame Colour Filter */}
       <div className="filter-section">
-        <div className="filter-section-header" onClick={() => toggleSection('frameColor')}>
+        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.frameColor} onClick={() => toggleSection('frameColor')} onKeyDown={onKeyActivate(() => toggleSection('frameColor'))}>
           <h3>Frame Colour</h3>
           <span className={`chevron ${expandedSections.frameColor ? 'expanded' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -750,9 +762,14 @@ const Products = ({ onPageChange }) => {
                 return (
                   <div
                     key={colorId}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={selectedFrameColor === colorId}
+                    aria-label={colorName}
                     className={`color-swatch ${selectedFrameColor === colorId ? 'active' : ''}`}
                     style={{ backgroundColor: colorHex }}
                     onClick={() => setSelectedFrameColor(selectedFrameColor === colorId ? null : colorId)}
+                    onKeyDown={onKeyActivate(() => setSelectedFrameColor(selectedFrameColor === colorId ? null : colorId))}
                     title={colorName}
                   ></div>
                 );
@@ -773,17 +790,22 @@ const Products = ({ onPageChange }) => {
         </aside>
 
         {/* Mobile filter toggle - visible via CSS on small screens */}
-        <button className="filter-toggle-btn" onClick={() => setMobileFilterOpen(true)}>
-          Filters ▾
+        <button type="button" className="filter-toggle-btn" onClick={() => setMobileFilterOpen(true)}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 6h16M7 12h10M10 18h4" />
+          </svg>
+          Filters
         </button>
 
         {/* Mobile centered modal for filter (closes when clicking backdrop) */}
         {mobileFilterOpen && (
-          <div className={`mobile-filter-modal open`} onClick={() => setMobileFilterOpen(false)}>
-            <div onClick={(e) => e.stopPropagation()}>
+          <div className="mobile-filter-modal open" onClick={() => setMobileFilterOpen(false)} role="dialog" aria-modal="true" aria-label="Product filters">
+            <div className="mobile-filter-modal__panel" onClick={(e) => e.stopPropagation()}>
               <aside className="filter-sidebar">
-                <div style={{display: 'flex', justifyContent: 'flex-end'}}>
-                  <button className="reset-button" onClick={() => setMobileFilterOpen(false)}>Close ✕</button>
+                <div className="mobile-filter-modal__close-row">
+                  <button type="button" className="mobile-filter-close" onClick={() => setMobileFilterOpen(false)} aria-label="Close filters">
+                    <span aria-hidden="true">&times;</span>
+                  </button>
                 </div>
                 <FilterContent />
               </aside>
@@ -801,7 +823,8 @@ const Products = ({ onPageChange }) => {
               }
             </h2>
             {searchQuery && (
-              <button 
+              <button
+                type="button"
                 className="clear-search-btn"
                 onClick={() => {
                   setSearchQuery('');
@@ -823,34 +846,49 @@ const Products = ({ onPageChange }) => {
             <div className="active-filters">
               <span className="active-filters__label">Filters:</span>
               {activeFilterChips.map(chip => (
-                <button key={chip.key} className="filter-chip" onClick={chip.remove} title={`Remove ${chip.label}`}>
-                  {chip.label}
+                <button key={chip.key} type="button" className="filter-chip" onClick={chip.remove} aria-label={`Remove filter ${chip.label}`} title={`Remove ${chip.label}`}>
+                  <span className="filter-chip__label">{chip.label}</span>
                   <span className="filter-chip__x" aria-hidden="true">&times;</span>
                 </button>
               ))}
-              <button className="filter-chip-clear" onClick={handleReset}>Clear all</button>
+              <button type="button" className="filter-chip-clear" onClick={handleReset}>Clear all</button>
             </div>
           )}
 
-          <div className="products-grid-container">
-            {loading ? (
-              Array.from({ length: limit }).map((_, i) => (
-                <div key={`product-skeleton-${i}`} style={{ padding: 8 }}>
-                  <Skeleton width="100%" height={180} radius={12} />
-                  <Skeleton width="70%" height={16} style={{ marginTop: 12, display: 'block' }} />
-                  <Skeleton width="40%" height={14} style={{ marginTop: 8, display: 'block' }} />
-                </div>
-              ))
-            ) : error ? (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'red' }}>
-                Error: {error}
+          {error ? (
+            <div className="ui-state ui-state--error products-state">
+              <span className="ui-state__icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="9" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+              </span>
+              <p className="ui-state__title">Something went wrong</p>
+              <p className="ui-state__desc">{error}</p>
+              <div className="ui-state__actions">
+                <button type="button" className="ui-btn ui-btn--primary ui-btn--md" onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}>
+                  <span className="ui-btn__label">Try again</span>
+                </button>
               </div>
-            ) : products.length > 0 ? (
-              products.map(product => {
+            </div>
+          ) : loading ? (
+            <div className="products-grid-container" aria-busy="true" aria-live="polite">
+              {Array.from({ length: limit }).map((_, i) => (
+                <div key={`product-skeleton-${i}`} className="product-skeleton">
+                  <Skeleton width="100%" height={180} radius={12} />
+                  <Skeleton width="70%" height={16} className="product-skeleton__line" />
+                  <Skeleton width="40%" height={14} className="product-skeleton__line" />
+                </div>
+              ))}
+            </div>
+          ) : products.length > 0 ? (
+            <div className="products-grid-container">
+              {products.map(product => {
                 const productId = product.product_id || product.id;
                 const productName = product.model_no || product.name || 'Product';
                 const productImage = getProductImage(product);
-                
+
                 return (
                   <ProductCard
                     key={productId}
@@ -862,38 +900,57 @@ const Products = ({ onPageChange }) => {
                     onViewMore={handleViewMore}
                   />
                 );
-              })
-            ) : (
-              <div style={{ padding: '40px', textAlign: 'center', color: 'white', gridColumn: '1 / -1' }}>
-                {searchQuery ? 
-                  `No products found for "${searchQuery}"` : 
-                  'No products found'
-                }
-              </div>
-            )}
-          </div>
+              })}
+            </div>
+          ) : (
+            <div className="ui-state ui-state--empty products-state">
+              <span className="ui-state__icon" aria-hidden="true">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="11" cy="11" r="7" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+              </span>
+              <p className="ui-state__title">
+                {searchQuery ? `No frames match "${searchQuery}"` : 'No frames match'}
+              </p>
+              <p className="ui-state__desc">
+                {searchQuery
+                  ? 'Try a different search term or clear your filters to see more frames.'
+                  : 'Try removing some filters to see more frames.'}
+              </p>
+              {(activeFilterChips.length > 0 || searchQuery) && (
+                <div className="ui-state__actions">
+                  <button type="button" className="ui-btn ui-btn--secondary ui-btn--md" onClick={handleReset}>
+                    <span className="ui-btn__label">Clear filters</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
           
           {/* Pagination Controls */}
           {!loading && products.length > 0 && totalPages > 1 && (
-            <div className="products-pagination">
-              <button 
+            <nav className="products-pagination" aria-label="Products pagination">
+              <button
+                type="button"
                 className="pagination-btn"
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
               >
                 Previous
               </button>
-              <div className="pagination-info">
+              <div className="pagination-info" aria-live="polite">
                 Page {page} of {totalPages}
               </div>
-              <button 
+              <button
+                type="button"
                 className="pagination-btn"
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
               >
                 Next
               </button>
-            </div>
+            </nav>
           )}
         </main>
       </div>

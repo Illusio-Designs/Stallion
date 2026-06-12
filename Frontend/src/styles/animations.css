@@ -1,0 +1,72 @@
+/* ============================================================
+   Motion layer — global keyframes + utilities.
+   Rules (Emil Kowalski): short durations, ease-out on enter,
+   animate transform/opacity only, reduced-motion honored.
+   Loaded app-wide via app/globals.css.
+   ============================================================ */
+
+@keyframes ui-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes ui-fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes ui-fade-in-down {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes ui-scale-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes ui-slide-in-right {
+  from { opacity: 0; transform: translateX(12px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The single easing curve used across the app (decelerate / ease-out). */
+:root {
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Opt-in entrance utilities */
+.animate-fade-in      { animation: ui-fade-in 0.2s var(--ease-out) both; }
+.animate-fade-in-up   { animation: ui-fade-in-up 0.28s var(--ease-out) both; }
+.animate-fade-in-down { animation: ui-fade-in-down 0.28s var(--ease-out) both; }
+.animate-scale-in     { animation: ui-scale-in 0.2s var(--ease-out) both; }
+
+/* Page / route enter — applied to layout main content (re-keyed per page) */
+.page-enter { animation: ui-fade-in-up 0.32s var(--ease-out) both; }
+
+/* Staggered children — add .stagger to a list/grid container */
+.stagger > * { animation: ui-fade-in-up 0.34s var(--ease-out) both; }
+.stagger > *:nth-child(1)  { animation-delay: 0.02s; }
+.stagger > *:nth-child(2)  { animation-delay: 0.05s; }
+.stagger > *:nth-child(3)  { animation-delay: 0.08s; }
+.stagger > *:nth-child(4)  { animation-delay: 0.11s; }
+.stagger > *:nth-child(5)  { animation-delay: 0.14s; }
+.stagger > *:nth-child(6)  { animation-delay: 0.17s; }
+.stagger > *:nth-child(7)  { animation-delay: 0.20s; }
+.stagger > *:nth-child(8)  { animation-delay: 0.23s; }
+.stagger > *:nth-child(9)  { animation-delay: 0.26s; }
+.stagger > *:nth-child(n+10) { animation-delay: 0.28s; }
+
+/* A consistent, GPU-cheap press feedback for any clickable element. */
+.press-feedback { transition: transform var(--transition-fast); }
+.press-feedback:active { transform: scale(0.97); }
+
+/* ---- Reduced-motion: global safety net ----
+   Honors the OS setting for every animation/transition in the app, including
+   all the transitions added during the revamp. Non-negotiable a11y baseline. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}

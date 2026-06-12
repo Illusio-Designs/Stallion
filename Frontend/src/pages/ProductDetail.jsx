@@ -1,8 +1,9 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import "../styles/pages/ProductDetail.css";
 import Skeleton from "../components/ui/Skeleton";
 import { addToCart } from "../services/cartService";
 import { showAddToCartSuccess } from "../services/notificationService";
+import { parseProductPath } from "../utils/dashboardRoutes";
 import {
   getProductModels,
   getProductById,
@@ -29,6 +30,14 @@ export const registerViewModeSetter = (setter) => {
   sharedSetViewMode = setter;
 };
 
+// Render helper: degrade missing / placeholder spec values to a clean em dash.
+const display = (value) => {
+  if (value === null || value === undefined) return "—";
+  const str = String(value).trim();
+  if (str === "" || str === "N/A") return "—";
+  return str;
+};
+
 const ProductDetail = ({ productId: propProductId = null }) => {
   // Get productId and model_no from URL if not provided as prop (for direct navigation)
   const [productId, setProductId] = useState(() => {
@@ -43,6 +52,9 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   });
   const [modelNo, setModelNo] = useState(() => {
     if (typeof window !== "undefined") {
+      // Clean route /product/<model_no>, with legacy ?model_no= fallback.
+      const fromPath = parseProductPath(window.location.pathname);
+      if (fromPath) return fromPath;
       const urlParams = new URLSearchParams(window.location.search);
       return urlParams.get("model_no") || null;
     }
@@ -55,8 +67,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
       if (typeof window !== "undefined") {
         const urlParams = new URLSearchParams(window.location.search);
         const id = urlParams.get("id");
-        const modelNoParam = urlParams.get("model_no");
-        
+        const modelNoParam = parseProductPath(window.location.pathname) || urlParams.get("model_no");
+
         if (id && id !== productId) {
           setProductId(id);
         }
@@ -83,6 +95,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   const [quantities, setQuantities] = useState({});
   const [editingQuantities, setEditingQuantities] = useState({});
   const [productVariations, setProductVariations] = useState([]);
+  const [addedIds, setAddedIds] = useState({}); // transient "Added" feedback per variation
+  const addedTimersRef = useRef({});
   const [rawModels, setRawModels] = useState([]); // Store raw API models for re-transformation
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -102,6 +116,14 @@ const ProductDetail = ({ productId: propProductId = null }) => {
     registerViewModeSetter((mode) => {
       setViewMode(mode);
     });
+  }, []);
+
+  // Clear any pending "Added" feedback timers on unmount.
+  useEffect(() => {
+    const timers = addedTimersRef.current;
+    return () => {
+      Object.values(timers).forEach((t) => clearTimeout(t));
+    };
   }, []);
 
   // Lookup tables are fetched lazily and ONLY when the product models don't
@@ -196,6 +218,17 @@ const ProductDetail = ({ productId: propProductId = null }) => {
       `${variation.name} (${variation.lenseColour})`,
       quantity
     );
+    // Transient inline "Added" confirmation on the button itself.
+    setAddedIds((prev) => ({ ...prev, [variation.id]: true }));
+    if (addedTimersRef.current[variation.id]) {
+      clearTimeout(addedTimersRef.current[variation.id]);
+    }
+    addedTimersRef.current[variation.id] = setTimeout(() => {
+      setAddedIds((prev) => {
+        const { [variation.id]: _, ...rest } = prev;
+        return rest;
+      });
+    }, 1600);
   };
 
   // Transform API response to match component's expected format
@@ -497,6 +530,32 @@ const ProductDetail = ({ productId: propProductId = null }) => {
     setSelectedVariation(index);
   };
 
+  // Roving keyboard navigation for the thumbnail gallery: arrow keys move
+  // focus + selection, Home/End jump to ends. Enter/Space select (handled
+  // inline). Purely additive UX — no data/prop changes.
+  const thumbnailRefs = useRef([]);
+  const handleThumbnailKeyDown = useCallback(
+    (e, index, count) => {
+      let next = null;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (index + 1) % count;
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (index - 1 + count) % count;
+      else if (e.key === "Home") next = 0;
+      else if (e.key === "End") next = count - 1;
+      else if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        handleVariationClick(index);
+        return;
+      }
+      if (next !== null) {
+        e.preventDefault();
+        handleVariationClick(next);
+        const node = thumbnailRefs.current[next];
+        if (node && typeof node.focus === "function") node.focus();
+      }
+    },
+    []
+  );
+
   const getVisibleVariations = () => {
     if (viewMode === 'list') return productVariations;
     // Grid view: show a window of productVariations according to cardsPerRow and sliderPosition
@@ -521,15 +580,21 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   if (loading) {
     return (
       <div className="product-detail-page">
-        <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', padding: 24 }}>
-          <Skeleton width={420} height={360} radius={16} style={{ maxWidth: '100%', flex: '1 1 320px' }} />
-          <div style={{ flex: '1 1 320px', minWidth: 280 }}>
-            <Skeleton width="60%" height={28} style={{ display: 'block', marginBottom: 16 }} />
-            <Skeleton width="40%" height={20} style={{ display: 'block', marginBottom: 24 }} />
+        <div className="pd-skeleton" aria-busy="true" aria-live="polite">
+          <Skeleton className="pd-skeleton__media" height="100%" radius={12} />
+          <div className="pd-skeleton__panel">
+            <Skeleton className="pd-skeleton__line" width="60%" height={28} radius={6} />
+            <Skeleton className="pd-skeleton__line" width="40%" height={20} radius={6} />
             {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={`pd-skeleton-${i}`} width={`${80 - i * 6}%`} height={14} style={{ display: 'block', marginBottom: 12 }} />
+              <Skeleton
+                key={`pd-skeleton-${i}`}
+                className="pd-skeleton__line"
+                width={`${80 - i * 6}%`}
+                height={14}
+                radius={6}
+              />
             ))}
-            <Skeleton width={160} height={44} radius={10} style={{ display: 'block', marginTop: 24 }} />
+            <Skeleton className="pd-skeleton__cta" width={160} height={44} radius={8} />
           </div>
         </div>
       </div>
@@ -540,8 +605,27 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   if (error) {
     return (
       <div className="product-detail-page">
-        <div style={{ padding: '40px', textAlign: 'center', color: 'red' }}>
-          <p>Error: {error}</p>
+        <div className="ui-state ui-state--error" role="alert">
+          <div className="ui-state__icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          </div>
+          <p className="ui-state__title">Couldn&apos;t load this product</p>
+          <p className="ui-state__desc">{error}. Please check your connection and try again.</p>
+          <div className="ui-state__actions">
+            <button
+              type="button"
+              className="ui-btn ui-btn--primary ui-btn--md"
+              onClick={() => {
+                if (typeof window !== "undefined") window.location.reload();
+              }}
+            >
+              <span className="ui-btn__label">Retry</span>
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -551,8 +635,15 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   if (productVariations.length === 0) {
     return (
       <div className="product-detail-page">
-        <div style={{ padding: '40px', textAlign: 'center' }}>
-          <p>No product variations found.</p>
+        <div className="ui-state ui-state--empty">
+          <div className="ui-state__icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+          </div>
+          <p className="ui-state__title">No variations found</p>
+          <p className="ui-state__desc">This product has no available variations to show right now.</p>
         </div>
       </div>
     );
@@ -580,71 +671,77 @@ const ProductDetail = ({ productId: propProductId = null }) => {
               <div className="list-item-details">
                 <div className="detail-grid">
                   <div className="detail-item">
-                    <span className="detail-label">Brand:</span>
-                    <span className="detail-value">{variation.brand}</span>
+                    <span className="detail-label">Brand</span>
+                    <span className="detail-value">{display(variation.brand)}</span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Model:</span>
-                    <span className="detail-value">{variation.model}</span>
+                    <span className="detail-label">Model</span>
+                    <span className="detail-value">{display(variation.model)}</span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Type:</span>
-                    <span className="detail-value">{variation.type}</span>
+                    <span className="detail-label">Type</span>
+                    <span className="detail-value">{display(variation.type)}</span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Gender:</span>
-                    <span className="detail-value">{variation.gender}</span>
+                    <span className="detail-label">Gender</span>
+                    <span className="detail-value">{display(variation.gender)}</span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Shape:</span>
-                    <span className="detail-value">{variation.shape}</span>
+                    <span className="detail-label">Shape</span>
+                    <span className="detail-value">{display(variation.shape)}</span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Frame Colour:</span>
+                    <span className="detail-label">Frame Colour</span>
                     <span className="detail-value">
-                      {variation.frameColour}
+                      {display(variation.frameColour)}
                     </span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Frame Material:</span>
+                    <span className="detail-label">Frame Material</span>
                     <span className="detail-value">
-                      {variation.frameMaterial}
+                      {display(variation.frameMaterial)}
                     </span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Lense Colour:</span>
+                    <span className="detail-label">Lense Colour</span>
                     <span className="detail-value">
-                      {variation.lenseColour}
+                      {display(variation.lenseColour)}
                     </span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Lense Material:</span>
+                    <span className="detail-label">Lense Material</span>
                     <span className="detail-value">
-                      {variation.lenseMaterial}
+                      {display(variation.lenseMaterial)}
                     </span>
                   </div>
                   <div className="detail-item">
-                    <span className="detail-label">Size:</span>
-                    <span className="detail-value">{variation.size}</span>
+                    <span className="detail-label">Size</span>
+                    <span className="detail-value">{display(variation.size)}</span>
                   </div>
                   {/* QTY label/value as a normal detail cell */}
                   <div className="detail-item">
-                    <span className="detail-label">QTY:</span>
-                    <span className="detail-value">{variation.qty}</span>
+                    <span className="detail-label">QTY</span>
+                    <span className="detail-value">{display(variation.qty)}</span>
                   </div>
                   {/* Quantity selector in 5th column */}
                   <div className="quantity-selector-wrapper">
                     <div className="quantity-selector">
                       <button
+                        type="button"
                         className="qty-btn minus"
+                        aria-label={`Decrease quantity for ${variation.name}`}
+                        disabled={getQuantity(variation.id) <= 1}
                         onClick={(e) => handleQuantityDecrease(variation.id, e)}
                       >
-                        -
+                        <span aria-hidden="true">&minus;</span>
                       </button>
                       <input
                         className="qty-number"
                         type="number"
+                        inputMode="numeric"
+                        min="1"
                         step="1"
+                        aria-label={`Quantity for ${variation.name}`}
                         value={
                           editingQuantities[variation.id] !== undefined
                             ? editingQuantities[variation.id]
@@ -671,20 +768,23 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                         }}
                       />
                       <button
+                        type="button"
                         className="qty-btn plus"
+                        aria-label={`Increase quantity for ${variation.name}`}
                         onClick={(e) => handleQuantityIncrease(variation.id, e)}
                       >
-                        +
+                        <span aria-hidden="true">+</span>
                       </button>
                     </div>
                   </div>
                   {/* Add to Cart button in 6th column */}
                   <div className="add-to-cart-wrapper">
                     <button
-                      className="add-to-cart-btn-list"
+                      type="button"
+                      className={`add-to-cart-btn-list ${addedIds[variation.id] ? "is-added" : ""}`}
                       onClick={(e) => handleAddToCart(variation, e)}
                     >
-                      Add to Cart
+                      {addedIds[variation.id] ? "Added ✓" : "Add to Cart"}
                     </button>
                   </div>
                 </div>
@@ -704,7 +804,9 @@ const ProductDetail = ({ productId: propProductId = null }) => {
               <div className="variation-slider-section">
                 {needsSlider && (
                   <button
+                    type="button"
                     className="slider-arrow left"
+                    aria-label="Previous variations"
                     onClick={() => scrollSlider("prev")}
                     disabled={sliderPosition === 0}
                   >
@@ -745,7 +847,17 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                           className={`variation-card ${
                             selectedVariation === actualIndex ? "active" : ""
                           }`}
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={selectedVariation === actualIndex}
+                          aria-label={`Select variation ${variation.name}`}
                           onClick={() => handleVariationClick(actualIndex)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              handleVariationClick(actualIndex);
+                            }
+                          }}
                         >
                           <div className="variation-card-image">
                             <img 
@@ -761,7 +873,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                           </div>
                           <div className="variation-card-details">
                             <h4 className="variation-card-title">
-                              {variation.name}
+                              {display(variation.name)}
                             </h4>
                             <div className="variation-specs">
                               <div className="variation-spec-item">
@@ -769,7 +881,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                                   Frame Colour
                                 </span>
                                 <span className="variation-spec-value">
-                                  {variation.frameColour}
+                                  {display(variation.frameColour)}
                                 </span>
                               </div>
                               <div className="variation-spec-item">
@@ -777,23 +889,33 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                                   Lense Colour
                                 </span>
                                 <span className="variation-spec-value">
-                                  {variation.lenseColour}
+                                  {display(variation.lenseColour)}
                                 </span>
                               </div>
                             </div>
-                            <div className="quantity-selector-small">
+                            <div
+                              className="quantity-selector-small"
+                              onClick={(e) => e.stopPropagation()}
+                            >
                               <button
+                                type="button"
                                 className="qty-btn-small minus"
+                                aria-label={`Decrease quantity for ${variation.name}`}
+                                disabled={getQuantity(variation.id) <= 1}
                                 onClick={(e) =>
                                   handleQuantityDecrease(variation.id, e)
                                 }
                               >
-                                -
+                                <span aria-hidden="true">&minus;</span>
                               </button>
                               <input
                                 className="qty-number-small"
                                 type="number"
+                                inputMode="numeric"
+                                min="1"
                                 step="1"
+                                aria-label={`Quantity for ${variation.name}`}
+                                onClick={(e) => e.stopPropagation()}
                                 value={
                                   editingQuantities[variation.id] !== undefined
                                     ? editingQuantities[variation.id]
@@ -820,19 +942,22 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                                 }}
                               />
                               <button
+                                type="button"
                                 className="qty-btn-small plus"
+                                aria-label={`Increase quantity for ${variation.name}`}
                                 onClick={(e) =>
                                   handleQuantityIncrease(variation.id, e)
                                 }
                               >
-                                +
+                                <span aria-hidden="true">+</span>
                               </button>
                             </div>
                             <button
-                              className="add-to-cart-btn-small"
+                              type="button"
+                              className={`add-to-cart-btn-small ${addedIds[variation.id] ? "is-added" : ""}`}
                               onClick={(e) => handleAddToCart(variation, e)}
                             >
-                              Add to Cart
+                              {addedIds[variation.id] ? "Added ✓" : "Add to Cart"}
                             </button>
                           </div>
                         </div>
@@ -842,7 +967,9 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                 </div>
                 {needsSlider && (
                   <button
+                    type="button"
                     className="slider-arrow right"
+                    aria-label="Next variations"
                     onClick={() => scrollSlider("next")}
                     disabled={sliderPosition >= maxSliderPosition}
                   >
@@ -881,14 +1008,17 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                 />
               </div>
               <div className="main-product-info">
-                <h2 className="product-title">{currentProduct.name}</h2>
-                <div className="color-selectors">
+                <h2 className="product-title">{display(currentProduct.name)}</h2>
+                <div className="color-selectors" role="group" aria-label="Select colour variation">
                   {productVariations.slice(0, 3).map((variation, index) => (
-                    <div
+                    <button
+                      type="button"
                       key={variation.id}
                       className={`color-swatch ${
                         selectedVariation === index ? "active" : ""
                       }`}
+                      aria-label={`Colour variation ${index + 1}`}
+                      aria-pressed={selectedVariation === index}
                       onClick={() => handleVariationClick(index)}
                       style={{
                         backgroundColor:
@@ -898,33 +1028,39 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                             ? "#FFFFFF"
                             : "#FFB6C1",
                       }}
-                    ></div>
+                    ></button>
                   ))}
                 </div>
                 <div className="price-info">
                   <div className="price-item">
                     <span className="price-label">MRP</span>
-                    <span className="price-value">{currentProduct.mrp}</span>
+                    <span className="price-value">{display(currentProduct.mrp)}</span>
                   </div>
                   <div className="price-item">
                     <span className="price-label">WHP</span>
-                    <span className="price-value">{currentProduct.whp}</span>
+                    <span className="price-value">{display(currentProduct.whp)}</span>
                   </div>
                 </div>
                 <div className="main-selector-action-row">
                   <div className="quantity-selector-small">
                     <button
+                      type="button"
                       className="qty-btn-small minus"
+                      aria-label="Decrease quantity"
+                      disabled={getQuantity(currentProduct.id) <= 1}
                       onClick={(e) =>
                         handleQuantityDecrease(currentProduct.id, e)
                       }
                     >
-                      -
+                      <span aria-hidden="true">&minus;</span>
                     </button>
                     <input
                       className="qty-number-small"
                       type="number"
+                      inputMode="numeric"
+                      min="1"
                       step="1"
+                      aria-label="Quantity"
                       value={
                         editingQuantities[currentProduct.id] !== undefined
                           ? editingQuantities[currentProduct.id]
@@ -944,33 +1080,50 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                       }}
                     />
                     <button
+                      type="button"
                       className="qty-btn-small plus"
+                      aria-label="Increase quantity"
                       onClick={(e) =>
                         handleQuantityIncrease(currentProduct.id, e)
                       }
                     >
-                      +
+                      <span aria-hidden="true">+</span>
                     </button>
                   </div>
                   <button
-                    className="add-to-cart-btn-small"
+                    type="button"
+                    className={`add-to-cart-btn-small ${addedIds[currentProduct.id] ? "is-added" : ""}`}
                     onClick={(e) => handleAddToCart(currentProduct, e)}
                   >
-                    Add to Cart
+                    {addedIds[currentProduct.id] ? "Added ✓" : "Add to Cart"}
                   </button>
                 </div>
               </div>
             </div>
 
             {/* Variation Thumbnails */}
-            <div className="variation-thumbnails">
+            <div
+              className="variation-thumbnails"
+              role="listbox"
+              aria-label="Product variation thumbnails"
+            >
               {productVariations.map((variation, index) => (
                 <div
                   key={variation.id}
+                  ref={(node) => {
+                    thumbnailRefs.current[index] = node;
+                  }}
                   className={`thumbnail ${
                     selectedVariation === index ? "active" : ""
                   }`}
+                  role="option"
+                  tabIndex={selectedVariation === index ? 0 : -1}
+                  aria-selected={selectedVariation === index}
+                  aria-label={`View ${variation.name} ${variation.lenseColour}`}
                   onClick={() => handleVariationClick(index)}
+                  onKeyDown={(e) =>
+                    handleThumbnailKeyDown(e, index, productVariations.length)
+                  }
                 >
                   <img
                     src={variation.image || '/images/products/spac1.webp'}
@@ -997,35 +1150,35 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                     <span className="feature-label">Brand</span>
                     <span className="feature-separator">-</span>
                     <span className="feature-value">
-                      {displayVariation.brand}
+                      {display(displayVariation.brand)}
                     </span>
                   </div>
                   <div className="feature-item">
                     <span className="feature-label">Type</span>
                     <span className="feature-separator">-</span>
                     <span className="feature-value">
-                      {displayVariation.type}
+                      {display(displayVariation.type)}
                     </span>
                   </div>
                   <div className="feature-item">
                     <span className="feature-label">Gender</span>
                     <span className="feature-separator">-</span>
                     <span className="feature-value">
-                      {displayVariation.gender}
+                      {display(displayVariation.gender)}
                     </span>
                   </div>
                   <div className="feature-item">
                     <span className="feature-label">Shape</span>
                     <span className="feature-separator">-</span>
                     <span className="feature-value">
-                      {displayVariation.shape}
+                      {display(displayVariation.shape)}
                     </span>
                   </div>
                   <div className="feature-item">
                     <span className="feature-label">Size</span>
                     <span className="feature-separator">-</span>
                     <span className="feature-value">
-                      {displayVariation.size}
+                      {display(displayVariation.size)}
                     </span>
                   </div>
                 </div>
@@ -1034,35 +1187,35 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                     <span className="feature-label">Frame Colour</span>
                     <span className="feature-separator">-</span>
                     <span className="feature-value">
-                      {displayVariation.frameColour}
+                      {display(displayVariation.frameColour)}
                     </span>
                   </div>
                   <div className="feature-item">
                     <span className="feature-label">Frame Material</span>
                     <span className="feature-separator">-</span>
                     <span className="feature-value">
-                      {displayVariation.frameMaterial}
+                      {display(displayVariation.frameMaterial)}
                     </span>
                   </div>
                   <div className="feature-item">
                     <span className="feature-label">Lense Colour</span>
                     <span className="feature-separator">-</span>
                     <span className="feature-value">
-                      {displayVariation.lenseColour}
+                      {display(displayVariation.lenseColour)}
                     </span>
                   </div>
                   <div className="feature-item">
                     <span className="feature-label">Lense Material</span>
                     <span className="feature-separator">-</span>
                     <span className="feature-value">
-                      {displayVariation.lenseMaterial}
+                      {display(displayVariation.lenseMaterial)}
                     </span>
                   </div>
                   <div className="feature-item">
                     <span className="feature-label">QTY</span>
                     <span className="feature-separator">-</span>
                     <span className="feature-value">
-                      {displayVariation.qty}
+                      {display(displayVariation.qty)}
                     </span>
                   </div>
                 </div>

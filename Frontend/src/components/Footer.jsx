@@ -11,23 +11,23 @@ const Footer = ({ onPageChange }) => {
         <img src="/images/banners/spacs.webp" alt="Eyewear" className="footer-side-image" />
       </div>
       <div className="footer-content">
-        <div className="footer-section">
+        <div className="footer-section footer-section--brand">
           <div className="footer-logo">
             <img src="/images/logo/logo.webp" alt="Stallion Eyewear" className="footer-logo-image" />
           </div>
         </div>
         <div className="footer-section">
-          <h4>Quick Links</h4>
-          <ul>
-            <li><a href="/products" onClick={e => { e.preventDefault(); onPageChange ? onPageChange('products') : (window.location.href = '/products'); }}>Shop</a></li>
-            <li><a href="/about" onClick={e => { e.preventDefault(); onPageChange ? onPageChange('about') : (window.location.href = '/about'); }}>About</a></li>
-            <li><a href="/privacy-policy" onClick={e => { e.preventDefault(); onPageChange ? onPageChange('privacy-policy') : (window.location.href = '/privacy-policy'); }}>Privacy policy</a></li>
+          <h4 className="footer-heading">Quick Links</h4>
+          <ul className="footer-links">
+            <li><a href="/products" className="footer-link" onClick={e => { e.preventDefault(); onPageChange ? onPageChange('products') : (window.location.href = '/products'); }}>Shop</a></li>
+            <li><a href="/about" className="footer-link" onClick={e => { e.preventDefault(); onPageChange ? onPageChange('about') : (window.location.href = '/about'); }}>About</a></li>
+            <li><a href="/privacy-policy" className="footer-link" onClick={e => { e.preventDefault(); onPageChange ? onPageChange('privacy-policy') : (window.location.href = '/privacy-policy'); }}>Privacy policy</a></li>
           </ul>
         </div>
         <div className="footer-section">
-          <h4>Contact and Support</h4>
-          <p>+1(800)123-4567</p>
-          <p><a href="mailto:support@stallion.com">support@stallion.com</a></p>
+          <h4 className="footer-heading">Contact and Support</h4>
+          <p className="footer-text">+1 (800) 123-4567</p>
+          <p className="footer-text"><a href="mailto:support@stallion.com" className="footer-link footer-link--inline">support@stallion.com</a></p>
         </div>
       </div>
     </footer>

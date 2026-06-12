@@ -22,6 +22,7 @@ import '../styles/pages/dashboard-settings.css';
 import '../styles/pages/dashboard-support.css';
 import { getUserRole, isLoggedIn } from '../services/authService';
 import { hasPageAccess } from '../utils/rolePermissions';
+import { pageKeyToPath, pathToDashboardPage, isDashboardPage, parseProductPath } from '../utils/dashboardRoutes';
 
 // Auth + Public pages are imported eagerly so their CSS ships in the main
 // bundle and is applied on first paint (no unstyled flash on reload / direct
@@ -59,9 +60,18 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname;
       const params = new URLSearchParams(window.location.search);
-      // Keep a single dashboard route, switch content via ?tab=
-      if (path === '/dashboard') {
-        return params.get('tab') || 'dashboard';
+      // Dashboard pages use nested routes (/dashboard/products, ...).
+      const dashboardPage = pathToDashboardPage(path);
+      if (dashboardPage) {
+        // Back-compat: honor a legacy ?tab= on the bare /dashboard route.
+        if (path.replace(/\/+$/, '') === '/dashboard' && params.get('tab')) {
+          return params.get('tab');
+        }
+        return dashboardPage;
+      }
+      // Clean product detail route: /product/<model_no>
+      if (parseProductPath(path)) {
+        return 'product-detail';
       }
       const page = path.slice(1);
       return page === '' ? '' : page;
@@ -83,7 +93,7 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   const getLayoutFromPage = (page) => {
     if (['login', 'register'].includes(page)) {
       return 'auth';
-    } else if (['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings', 'expenses'].includes(page)) {
+    } else if (isDashboardPage(page)) {
       return 'dashboard';
     }
     return 'public';
@@ -116,19 +126,9 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   // Update URL when page or layout changes
   const handlePageChange = (page, productId = null) => {
     if (page === currentPage && productId === currentProductId) return;
-    const dashboardTabs = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings', 'expenses'];
-    // For dashboard tabs, keep the same /dashboard route and switch ?tab=
-    let url;
-    if (dashboardTabs.includes(page)) {
-      const params = new URLSearchParams();
-      params.set('tab', page);
-      url = `/dashboard?${params.toString()}`;
-    } else {
-      url = `/${page}`;
-      if (productId) {
-        url += `?id=${productId}`;
-      }
-    }
+    // Dashboard pages -> nested routes (/dashboard/products, ...);
+    // public pages keep their flat route. See utils/dashboardRoutes.
+    const url = pageKeyToPath(page, productId);
     router.push(url, { scroll: false });
     
     // Determine layout based on page

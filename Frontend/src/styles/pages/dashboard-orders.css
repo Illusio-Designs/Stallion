@@ -1,45 +1,48 @@
 /* Dashboard Orders Page Styles */
+/* Shared by Orders, Events, Tray, Manage, Products(dash), DistributorOrders. */
 
 /* Summary Cards */
 .orders-summary {
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .orders-card {
-  padding: 20px;
+  padding: var(--space-5);
 }
 
 .orders-card h4 {
-  color: #00000099;
-  font-size: 12px;
-  font-weight: 400;
-  margin-bottom: 12px;
+  color: var(--color-text-subtle);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  letter-spacing: var(--tracking-label);
+  margin-bottom: var(--space-3);
   text-transform: uppercase;
 }
 
 .orders-card .metric-value {
-  font-size: 20px;
-  font-weight: 600;
-  color: #000;
-  margin-bottom: 8px;
-  line-height: 1.2;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text);
+  margin-bottom: var(--space-2);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
 }
 
 .orders-card .metric-sub {
-  font-size: 12px;
-  font-weight: 500;
-  color: #181265; /* neutral */
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-muted); /* neutral */
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--space-1);
 }
 
 .orders-card .metric-sub.green {
-  color: #077D55; /* profit */
+  color: var(--color-success); /* profit */
 }
 
 .orders-card .metric-sub.red {
-  color: #D91F11; /* loss */
+  color: var(--color-error); /* loss */
 }
 
 .orders-card .metric-sub svg {
@@ -50,15 +53,18 @@
 
 /* Order Status Tabs */
 .order-tabs-container {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   overflow-x: auto;
-  padding: 5px 10px;
+  padding: var(--space-2) var(--space-3);
   width: 100%;
   grid-column: 1 / -1;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-grey-300) transparent;
 }
 
 .order-tabs-container::-webkit-scrollbar {
@@ -70,24 +76,49 @@
 }
 
 .order-tabs-container::-webkit-scrollbar-thumb {
-  background: #140F51;
-  border-radius: 10px;
+  background: var(--color-grey-300);
+  border-radius: var(--radius-pill);
 }
 
 .order-tab {
-  padding: 8px 16px;
-  border-radius: 6px;
-  color: #374151;
-  font-weight: 600;
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-md);
+  color: var(--color-text-muted);
+  font-weight: var(--font-weight-semibold);
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background var(--transition-fast),
+              color var(--transition-fast),
+              box-shadow var(--transition-fast);
   white-space: nowrap;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.order-tab:hover, .order-tab.active {
-  background: #181265;
-  color: #fff;
+.order-tab:hover {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
 }
 
+.order-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.order-tab:active {
+  transform: scale(0.98);
+}
+
+.order-tab.active,
+.order-tab.active:hover {
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+
+.order-tab.active:focus-visible {
+  box-shadow: var(--focus-ring);
+}

@@ -3,8 +3,16 @@ const CART_STORAGE_KEY = 'stallion_cart_items';
 let cartItems = [];
 let cartListeners = [];
 
+// localStorage only exists in the browser. This module is imported during SSR
+// (via Header -> cartService), so guard every access behind a window check.
+const hasStorage = () => typeof window !== 'undefined' && !!window.localStorage;
+
 // Load cart items from localStorage
 const loadCartFromStorage = () => {
+  if (!hasStorage()) {
+    cartItems = [];
+    return;
+  }
   try {
     const stored = localStorage.getItem(CART_STORAGE_KEY);
     if (stored) {
@@ -20,6 +28,7 @@ const loadCartFromStorage = () => {
 
 // Save cart items to localStorage
 const saveCartToStorage = () => {
+  if (!hasStorage()) return;
   try {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
   } catch (error) {
@@ -27,7 +36,7 @@ const saveCartToStorage = () => {
   }
 };
 
-// Initialize cart from storage
+// Initialize cart from storage (no-op on the server; rehydrated in the browser).
 loadCartFromStorage();
 
 // Get cart items

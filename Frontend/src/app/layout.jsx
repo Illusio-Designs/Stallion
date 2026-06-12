@@ -2,6 +2,7 @@ import "./globals.css";
 import 'react-toastify/dist/ReactToastify.css';
 import LoaderProvider from "../components/LoaderProvider";
 import ToastContainerProvider from "../components/ToastContainerProvider";
+import ErrorBoundary from "../components/ErrorBoundary";
 
 export const metadata = {
   title: "Stallion Eyewear",
@@ -17,8 +18,7 @@ export const metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  // Do not disable zoom — maximumScale/userScalable:false is a WCAG failure.
 };
 
 export default function RootLayout({ children }) {
@@ -35,11 +35,13 @@ export default function RootLayout({ children }) {
         <meta name="color-scheme" content="light only" />
       </head>
       <body className="antialiased" style={{colorScheme: 'light'}}>
-        <LoaderProvider>
-          <ToastContainerProvider>
-            {children}
-          </ToastContainerProvider>
-        </LoaderProvider>
+        <ErrorBoundary>
+          <LoaderProvider>
+            <ToastContainerProvider>
+              {children}
+            </ToastContainerProvider>
+          </LoaderProvider>
+        </ErrorBoundary>
       </body>
     </html>
   );

@@ -9,10 +9,12 @@ const ToastContainerProvider = ({ children }) => {
       {children}
       <ToastContainer
         position="top-right"
-        autoClose={3000}
+        autoClose={4000}
+        limit={3}
         hideProgressBar={false}
-        newestOnTop={false}
+        newestOnTop
         closeOnClick
+        closeButton
         rtl={false}
         pauseOnFocusLoss
         draggable

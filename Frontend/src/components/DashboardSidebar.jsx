@@ -57,7 +57,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
   return (
     <aside className={`dashboard-sidebar ${isCollapsed ? 'collapsed' : 'expanded'}`}>
       <div className="dashboard-sidebar-header">
-        <div className="sidebar-logo-wrap" style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+        <div className="sidebar-logo-wrap">
           {isCollapsed ? (
             <img src="/faviconnotbg.png" alt="S logo" className="sidebar-logo-img" />
           ) : (
@@ -116,9 +116,14 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
         </ul>
       </nav>
       <div className="dashboard-sidebar-footer">
-        <button className="sidebar-toggle" onClick={onToggleCollapse} style={{ display: 'flex', alignItems: 'center', gap: isCollapsed ? 0 : 8, background: 'none', border: 'none', cursor: 'pointer', width: '100%', justifyContent: isCollapsed ? 'center' : 'start' }}>
-          <img src="/images/icons/hideshow.webp" alt="Toggle Sidebar" style={{ width: 18, height: 18, transform: isCollapsed ? 'rotate(180deg)' : 'none', transition: 'transform 0.25s' }} />
-          {!isCollapsed && <span style={{ fontSize: '12px' }}>Hide Sidebar</span>}
+        <button
+          className="sidebar-toggle"
+          onClick={onToggleCollapse}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          aria-expanded={!isCollapsed}
+        >
+          <img src="/images/icons/hideshow.webp" alt="" aria-hidden="true" className="sidebar-toggle__icon" />
+          {!isCollapsed && <span className="sidebar-toggle__label">Hide Sidebar</span>}
         </button>
       </div>
     </aside>

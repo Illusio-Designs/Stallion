@@ -8,7 +8,7 @@ const PublicLayout = ({ children, onPageChange, currentPage }) => {
     <div className="public-layout">
       <Header onPageChange={onPageChange} currentPage={currentPage} />
       <Breadcrumb currentPage={currentPage} onPageChange={onPageChange} />
-      <main className="main-content">
+      <main className="main-content page-enter" key={currentPage}>
         {children}
       </main>
       <Footer onPageChange={onPageChange} />

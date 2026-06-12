@@ -62,8 +62,12 @@ const DashboardOrders = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [partyNamesMap, setPartyNamesMap] = useState({}); // Map of party_id -> party_name
-  const userRole = getUserRole();
-  const user = getUser();
+  // Memoize so the reference is stable across renders — getUser()/getUserRole()
+  // parse localStorage and return a fresh object each call, which otherwise
+  // re-creates every useCallback that depends on `user` and causes an infinite
+  // render loop (the parties-fetch effect re-fires forever).
+  const userRole = useMemo(() => getUserRole(), []);
+  const user = useMemo(() => getUser(), []);
   const isAdmin = userRole === 'admin';
   const isDistributor = userRole === 'distributor';
   const isParty = userRole === 'party';

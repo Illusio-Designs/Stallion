@@ -4,12 +4,13 @@
   position: relative;
   overflow: hidden;
   vertical-align: middle;
-  background-color: #e9ecf1;
+  border-radius: var(--radius-sm);
+  background-color: var(--color-grey-200);
   background-image: linear-gradient(
     90deg,
-    rgba(233, 236, 241, 1) 0,
-    rgba(244, 246, 249, 1) 40px,
-    rgba(233, 236, 241, 1) 80px
+    var(--color-grey-200) 0,
+    var(--color-grey-100) 40px,
+    var(--color-grey-200) 80px
   );
   background-size: 600px 100%;
   background-repeat: no-repeat;
@@ -26,7 +27,7 @@
 }
 
 .ui-skeleton-row td {
-  border-bottom: 1px solid #f0f0f3;
+  border-bottom: 1px solid var(--color-border);
 }
 
 /* Reduced motion: keep a static placeholder, no animation */

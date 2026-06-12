@@ -5,7 +5,7 @@ const themeColors = {
   primary: '#181265',
   success: '#181265',
   error: '#ff4444',
-  warning: '#ffaa00',
+  warning: '#b25e00',
   info: '#181265'
 };
 
@@ -35,9 +35,9 @@ const InfoIcon = () => (
 
 const WarningIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2L2 22H22L12 2Z" stroke="#ffaa00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-    <path d="M12 9V13" stroke="#ffaa00" strokeWidth="2" strokeLinecap="round"/>
-    <path d="M12 17H12.01" stroke="#ffaa00" strokeWidth="2" strokeLinecap="round"/>
+    <path d="M12 2L2 22H22L12 2Z" stroke="#b25e00" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+    <path d="M12 9V13" stroke="#b25e00" strokeWidth="2" strokeLinecap="round"/>
+    <path d="M12 17H12.01" stroke="#b25e00" strokeWidth="2" strokeLinecap="round"/>
   </svg>
 );
 

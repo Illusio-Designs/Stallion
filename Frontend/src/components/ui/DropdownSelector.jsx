@@ -79,9 +79,24 @@ export default function DropdownSelector({
       ref={dropdownRef}
       className={`ui-dropdown-custom ${className} ${disabled ? 'ui-dropdown-custom--disabled' : ''} ${isOpen ? 'ui-dropdown-custom--open' : ''}`}
     >
-      <div 
+      <div
         className="ui-dropdown-custom__trigger"
         onClick={handleToggle}
+        role="button"
+        tabIndex={disabled ? -1 : 0}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-disabled={disabled || undefined}
+        onKeyDown={(e) => {
+          if (disabled) return;
+          if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
+            e.preventDefault();
+            handleToggle();
+          } else if (e.key === 'Escape' && isOpen) {
+            setIsOpen(false);
+            setSearchQuery('');
+          }
+        }}
       >
         <span className={`ui-dropdown-custom__value ${!hasValue ? 'ui-dropdown-custom__value--placeholder' : ''}`}>{displayValue}</span>
         <svg 

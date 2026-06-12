@@ -1,28 +1,66 @@
-/* Dashboard Layout Styles */
-@import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap');
+/* Dashboard Layout Shell
+   Owns only the outer shell: calm page background, sidebar offset,
+   content max-width + gutters, no layout shift. Inner components
+   (sidebar/header/footer) own their own styles. */
+
 .dashboard-layout {
   display: flex;
   min-height: 100vh;
-  background: #f5f6f8;
+  background: var(--color-surface-muted);
+  color: var(--color-text);
 }
 
-/* Enforce Instrument Sans across the dashboard area */
-.dashboard-layout, .dashboard-layout * {
-  font-family: 'Instrument Sans', sans-serif;
+/* Sidebar width coordination — the shell offsets by the sidebar width.
+   Transition only margin so collapsing the sidebar feels calm, never janky. */
+.dashboard-layout .dashboard-shell {
+  margin-left: 240px;
+  transition: margin-left var(--transition) ease;
+}
+.dashboard-layout.collapsed .dashboard-shell {
+  margin-left: 64px;
 }
 
-/* sidebar width coordination */
-.dashboard-layout.expanded .dashboard-shell { margin-left: 240px; }
-.dashboard-layout.collapsed .dashboard-shell { margin-left: 64px; }
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-layout .dashboard-shell {
+    transition: none;
+  }
+}
 
 .dashboard-shell {
   display: flex;
   flex-direction: column;
-  width: 100%;
-  overflow: hidden;
+  flex: 1;
+  min-width: 0;            /* allow inner content to shrink, prevents overflow */
+  min-height: 100vh;
 }
 
+/* Page content region: generous, consistent gutters and a readable max width
+   so wide screens don't stretch tables/cards edge-to-edge. */
 .dashboard-content {
   flex: 1;
-  padding: 16px;
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: var(--space-6) var(--space-6);   /* 24px */
+}
+
+@media (max-width: 768px) {
+  .dashboard-content {
+    padding: var(--space-5) var(--space-4);  /* 20px / 16px */
+  }
+}
+
+/* On small screens the sidebar collapses to an overlay/off-canvas pattern
+   owned by the sidebar component; the shell should not reserve its width. */
+@media (max-width: 768px) {
+  .dashboard-layout .dashboard-shell,
+  .dashboard-layout.collapsed .dashboard-shell {
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 375px) {
+  .dashboard-content {
+    padding: var(--space-4) var(--space-4);  /* 16px keeps tap targets clear */
+  }
 }

@@ -8,6 +8,7 @@ import { showLoginSuccess, showError, showSuccess } from '../services/notificati
 import { setAuth, isLoggedIn, getUserRole, getUser } from '../services/authService';
 import { checkUser, login, getUsers, getRoles } from '../services/apiService';
 import { getAccessiblePages, hasPageAccess } from '../utils/rolePermissions';
+import { pageKeyToPath } from '../utils/dashboardRoutes';
 import { verifyOTP, resendOTP, initializeOTPWidget, destroyOTPWidget } from '../services/msg91Service';
 
 const Login = ({ onPageChange }) => {
@@ -17,6 +18,8 @@ const Login = ({ onPageChange }) => {
   const [loading, setLoading] = useState(false);
   const [resendDisabled, setResendDisabled] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
+  const [phoneError, setPhoneError] = useState('');
+  const [otpError, setOtpError] = useState('');
   const otpInputRefs = useRef([]);
   const [returnUrl, setReturnUrl] = useState(null);
 
@@ -89,13 +92,16 @@ const Login = ({ onPageChange }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setPhoneError('');
     setLoading(true);
 
     // Validate Indian phone numbers: require exactly 10 digits (excluding country code)
     const digitsOnly = String(phoneNumber || '').replace(/\D/g, '');
     const nationalNumber = digitsOnly.startsWith('91') ? digitsOnly.slice(2) : digitsOnly;
     if (nationalNumber.length !== 10) {
-      showError('Please enter a 10-digit phone number');
+      const msg = 'Enter a valid 10-digit mobile number.';
+      setPhoneError(msg);
+      showError(msg);
       setLoading(false);
       return;
     }
@@ -171,6 +177,7 @@ const Login = ({ onPageChange }) => {
 
   const handleOTPChange = (index, value) => {
     if (value && !/^\d+$/.test(value)) return;
+    if (otpError) setOtpError('');
     const newOtp = [...otp];
     newOtp[index] = value.slice(-1);
     setOtp(newOtp);
@@ -199,9 +206,12 @@ const Login = ({ onPageChange }) => {
   const handleOTPVerify = async (e) => {
     e.preventDefault();
     const otpValue = otp.join('');
-    
+    setOtpError('');
+
     if (otpValue.length !== 6) {
-      showError('Please enter a 6-digit OTP');
+      const msg = 'Enter the 6-digit code sent to your phone.';
+      setOtpError(msg);
+      showError(msg);
       return;
     }
 
@@ -406,6 +416,11 @@ const Login = ({ onPageChange }) => {
               if (returnUrl) {
                 // Parse returnUrl - it should be a path like "/products" or "/products?id=123"
                 if (returnUrl.startsWith('/')) {
+                  // Product detail uses a clean /product/<model_no> path — navigate directly.
+                  if (returnUrl.startsWith('/product/')) {
+                    if (typeof window !== 'undefined') window.location.href = returnUrl;
+                    return;
+                  }
                   // Extract page name from path (remove leading slash)
                   const pathParts = returnUrl.split('?');
                   const path = pathParts[0];
@@ -420,14 +435,14 @@ const Login = ({ onPageChange }) => {
                       if (onPageChange) {
                         onPageChange(accessiblePages[0]);
                       } else if (typeof window !== 'undefined') {
-                        window.location.href = `/dashboard?tab=${accessiblePages[0]}`;
+                        window.location.href = pageKeyToPath(accessiblePages[0]);
                       }
                     } else {
                       // No accessible pages, redirect to settings as fallback
                       if (onPageChange) {
                         onPageChange('settings');
                       } else if (typeof window !== 'undefined') {
-                        window.location.href = '/dashboard?tab=settings';
+                        window.location.href = pageKeyToPath('settings');
                       }
                     }
                     return;
@@ -471,14 +486,14 @@ const Login = ({ onPageChange }) => {
                     if (onPageChange) {
                       onPageChange(accessiblePages[0]);
                     } else if (typeof window !== 'undefined') {
-                      window.location.href = `/dashboard?tab=${accessiblePages[0]}`;
+                      window.location.href = pageKeyToPath(accessiblePages[0]);
                     }
                   } else {
                     // No accessible pages, redirect to settings as fallback
                     if (onPageChange) {
                       onPageChange('settings');
                     } else if (typeof window !== 'undefined') {
-                      window.location.href = '/dashboard?tab=settings';
+                      window.location.href = pageKeyToPath('settings');
                     }
                   }
                 } else {
@@ -498,6 +513,11 @@ const Login = ({ onPageChange }) => {
               if (returnUrl) {
                 // Parse returnUrl - it should be a path like "/products" or "/products?id=123"
                 if (returnUrl.startsWith('/')) {
+                  // Product detail uses a clean /product/<model_no> path — navigate directly.
+                  if (returnUrl.startsWith('/product/')) {
+                    if (typeof window !== 'undefined') window.location.href = returnUrl;
+                    return;
+                  }
                   // Extract page name from path (remove leading slash)
                   const pathParts = returnUrl.split('?');
                   const path = pathParts[0];
@@ -512,14 +532,14 @@ const Login = ({ onPageChange }) => {
                       if (onPageChange) {
                         onPageChange(accessiblePages[0]);
                       } else if (typeof window !== 'undefined') {
-                        window.location.href = `/dashboard?tab=${accessiblePages[0]}`;
+                        window.location.href = pageKeyToPath(accessiblePages[0]);
                       }
                     } else {
                       // No accessible pages, redirect to settings as fallback
                       if (onPageChange) {
                         onPageChange('settings');
                       } else if (typeof window !== 'undefined') {
-                        window.location.href = '/dashboard?tab=settings';
+                        window.location.href = pageKeyToPath('settings');
                       }
                     }
                     return;
@@ -563,14 +583,14 @@ const Login = ({ onPageChange }) => {
                     if (onPageChange) {
                       onPageChange(accessiblePages[0]);
                     } else if (typeof window !== 'undefined') {
-                      window.location.href = `/dashboard?tab=${accessiblePages[0]}`;
+                      window.location.href = pageKeyToPath(accessiblePages[0]);
                     }
                   } else {
                     // No accessible pages, redirect to settings as fallback
                     if (onPageChange) {
                       onPageChange('settings');
                     } else if (typeof window !== 'undefined') {
-                      window.location.href = '/dashboard?tab=settings';
+                      window.location.href = pageKeyToPath('settings');
                     }
                   }
                 } else {
@@ -592,9 +612,10 @@ const Login = ({ onPageChange }) => {
       }
     } catch (error) {
       console.error('OTP verification error:', error);
-      const errorMessage = error.message || error.error?.message || 'OTP verification failed. Please try again.';
+      const errorMessage = error.message || error.error?.message || 'Incorrect code. Please try again.';
+      setOtpError(errorMessage);
       showError(errorMessage);
-      
+
       // Clear OTP on error
       setOtp(['', '', '', '', '', '']);
       otpInputRefs.current[0]?.focus();
@@ -649,82 +670,98 @@ const Login = ({ onPageChange }) => {
         <div className="login-container">
           {!showOTP ? (
             <>
-              <h1 className="login-title">Login</h1>
-              <p className="login-subtitle">Welcome back, enter your phone number.</p>
-              <form className="login-form" onSubmit={handleSubmit}>
+              <h1 className="login-title">Sign in</h1>
+              <p className="login-subtitle">Enter your mobile number to receive a one-time code.</p>
+              <form className="login-form" onSubmit={handleSubmit} noValidate>
                 <div className="login-input-group">
-                  <label htmlFor="phone">Phone Number</label>
+                  <label className="ui-label" htmlFor="phone">Mobile number</label>
                   <PhoneInput
                     country={'in'}
                     value={phoneNumber}
-                    onChange={setPhoneNumber}
+                    onChange={(value) => { setPhoneNumber(value); if (phoneError) setPhoneError(''); }}
                     inputProps={{
                       id: 'phone',
                       required: true,
-                      placeholder: 'Enter your phone number',
+                      placeholder: 'Enter your mobile number',
+                      'aria-invalid': phoneError ? 'true' : 'false',
+                      'aria-describedby': phoneError ? 'phone-error' : undefined,
                     }}
-                    containerClass="phone-input-container"
+                    containerClass={`phone-input-container${phoneError ? ' phone-input-container--error' : ''}`}
                     inputClass="phone-input-field"
                     buttonClass="phone-input-button"
                     dropdownClass="phone-input-dropdown"
                     disableDropdown={false}
                     disableCountryGuess={false}
                   />
+                  {phoneError && (
+                    <p className="ui-field-error" id="phone-error" role="alert">{phoneError}</p>
+                  )}
                 </div>
-                <div className="login-button-container">
-                  <button type="submit" className="login-button" disabled={loading}>
-                    {loading ? 'SENDING...' : 'SEND OTP'}
-                  </button>
-                  <div className="login-button-border"></div>
-                </div>
+                <button
+                  type="submit"
+                  className={`ui-btn ui-btn--primary ui-btn--lg login-submit${loading ? ' ui-btn--loading' : ''}`}
+                  disabled={loading}
+                >
+                  <span className="ui-btn__label">{loading ? 'Sending code…' : 'Send code'}</span>
+                </button>
               </form>
             </>
           ) : (
             <>
-              <h1 className="login-title">OTP</h1>
-              <p className="login-subtitle">We sent OTP code to your phone number.</p>
-              <form className="login-form" onSubmit={handleOTPVerify}>
-                <div className="otp-container">
-                  {otp.map((digit, index) => (
-                    <input
-                      key={index}
-                      ref={(el) => (otpInputRefs.current[index] = el)}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleOTPChange(index, e.target.value)}
-                      onKeyDown={(e) => handleOTPKeyDown(index, e)}
-                      onPaste={handleOTPPaste}
-                      className="otp-input"
-                      required
-                      disabled={loading}
-                    />
-                  ))}
+              <h1 className="login-title">Verify your number</h1>
+              <p className="login-subtitle">
+                We sent a 6-digit code to
+                {phoneNumber ? <strong className="login-phone-hint"> +{String(phoneNumber).replace(/^\+/, '')}</strong> : ' your phone'}.
+              </p>
+              <form className="login-form" onSubmit={handleOTPVerify} noValidate>
+                <div className="login-input-group">
+                  <span className="ui-label" id="otp-label">One-time code</span>
+                  <div
+                    className={`otp-container${otpError ? ' otp-container--error' : ''}`}
+                    role="group"
+                    aria-labelledby="otp-label"
+                  >
+                    {otp.map((digit, index) => (
+                      <input
+                        key={index}
+                        ref={(el) => (otpInputRefs.current[index] = el)}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete={index === 0 ? 'one-time-code' : 'off'}
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOTPChange(index, e.target.value)}
+                        onKeyDown={(e) => handleOTPKeyDown(index, e)}
+                        onPaste={handleOTPPaste}
+                        className="otp-input"
+                        aria-label={`Digit ${index + 1}`}
+                        aria-invalid={otpError ? 'true' : 'false'}
+                        required
+                        disabled={loading}
+                      />
+                    ))}
+                  </div>
+                  {otpError && (
+                    <p className="ui-field-error" id="otp-error" role="alert">{otpError}</p>
+                  )}
                 </div>
-                <div className="login-button-container">
-                  <button type="submit" className="login-button" disabled={loading}>
-                    {loading ? 'VERIFYING...' : 'VERIFY OTP'}
-                  </button>
-                  <div className="login-button-border"></div>
-                </div>
-                <div className="resend-otp-container" style={{ marginTop: '1rem', textAlign: 'center' }}>
+                <button
+                  type="submit"
+                  className={`ui-btn ui-btn--primary ui-btn--lg login-submit${loading ? ' ui-btn--loading' : ''}`}
+                  disabled={loading}
+                >
+                  <span className="ui-btn__label">{loading ? 'Verifying…' : 'Verify code'}</span>
+                </button>
+                <div className="resend-otp-container">
                   <button
                     type="button"
+                    className="resend-otp-btn"
                     onClick={handleResendOTP}
                     disabled={resendDisabled || loading}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: resendDisabled ? '#999' : '#007bff',
-                      cursor: resendDisabled || loading ? 'not-allowed' : 'pointer',
-                      textDecoration: 'underline',
-                      fontSize: '0.9rem',
-                    }}
                   >
                     {resendTimer > 0
-                      ? `Resend OTP in ${resendTimer}s`
-                      : 'Resend OTP'}
+                      ? `Resend code in ${resendTimer}s`
+                      : 'Resend code'}
                   </button>
                 </div>
               </form>
