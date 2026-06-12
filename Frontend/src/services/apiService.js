@@ -7,6 +7,15 @@
 import { sendOTP } from './msg91Service';
 import { logout } from './authService';
 import { showError } from './notificationService';
+import { getCached, invalidateCache } from './cacheService';
+
+// Cache TTLs (ms). Lookup data rarely changes; transactional data is shorter.
+const TTL_LOOKUP = 10 * 60 * 1000; // 10 min - countries, roles, brands, attributes
+const TTL_PRODUCTS = 3 * 60 * 1000; // 3 min - product catalog
+const TTL_TRANSACTIONAL = 60 * 1000; // 1 min - orders, events
+
+// Verbose request logging is opt-in. Set NEXT_PUBLIC_API_DEBUG=true to enable.
+const API_DEBUG = process.env.NEXT_PUBLIC_API_DEBUG === 'true';
 
 /**
  * Get Base URL from environment variable
@@ -311,8 +320,10 @@ const apiRequest = async (endpoint, options = {}) => {
     fullUrl = fullUrl.replace(/([^:]\/)\/+(?=\/)/g, '$1');
   }
   
-  console.log(`[API Request] ${actualMethod} ${fullUrl}`); // Debug log
-  console.log(`[API Base URL] ${baseUrl}`); // Debug log
+  if (API_DEBUG) {
+    console.log(`[API Request] ${actualMethod} ${fullUrl}`);
+    console.log(`[API Base URL] ${baseUrl}`);
+  }
 
   const config = {
     method: actualMethod,
@@ -326,19 +337,19 @@ const apiRequest = async (endpoint, options = {}) => {
     if (requestBody === null) {
       // For POST/PUT/PATCH, if body is explicitly null, don't send body
       // Don't add body to config
-      console.log(`[API Request Body]`, null); // Debug log
+      if (API_DEBUG) console.log(`[API Request Body]`, null);
     } else if (requestBody) {
       // Clean the body - remove any undefined values and ensure proper JSON
       const cleanBody = JSON.parse(JSON.stringify(requestBody)); // This removes undefined and ensures valid JSON
       config.body = JSON.stringify(cleanBody);
       config.headers['Content-Type'] = 'application/json';
-      console.log(`[API Request Body]`, cleanBody); // Debug log
+      if (API_DEBUG) console.log(`[API Request Body]`, cleanBody);
     }
     // If requestBody is undefined, don't add body
   } else if (actualMethod === 'DELETE') {
     // DELETE requests should not have a body
     // Don't add body to config at all
-    console.log(`[API Request] DELETE request - no body sent`);
+    if (API_DEBUG) console.log(`[API Request] DELETE request - no body sent`);
   }
 
   try {
@@ -441,10 +452,10 @@ export const register = async (userData) => {
  * @returns {Promise<Array>} Array of role objects
  */
 export const getRoles = async () => {
-  return apiRequest('/roles', {
+  return getCached('roles', () => apiRequest('/roles', {
     method: 'GET',
     includeAuth: true,
-  });
+  }), TTL_LOOKUP);
 };
 
 // ==================== USER ENDPOINTS ====================
@@ -604,10 +615,10 @@ export const uploadProfileImage = async (userId, profileImage) => {
  * @returns {Promise<Array>} Array of country objects
  */
 export const getCountries = async () => {
-  return apiRequest('/countries', {
+  return getCached('countries', () => apiRequest('/countries', {
     method: 'GET',
     includeAuth: true,
-  });
+  }), TTL_LOOKUP);
 };
 
 /**
@@ -621,11 +632,13 @@ export const getCountries = async () => {
  */
 export const createCountry = async (countryData) => {
   const { name, code, phone_code, currency } = countryData;
-  return apiRequest('/countries/', {
+  const result = await apiRequest('/countries/', {
     method: 'POST',
     body: { name, code, phone_code, currency },
     includeAuth: true,
   });
+  invalidateCache('countries');
+  return result;
 };
 
 /**
@@ -640,11 +653,13 @@ export const createCountry = async (countryData) => {
  */
 export const updateCountry = async (countryId, countryData) => {
   const { name, code, phone_code, currency } = countryData;
-  return apiRequest(`/countries/${countryId}`, {
+  const result = await apiRequest(`/countries/${countryId}`, {
     method: 'PUT',
     body: { name, code, phone_code, currency },
     includeAuth: true,
   });
+  invalidateCache('countries');
+  return result;
 };
 
 /**
@@ -653,10 +668,12 @@ export const updateCountry = async (countryId, countryData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const deleteCountry = async (countryId) => {
-  return apiRequest(`/countries/${countryId}`, {
+  const result = await apiRequest(`/countries/${countryId}`, {
     method: 'DELETE',
     includeAuth: true,
   });
+  invalidateCache('countries');
+  return result;
 };
 
 // ==================== STATE ENDPOINTS ====================
@@ -3000,13 +3017,13 @@ export const deleteShape = async (shapeId) => {
  * Get all brands
  * @returns {Promise<Array>} Array of brand objects
  */
-export const getBrands = async () => {
+export const getBrands = async () => getCached('brands', async () => {
   try {
     const response = await apiRequest('/brands', {
       method: 'GET',
       includeAuth: true,
     });
-    
+
     if (Array.isArray(response)) {
       return response;
     }
@@ -3017,7 +3034,7 @@ export const getBrands = async () => {
   } catch (error) {
     const errorMessage = (error.message || '').toLowerCase();
     const errorText = (error.errorData?.error || error.errorData?.message || '').toLowerCase();
-    
+
     if (errorMessage.includes('brands not found') ||
         errorMessage.includes('not found') ||
         errorText.includes('brands not found') ||
@@ -3027,7 +3044,7 @@ export const getBrands = async () => {
     }
     throw error;
   }
-};
+}, TTL_LOOKUP);
 
 /**
  * Create brand
@@ -3037,11 +3054,13 @@ export const getBrands = async () => {
  */
 export const createBrand = async (brandData) => {
   const { brand_name } = brandData;
-  return apiRequest('/brands', {
+  const result = await apiRequest('/brands', {
     method: 'POST',
     body: { brand_name },
     includeAuth: true,
   });
+  invalidateCache('brands');
+  return result;
 };
 
 /**
@@ -3053,11 +3072,13 @@ export const createBrand = async (brandData) => {
  */
 export const updateBrand = async (brandId, brandData) => {
   const { brand_name } = brandData;
-  return apiRequest(`/brands/${brandId}`, {
+  const result = await apiRequest(`/brands/${brandId}`, {
     method: 'PUT',
     body: { brand_name },
     includeAuth: true,
   });
+  invalidateCache('brands');
+  return result;
 };
 
 /**
@@ -3066,10 +3087,12 @@ export const updateBrand = async (brandId, brandData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const deleteBrand = async (brandId) => {
-  return apiRequest(`/brands/${brandId}`, {
+  const result = await apiRequest(`/brands/${brandId}`, {
     method: 'DELETE',
     includeAuth: true,
   });
+  invalidateCache('brands');
+  return result;
 };
 
 // ==================== COLLECTIONS ENDPOINTS ====================
@@ -3078,13 +3101,13 @@ export const deleteBrand = async (brandId) => {
  * Get all collections
  * @returns {Promise<Array>} Array of collection objects
  */
-export const getCollections = async () => {
+export const getCollections = async () => getCached('collections', async () => {
   try {
     const response = await apiRequest('/collections', {
       method: 'GET',
       includeAuth: false, // Changed to false so it can be used on public pages like Home
     });
-    
+
     if (Array.isArray(response)) {
       return response;
     }
@@ -3095,7 +3118,7 @@ export const getCollections = async () => {
   } catch (error) {
     const errorMessage = (error.message || '').toLowerCase();
     const errorText = (error.errorData?.error || error.errorData?.message || '').toLowerCase();
-    
+
     if (errorMessage.includes('collections not found') ||
         errorMessage.includes('not found') ||
         errorText.includes('collections not found') ||
@@ -3105,7 +3128,7 @@ export const getCollections = async () => {
     }
     throw error;
   }
-};
+}, TTL_LOOKUP);
 
 /**
  * Create collection
@@ -3116,11 +3139,13 @@ export const getCollections = async () => {
  */
 export const createCollection = async (collectionData) => {
   const { collection_name, brand_id } = collectionData;
-  return apiRequest('/collections', {
+  const result = await apiRequest('/collections', {
     method: 'POST',
     body: { collection_name, brand_id },
     includeAuth: true,
   });
+  invalidateCache('collections');
+  return result;
 };
 
 /**
@@ -3133,11 +3158,13 @@ export const createCollection = async (collectionData) => {
  */
 export const updateCollection = async (collectionId, collectionData) => {
   const { collection_name, brand_id } = collectionData;
-  return apiRequest(`/collections/${collectionId}`, {
+  const result = await apiRequest(`/collections/${collectionId}`, {
     method: 'PUT',
     body: { collection_name, brand_id },
     includeAuth: true,
   });
+  invalidateCache('collections');
+  return result;
 };
 
 /**
@@ -3146,10 +3173,12 @@ export const updateCollection = async (collectionId, collectionData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const deleteCollection = async (collectionId) => {
-  return apiRequest(`/collections/${collectionId}`, {
+  const result = await apiRequest(`/collections/${collectionId}`, {
     method: 'DELETE',
     includeAuth: true,
   });
+  invalidateCache('collections');
+  return result;
 };
 
 // ==================== PRODUCTS ENDPOINTS ====================
@@ -3173,7 +3202,7 @@ export const deleteCollection = async (collectionId) => {
  * @param {number} [filters.price.max] - Maximum price
  * @returns {Promise<Array>} Array of product objects
  */
-export const getProducts = async (page = 1, limit = 21, filters = {}) => {
+const fetchProductsUncached = async (page = 1, limit = 21, filters = {}) => {
   try {
     // Build query string for page and limit (matching Postman: /products/?page=1&limit=21)
     const queryParams = new URLSearchParams();
@@ -3306,6 +3335,26 @@ export const getProducts = async (page = 1, limit = 21, filters = {}) => {
 };
 
 /**
+ * Get products (cached).
+ *
+ * The dashboard/catalog pages request a large page (the whole catalog) so they
+ * can filter/search client-side. Without caching this heavy call ran on every
+ * page mount and every full reload. Results are cached per page/limit/filters
+ * for a few minutes (in-memory + sessionStorage), so navigating between tabs or
+ * reloading reuses the data instead of re-fetching. The cache is invalidated
+ * automatically whenever a product is created, updated, or deleted.
+ *
+ * @param {number} [page=1] - Page number
+ * @param {number} [limit=21] - Items per page
+ * @param {Object|null} [filters={}] - Filter object (null = all products)
+ * @returns {Promise<Array>}
+ */
+export const getProducts = async (page = 1, limit = 21, filters = {}) => {
+  const key = `products:${page}:${limit}:${JSON.stringify(filters ?? null)}`;
+  return getCached(key, () => fetchProductsUncached(page, limit, filters), TTL_PRODUCTS);
+};
+
+/**
  * Create product
  * @param {Object} productData - Product data
  * @param {string} productData.model_no - Model number
@@ -3345,8 +3394,8 @@ export const createProduct = async (productData) => {
     warehouse_qty,
     status,
   } = productData;
-  
-  return apiRequest('/products/create', {
+
+  const result = await apiRequest('/products/create', {
     method: 'POST',
     body: {
       model_no,
@@ -3368,6 +3417,8 @@ export const createProduct = async (productData) => {
     },
     includeAuth: true,
   });
+  invalidateCache('products:'); // Catalog changed - drop cached product lists
+  return result;
 };
 
 /**
@@ -3443,11 +3494,13 @@ export const updateProduct = async (productId, productData) => {
     body.image_urls = image_urls;
   }
   
-  return apiRequest(`/products/${productId}`, {
+  const result = await apiRequest(`/products/${productId}`, {
     method: 'PUT',
     body,
     includeAuth: true,
   });
+  invalidateCache('products:'); // Catalog changed - drop cached product lists
+  return result;
 };
 
 /**
@@ -3498,10 +3551,12 @@ export const getProductModels = async (modelNo) => {
  * @returns {Promise<Object>} Response with message
  */
 export const deleteProduct = async (productId) => {
-  return apiRequest(`/products/${productId}`, {
+  const result = await apiRequest(`/products/${productId}`, {
     method: 'DELETE',
     includeAuth: true,
   });
+  invalidateCache('products:'); // Catalog changed - drop cached product lists
+  return result;
 };
 
 /**
@@ -3876,10 +3931,10 @@ export const deleteProductFromTray = async (trayProductData) => {
  * @returns {Promise<Array>} Array of event objects
  */
 export const getEvents = async () => {
-  return apiRequest('/events/', {
+  return getCached('events', () => apiRequest('/events/', {
     method: 'GET',
     includeAuth: true,
-  });
+  }), TTL_TRANSACTIONAL);
 };
 
 /**
@@ -3893,11 +3948,13 @@ export const getEvents = async () => {
  */
 export const createEvent = async (eventData) => {
   const { event_name, start_date, end_date, event_location } = eventData;
-  return apiRequest('/events/', {
+  const result = await apiRequest('/events/', {
     method: 'POST',
     body: { event_name, start_date, end_date, event_location },
     includeAuth: true,
   });
+  invalidateCache('events');
+  return result;
 };
 
 /**
@@ -3912,11 +3969,13 @@ export const createEvent = async (eventData) => {
  */
 export const updateEvent = async (eventId, eventData) => {
   const { event_name, start_date, end_date, event_location } = eventData;
-  return apiRequest(`/events/${eventId}`, {
+  const result = await apiRequest(`/events/${eventId}`, {
     method: 'PUT',
     body: { event_name, start_date, end_date, event_location },
     includeAuth: true,
   });
+  invalidateCache('events');
+  return result;
 };
 
 /**
@@ -3925,10 +3984,12 @@ export const updateEvent = async (eventId, eventData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const deleteEvent = async (eventId) => {
-  return apiRequest(`/events/${eventId}`, {
+  const result = await apiRequest(`/events/${eventId}`, {
     method: 'DELETE',
     includeAuth: true,
   });
+  invalidateCache('events');
+  return result;
 };
 
 // ==================== ORDER ENDPOINTS ====================
@@ -3937,7 +3998,7 @@ export const deleteEvent = async (eventId) => {
  * Get all orders
  * @returns {Promise<Array>} Array of order objects
  */
-export const getOrders = async () => {
+export const getOrders = async () => getCached('orders', async () => {
   try {
     return await apiRequest('/orders/', {
       method: 'GET',
@@ -3957,13 +4018,13 @@ export const getOrders = async () => {
         errorText.includes('order not found') ||
         error.statusCode === 404) {
       // Return empty array for "not found" cases - this is a valid state
-      console.log('[getOrders] No orders found, returning empty array');
+      if (API_DEBUG) console.log('[getOrders] No orders found, returning empty array');
       return [];
     }
     // Re-throw other errors
     throw error;
   }
-};
+}, TTL_TRANSACTIONAL);
 
 /**
  * Create a new order
@@ -4053,14 +4114,18 @@ export const createOrder = async (orderData) => {
     body.longitude = Number(longitude);
   }
 
-  console.log('[createOrder] Request body:', JSON.stringify(body, null, 2));
-  console.log('[createOrder] 🚀 Making API request to /orders/...');
+  if (API_DEBUG) {
+    console.log('[createOrder] Request body:', JSON.stringify(body, null, 2));
+    console.log('[createOrder] 🚀 Making API request to /orders/...');
+  }
 
-  return apiRequest('/orders/', {
+  const result = await apiRequest('/orders/', {
     method: 'POST',
     body,
     includeAuth: true,
   });
+  invalidateCache('orders'); // New order - drop cached order list
+  return result;
 };
 
 /**
@@ -4082,11 +4147,13 @@ export const updateOrderStatus = async (orderId, orderStatusData) => {
   if (courier_tracking_number) body.courier_tracking_number = courier_tracking_number;
   if (partial_dispatch_qty !== undefined) body.partial_dispatch_qty = partial_dispatch_qty;
 
-  return apiRequest(`/orders/${orderId}`, {
+  const result = await apiRequest(`/orders/${orderId}`, {
     method: 'PUT',
     body,
     includeAuth: true,
   });
+  invalidateCache('orders'); // Status changed - drop cached order list
+  return result;
 };
 
 /**
@@ -4095,10 +4162,12 @@ export const updateOrderStatus = async (orderId, orderStatusData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const deleteOrder = async (orderId) => {
-  return apiRequest(`/orders/${orderId}`, {
+  const result = await apiRequest(`/orders/${orderId}`, {
     method: 'DELETE',
     includeAuth: true,
   });
+  invalidateCache('orders'); // Order removed - drop cached order list
+  return result;
 };
 
 /**
