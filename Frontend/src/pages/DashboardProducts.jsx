@@ -129,10 +129,17 @@ const hasValidImageUrls = (product) => {
 };
 
 const DashboardProducts = () => {
+  const PRODUCTS_PER_PAGE = 20;
   const [activeTab, setActiveTab] = useState('Products');
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Server-side pagination for the Products listing (load 20 at a time)
+  const [productPage, setProductPage] = useState(1);
+  const [productPageCount, setProductPageCount] = useState(1);
+  // Attribute/lookup data is loaded once (it's needed to display names and to
+  // power the Add/Edit form). Cached at the service layer.
+  const [relatedLoaded, setRelatedLoaded] = useState(false);
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [openBulkUpload, setOpenBulkUpload] = useState(false);
@@ -320,6 +327,44 @@ const DashboardProducts = () => {
       console.error('Error fetching uploads:', error);
       setError(`Failed to load images: ${error.message}`);
       setAllUploads([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Load attribute/lookup data once (brands, collections, genders, etc.).
+  // Used both to display attribute names in the table and to populate the
+  // Add/Edit form dropdowns. Results are cached at the service layer.
+  const ensureRelatedData = async () => {
+    if (relatedLoaded) return;
+    await fetchRelatedData();
+    setRelatedLoaded(true);
+  };
+
+  // Lightweight paginated fetch for the Products listing tab.
+  // Fetches only ONE page (20) of products instead of the whole catalog.
+  const fetchProductsPage = async (targetPage = 1) => {
+    try {
+      setLoading(true);
+      setError(null);
+      // Fetch the page of products and ensure lookup data is available (cached).
+      const [data] = await Promise.all([
+        getProducts(targetPage, PRODUCTS_PER_PAGE, null),
+        ensureRelatedData(),
+      ]);
+      const list = Array.isArray(data) ? data : [];
+      setProducts(list);
+      setProductPage(targetPage);
+      // The products API returns a plain array (no total count). Treat a full
+      // page as a signal that at least one more page may exist.
+      setProductPageCount(list.length === PRODUCTS_PER_PAGE ? targetPage + 1 : targetPage);
+    } catch (error) {
+      console.error('Error fetching products page:', error);
+      if (!error.message?.toLowerCase().includes('token expired') &&
+          !error.message?.toLowerCase().includes('unauthorized')) {
+        setError(`Failed to load products: ${error.message}`);
+      }
+      setProducts([]);
     } finally {
       setLoading(false);
     }
@@ -521,24 +566,21 @@ const DashboardProducts = () => {
     }
   };
 
-  // Fetch data based on active tab
+  // Fetch data based on active tab. This runs on mount too (activeTab defaults
+  // to 'Products'), so there is no separate mount effect - that previously
+  // caused every API call to fire twice.
   useEffect(() => {
     if (activeTab === 'Products') {
-      // Fetch products and related data together
-      fetchAllData();
+      // Products listing: only fetch one page of products (lookups load once, cached)
+      fetchProductsPage(1);
     } else if (activeTab === 'Media Gallery') {
       // Only fetch images from uploads/products folder - no products API call
       fetchAllUploads();
     } else if (activeTab === 'Unuploaded Media Gallery') {
-      // Fetch products to check which ones don't have images when Unuploaded Media Gallery tab is active
+      // Needs the full product list to find products without images
       fetchAllData();
     }
   }, [activeTab]);
-
-  // Initial fetch on component mount
-  useEffect(() => {
-    fetchAllData();
-  }, []);
 
   // Cleanup object URLs when component unmounts or images are removed
   useEffect(() => {
@@ -1695,11 +1737,13 @@ const DashboardProducts = () => {
   };
 
   const handleAdd = () => {
+    ensureRelatedData(); // make sure dropdown options are loaded
     resetForm();
     setOpenAdd(true);
   };
 
   const handleEdit = (row) => {
+    ensureRelatedData(); // make sure dropdown options are loaded
     const product = row.data;
     setFormData({
       model_no: product.model_no || '',
@@ -1791,7 +1835,7 @@ const DashboardProducts = () => {
 
       // Now delete the product
       await deleteProduct(productId);
-      await fetchProducts();
+      await fetchProductsPage(productPage);
       setError(null);
       showSuccess('Product deleted successfully');
     } catch (error) {
@@ -1939,9 +1983,9 @@ const DashboardProducts = () => {
         await createProduct(dataToSend);
         showSuccess('Product created successfully');
       }
-      
-      await fetchProductsWithoutLoading();
-      await fetchRelatedData();
+
+      // Refresh the current page of products (lookups are unchanged)
+      await fetchProductsPage(productPage);
       setError(null);
       setOpenAdd(false);
       setEditRow(null);
@@ -2553,6 +2597,11 @@ const DashboardProducts = () => {
               secondaryActions={[]}
               searchPlaceholder="Search products"
               loading={loading}
+              serverPagination={activeTab === 'Products'}
+              serverPage={productPage}
+              serverPageCount={productPageCount}
+              serverPageSize={PRODUCTS_PER_PAGE}
+              onServerPageChange={fetchProductsPage}
             />
             )}
           </div>

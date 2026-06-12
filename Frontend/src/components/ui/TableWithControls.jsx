@@ -27,6 +27,16 @@ export default function TableWithControls({
   showFilter = false, // Show filter icon
   filterContent = null, // React node to render in filter popover
   loading = false, // Show loading spinner when true
+  // --- Optional server-side pagination ---
+  // When serverPagination is true, `rows` is treated as the current page (already
+  // fetched from the server). Internal slicing is disabled and the footer pager
+  // is controlled by the parent via serverPage/serverPageCount/onServerPageChange.
+  serverPagination = false,
+  serverPage = 1,
+  serverPageCount = 1,
+  serverPageSize = 20,
+  serverTotal = null,
+  onServerPageChange,
 }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -107,11 +117,19 @@ export default function TableWithControls({
     return copy;
   }, [filteredRows, sortBy, sortDir]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  const totalPages = serverPagination
+    ? Math.max(1, serverPageCount)
+    : Math.max(1, Math.ceil(sortedRows.length / pageSize));
   const pageRows = useMemo(() => {
+    // In server mode, `rows` already represents the current page - render as-is.
+    if (serverPagination) return sortedRows;
     const start = (page - 1) * pageSize;
     return sortedRows.slice(start, start + pageSize);
-  }, [sortedRows, page, pageSize]);
+  }, [sortedRows, page, pageSize, serverPagination]);
+
+  // Effective page / page size used for serial numbers and the footer pager.
+  const effectivePage = serverPagination ? serverPage : page;
+  const effectivePageSize = serverPagination ? serverPageSize : pageSize;
 
   const toggleColumn = (key) => {
     const next = new Set(visible);
@@ -180,17 +198,19 @@ export default function TableWithControls({
               </div>
             )}
 
-            <DropdownSelector
-              options={rowSizeOptions.map((n) => ({
-                value: n,
-                label: `Show ${n} Row`,
-              }))}
-              value={pageSize}
-              onChange={(v) => {
-                setPageSize(Number(v));
-                setPage(1);
-              }}
-            />
+            {!serverPagination && (
+              <DropdownSelector
+                options={rowSizeOptions.map((n) => ({
+                  value: n,
+                  label: `Show ${n} Row`,
+                }))}
+                value={pageSize}
+                onChange={(v) => {
+                  setPageSize(Number(v));
+                  setPage(1);
+                }}
+              />
+            )}
 
             {/* Filter Dropdown - appear below filter icon if open */}
             {showFilter && (
@@ -324,7 +344,7 @@ export default function TableWithControls({
               </tr>
             ) : (
               pageRows.map((row, idx) => {
-              const serialNumber = (page - 1) * pageSize + idx + 1;
+              const serialNumber = (effectivePage - 1) * effectivePageSize + idx + 1;
               return (
                 <tr key={idx}>
                   {selectable && (
@@ -365,13 +385,13 @@ export default function TableWithControls({
      
     </div> <div className="ui-table__footer">
         <div className="ui-table__count">
-          Showing {pageRows.length} Of {sortedRows.length} {itemName}
+          Showing {pageRows.length} Of {serverPagination ? (serverTotal ?? pageRows.length) : sortedRows.length} {itemName}
         </div>
         <div className="ui-table__pager">
           <Pagination
-            page={page}
+            page={effectivePage}
             pageCount={totalPages}
-            onPageChange={setPage}
+            onPageChange={serverPagination ? (onServerPageChange || (() => {})) : setPage}
           />
         </div>
         <div className="ui-page-goto">
@@ -381,11 +401,16 @@ export default function TableWithControls({
             min={1}
             max={totalPages}
             className="ui-input ui-input--goto"
-            defaultValue={page}
+            defaultValue={effectivePage}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 const val = parseInt(e.currentTarget.value || "1", 10);
-                setPage(Math.min(Math.max(1, val), totalPages));
+                const target = Math.min(Math.max(1, val), totalPages);
+                if (serverPagination) {
+                  onServerPageChange?.(target);
+                } else {
+                  setPage(target);
+                }
               }
             }}
           />

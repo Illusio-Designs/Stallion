@@ -3,6 +3,8 @@
  * Handles user authentication state and token management
  */
 
+import { clearCache } from './cacheService';
+
 // Check if user is logged in
 export const isLoggedIn = () => {
   if (typeof window === 'undefined') return false;
@@ -35,6 +37,8 @@ export const setAuth = (user, token) => {
 // Clear authentication data
 export const logout = () => {
   if (typeof window === 'undefined') return;
+  // Drop all cached API data so the next user never sees the previous session's data
+  clearCache();
   localStorage.removeItem('user');
   localStorage.removeItem('token');
   // Dispatch custom event for same-tab updates
