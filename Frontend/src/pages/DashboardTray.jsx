@@ -441,7 +441,20 @@ const DashboardTray = () => {
                 itemName="Tray"
                 loading={loading}
               />
-              {error && <div style={{ padding: 12, color: 'red' }}>{error}</div>}
+              {error && !loading && (
+                <div className="ui-state ui-state--error">
+                  <div className="ui-state__icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  </div>
+                  <p className="ui-state__title">Couldn't load trays</p>
+                  <p className="ui-state__desc">{error}</p>
+                  <button className="ui-btn ui-btn--secondary" onClick={fetchTrays}>Try again</button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -705,15 +718,50 @@ const DashboardTray = () => {
                         </thead>
                         <tbody>
                           {loadingProducts ? (
+                            Array.from({ length: 4 }).map((_, i) => (
+                              <tr key={`sk-${i}`} style={{ borderBottom: '1px solid #eee' }}>
+                                {Array.from({ length: 8 }).map((__, c) => (
+                                  <td key={c} style={{ padding: '12px' }}>
+                                    <span className="ui-skeleton" style={{ display: 'block', height: '14px', width: c === 7 ? '60px' : '100%', borderRadius: '6px' }} />
+                                  </td>
+                                ))}
+                              </tr>
+                            ))
+                          ) : error && selectedTray ? (
                             <tr>
-                              <td colSpan="8" style={{ padding: '20px', textAlign: 'center', color: '#666', fontStyle: 'italic' }}>
-                                Loading products...
+                              <td colSpan="8" style={{ padding: 0 }}>
+                                <div className="ui-state ui-state--error">
+                                  <div className="ui-state__icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                      <circle cx="12" cy="12" r="10" />
+                                      <line x1="12" y1="8" x2="12" y2="12" />
+                                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                                    </svg>
+                                  </div>
+                                  <p className="ui-state__title">Couldn't load products</p>
+                                  <p className="ui-state__desc">{error}</p>
+                                  <button className="ui-btn ui-btn--secondary" onClick={() => handleTrayChange(selectedTray)}>Try again</button>
+                                </div>
                               </td>
                             </tr>
                           ) : trayProducts.length === 0 ? (
                             <tr>
-                              <td colSpan="8" style={{ padding: '20px', textAlign: 'center', color: '#666', fontStyle: 'italic' }}>
-                                {selectedTray ? 'No products in this tray' : 'Please select a tray to view products'}
+                              <td colSpan="8" style={{ padding: 0 }}>
+                                <div className="ui-state ui-state--empty">
+                                  <div className="ui-state__icon">
+                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                                      <rect x="3" y="7" width="18" height="13" rx="2" />
+                                      <path d="M3 11h18" />
+                                      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                                    </svg>
+                                  </div>
+                                  <p className="ui-state__title">{selectedTray ? 'No products yet' : 'No tray selected'}</p>
+                                  <p className="ui-state__desc">
+                                    {selectedTray
+                                      ? 'This tray has no products. Use "Add Products to Tray" above to assign some.'
+                                      : 'Select a tray above to view and manage its products.'}
+                                  </p>
+                                </div>
                               </td>
                             </tr>
                           ) : (

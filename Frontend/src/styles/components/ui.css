@@ -651,8 +651,10 @@ textarea.ui-input {
   grid-column: 1 / -1;
 }
 .ui-label {
+  display: block;
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
+  line-height: var(--leading-snug);
   color: var(--color-text);
 }
 .ui-form .ui-input,
@@ -1382,6 +1384,7 @@ input[type="number"] {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
   padding: var(--space-6);
 }
 .ui-filter-popover {
@@ -1466,4 +1469,20 @@ input[type="number"] {
 }
 @media (prefers-reduced-motion: reduce) {
   .ui-state__spinner { animation-duration: 1.5s; }
+}
+
+/* ============================================================
+   PRICE UTILITIES
+   ============================================================ */
+.price {
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--font-weight-semibold);
+}
+.price--mrp {
+  text-decoration: line-through;
+  color: var(--color-text-subtle);
+  font-weight: var(--font-weight-normal);
+}
+.price--accent {
+  color: var(--color-accent);
 }

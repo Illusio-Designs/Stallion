@@ -270,20 +270,49 @@ const DashboardEvents = () => {
       <div className="dash-container flex flex-col gap-4">
         <div className="dash-row grid grid-cols-1 gap-3 min-[560px]:grid-cols-12 min-[560px]:gap-4">
           <div className="dash-card full col-span-full bg-surface border border-border rounded-lg shadow-sm p-0">
-            <TableWithControls
-              title="Event Management"
-              columns={columns}
-              rows={rows}
-              selectable={!loading}
-              onAddNew={() => setOpenAdd(true)}
-              addNewText="Add New Event"
-              onImport={fetchEvents}
-              importText="Refresh"
-              dateRange={dateRange}
-              onDateChange={setDateRange}
-              itemName="Event"
-              loading={loading}
-            />
+            {error && !loading ? (
+              <div className="ui-state ui-state--error">
+                <div className="ui-state__icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                    <circle cx="12" cy="12" r="9" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">Couldn't load events</p>
+                <p className="ui-state__desc">{error}</p>
+                <button className="ui-btn ui-btn--secondary" onClick={fetchEvents}>Try again</button>
+              </div>
+            ) : !loading && events.length === 0 ? (
+              <div className="ui-state ui-state--empty">
+                <div className="ui-state__icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                    <rect x="3" y="4" width="18" height="18" rx="2" />
+                    <line x1="16" y1="2" x2="16" y2="6" />
+                    <line x1="8" y1="2" x2="8" y2="6" />
+                    <line x1="3" y1="10" x2="21" y2="10" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">No events yet</p>
+                <p className="ui-state__desc">Create your first event to start managing schedules and locations.</p>
+                <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Event</button>
+              </div>
+            ) : (
+              <TableWithControls
+                title="Event Management"
+                columns={columns}
+                rows={rows}
+                selectable={!loading}
+                onAddNew={() => setOpenAdd(true)}
+                addNewText="Add New Event"
+                onImport={fetchEvents}
+                importText="Refresh"
+                dateRange={dateRange}
+                onDateChange={setDateRange}
+                itemName="Event"
+                loading={loading}
+              />
+            )}
           </div>
         </div>
       </div>

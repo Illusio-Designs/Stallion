@@ -20,6 +20,7 @@ import '../styles/pages/dashboard-expenses.css';
 const DashboardExpenses = () => {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
@@ -67,7 +68,8 @@ const DashboardExpenses = () => {
   const fetchExpenses = async () => {
     try {
       setLoading(true);
-      
+      setError(null);
+
       let response;
       
       console.log('User role:', userRole);
@@ -98,6 +100,7 @@ const DashboardExpenses = () => {
       // Don't show error for "not found" - just means no expenses exist
       if (!message.toLowerCase().includes('not found')) {
         showError(message);
+        setError(message);
       }
       setExpenses([]);
     } finally {
@@ -488,15 +491,52 @@ const DashboardExpenses = () => {
             )}
           </div>
           
-          <TableWithControls
-            columns={columns}
-            rows={filteredRows}
-            loading={loading}
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            tabs={['All', 'Pending', 'Approved']}
-            searchPlaceholder="Search expenses..."
-          />
+          {error && !loading ? (
+            <div className="ui-state ui-state--error">
+              <div className="ui-state__icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+                  <path d="M12 8v5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <circle cx="12" cy="16.5" r="1" fill="currentColor" />
+                </svg>
+              </div>
+              <p className="ui-state__title">Couldn't load expenses</p>
+              <p className="ui-state__desc">{error}</p>
+              <button className="ui-btn ui-btn--secondary" onClick={fetchExpenses}>
+                Try again
+              </button>
+            </div>
+          ) : !loading && expenses.length === 0 ? (
+            <div className="ui-state ui-state--empty">
+              <div className="ui-state__icon">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M4 7h16M4 7l1.5 12.5A2 2 0 0 0 7.5 21h9a2 2 0 0 0 2-1.5L20 7M4 7l2-3h12l2 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M12 11v6M9 11v6M15 11v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </div>
+              <p className="ui-state__title">No expenses yet</p>
+              <p className="ui-state__desc">
+                {shouldShowSalesmanFeatures
+                  ? 'Add your first expense to start tracking travel, fuel and other costs.'
+                  : 'No expenses have been submitted by any salesman yet.'}
+              </p>
+              {shouldShowSalesmanFeatures && (
+                <button className="ui-btn ui-btn--primary" onClick={() => setCreateModalOpen(true)}>
+                  + Add Expense
+                </button>
+              )}
+            </div>
+          ) : (
+            <TableWithControls
+              columns={columns}
+              rows={filteredRows}
+              loading={loading}
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+              tabs={['All', 'Pending', 'Approved']}
+              searchPlaceholder="Search expenses..."
+            />
+          )}
         </div>
       </div>
 

@@ -64,15 +64,31 @@ const AnalyticsReports = () => {
           <div className="dash-container flex flex-col gap-4">
             <div className="dash-row grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
               <div className="dash-card full bg-surface border border-border rounded-lg shadow-sm p-0 col-span-full">
-                <TableWithControls
-                  title="Today's Visit"
-                  columns={columns}
-                  rows={rows}
-                  onAddNew={() => setOpenAdd(true)}
-                  addNewText="Add New Visit"
-                  onImport={() => console.log('Import All Data')}
-                  importText="Import All Data"
-                />
+                {rows.length === 0 ? (
+                  <div className="ui-state ui-state--empty">
+                    <div className="ui-state__icon">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 3v18h18" />
+                        <path d="M7 16l4-5 3 3 4-6" />
+                      </svg>
+                    </div>
+                    <p className="ui-state__title">No visits yet</p>
+                    <p className="ui-state__desc">There are no visits or reports to show for this period. Add a new visit to start tracking your analytics.</p>
+                    <div className="ui-state__actions">
+                      <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Visit</button>
+                    </div>
+                  </div>
+                ) : (
+                  <TableWithControls
+                    title="Today's Visit"
+                    columns={columns}
+                    rows={rows}
+                    onAddNew={() => setOpenAdd(true)}
+                    addNewText="Add New Visit"
+                    onImport={() => console.log('Import All Data')}
+                    importText="Import All Data"
+                  />
+                )}
               </div>
             </div>
           </div>

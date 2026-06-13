@@ -37,6 +37,7 @@ const ProductCard = ({
   const [activeColor, setActiveColor] = useState(0);
   const [qty, setQty] = useState(1);
   const [imgLoaded, setImgLoaded] = useState(false);
+  const [imgBroken, setImgBroken] = useState(false);
 
   const handleColorClick = (colorIndex) => {
     setActiveColor(colorIndex);
@@ -111,7 +112,12 @@ const ProductCard = ({
   const handleImageError = (e) => {
     // Swap to the local placeholder once; guard against an onError loop if the
     // placeholder itself ever fails (avoids console spam + infinite re-render).
-    if (e.currentTarget.dataset.fallbackApplied === 'true') return;
+    if (e.currentTarget.dataset.fallbackApplied === 'true') {
+      // The local placeholder failed too — fall back to a graceful
+      // "image unavailable" affordance instead of leaving blank space.
+      setImgBroken(true);
+      return;
+    }
     e.currentTarget.dataset.fallbackApplied = 'true';
     e.currentTarget.src = FALLBACK_IMAGE;
     setImgLoaded(true);
@@ -124,16 +130,32 @@ const ProductCard = ({
 
   return (
     <div className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
-      <div className="product-image relative overflow-hidden rounded-md">
-        {!imgLoaded && <span className="pc-image-placeholder absolute inset-0" aria-hidden="true" />}
-        <img
-          src={imageUrl}
-          alt={productName}
-          loading="lazy"
-          className={`pc-image-img transition duration-300 ease-[ease] motion-reduce:transition-none ${imgLoaded ? 'is-loaded opacity-100 group-hover:scale-105' : 'opacity-0'}`}
-          onLoad={() => setImgLoaded(true)}
-          onError={handleImageError}
-        />
+      <div className={`product-image relative overflow-hidden rounded-md${imgBroken ? ' aspect-square' : ''}`}>
+        {!imgLoaded && !imgBroken && <span className="pc-image-placeholder absolute inset-0" aria-hidden="true" />}
+        {imgBroken ? (
+          <div
+            className="pc-image-unavailable absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-surface-muted text-text-subtle"
+            role="img"
+            aria-label="Image unavailable"
+          >
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <circle cx="9" cy="9" r="1.5" />
+              <path d="m21 15-3.5-3.5L9 20" />
+              <line x1="3" y1="3" x2="21" y2="21" />
+            </svg>
+            <span className="text-[length:var(--text-xs)] font-medium tracking-[var(--tracking-label)] uppercase">Image unavailable</span>
+          </div>
+        ) : (
+          <img
+            src={imageUrl}
+            alt={productName}
+            loading="lazy"
+            className={`pc-image-img transition duration-300 ease-[ease] motion-reduce:transition-none ${imgLoaded ? 'is-loaded opacity-100 group-hover:scale-105' : 'opacity-0'}`}
+            onLoad={() => setImgLoaded(true)}
+            onError={handleImageError}
+          />
+        )}
       </div>
       <h3 className="product-name block overflow-hidden [-webkit-box-orient:vertical] [display:-webkit-box] [-webkit-line-clamp:2] [line-clamp:2] min-h-[calc(2*var(--leading-snug)*var(--text-md))]">{productName}</h3>
 

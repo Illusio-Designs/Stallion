@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import '../styles/components/DashboardHeader.css';
-import { FiMaximize, FiMinimize } from 'react-icons/fi';
+import { FiMaximize, FiMinimize, FiBell } from 'react-icons/fi';
 import Tooltip from './ui/Tooltip';
 import { logout as authLogout, getUser } from '../services/authService';
 import { showLogoutSuccess } from '../services/notificationService';
@@ -230,7 +230,7 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed }) => {
           <div className="dashboard-action-icons flex items-center gap-2">
             <Tooltip label="Notifications" placement="bottom">
               <button className="dashboard-icon-btn bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]" aria-label="Notifications">
-                <img src="/images/icons/bell.webp" alt="Notifications" className="dashboard-icon-image w-[18px] h-[18px] object-contain" />
+                <FiBell size={20} aria-hidden="true" />
               </button>
             </Tooltip>
             <Tooltip label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} placement="bottom">

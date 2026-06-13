@@ -1101,22 +1101,58 @@ const DashboardClients = () => {
             ))}
           </div>
         </div>
-        {error && (
+        {!loading && error ? (
           <div className="dash-row">
             <div className="dash-card full">
-              <div className="p-4 mb-4 rounded-lg border border-error bg-error-soft text-error">
-                <strong>Error:</strong> {error}
+              <div className="ui-state ui-state--error">
+                <div className="ui-state__icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="9" />
+                    <line x1="12" y1="8" x2="12" y2="13" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">Couldn&apos;t load parties</p>
+                <p className="ui-state__desc">{error}</p>
                 <button
-                  onClick={() => setError(null)}
-                  className="float-right bg-transparent border-0 text-error cursor-pointer text-[18px] font-bold"
+                  className="ui-btn ui-btn--secondary"
+                  onClick={() => {
+                    setError(null);
+                    if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter);
+                    else window.location.reload();
+                  }}
                 >
-                  ×
+                  Try again
                 </button>
               </div>
             </div>
           </div>
-        )}
-        <div className="dash-row">
+        ) : !loading && filteredRowsByTab.length === 0 ? (
+          <div className="dash-row">
+            <div className="dash-card full">
+              <div className="ui-state ui-state--empty">
+                <div className="ui-state__icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <line x1="19" y1="8" x2="19" y2="14" />
+                    <line x1="22" y1="11" x2="16" y2="11" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">No parties yet</p>
+                <p className="ui-state__desc">
+                  {selectedCountryFilter
+                    ? 'No parties found for the selected country. Add a new party to get started.'
+                    : 'Select a country to view its parties, or add a new party to get started.'}
+                </p>
+                <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
+                  Add New Party
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+        <div className="dash-row" style={(!loading && (error || filteredRowsByTab.length === 0)) ? { display: 'none' } : undefined}>
           <div className="dash-card full">
             <TableWithControls
               title="Party"

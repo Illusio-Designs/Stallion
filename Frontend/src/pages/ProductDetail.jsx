@@ -100,6 +100,10 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   const [rawModels, setRawModels] = useState([]); // Store raw API models for re-transformation
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Track the src of the main image that failed even after the local placeholder
+  // fallback, so we can show a graceful "image unavailable" affordance. Keyed by
+  // src so selecting a different variation gives its image a fresh attempt.
+  const [brokenMainImageSrc, setBrokenMainImageSrc] = useState(null);
   
   // Lookup data for resolving IDs to names
   const [brands, setBrands] = useState([]);
@@ -998,17 +1002,44 @@ const ProductDetail = ({ productId: propProductId = null }) => {
             {/* Main Product Display */}
             <div className="main-product-display grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-10 bg-transparent pt-4 px-0 pb-0 items-center">
               <div className="main-product-image w-full h-[320px] md:h-[400px] flex items-center justify-center bg-surface rounded-lg overflow-hidden p-6 shadow-lg">
-                <img
-                  src={currentProduct.image || '/images/products/spac1.webp'}
-                  alt={currentProduct.name}
-                  className="max-w-full max-h-full object-contain"
-                  onError={(e) => {
-                    // Fallback to default image if image fails to load
-                    if (e.target.src !== '/images/products/spac1.webp') {
-                      e.target.src = '/images/products/spac1.webp';
-                    }
-                  }}
-                />
+                {(() => {
+                  const mainImageSrc = currentProduct.image || '/images/products/spac1.webp';
+                  if (brokenMainImageSrc === mainImageSrc) {
+                    return (
+                      <div
+                        className="main-product-image-unavailable flex flex-col items-center justify-center gap-2 text-text-subtle"
+                        role="img"
+                        aria-label="Image unavailable"
+                      >
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <circle cx="9" cy="9" r="1.5" />
+                          <path d="m21 15-3.5-3.5L9 20" />
+                          <line x1="3" y1="3" x2="21" y2="21" />
+                        </svg>
+                        <span className="text-[length:var(--text-sm)] font-medium tracking-[var(--tracking-label)] uppercase">Image unavailable</span>
+                      </div>
+                    );
+                  }
+                  return (
+                    <img
+                      src={mainImageSrc}
+                      alt={currentProduct.name}
+                      className="max-w-full max-h-full object-contain"
+                      onError={(e) => {
+                        // Fallback to default image if image fails to load; if the
+                        // local placeholder fails too, show the "image unavailable"
+                        // affordance instead of leaving blank space.
+                        if (e.target.src !== '/images/products/spac1.webp' && e.target.dataset.fallbackApplied !== 'true') {
+                          e.target.dataset.fallbackApplied = 'true';
+                          e.target.src = '/images/products/spac1.webp';
+                        } else {
+                          setBrokenMainImageSrc(mainImageSrc);
+                        }
+                      }}
+                    />
+                  );
+                })()}
               </div>
               <div className="main-product-info flex flex-col gap-6">
                 <h2 className="product-title text-[length:var(--text-2xl)] text-text-on-primary m-0 font-semibold leading-[var(--leading-tight)] tracking-[-0.02em]">{display(currentProduct.name)}</h2>

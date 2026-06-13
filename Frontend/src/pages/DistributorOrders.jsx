@@ -435,17 +435,52 @@ const DistributorOrders = () => {
         {/* Order Overview Table */}
         <div className="dash-row">
           <div className="dash-card full">
-            <TableWithControls
-              title="My Orders"
-              columns={columns}
-              rows={filteredRowsByTab}
-              onAddNew={() => setCreateModalOpen(true)}
-              addNewText="Create Order"
-              dateRange={dateRange}
-              onDateChange={setDateRange}
-              itemName="Order"
-              loading={loading}
-            />
+            {!loading && error ? (
+              <div className="ui-state ui-state--error">
+                <div className="ui-state__icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                    <circle cx="12" cy="12" r="9" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">Couldn't load orders</p>
+                <p className="ui-state__desc">{error}</p>
+                <button className="ui-btn ui-btn--secondary" onClick={() => fetchOrders()}>Try again</button>
+              </div>
+            ) : !loading && filteredRowsByTab.length === 0 ? (
+              <div className="ui-state ui-state--empty">
+                <div className="ui-state__icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                    <path d="M6 2h9l5 5v15a0 0 0 0 1 0 0H6a0 0 0 0 1 0 0V2Z" />
+                    <path d="M14 2v6h6" />
+                    <line x1="9" y1="13" x2="15" y2="13" />
+                    <line x1="9" y1="17" x2="13" y2="17" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">No orders yet</p>
+                <p className="ui-state__desc">
+                  {activeTab === 'All'
+                    ? "You haven't placed any orders. Create your first order to get started."
+                    : `No orders found in "${activeTab}".`}
+                </p>
+                {activeTab === 'All' && (
+                  <button className="ui-btn ui-btn--primary" onClick={() => setCreateModalOpen(true)}>Create Order</button>
+                )}
+              </div>
+            ) : (
+              <TableWithControls
+                title="My Orders"
+                columns={columns}
+                rows={filteredRowsByTab}
+                onAddNew={() => setCreateModalOpen(true)}
+                addNewText="Create Order"
+                dateRange={dateRange}
+                onDateChange={setDateRange}
+                itemName="Order"
+                loading={loading}
+              />
+            )}
           </div>
         </div>
       </div>

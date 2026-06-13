@@ -7,6 +7,7 @@ import Button from '../components/ui/Button';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import { Skeleton } from '../components/ui/Skeleton';
 import {
   getProducts,
   createProduct,
@@ -2343,14 +2344,55 @@ const DashboardProducts = () => {
             {activeTab === 'Media Gallery' ? (
               <div>
                 {loading ? (
-                  <LoadingSpinner />
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-5 p-5">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div
+                        key={`media-skeleton-${i}`}
+                        className="border border-border rounded-xl overflow-hidden bg-surface flex flex-col shadow-md"
+                      >
+                        <Skeleton width="100%" height={250} radius={0} />
+                        <div className="p-3">
+                          <Skeleton width="60%" height={14} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : error ? (
+                  <div className="ui-state ui-state--error">
+                    <div className="ui-state__icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                        <circle cx="12" cy="12" r="9" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                      </svg>
+                    </div>
+                    <p className="ui-state__title">Couldn't load images</p>
+                    <p className="ui-state__desc">{error}</p>
+                    <button className="ui-btn ui-btn--secondary" onClick={() => fetchAllUploads()}>
+                      Try again
+                    </button>
+                  </div>
+                ) : allMediaImages.length === 0 ? (
+                  <div className="ui-state ui-state--empty">
+                    <div className="ui-state__icon">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="8.5" cy="8.5" r="1.5" />
+                        <path d="M21 15l-5-5L5 21" />
+                      </svg>
+                    </div>
+                    <p className="ui-state__title">No images yet</p>
+                    <p className="ui-state__desc">Upload product images to build your media gallery.</p>
+                    <button
+                      className="ui-btn ui-btn--primary"
+                      onClick={handleOpenMediaUpload}
+                      disabled={uploadingImage}
+                    >
+                      {uploadingImage ? 'Uploading...' : 'Upload Images'}
+                    </button>
+                  </div>
                 ) : (
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-5 p-5">
-                    {allMediaImages.length === 0 && (
-                      <div className="col-span-full text-center text-text-muted p-10">
-                        No uploaded images found.
-                      </div>
-                    )}
                     {allMediaImages.map(item => (
                     <div
                       key={item.id}

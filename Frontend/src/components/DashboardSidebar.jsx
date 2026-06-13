@@ -1,30 +1,32 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import '../styles/components/DashboardSidebar.css';
-import { FiUsers, FiSliders, FiInbox, FiCalendar } from 'react-icons/fi';
+import {
+  FiGrid, FiPackage, FiShoppingCart, FiDollarSign, FiInbox, FiCalendar,
+  FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
+  FiHelpCircle, FiSettings, FiChevronsLeft,
+} from 'react-icons/fi';
 import { getUserRole } from '../services/authService';
 import { filterMenuItemsByRole } from '../utils/rolePermissions';
 
 const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleCollapse }) => {
   const [tooltipState, setTooltipState] = useState({ show: false, text: '', top: 0 });
+  // Single crisp icon system (react-icons) — inherits currentColor (white on
+  // the indigo sidebar), no webp + filter:brightness() hack.
   const sidebarIcons = {
-    dashboard: '/images/icons/Dashboard.webp',
-    'dashboard-products': '/images/icons/Products.webp',
-    orders: '/images/icons/Orders.webp',
-    expenses: '/images/icons/bank-note-01.webp',
-    party: '/images/icons/Clients.webp',
-    salesmen: '/images/icons/user-circle.webp',
-    distributor: '/images/icons/Supplier.webp',
-    'office-team': '/images/icons/user-circle.webp',
-    manage: '/images/icons/menu.webp',
-    analytics: '/images/icons/Analytics.webp',
-    support: '/images/icons/Support.webp',
-    settings: '/images/icons/Setting.webp',
-  };
-  const reactSidebarIcons = {
-    salesmen: FiUsers,
-    manage: FiSliders,
+    dashboard: FiGrid,
+    'dashboard-products': FiPackage,
+    orders: FiShoppingCart,
+    expenses: FiDollarSign,
     tray: FiInbox,
     events: FiCalendar,
+    party: FiUsers,
+    salesmen: FiUser,
+    distributor: FiTruck,
+    'office-team': FiBriefcase,
+    manage: FiSliders,
+    analytics: FiBarChart2,
+    support: FiHelpCircle,
+    settings: FiSettings,
   };
   
   // Get user role
@@ -124,12 +126,8 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
                 }}
                 aria-label={item.text}
               >
-                <span className="sidebar-icon inline-flex h-5 w-5 flex-shrink-0 items-center justify-center [&>img]:block [&>img]:h-5 [&>img]:w-5 [&>img]:object-contain [&>img]:[filter:brightness(0)_invert(1)] [&>svg]:h-5 [&>svg]:w-5 [&>svg]:flex-shrink-0">
-                  {reactSidebarIcons[item.id] ? (
-                    React.createElement(reactSidebarIcons[item.id], { size: 20 })
-                  ) : (
-                    <img src={sidebarIcons[item.id]} alt={item.text} />
-                  )}
+                <span className="sidebar-icon inline-flex h-5 w-5 flex-shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5 [&>svg]:flex-shrink-0">
+                  {React.createElement(sidebarIcons[item.id] || FiGrid, { size: 20, 'aria-hidden': true })}
                 </span>
                 {!isCollapsed && (
                   <span className="sidebar-text whitespace-nowrap text-[length:var(--text-base)]">
@@ -162,9 +160,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!isCollapsed}
         >
-          <img
-            src="/images/icons/hideshow.webp"
-            alt=""
+          <FiChevronsLeft
             aria-hidden="true"
             className={`sidebar-toggle__icon h-[18px] w-[18px] flex-shrink-0 transition-transform duration-300 ease-[ease] motion-reduce:transition-none ${
               isCollapsed ? 'rotate-180' : ''

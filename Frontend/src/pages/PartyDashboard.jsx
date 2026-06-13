@@ -10,6 +10,7 @@ import RowActions from '../components/ui/RowActions';
 const PartyDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
   // Get partyId once on mount - user data shouldn't change during component lifecycle
   const partyId = useMemo(() => {
@@ -20,6 +21,7 @@ const PartyDashboard = () => {
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const allOrders = await getOrders();
       // Filter orders for this party
       const currentPartyId = partyId;
@@ -33,6 +35,7 @@ const PartyDashboard = () => {
     } catch (error) {
       console.error('Failed to fetch orders:', error);
       showError('Could not load your orders. Please try again.');
+      setError(error?.message || 'Could not load your orders. Please try again.');
       setOrders([]);
     } finally {
       setLoading(false);
@@ -115,12 +118,48 @@ const PartyDashboard = () => {
                 </thead>
                 <tbody>
                   {loading ? (
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <tr key={`sk-${i}`}>
+                        {Array.from({ length: 8 }).map((__, c) => (
+                          <td key={c} style={{padding:'14px 0'}}>
+                            <Skeleton height={16} width={c === 5 ? 90 : '70%'} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : error ? (
                     <tr>
-                      <td colSpan="8" style={{padding:'20px', textAlign:'center'}}>Loading orders...</td>
+                      <td colSpan="8" style={{padding:0, borderBottom:'none'}}>
+                        <div className="ui-state ui-state--error">
+                          <div className="ui-state__icon" aria-hidden="true">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                              <circle cx="12" cy="12" r="9" />
+                              <line x1="12" y1="8" x2="12" y2="12" />
+                              <line x1="12" y1="16" x2="12.01" y2="16" />
+                            </svg>
+                          </div>
+                          <p className="ui-state__title">Couldn't load your orders</p>
+                          <p className="ui-state__desc">{error}</p>
+                          <button type="button" className="ui-btn ui-btn--secondary" onClick={fetchOrders}>Try again</button>
+                        </div>
+                      </td>
                     </tr>
                   ) : orders.length === 0 ? (
                     <tr>
-                      <td colSpan="8" style={{padding:'20px', textAlign:'center'}}>No orders found</td>
+                      <td colSpan="8" style={{padding:0, borderBottom:'none'}}>
+                        <div className="ui-state ui-state--empty">
+                          <div className="ui-state__icon" aria-hidden="true">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z" />
+                              <path d="M14 2v6h6" />
+                              <line x1="9" y1="13" x2="15" y2="13" />
+                              <line x1="9" y1="17" x2="15" y2="17" />
+                            </svg>
+                          </div>
+                          <p className="ui-state__title">No orders yet</p>
+                          <p className="ui-state__desc">Your party orders will appear here once they're placed.</p>
+                        </div>
+                      </td>
                     </tr>
                   ) : (
                     orders.slice(0, 10).map((order, index) => {

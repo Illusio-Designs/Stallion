@@ -1083,79 +1083,115 @@ const DashboardDistributor = () => {
     }
   };
 
+  // Canonical state flags. The table itself renders loading skeleton rows
+  // (via `loading`). We surface the error/empty states with the shared
+  // .ui-state components so every state is handled consistently.
+  const retryFetch = () => {
+    setError(null);
+    if (selectedCountryFilter) {
+      fetchDistributorsForCountry(selectedCountryFilter);
+    } else {
+      window.location.reload();
+    }
+  };
+  const showError_ = !loading && !!error;
+  const showEmpty = !loading && !error && rows.length === 0;
+
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
-        {error && (
-          <div className="dash-row grid grid-cols-1 gap-4 sm:grid-cols-12">
-            <div className="dash-card full col-span-1 p-0 sm:col-span-12">
-              <div className="mb-4 rounded-md border border-error bg-error-soft p-4 text-error">
-                <strong>Error:</strong> {error}
-                <button
-                  onClick={() => setError(null)}
-                  className="float-right cursor-pointer border-none bg-transparent text-lg font-bold text-error"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
         <div className="dash-row grid grid-cols-1 gap-4 sm:grid-cols-12">
           <div className="dash-card full col-span-1 p-0 sm:col-span-12">
-            <TableWithControls
-              title="Distributors"
-              columns={columns}
-              rows={rows}
-              onAddNew={handleAdd}
-              addNewText="Add New Distributor"
-              onImport={() => {
-                setError(null);
-                if (selectedCountryFilter) {
-                  fetchDistributorsForCountry(selectedCountryFilter);
-                }
-              }}
-              importText="Refresh Data"
-              showFilter={true}
-              filterContent={
-                <div>
-                  <label className="mb-2 block text-[14px] font-medium">
-                    Filter by Country
-                  </label>
-                  <DropdownSelector
-                    options={[
-                      { value: '', label: 'All Countries' },
-                      ...countries.map(country => ({
-                        value: country.id,
-                        label: country.name
-                      }))
-                    ]}
-                    value={selectedCountryFilter || ''}
-                    onChange={(value) => {
-                      const newCountryId = value || null;
-                      const oldCountryId = selectedCountryFilter;
-                      console.log('[Filter] Country selection changed from', oldCountryId, 'to', newCountryId);
-                      
-                      // Clear distributors immediately when changing countries
-                      setDistributors([]);
-                      
-                      // Update state - useEffect will handle fetching or clearing
-                      setSelectedCountryFilter(newCountryId);
-                      
-                      // If "All Countries" is selected (empty), ensure distributors are cleared
-                      if (!newCountryId) {
-                        console.log('[Filter] All Countries selected - clearing distributors');
-                        setDistributors([]);
-                        setLoading(false);
-                      }
-                    }}
-                    placeholder="All Countries"
-                    className="ui-dropdown-custom--full-width"
-                  />
+            {showError_ ? (
+              <div className="ui-state ui-state--error">
+                <div className="ui-state__icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
                 </div>
-              }
-              loading={loading}
-            />
+                <p className="ui-state__title">Couldn&apos;t load distributors</p>
+                <p className="ui-state__desc">{error}</p>
+                <button className="ui-btn ui-btn--secondary" onClick={retryFetch}>
+                  Try again
+                </button>
+              </div>
+            ) : showEmpty ? (
+              <div className="ui-state ui-state--empty">
+                <div className="ui-state__icon">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <line x1="19" y1="8" x2="19" y2="14" />
+                    <line x1="22" y1="11" x2="16" y2="11" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">No distributors yet</p>
+                <p className="ui-state__desc">
+                  {selectedCountryFilter
+                    ? 'No distributors found for the selected country. Add one to get started.'
+                    : 'Select a country to view its distributors, or add a new one to get started.'}
+                </p>
+                <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
+                  Add New Distributor
+                </button>
+              </div>
+            ) : (
+              <TableWithControls
+                title="Distributors"
+                columns={columns}
+                rows={rows}
+                onAddNew={handleAdd}
+                addNewText="Add New Distributor"
+                onImport={() => {
+                  setError(null);
+                  if (selectedCountryFilter) {
+                    fetchDistributorsForCountry(selectedCountryFilter);
+                  }
+                }}
+                importText="Refresh Data"
+                showFilter={true}
+                filterContent={
+                  <div>
+                    <label className="mb-2 block text-[14px] font-medium">
+                      Filter by Country
+                    </label>
+                    <DropdownSelector
+                      options={[
+                        { value: '', label: 'All Countries' },
+                        ...countries.map(country => ({
+                          value: country.id,
+                          label: country.name
+                        }))
+                      ]}
+                      value={selectedCountryFilter || ''}
+                      onChange={(value) => {
+                        const newCountryId = value || null;
+                        const oldCountryId = selectedCountryFilter;
+                        console.log('[Filter] Country selection changed from', oldCountryId, 'to', newCountryId);
+
+                        // Clear distributors immediately when changing countries
+                        setDistributors([]);
+
+                        // Update state - useEffect will handle fetching or clearing
+                        setSelectedCountryFilter(newCountryId);
+
+                        // If "All Countries" is selected (empty), ensure distributors are cleared
+                        if (!newCountryId) {
+                          console.log('[Filter] All Countries selected - clearing distributors');
+                          setDistributors([]);
+                          setLoading(false);
+                        }
+                      }}
+                      placeholder="All Countries"
+                      className="ui-dropdown-custom--full-width"
+                    />
+                  </div>
+                }
+                loading={loading}
+              />
+            )}
           </div>
         </div>
       </div>

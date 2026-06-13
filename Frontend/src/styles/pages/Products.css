@@ -296,7 +296,7 @@
 
 .color-swatch.active {
   border-color: var(--color-surface);
-  box-shadow: 0 0 0 2px var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
 }
 
 /* ---- Products main area -------------------------------------------- */

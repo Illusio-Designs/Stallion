@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import PhoneInput from 'react-phone-input-2';
-import 'react-phone-input-2/lib/style.css';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/pages/Login.css';
@@ -676,9 +676,10 @@ const Login = ({ onPageChange }) => {
                 <div className="login-input-group flex flex-col gap-2">
                   <label className="ui-label" htmlFor="phone">Mobile number</label>
                   <PhoneInput
-                    country={'in'}
+                    defaultCountry="in"
                     value={phoneNumber}
-                    onChange={(value) => { setPhoneNumber(value); if (phoneError) setPhoneError(''); }}
+                    onChange={(phone) => { setPhoneNumber(phone); if (phoneError) setPhoneError(''); }}
+                    className={`phone-intl${phoneError ? ' phone-intl--error' : ''}`}
                     inputProps={{
                       id: 'phone',
                       required: true,
@@ -686,12 +687,6 @@ const Login = ({ onPageChange }) => {
                       'aria-invalid': phoneError ? 'true' : 'false',
                       'aria-describedby': phoneError ? 'phone-error' : undefined,
                     }}
-                    containerClass={`phone-input-container${phoneError ? ' phone-input-container--error' : ''}`}
-                    inputClass="phone-input-field"
-                    buttonClass="phone-input-button"
-                    dropdownClass="phone-input-dropdown"
-                    disableDropdown={false}
-                    disableCountryGuess={false}
                   />
                   {phoneError && (
                     <p className="ui-field-error" id="phone-error" role="alert">{phoneError}</p>

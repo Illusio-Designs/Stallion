@@ -1568,36 +1568,53 @@ const DashboardManage = () => {
             ))}
           </div>
         </div>
-        {error && (
+        {error ? (
           <div className="dash-row">
             <div className="dash-card full">
-              <div style={{ 
-                padding: '16px', 
-                backgroundColor: '#fee', 
-                border: '1px solid #fcc', 
-                borderRadius: '8px',
-                color: '#c33',
-                marginBottom: '16px'
-              }}>
-                <strong>Error:</strong> {error}
-                <button 
-                  onClick={() => setError(null)}
-                  style={{
-                    float: 'right',
-                    background: 'none',
-                    border: 'none',
-                    color: '#c33',
-                    cursor: 'pointer',
-                    fontSize: '18px',
-                    fontWeight: 'bold'
+              <div className="ui-state ui-state--error">
+                <div className="ui-state__icon">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="9" />
+                    <line x1="12" y1="8" x2="12" y2="13" />
+                    <line x1="12" y1="16.5" x2="12" y2="16.5" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">Couldn't load {activeTab}</p>
+                <p className="ui-state__desc">{error}</p>
+                <button
+                  className="ui-btn ui-btn--secondary"
+                  onClick={() => {
+                    setError(null);
+                    fetchDataForTab(activeTab);
                   }}
                 >
-                  ×
+                  Try again
                 </button>
               </div>
             </div>
           </div>
-        )}
+        ) : !loading && filteredRowsByTab.length === 0 && !['State', 'City', 'Zone'].includes(activeTab) ? (
+          <div className="dash-row">
+            <div className="dash-card full">
+              <div className="ui-state ui-state--empty">
+                <div className="ui-state__icon">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="3" y="4" width="18" height="16" rx="2" />
+                    <line x1="3" y1="9" x2="21" y2="9" />
+                    <line x1="9" y1="20" x2="9" y2="9" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">No {activeTab} yet</p>
+                <p className="ui-state__desc">
+                  You haven't added any {activeTab.toLowerCase()} entries yet. Create one to get started.
+                </p>
+                <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
+                  Add {activeTab}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
         <div className="dash-row">
           <div className="dash-card full">
             <TableWithControls
@@ -1713,6 +1730,7 @@ const DashboardManage = () => {
             />
           </div>
         </div>
+        )}
       </div>
       <Modal
         open={openAdd}

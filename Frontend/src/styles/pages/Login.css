@@ -107,195 +107,79 @@
 }
 
 /* ============================================================
-   Phone input (react-phone-input-2) — themed to the system
+   Phone input (react-international-phone) — themed to the system
    ============================================================ */
-.login-input-group .phone-input-container {
-  position: relative !important;
-  width: 100% !important;
-  border: 1px solid var(--color-border-strong) !important;
-  border-radius: var(--radius-md) !important;
-  transition: border-color var(--transition), box-shadow var(--transition) !important;
-  background: var(--color-surface) !important;
-  display: block !important;
+.login-input-group .phone-intl {
+  width: 100%;
+  --react-international-phone-height: 44px;
+  --react-international-phone-font-size: var(--text-base);
+  --react-international-phone-border-radius: var(--radius-md);
+  --react-international-phone-border-color: var(--color-border-strong);
+  --react-international-phone-background-color: var(--color-surface);
+  --react-international-phone-text-color: var(--color-text);
+  --react-international-phone-country-selector-background-color: var(--color-surface);
+  --react-international-phone-country-selector-background-color-hover: var(--color-surface-muted);
+  --react-international-phone-country-selector-arrow-color: var(--color-text-subtle);
+  --react-international-phone-disabled-background-color: var(--color-surface-muted);
+  --react-international-phone-disabled-text-color: var(--color-text-subtle);
+  --react-international-phone-dropdown-item-font-size: var(--text-base);
+  --react-international-phone-dropdown-item-height: 36px;
+  --react-international-phone-dropdown-item-text-color: var(--color-text);
+  --react-international-phone-dropdown-item-background-color: var(--color-surface);
+  --react-international-phone-dropdown-item-background-color-hover: var(--color-surface-muted);
+  --react-international-phone-selected-dropdown-item-text-color: var(--color-primary);
+  --react-international-phone-selected-dropdown-item-background-color: var(--color-primary-soft);
 }
 
-.login-input-group .phone-input-container:hover {
-  border-color: var(--color-grey-400) !important;
+.login-input-group .phone-intl .react-international-phone-input {
+  width: 100%;
+  font-family: 'Spoof Trial', sans-serif;
 }
 
-.login-input-group .phone-input-container:focus-within {
-  border-color: var(--color-primary) !important;
-  box-shadow: var(--focus-ring) !important;
+.login-input-group .phone-intl .react-international-phone-country-selector-button {
+  border-top-left-radius: var(--radius-md);
+  border-bottom-left-radius: var(--radius-md);
+  padding: 0 var(--space-2);
+  transition: background var(--transition), border-color var(--transition);
 }
 
-.login-input-group .phone-input-container--error {
+/* Brand focus ring around the whole control */
+.login-input-group .phone-intl:focus-within .react-international-phone-input,
+.login-input-group .phone-intl:focus-within .react-international-phone-country-selector-button {
+  border-color: var(--color-primary);
+}
+.login-input-group .phone-intl:focus-within {
+  border-radius: var(--radius-md);
+  box-shadow: var(--focus-ring);
+}
+
+/* Error state */
+.login-input-group .phone-intl--error .react-international-phone-input,
+.login-input-group .phone-intl--error .react-international-phone-country-selector-button {
   border-color: var(--color-error) !important;
 }
-
-.login-input-group .phone-input-container--error:focus-within {
-  border-color: var(--color-error) !important;
-  box-shadow: var(--focus-ring-error) !important;
+.login-input-group .phone-intl--error:focus-within {
+  box-shadow: var(--focus-ring-error);
 }
 
-/* Flag dropdown button */
-.phone-input-container .flag-dropdown {
-  position: absolute !important;
-  left: 0 !important;
-  top: 0 !important;
-  bottom: 0 !important;
-  background: transparent !important;
-  border: none !important;
-  border-right: 1px solid var(--color-border) !important;
-  border-radius: var(--radius-md) 0 0 var(--radius-md) !important;
-  padding: 0 !important;
-  width: auto !important;
-  min-width: 92px !important;
-  height: 44px !important;
-  z-index: 2 !important;
-}
-
-.phone-input-container .flag-dropdown.open {
-  background: transparent !important;
-  z-index: 3 !important;
-}
-
-/* Selected flag display */
-.phone-input-container .selected-flag {
-  background: transparent !important;
-  padding: 0 var(--space-3) !important;
-  width: 100% !important;
-  height: 100% !important;
-  border-radius: var(--radius-md) 0 0 var(--radius-md) !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: flex-start !important;
-  cursor: pointer !important;
-  transition: background var(--transition) !important;
-}
-
-.phone-input-container .selected-flag:hover,
-.phone-input-container .selected-flag:focus,
-.phone-input-container .flag-dropdown.open .selected-flag {
-  background: var(--color-surface-muted) !important;
-}
-
-.phone-input-container .selected-flag .selected-dial-code {
-  margin-right: var(--space-1) !important;
-  font-size: var(--text-base) !important;
-  color: var(--color-text) !important;
-  flex-shrink: 0 !important;
-}
-
-.phone-input-container .selected-flag .arrow {
-  border-top-color: var(--color-text-subtle) !important;
-  border-left-color: transparent !important;
-  border-right-color: transparent !important;
-  margin-left: auto !important;
-  margin-top: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  border-width: 4px 4px 0 4px !important;
-  position: relative !important;
-  top: 2px !important;
-  flex-shrink: 0 !important;
-}
-
-.phone-input-container .selected-flag .arrow.up {
-  border-bottom-color: var(--color-text-subtle) !important;
-  border-top-color: transparent !important;
-  border-width: 0 4px 4px 4px !important;
-  top: -2px !important;
-}
-
-/* Phone number input field */
-.phone-input-container .phone-input-field {
-  padding-left: 108px !important;
-  padding-right: var(--space-4) !important;
-  padding-top: var(--space-3) !important;
-  padding-bottom: var(--space-3) !important;
-  border: none !important;
-  border-radius: var(--radius-md) !important;
-  font-size: var(--text-base) !important;
-  font-family: 'Spoof Trial', sans-serif !important;
-  color: var(--color-text) !important;
-  background: transparent !important;
-  width: 100% !important;
-  height: 44px !important;
-  box-sizing: border-box !important;
-  margin: 0 !important;
-}
-
-.phone-input-container .phone-input-field:focus {
-  outline: none !important;
-  border: none !important;
-  box-shadow: none !important;
-}
-
-.phone-input-container .phone-input-field::placeholder {
-  color: var(--color-text-subtle) !important;
-}
-
-/* Country dropdown list */
-.phone-input-container .country-list {
-  position: absolute !important;
-  top: calc(100% + var(--space-1)) !important;
-  left: 0 !important;
-  right: 0 !important;
-  max-height: 220px !important;
-  overflow-y: auto !important;
+/* Country dropdown (rendered in a portal) — rounded, elevated, brand-themed */
+.react-international-phone-country-selector-dropdown {
   border: 1px solid var(--color-border) !important;
-  border-radius: var(--radius-lg) !important;
+  border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-lg) !important;
-  z-index: 1000 !important;
-  background: var(--color-surface) !important;
-  width: auto !important;
-  min-width: 220px !important;
   padding: var(--space-1) !important;
-  margin: 0 !important;
+  font-family: 'Spoof Trial', sans-serif !important;
+  z-index: 1200 !important;
 }
-
-.phone-input-container .country-list .country {
-  padding: var(--space-2) var(--space-3) !important;
-  cursor: pointer !important;
-  display: flex !important;
-  align-items: center !important;
+.react-international-phone-country-selector-dropdown__list-item {
   border-radius: var(--radius-sm) !important;
-  font-size: var(--text-base) !important;
-  color: var(--color-text) !important;
+  padding: var(--space-2) var(--space-3) !important;
 }
-
-.phone-input-container .country-list .country .dial-code {
-  color: var(--color-text-muted) !important;
-}
-
-.phone-input-container .country-list .country:hover,
-.phone-input-container .country-list .country.highlight {
-  background: var(--color-surface-muted) !important;
-}
-
-.phone-input-container .country-list .country.active {
-  background: var(--color-primary-soft) !important;
-  color: var(--color-primary) !important;
-}
-
-.phone-input-container .country-list .search {
-  padding: var(--space-2) !important;
-}
-
-.phone-input-container .country-list .search-box {
-  width: 100% !important;
+.react-international-phone-country-selector-dropdown__search-input {
   border: 1px solid var(--color-border-strong) !important;
   border-radius: var(--radius-sm) !important;
   padding: var(--space-2) var(--space-3) !important;
-  font-size: var(--text-base) !important;
-  color: var(--color-text) !important;
-  margin: 0 !important;
-}
-
-.phone-input-container .country-list .search-box:focus {
-  outline: none !important;
-  border-color: var(--color-primary) !important;
-  box-shadow: var(--focus-ring) !important;
+  font-family: 'Spoof Trial', sans-serif !important;
 }
 
 /* ============================================================

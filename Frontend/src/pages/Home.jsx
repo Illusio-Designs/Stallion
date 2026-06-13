@@ -5,6 +5,7 @@ import Skeleton from '../components/ui/Skeleton';
 import { getFeaturedProducts, getCollections } from '../services/apiService';
 import { isLoggedIn } from '../services/authService';
 import { productPath } from '../utils/dashboardRoutes';
+import { FiPackage, FiCreditCard, FiGlobe } from 'react-icons/fi';
 
 const Home = ({ onPageChange }) => {
   const [activeFilter, setActiveFilter] = useState('ALL');
@@ -323,19 +324,19 @@ const Home = ({ onPageChange }) => {
         <div className="b2b-advantage-container mx-auto grid max-w-[1400px] grid-cols-3 gap-10 rounded-lg border border-white/10 bg-white/[0.04] p-10 lg:gap-6 lg:p-6 max-md:gap-6 max-[426px]:grid-cols-1">
           <div className="b2b-advantage-card flex flex-col items-center text-center text-text-on-primary">
             <div className="b2b-icon relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-pill border border-white/[0.16] bg-white/[0.08] max-md:h-[60px] max-md:w-[60px]">
-              <img src="/images/icons/package.webp" alt="Package" className="relative z-[1] h-[50px] w-[50px] object-contain brightness-0 invert max-md:h-[30px] max-md:w-[30px]" />
+              <FiPackage aria-hidden="true" className="relative z-[1] h-[50px] w-[50px] max-md:h-[30px] max-md:w-[30px]" />
             </div>
             <h3 className="m-0 text-[length:var(--text-lg)] font-medium text-text-on-primary lg:text-[length:var(--text-md)] max-[384px]:text-[length:var(--text-base)]">Bulk Order Fulfilment</h3>
           </div>
           <div className="b2b-advantage-card flex flex-col items-center text-center text-text-on-primary">
             <div className="b2b-icon relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-pill border border-white/[0.16] bg-white/[0.08] max-md:h-[60px] max-md:w-[60px]">
-              <img src="/images/icons/bank-note-01.webp" alt="Bank Note" className="relative z-[1] h-[50px] w-[50px] object-contain brightness-0 invert max-md:h-[30px] max-md:w-[30px]" />
+              <FiCreditCard aria-hidden="true" className="relative z-[1] h-[50px] w-[50px] max-md:h-[30px] max-md:w-[30px]" />
             </div>
             <h3 className="m-0 text-[length:var(--text-lg)] font-medium text-text-on-primary lg:text-[length:var(--text-md)] max-[384px]:text-[length:var(--text-base)]">Competitive Pricing</h3>
           </div>
           <div className="b2b-advantage-card flex flex-col items-center text-center text-text-on-primary">
             <div className="b2b-icon relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-pill border border-white/[0.16] bg-white/[0.08] max-md:h-[60px] max-md:w-[60px]">
-              <img src="/images/icons/globe-01.webp" alt="Globe" className="relative z-[1] h-[50px] w-[50px] object-contain brightness-0 invert max-md:h-[30px] max-md:w-[30px]" />
+              <FiGlobe aria-hidden="true" className="relative z-[1] h-[50px] w-[50px] max-md:h-[30px] max-md:w-[30px]" />
             </div>
             <h3 className="m-0 text-[length:var(--text-lg)] font-medium text-text-on-primary lg:text-[length:var(--text-md)] max-[384px]:text-[length:var(--text-base)]">Global Shipping</h3>
           </div>

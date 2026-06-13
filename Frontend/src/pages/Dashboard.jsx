@@ -310,9 +310,31 @@ const Dashboard = () => {
                 </thead>
                 <tbody>
                   {targetsLoading ? (
-                    <tr><td colSpan="7" style={{padding:'16px', textAlign:'center', color:'#6b7280', fontSize:'13px'}}>Loading targets...</td></tr>
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <tr key={`target-skel-${i}`}>
+                        {Array.from({ length: 7 }).map((__, c) => (
+                          <td key={c} style={{padding:'10px 0'}}>
+                            <Skeleton width={c === 5 || c === 6 ? 120 : 80} height={14} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
                   ) : targets.length === 0 ? (
-                    <tr><td colSpan="7" style={{padding:'16px', textAlign:'center', color:'#6b7280', fontSize:'13px'}}>No targets assigned yet</td></tr>
+                    <tr>
+                      <td colSpan="7" style={{padding:0}}>
+                        <div className="ui-state ui-state--empty">
+                          <div className="ui-state__icon">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                              <circle cx="12" cy="12" r="9" />
+                              <circle cx="12" cy="12" r="5" />
+                              <circle cx="12" cy="12" r="1" />
+                            </svg>
+                          </div>
+                          <p className="ui-state__title">No targets yet</p>
+                          <p className="ui-state__desc">You don&apos;t have any sales targets assigned. They&apos;ll appear here once your manager sets them.</p>
+                        </div>
+                      </td>
+                    </tr>
                   ) : targets.map((t, i) => (
                     <tr key={i}>
                       <td style={{padding:'10px 0', fontSize:'13px', fontWeight:'600'}}>₹{parseFloat(t.target_amount || 0).toLocaleString('en-IN')}</td>
@@ -352,9 +374,31 @@ const Dashboard = () => {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan="6" style={{padding:'20px', textAlign:'center', color:'#6b7280', fontSize:'13px'}}>Loading orders...</td></tr>
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <tr key={`order-skel-${i}`}>
+                      {Array.from({ length: 6 }).map((__, c) => (
+                        <td key={c} style={{padding:'10px 8px'}}>
+                          <Skeleton width={c === 0 ? 70 : c === 3 ? 64 : 90} height={14} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))
                 ) : recentOrders.length === 0 ? (
-                  <tr><td colSpan="6" style={{padding:'20px', textAlign:'center', color:'#6b7280', fontSize:'13px'}}>No orders found</td></tr>
+                  <tr>
+                    <td colSpan="6" style={{padding:0}}>
+                      <div className="ui-state ui-state--empty">
+                        <div className="ui-state__icon">
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+                            <path d="M3 6h18" />
+                            <path d="M16 10a4 4 0 0 1-8 0" />
+                          </svg>
+                        </div>
+                        <p className="ui-state__title">No orders yet</p>
+                        <p className="ui-state__desc">Orders will show up here as soon as they&apos;re placed.</p>
+                      </div>
+                    </td>
+                  </tr>
                 ) : recentOrders.map((order, i) => {
                   const orderId = order.order_id || order.id || '';
                   const orderNum = order.order_number || `#${String(orderId).slice(-6)}`;

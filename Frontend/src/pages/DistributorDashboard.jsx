@@ -10,6 +10,7 @@ import RowActions from '../components/ui/RowActions';
 const DistributorDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const user = getUser();
   const distributorId = user?.distributor_id || user?.distributorId;
 
@@ -20,6 +21,7 @@ const DistributorDashboard = () => {
   const fetchOrders = async () => {
     try {
       setLoading(true);
+      setError(null);
       const allOrders = await getOrders();
       // Filter orders for this distributor
       const distributorOrders = distributorId 
@@ -32,6 +34,7 @@ const DistributorDashboard = () => {
     } catch (error) {
       console.error('Failed to fetch orders:', error);
       showError('Could not load orders. Please try again.');
+      setError(error?.message || 'Could not load orders. Please try again.');
       setOrders([]);
     } finally {
       setLoading(false);
@@ -110,12 +113,39 @@ const DistributorDashboard = () => {
                 </thead>
                 <tbody>
                   {loading ? (
+                    Array.from({ length: 6 }).map((_, i) => (
+                      <tr key={`sk-${i}`}>
+                        {Array.from({ length: 8 }).map((__, j) => (
+                          <td key={j} className="py-[14px]" style={{padding:'14px 0'}}>
+                            <Skeleton height={16} width={j === 3 ? '60%' : '80%'} />
+                          </td>
+                        ))}
+                      </tr>
+                    ))
+                  ) : error ? (
                     <tr>
-                      <td colSpan="8" className="p-5 text-center" style={{padding:'20px', textAlign:'center'}}>Loading orders...</td>
+                      <td colSpan="8" style={{padding:0}}>
+                        <div className="ui-state ui-state--error">
+                          <div className="ui-state__icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                          </div>
+                          <p className="ui-state__title">Couldn't load orders</p>
+                          <p className="ui-state__desc">{error}</p>
+                          <button className="ui-btn ui-btn--secondary" onClick={fetchOrders}>Try again</button>
+                        </div>
+                      </td>
                     </tr>
                   ) : orders.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="p-5 text-center" style={{padding:'20px', textAlign:'center'}}>No orders found</td>
+                      <td colSpan="8" style={{padding:0}}>
+                        <div className="ui-state ui-state--empty">
+                          <div className="ui-state__icon">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+                          </div>
+                          <p className="ui-state__title">No orders yet</p>
+                          <p className="ui-state__desc">Orders placed for your distribution will appear here once they're created.</p>
+                        </div>
+                      </td>
                     </tr>
                   ) : (
                     orders.slice(0, 10).map((order, index) => {

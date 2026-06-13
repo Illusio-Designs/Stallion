@@ -905,17 +905,43 @@ const DashboardOrders = () => {
         {/* Order Overview Table */}
         <div className="dash-row">
           <div className="dash-card full">
-            <TableWithControls
-              title="Order Overview"
-              columns={columns}
-              rows={filteredRowsByTab}
-              onImport={() => console.log('import orders')}
-              importText="Import All Orders Data"
-              dateRange={dateRange}
-              onDateChange={setDateRange}
-              itemName="Order"
-              loading={loading}
-            />
+            {error && !loading ? (
+              <div className="ui-state ui-state--error">
+                <div className="ui-state__icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 8V12M12 16H12.01M12 3L2 20H22L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">Couldn't load orders</p>
+                <p className="ui-state__desc">{error}</p>
+                <button className="ui-btn ui-btn--secondary" onClick={() => fetchOrders()}>Try again</button>
+              </div>
+            ) : !loading && orders.length === 0 ? (
+              <div className="ui-state ui-state--empty">
+                <div className="ui-state__icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M9 5H7C5.895 5 5 5.895 5 7V19C5 20.105 5.895 21 7 21H17C18.105 21 19 20.105 19 19V7C19 5.895 18.105 5 17 5H15M9 5C9 6.105 9.895 7 11 7H13C14.105 7 15 6.105 15 5M9 5C9 3.895 9.895 3 11 3H13C14.105 3 15 3.895 15 5M9 12H15M9 16H13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">No orders yet</p>
+                <p className="ui-state__desc">Orders you create will show up here. Get started by creating your first order.</p>
+                <div className="ui-state__actions">
+                  <button className="ui-btn ui-btn--primary" onClick={() => setCreateModalOpen(true)}>Create Order</button>
+                </div>
+              </div>
+            ) : (
+              <TableWithControls
+                title="Order Overview"
+                columns={columns}
+                rows={filteredRowsByTab}
+                onImport={() => console.log('import orders')}
+                importText="Import All Orders Data"
+                dateRange={dateRange}
+                onDateChange={setDateRange}
+                itemName="Order"
+                loading={loading}
+              />
+            )}
           </div>
         </div>
       </div>

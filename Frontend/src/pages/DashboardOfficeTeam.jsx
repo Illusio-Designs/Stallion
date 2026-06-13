@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import PhoneInput from 'react-phone-input-2';
 import 'react-phone-input-2/lib/style.css';
 import TableWithControls from '../components/ui/TableWithControls';
@@ -14,6 +14,7 @@ const DashboardOfficeTeam = () => {
   const [editRow, setEditRow] = useState(null);
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
   const [formData, setFormData] = useState({
     fullName: '',
     phoneNumber: '',
@@ -149,46 +150,51 @@ const DashboardOfficeTeam = () => {
   const [users, setUsers] = useState([]);
 
   // Fetch users on component mount and after operations
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        setLoading(true);
-        const response = await getUsers();
-        console.log('Users API Response:', response); // Debug log
-        
-        // Handle different response structures
-        let usersArray = [];
-        if (Array.isArray(response)) {
-          usersArray = response;
-        } else if (response && Array.isArray(response.data)) {
-          usersArray = response.data;
-        } else if (response && Array.isArray(response.users)) {
-          usersArray = response.users;
-        }
-        
-        setUsers(usersArray);
-        setRows(mapUsersToRows(usersArray));
-      } catch (error) {
-        console.error('Error fetching users:', error);
-        // Show user-friendly error message
-        if (error.message?.includes('Failed to fetch') || error.message?.includes('CORS')) {
-          showError('Unable to connect to server. Please check your internet connection or contact support.');
-        } else if (!error.message?.toLowerCase().includes('token expired') && 
-                   !error.message?.toLowerCase().includes('unauthorized')) {
-          showError(`Failed to load users: ${error.message || 'Unknown error'}`);
-        }
-        setUsers([]);
-        setRows([]);
-      } finally {
-        setLoading(false);
+  const fetchUsers = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await getUsers();
+      console.log('Users API Response:', response); // Debug log
+
+      // Handle different response structures
+      let usersArray = [];
+      if (Array.isArray(response)) {
+        usersArray = response;
+      } else if (response && Array.isArray(response.data)) {
+        usersArray = response.data;
+      } else if (response && Array.isArray(response.users)) {
+        usersArray = response.users;
       }
-    };
-    
+
+      setUsers(usersArray);
+      setRows(mapUsersToRows(usersArray));
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      // Show user-friendly error message
+      if (error.message?.includes('Failed to fetch') || error.message?.includes('CORS')) {
+        showError('Unable to connect to server. Please check your internet connection or contact support.');
+        setError('Unable to connect to server. Please check your internet connection or contact support.');
+      } else if (!error.message?.toLowerCase().includes('token expired') &&
+                 !error.message?.toLowerCase().includes('unauthorized')) {
+        showError(`Failed to load users: ${error.message || 'Unknown error'}`);
+        setError(error.message || 'Something went wrong while loading the team.');
+      } else {
+        setError(error.message || 'Something went wrong while loading the team.');
+      }
+      setUsers([]);
+      setRows([]);
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roles]);
+
+  useEffect(() => {
     // Fetch users - if roles are empty, we'll still fetch users but role names might show as "Unknown Role"
     // This allows the page to work even if roles fail to load
     fetchUsers();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roles]);
+  }, [fetchUsers]);
 
   const filteredRowsByTab = useMemo(() => {
     let filtered = [];
@@ -481,15 +487,52 @@ const DashboardOfficeTeam = () => {
         </div>
         <div className="dash-row grid grid-cols-12 gap-4">
           <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
-            <TableWithControls
-              title="Office Team"
-              columns={columns}
-              rows={filteredRowsByTab}
-              onAddNew={() => setOpenAdd(true)}
-              addNewText="Add New User"
-              searchPlaceholder="Search users"
-              loading={loading}
-            />
+            {error && !loading ? (
+              <div className="ui-state ui-state--error">
+                <div className="ui-state__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="32" height="32">
+                    <circle cx="12" cy="12" r="9" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">Couldn&apos;t load the team</p>
+                <p className="ui-state__desc">{error}</p>
+                <div className="ui-state__actions">
+                  <button className="ui-btn ui-btn--secondary" onClick={() => fetchUsers()}>
+                    Try again
+                  </button>
+                </div>
+              </div>
+            ) : !loading && rows.length === 0 ? (
+              <div className="ui-state ui-state--empty">
+                <div className="ui-state__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="32" height="32">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <line x1="19" y1="8" x2="19" y2="14" />
+                    <line x1="22" y1="11" x2="16" y2="11" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">No team members yet</p>
+                <p className="ui-state__desc">Add your office team members to manage their roles and access.</p>
+                <div className="ui-state__actions">
+                  <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>
+                    Add New User
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <TableWithControls
+                title="Office Team"
+                columns={columns}
+                rows={filteredRowsByTab}
+                onAddNew={() => setOpenAdd(true)}
+                addNewText="Add New User"
+                searchPlaceholder="Search users"
+                loading={loading}
+              />
+            )}
           </div>
         </div>
       </div>
