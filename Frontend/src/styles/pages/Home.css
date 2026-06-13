@@ -542,15 +542,6 @@
   position: relative;
 }
 
-.b2b-icon img {
-  width: 50px;
-  height: 50px;
-  object-fit: contain;
-  filter: brightness(0) invert(1);
-  position: relative;
-  z-index: 1;
-}
-
 .b2b-advantage-card h3 {
   font-size: var(--text-lg);
   font-weight: var(--font-weight-medium);

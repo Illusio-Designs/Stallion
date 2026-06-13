@@ -181,13 +181,6 @@
   justify-content: center;
   flex-shrink: 0;
 }
-.sidebar-icon img {
-  width: 20px;
-  height: 20px;
-  display: block;
-  filter: brightness(0) invert(1);
-  object-fit: contain;
-}
 .sidebar-icon svg {
   width: 20px;
   height: 20px;
