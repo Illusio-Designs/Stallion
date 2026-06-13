@@ -183,7 +183,7 @@ export const updateUser = async (userId, userData) => {
     const response = await fetch(fullUrl, {
       method: 'PUT',
       headers,
-      credentials: 'include',
+      credentials: 'omit',
       body: formData,
     });
     
@@ -242,7 +242,7 @@ export const uploadProfileImage = async (userId, profileImage) => {
   const response = await fetch(fullUrl, {
     method: 'POST',
     headers,
-    credentials: 'include',
+    credentials: 'omit',
     body: formData,
   });
   

@@ -84,7 +84,7 @@ export const getSalesmanExpenses = async () => {
   const response = await fetch(fullUrl, {
     method: 'GET',
     headers: getHeaders(true),
-    credentials: 'include',
+    credentials: 'omit',
   });
   
   // Handle 404 as empty array (no expenses found)
@@ -113,7 +113,7 @@ export const createSalesmanExpense = async (expenseData) => {
   const response = await fetch(fullUrl, {
     method: 'POST',
     headers: getHeaders(true),
-    credentials: 'include',
+    credentials: 'omit',
     body: JSON.stringify(expenseData),
   });
   
@@ -143,7 +143,7 @@ export const uploadExpenseImages = async (files) => {
   const response = await fetch(fullUrl, {
     method: 'POST',
     headers,
-    credentials: 'include',
+    credentials: 'omit',
     body: formData,
   });
   
@@ -165,7 +165,7 @@ export const updateSalesmanExpense = async (expenseId, updateData) => {
   const response = await fetch(fullUrl, {
     method: 'PUT',
     headers: getHeaders(true),
-    credentials: 'include',
+    credentials: 'omit',
     body: JSON.stringify(updateData),
   });
   
@@ -184,7 +184,7 @@ export const deleteSalesmanExpense = async (expenseId) => {
   const response = await fetch(fullUrl, {
     method: 'DELETE',
     headers: getHeaders(true),
-    credentials: 'include',
+    credentials: 'omit',
   });
   
   return await handleResponse(response);
@@ -203,7 +203,7 @@ export const getAllAdminExpenses = async () => {
   const response = await fetch(fullUrl, {
     method: 'GET',
     headers: getHeaders(true),
-    credentials: 'include',
+    credentials: 'omit',
   });
   
   console.log('Admin API response status:', response.status);

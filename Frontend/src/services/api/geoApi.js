@@ -287,6 +287,7 @@ const fetchAllZonesUncached = async (countryId) => {
       method: 'POST',
       body: { country_id: targetCountryId },
       includeAuth: true,
+      silent: true,
     });
     const statesArr = Array.isArray(statesResp) ? statesResp : (statesResp?.data || []);
     if (statesArr.length === 0) return [];
@@ -298,6 +299,7 @@ const fetchAllZonesUncached = async (countryId) => {
           method: 'POST',
           body: { state_id: state.id },
           includeAuth: true,
+          silent: true,
         }).catch(() => [])
       )
     );
@@ -315,6 +317,7 @@ const fetchAllZonesUncached = async (countryId) => {
             method: 'POST',
             body: { city_id: city.id },
             includeAuth: true,
+            silent: true,
           }).catch(() => [])
         )
       );

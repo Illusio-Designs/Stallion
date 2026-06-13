@@ -464,14 +464,14 @@ const DashboardOfficeTeam = () => {
   };
 
   return (
-    <div className="dash-page">
-      <div className="dash-container">
-        <div className="dash-row">
-          <div className="order-tabs-container">
+    <div className="dash-page w-full">
+      <div className="dash-container flex flex-col gap-4">
+        <div className="dash-row grid grid-cols-12 gap-4">
+          <div className="order-tabs-container col-span-full flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm">
             {['All', 'Activate', 'Deactivate'].map(tab => (
               <button
                 key={tab}
-                className={`order-tab ${activeTab === tab ? 'active' : ''}`}
+                className={`order-tab inline-flex min-h-10 flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-4 py-2 text-[var(--text-base)] font-semibold leading-[var(--leading-snug)] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] ${activeTab === tab ? 'active bg-primary text-text-on-primary' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}
@@ -479,8 +479,8 @@ const DashboardOfficeTeam = () => {
             ))}
           </div>
         </div>
-        <div className="dash-row">
-          <div className="dash-card full">
+        <div className="dash-row grid grid-cols-12 gap-4">
+          <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
             <TableWithControls
               title="Office Team"
               columns={columns}
@@ -506,8 +506,8 @@ const DashboardOfficeTeam = () => {
         title="Add New User"
         footer={(
           <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
+            <button
+              className="ui-btn ui-btn--secondary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border-strong bg-surface px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text transition-colors hover:bg-grey-100 hover:border-grey-400 active:bg-grey-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
               onClick={() => {
                 setOpenAdd(false);
                 setFormData({
@@ -520,8 +520,8 @@ const DashboardOfficeTeam = () => {
             >
               Cancel
             </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
+            <button
+              className="ui-btn ui-btn--primary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text-on-primary shadow-xs transition-colors hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
               onClick={handleSubmit}
               disabled={loading || !formData.fullName || !formData.phoneNumber || !formData.roleId}
             >
@@ -530,19 +530,19 @@ const DashboardOfficeTeam = () => {
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Full Name *</label>
-            <input 
-              className="ui-input" 
+        <form className="ui-form grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Full Name *</label>
+            <input
+              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
               placeholder="Enter full name"
               value={formData.fullName}
               onChange={(e) => handleInputChange('fullName', e.target.value)}
               required
             />
           </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Phone Number *</label>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Phone Number *</label>
             <PhoneInput
               country={'in'}
               value={formData.phoneNumber}
@@ -559,8 +559,8 @@ const DashboardOfficeTeam = () => {
               disableCountryGuess={false}
             />
           </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Role *</label>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Role *</label>
             <DropdownSelector
               options={roleOptions}
               value={formData.roleId}
@@ -584,8 +584,8 @@ const DashboardOfficeTeam = () => {
         title="Edit User"
         footer={(
           <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
+            <button
+              className="ui-btn ui-btn--secondary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border-strong bg-surface px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text transition-colors hover:bg-grey-100 hover:border-grey-400 active:bg-grey-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
               onClick={() => {
                 setEditRow(null);
                 setEditFormData({
@@ -599,8 +599,8 @@ const DashboardOfficeTeam = () => {
             >
               Cancel
             </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
+            <button
+              className="ui-btn ui-btn--primary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text-on-primary shadow-xs transition-colors hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
               onClick={handleEditSubmit}
               disabled={loading || !editFormData.fullName || !editFormData.phoneNumber || !editFormData.roleId}
             >
@@ -609,19 +609,19 @@ const DashboardOfficeTeam = () => {
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleEditSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Full Name *</label>
-            <input 
-              className="ui-input" 
+        <form className="ui-form grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleEditSubmit}>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Full Name *</label>
+            <input
+              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
               placeholder="Enter full name"
               value={editFormData.fullName}
               onChange={(e) => setEditFormData(prev => ({ ...prev, fullName: e.target.value }))}
               required
             />
           </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Phone Number *</label>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Phone Number *</label>
             <PhoneInput
               country={'in'}
               value={editFormData.phoneNumber}
@@ -638,8 +638,8 @@ const DashboardOfficeTeam = () => {
               disableCountryGuess={false}
             />
           </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Role *</label>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Role *</label>
             <DropdownSelector
               options={roleOptions}
               value={editFormData.roleId}
@@ -647,10 +647,10 @@ const DashboardOfficeTeam = () => {
               placeholder="Select a role"
             />
           </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Status</label>
-            <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Status</label>
+            <div className="flex items-center gap-4">
+              <label className="flex cursor-pointer items-center gap-2">
                 <input
                   type="checkbox"
                   checked={editFormData.isActive}

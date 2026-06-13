@@ -37,33 +37,33 @@ const AnalyticsReports = () => {
   );
 
   return (
-    <div className="dash-page">
-      <div className="dash-container">
+    <div className="dash-page w-full">
+      <div className="dash-container flex flex-col gap-4">
         {/* Summary cards */}
-        <div className="dash-row analytics-summary">
-          <div className="dash-card metric analytics-card">
-            <h4>Total Target</h4>
-            <div className="metric-value">₹30,00,000</div>
+        <div className="dash-row analytics-summary grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
+          <div className="dash-card metric analytics-card flex flex-col gap-1 bg-surface border border-border rounded-lg shadow-sm p-5 col-span-1 sm:col-span-6 lg:col-span-3">
+            <h4 className="m-0 text-xs font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle">Total Target</h4>
+            <div className="metric-value text-xl font-bold leading-tight tracking-[-0.01em] text-text">₹30,00,000</div>
           </div>
-          <div className="dash-card metric analytics-card">
-            <h4>Achieve Target</h4>
-            <div className="metric-value">₹17,50,000</div>
+          <div className="dash-card metric analytics-card flex flex-col gap-1 bg-surface border border-border rounded-lg shadow-sm p-5 col-span-1 sm:col-span-6 lg:col-span-3">
+            <h4 className="m-0 text-xs font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle">Achieve Target</h4>
+            <div className="metric-value text-xl font-bold leading-tight tracking-[-0.01em] text-text">₹17,50,000</div>
           </div>
-          <div className="dash-card metric analytics-card">
-            <h4>Due Target</h4>
-            <div className="metric-value">₹12,50,000</div>
+          <div className="dash-card metric analytics-card flex flex-col gap-1 bg-surface border border-border rounded-lg shadow-sm p-5 col-span-1 sm:col-span-6 lg:col-span-3">
+            <h4 className="m-0 text-xs font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle">Due Target</h4>
+            <div className="metric-value text-xl font-bold leading-tight tracking-[-0.01em] text-text">₹12,50,000</div>
           </div>
-          <div className="dash-card metric analytics-card">
-            <h4>Completed Percentage</h4>
-            <div className="metric-value">65%</div>
+          <div className="dash-card metric analytics-card flex flex-col gap-1 bg-surface border border-border rounded-lg shadow-sm p-5 col-span-1 sm:col-span-6 lg:col-span-3">
+            <h4 className="m-0 text-xs font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle">Completed Percentage</h4>
+            <div className="metric-value text-xl font-bold leading-tight tracking-[-0.01em] text-text">65%</div>
           </div>
         </div>
 
         {/* Table area */}
-        <div className="dash-page">
-          <div className="dash-container">
-            <div className="dash-row">
-              <div className="dash-card full">
+        <div className="dash-page w-full">
+          <div className="dash-container flex flex-col gap-4">
+            <div className="dash-row grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
+              <div className="dash-card full bg-surface border border-border rounded-lg shadow-sm p-0 col-span-full">
                 <TableWithControls
                   title="Today's Visit"
                   columns={columns}

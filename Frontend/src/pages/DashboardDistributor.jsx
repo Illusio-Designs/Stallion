@@ -98,11 +98,10 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
           </div>
           {/* Check All */}
           <div
-            className="ui-dropdown-custom__option"
-            style={{ borderBottom: '1px solid #e0e0e0', fontWeight: 600 }}
+            className="ui-dropdown-custom__option border-b border-border font-semibold"
             onClick={toggleAll}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={allSelected}
@@ -128,7 +127,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
                   className={`ui-dropdown-custom__option ${isChecked ? 'ui-dropdown-custom__option--selected' : ''}`}
                   onClick={() => toggleZone(zoneId)}
                 >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="flex items-center gap-2">
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -1085,31 +1084,16 @@ const DashboardDistributor = () => {
   };
 
   return (
-    <div className="dash-page">
-      <div className="dash-container">
+    <div className="dash-page w-full">
+      <div className="dash-container flex flex-col gap-4">
         {error && (
-          <div className="dash-row">
-            <div className="dash-card full">
-              <div style={{ 
-                padding: '16px', 
-                backgroundColor: '#fee', 
-                border: '1px solid #fcc', 
-                borderRadius: '8px',
-                color: '#c33',
-                marginBottom: '16px'
-              }}>
+          <div className="dash-row grid grid-cols-1 gap-4 sm:grid-cols-12">
+            <div className="dash-card full col-span-1 p-0 sm:col-span-12">
+              <div className="mb-4 rounded-md border border-error bg-error-soft p-4 text-error">
                 <strong>Error:</strong> {error}
-                <button 
+                <button
                   onClick={() => setError(null)}
-                  style={{
-                    float: 'right',
-                    background: 'none',
-                    border: 'none',
-                    color: '#c33',
-                    cursor: 'pointer',
-                    fontSize: '18px',
-                    fontWeight: 'bold'
-                  }}
+                  className="float-right cursor-pointer border-none bg-transparent text-lg font-bold text-error"
                 >
                   ×
                 </button>
@@ -1117,8 +1101,8 @@ const DashboardDistributor = () => {
             </div>
           </div>
         )}
-        <div className="dash-row">
-          <div className="dash-card full">
+        <div className="dash-row grid grid-cols-1 gap-4 sm:grid-cols-12">
+          <div className="dash-card full col-span-1 p-0 sm:col-span-12">
             <TableWithControls
               title="Distributors"
               columns={columns}
@@ -1135,7 +1119,7 @@ const DashboardDistributor = () => {
               showFilter={true}
               filterContent={
                 <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
+                  <label className="mb-2 block text-[14px] font-medium">
                     Filter by Country
                   </label>
                   <DropdownSelector

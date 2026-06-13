@@ -889,7 +889,7 @@ export const bulkUploadParties = async (file) => {
   const response = await fetch(fullUrl, {
     method: 'POST',
     headers,
-    credentials: 'include',
+    credentials: 'omit',
     body: formData,
   });
   return await handleResponse(response);

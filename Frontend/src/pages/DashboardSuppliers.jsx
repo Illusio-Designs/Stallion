@@ -108,12 +108,11 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
             />
           </div>
           <div
-            className="ui-dropdown-custom__option"
-            style={{ borderBottom: '1px solid #e0e0e0', fontWeight: 600 }}
+            className="ui-dropdown-custom__option border-b border-border font-semibold"
             onClick={toggleAll}
           >
-            <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} onClick={(e) => e.stopPropagation()} style={{ accentColor: '#181265', cursor: 'pointer' }} />
+            <span className="flex items-center gap-2">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} onClick={(e) => e.stopPropagation()} className="cursor-pointer accent-primary" />
               {allSelected ? 'Uncheck All' : 'Check All'}
             </span>
           </div>
@@ -132,8 +131,8 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
                   className={`ui-dropdown-custom__option ${isChecked ? 'ui-dropdown-custom__option--selected' : ''}`}
                   onClick={() => toggleZone(zoneId)}
                 >
-                  <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <input type="checkbox" checked={isChecked} onChange={() => toggleZone(zoneId)} onClick={(e) => e.stopPropagation()} style={{ accentColor: '#181265', cursor: 'pointer' }} />
+                  <span className="flex items-center gap-2">
+                    <input type="checkbox" checked={isChecked} onChange={() => toggleZone(zoneId)} onClick={(e) => e.stopPropagation()} className="cursor-pointer accent-primary" />
                     {zoneName}
                   </span>
                 </div>
@@ -1182,26 +1181,11 @@ const DashboardSuppliers = () => {
         {error && mainTab === 'Salesmen' && (
           <div className="dash-row">
             <div className="dash-card full">
-              <div style={{ 
-                padding: '16px', 
-                backgroundColor: '#fee', 
-                border: '1px solid #fcc', 
-                borderRadius: '8px',
-                color: '#c33',
-                marginBottom: '16px'
-              }}>
+              <div className="mb-4 rounded-md border border-error bg-error-soft p-4 text-error">
                 <strong>Error:</strong> {error}
-                <button 
+                <button
                   onClick={() => setError(null)}
-                  style={{
-                    float: 'right',
-                    background: 'none',
-                    border: 'none',
-                    color: '#c33',
-                    cursor: 'pointer',
-                    fontSize: '18px',
-                    fontWeight: 'bold'
-                  }}
+                  className="float-right cursor-pointer border-none bg-none text-lg font-bold text-error"
                 >
                   ×
                 </button>
@@ -1230,7 +1214,7 @@ const DashboardSuppliers = () => {
               showFilter={true}
               filterContent={
                 <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
+                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
                     Filter by Country
                   </label>
                   <DropdownSelector
@@ -1303,11 +1287,7 @@ const DashboardSuppliers = () => {
                 { key: 'end_date', label: 'END DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
                 { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
                 { key: 'target_status', label: 'STATUS', render: (v) => (
-                  <span style={{
-                    padding: '2px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: 600,
-                    background: v === 'pending' ? '#fff3cd' : '#d4edda',
-                    color: v === 'pending' ? '#856404' : '#155724',
-                  }}>{v || 'pending'}</span>
+                  <span className={`inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-xs font-semibold ${v === 'pending' ? 'bg-warning-soft text-warning' : 'bg-success-soft text-success'}`}>{v || 'pending'}</span>
                 )},
                 { key: 'target_description', label: 'DESCRIPTION' },
                 ...(!isSalesman ? [{ key: 'action', label: 'ACTION', render: (_v, row) => (

@@ -73,49 +73,49 @@ const DistributorDashboard = () => {
   };
 
   return (
-    <div className="dash-page">
-      <div className="dash-container">
+    <div className="dash-page w-full">
+      <div className="dash-container flex flex-col gap-4">
         {/* Summary Cards */}
-        <div className="dash-row orders-summary">
-          <div className="dash-card metric orders-card">
-            <h4>Total Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
+        <div className="dash-row orders-summary grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="dash-card metric orders-card bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="text-xs font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle mb-2">Total Orders</h4>
+            <div className="metric-value text-xl font-semibold leading-tight tracking-[-0.02em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Pending Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
+          <div className="dash-card metric orders-card bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="text-xs font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle mb-2">Pending Orders</h4>
+            <div className="metric-value text-xl font-semibold leading-tight tracking-[-0.02em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Completed Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
+          <div className="dash-card metric orders-card bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="text-xs font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle mb-2">Completed Orders</h4>
+            <div className="metric-value text-xl font-semibold leading-tight tracking-[-0.02em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Total Revenue</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
+          <div className="dash-card metric orders-card bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="text-xs font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle mb-2">Total Revenue</h4>
+            <div className="metric-value text-xl font-semibold leading-tight tracking-[-0.02em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
           </div>
         </div>
 
         {/* Order Overview Table */}
-        <div className="dash-row">
-          <div className="dash-card" style={{gridColumn:'span 12'}}>
-            <h4 style={{color: '#000000', fontSize: '16px', fontWeight: '700'}}>My Orders</h4>
+        <div className="dash-row grid grid-cols-1 gap-3 sm:gap-4">
+          <div className="dash-card bg-surface border border-border rounded-lg shadow-sm p-5" style={{gridColumn:'span 12'}}>
+            <h4 className="text-black text-base font-bold" style={{color: '#000000', fontSize: '16px', fontWeight: '700'}}>My Orders</h4>
             <div className="ui-table__scroll">
-              <table style={{width:'100%', borderCollapse:'separate', borderSpacing:0}}>
+              <table className="w-full border-separate border-spacing-0" style={{width:'100%', borderCollapse:'separate', borderSpacing:0}}>
                 <thead>
                   <tr>
                     {['ORDER ID','ORDER TYPE','PARTY NAME','PRODUCT','QTY','STATUS','VALUE','ACTION'].map((h)=> (
-                      <th key={h} style={{textAlign:'left', padding:'14px 0', fontSize:12, color:'#000', borderBottom:'1px solid #E0E0E0'}}>{h}</th>
+                      <th key={h} className="text-left py-[14px] text-xs text-black border-b border-b-[#E0E0E0]" style={{textAlign:'left', padding:'14px 0', fontSize:12, color:'#000', borderBottom:'1px solid #E0E0E0'}}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
                     <tr>
-                      <td colSpan="8" style={{padding:'20px', textAlign:'center'}}>Loading orders...</td>
+                      <td colSpan="8" className="p-5 text-center" style={{padding:'20px', textAlign:'center'}}>Loading orders...</td>
                     </tr>
                   ) : orders.length === 0 ? (
                     <tr>
-                      <td colSpan="8" style={{padding:'20px', textAlign:'center'}}>No orders found</td>
+                      <td colSpan="8" className="p-5 text-center" style={{padding:'20px', textAlign:'center'}}>No orders found</td>
                     </tr>
                   ) : (
                     orders.slice(0, 10).map((order, index) => {
@@ -170,14 +170,14 @@ const DistributorDashboard = () => {
                       
                       return (
                         <tr key={orderId || index}>
-                          <td style={{padding:'14px 0'}}>{orderNumber}</td>
-                          <td style={{padding:'14px 0'}}>{orderTypeDisplay}</td>
-                          <td style={{padding:'14px 0'}}>{partyName}</td>
-                          <td style={{padding:'14px 0', color:'#6b7280'}}>{productDisplay}</td>
-                          <td style={{padding:'14px 0'}}>{totalQuantity}</td>
-                          <td style={{padding:'14px 0'}}><StatusBadge status={orderStatus.toLowerCase().replace(/\s+/g, '-')}>{orderStatus}</StatusBadge></td>
-                          <td style={{padding:'14px 0'}}>₹{totalValue.toLocaleString('en-IN')}</td>
-                          <td style={{padding:'14px 0'}}>
+                          <td className="py-[14px]" style={{padding:'14px 0'}}>{orderNumber}</td>
+                          <td className="py-[14px]" style={{padding:'14px 0'}}>{orderTypeDisplay}</td>
+                          <td className="py-[14px]" style={{padding:'14px 0'}}>{partyName}</td>
+                          <td className="py-[14px] text-[#6b7280]" style={{padding:'14px 0', color:'#6b7280'}}>{productDisplay}</td>
+                          <td className="py-[14px]" style={{padding:'14px 0'}}>{totalQuantity}</td>
+                          <td className="py-[14px]" style={{padding:'14px 0'}}><StatusBadge status={orderStatus.toLowerCase().replace(/\s+/g, '-')}>{orderStatus}</StatusBadge></td>
+                          <td className="py-[14px]" style={{padding:'14px 0'}}>₹{totalValue.toLocaleString('en-IN')}</td>
+                          <td className="py-[14px]" style={{padding:'14px 0'}}>
                             <RowActions onView={()=>console.log('view', order)} />
                           </td>
                         </tr>

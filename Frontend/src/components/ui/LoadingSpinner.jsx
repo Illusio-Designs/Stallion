@@ -2,14 +2,7 @@ import React from 'react';
 
 const LoadingSpinner = ({ size = 40, color = '#181265' }) => {
   return (
-    <div style={{ 
-      display: 'flex', 
-      justifyContent: 'center', 
-      alignItems: 'center',
-      padding: '40px',
-      width: '100%',
-      minHeight: '200px'
-    }}>
+    <div className="flex items-center justify-center w-full min-h-[200px] p-10">
       <style>{`
         @keyframes spin {
           from { transform: rotate(0deg); }
@@ -20,7 +13,7 @@ const LoadingSpinner = ({ size = 40, color = '#181265' }) => {
         }
       `}</style>
       <svg
-        className="loading-spinner"
+        className="loading-spinner motion-reduce:[animation-duration:1.5s]"
         width={size}
         height={size}
         viewBox="0 0 24 24"

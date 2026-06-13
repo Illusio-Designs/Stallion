@@ -403,19 +403,19 @@ const DashboardTray = () => {
   }, [activeTab]);
 
   return (
-    <div className="dash-page">
-      <div className="dash-container">
+    <div className="dash-page w-full">
+      <div className="dash-container flex flex-col gap-[var(--space-4)]">
         {/* Tab Navigation */}
-        <div className="dash-row">
-          <div className="order-tabs-container">
+        <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
+          <div className="order-tabs-container col-span-full flex w-full gap-[var(--space-2)] overflow-x-auto rounded-lg border border-border bg-surface px-[var(--space-3)] py-[var(--space-2)] shadow-sm">
             <button
-              className={`order-tab ${activeTab === 'all-trays' ? 'active' : ''}`}
+              className={`order-tab inline-flex min-h-[40px] flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-[var(--space-4)] py-[var(--space-2)] text-[length:var(--text-base)] font-semibold leading-snug transition-colors active:scale-[0.98] ${activeTab === 'all-trays' ? 'bg-primary text-text-on-primary' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
               onClick={() => setActiveTab('all-trays')}
             >
               All Trays
             </button>
             <button
-              className={`order-tab ${activeTab === 'assign-products' ? 'active' : ''}`}
+              className={`order-tab inline-flex min-h-[40px] flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-[var(--space-4)] py-[var(--space-2)] text-[length:var(--text-base)] font-semibold leading-snug transition-colors active:scale-[0.98] ${activeTab === 'assign-products' ? 'bg-primary text-text-on-primary' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
               onClick={() => setActiveTab('assign-products')}
             >
               Assign Products
@@ -425,8 +425,8 @@ const DashboardTray = () => {
 
         {/* Tab Content */}
         {activeTab === 'all-trays' && (
-          <div className="dash-row">
-            <div className="dash-card full">
+          <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
+            <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
               <TableWithControls
                 title="Tray Management"
                 columns={columns}
@@ -447,8 +447,8 @@ const DashboardTray = () => {
         )}
 
         {activeTab === 'assign-products' && (
-          <div className="dash-row">
-            <div className="dash-card full">
+          <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
+            <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
               <div style={{ padding: '20px' }}>
                 <h2 style={{ marginTop: 0, marginBottom: '20px' }}>Assign Products to Tray</h2>
                 

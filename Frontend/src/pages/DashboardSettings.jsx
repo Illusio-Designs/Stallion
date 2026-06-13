@@ -511,17 +511,17 @@ const DashboardSettings = () => {
     <div className="dash-page">
       <div className="dash-container">
         <div className="dash-row">
-          <div className="dash-card full settings">
-            <div className="settings-header">
+          <div className="dash-card full settings p-4 min-[561px]:p-6">
+            <div className="settings-header flex flex-wrap items-end justify-between gap-4 mb-5 min-[561px]:mb-6">
               <div>
-                <h4 className="settings-title">Profile Settings</h4>
-                <p className="settings-subtitle">Update your personal information and profile photo.</p>
+                <h4 className="settings-title m-0 text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.01em] font-semibold text-text">Profile Settings</h4>
+                <p className="settings-subtitle mt-1 mb-0 text-text-muted text-[length:var(--text-base)] leading-[var(--leading-normal)]">Update your personal information and profile photo.</p>
               </div>
             </div>
 
-            <div className="settings-grid">
-              <aside className="settings-sidebar">
-                <div className="settings-avatar__preview settings-avatar__preview--lg">
+            <div className="settings-grid grid grid-cols-1 items-start gap-6 mt-6 min-[769px]:grid-cols-[280px_1fr] min-[769px]:gap-8 min-[769px]:mt-8">
+              <aside className="settings-sidebar flex flex-col gap-3">
+                <div className="settings-avatar__preview settings-avatar__preview--lg flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted text-center text-[length:var(--text-xs)] text-text-subtle">
                   {avatar && !avatarError ? (
                     <img 
                       key={avatar.substring(0, 100)} // Force re-render if avatar changes
@@ -563,12 +563,12 @@ const DashboardSettings = () => {
                     <span>No Image</span>
                   )}
                 </div>
-                <div className="settings-avatar__actions">
-                  <input 
-                    id="avatar-input" 
-                    type="file" 
-                    accept="image/*" 
-                    className="hidden-input" 
+                <div className="settings-avatar__actions flex flex-wrap items-center gap-2">
+                  <input
+                    id="avatar-input"
+                    type="file"
+                    accept="image/*"
+                    className="hidden-input hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       handleAvatarChange(file);
@@ -586,20 +586,20 @@ const DashboardSettings = () => {
                       setAvatarError(false);
                     }}>Remove</Button>
                   )}
-                  <div className="settings-hint">JPG, PNG up to ~2MB recommended.</div>
+                  <div className="settings-hint mt-1 text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-text-subtle">JPG, PNG up to ~2MB recommended.</div>
                 </div>
               </aside>
 
-              <form onSubmit={handleSubmit} className="settings-form ui-form">
-                <div className="form-group">
+              <form onSubmit={handleSubmit} className="settings-form ui-form grid max-w-[720px] grid-cols-1 gap-5 min-[561px]:gap-6">
+                <div className="form-group flex flex-col gap-2">
                   <label className="ui-label">User Name</label>
                   <input className="ui-input" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Enter your name" required />
                 </div>
-                <div className="form-group">
+                <div className="form-group flex flex-col gap-2">
                   <label className="ui-label">Email</label>
                   <input className="ui-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
                 </div>
-                <div className="form-group">
+                <div className="form-group flex flex-col gap-2">
                   <label className="ui-label">Phone Number</label>
                   <PhoneInput
                     country={'in'}
@@ -617,7 +617,7 @@ const DashboardSettings = () => {
                   />
                 </div>
 
-                <div className="settings-actions">
+                <div className="settings-actions flex flex-col-reverse items-stretch gap-3 mt-2 pt-6 border-t border-border [&_.ui-btn]:w-full min-[561px]:flex-row min-[561px]:items-center min-[561px]:justify-end min-[561px]:[&_.ui-btn]:w-auto">
                   <Button 
                     type="button" 
                     variant="secondary" 

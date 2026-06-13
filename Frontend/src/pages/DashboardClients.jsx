@@ -1104,26 +1104,11 @@ const DashboardClients = () => {
         {error && (
           <div className="dash-row">
             <div className="dash-card full">
-              <div style={{ 
-                padding: '16px', 
-                backgroundColor: '#fee', 
-                border: '1px solid #fcc', 
-                borderRadius: '8px',
-                color: '#c33',
-                marginBottom: '16px'
-              }}>
+              <div className="p-4 mb-4 rounded-lg border border-error bg-error-soft text-error">
                 <strong>Error:</strong> {error}
-                <button 
+                <button
                   onClick={() => setError(null)}
-                  style={{
-                    float: 'right',
-                    background: 'none',
-                    border: 'none',
-                    color: '#c33',
-                    cursor: 'pointer',
-                    fontSize: '18px',
-                    fontWeight: 'bold'
-                  }}
+                  className="float-right bg-transparent border-0 text-error cursor-pointer text-[18px] font-bold"
                 >
                   ×
                 </button>
@@ -1148,7 +1133,7 @@ const DashboardClients = () => {
               showFilter={true}
               filterContent={
                 <div>
-                  <label style={{ display: 'block', marginBottom: '8px', fontWeight: '500', fontSize: '14px' }}>
+                  <label className="block mb-2 text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
                     Filter by Country
                   </label>
                   <DropdownSelector
@@ -1324,7 +1309,7 @@ const DashboardClients = () => {
               className="ui-dropdown-custom--full-width"
             />
             {!formData.country_id && (
-              <small style={{ color: '#666', fontSize: '12px' }}>Please select a country first</small>
+              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a country first</small>
             )}
           </div>
           <div className="form-group">
@@ -1344,7 +1329,7 @@ const DashboardClients = () => {
               className="ui-dropdown-custom--full-width"
             />
             {!formData.state_id && (
-              <small style={{ color: '#666', fontSize: '12px' }}>Please select a state first</small>
+              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a state first</small>
             )}
           </div>
           <div className="form-group">
@@ -1364,7 +1349,7 @@ const DashboardClients = () => {
               className="ui-dropdown-custom--full-width"
             />
             {!formData.city_id && (
-              <small style={{ color: '#666', fontSize: '12px' }}>Please select a city first</small>
+              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a city first</small>
             )}
           </div>
           <div className="form-group">
@@ -1547,7 +1532,7 @@ const DashboardClients = () => {
               className="ui-dropdown-custom--full-width"
             />
             {!formData.country_id && (
-              <small style={{ color: '#666', fontSize: '12px' }}>Please select a country first</small>
+              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a country first</small>
             )}
           </div>
           <div className="form-group">
@@ -1567,7 +1552,7 @@ const DashboardClients = () => {
               className="ui-dropdown-custom--full-width"
             />
             {!formData.state_id && (
-              <small style={{ color: '#666', fontSize: '12px' }}>Please select a state first</small>
+              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a state first</small>
             )}
           </div>
           <div className="form-group">
@@ -1587,7 +1572,7 @@ const DashboardClients = () => {
               className="ui-dropdown-custom--full-width"
             />
             {!formData.city_id && (
-              <small style={{ color: '#666', fontSize: '12px' }}>Please select a city first</small>
+              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a city first</small>
             )}
           </div>
           <div className="form-group">
@@ -1647,8 +1632,8 @@ const DashboardClients = () => {
           </>
         )}
       >
-        <div style={{ padding: '8px 0' }}>
-          <p style={{ marginBottom: '16px', color: '#555', fontSize: '14px' }}>
+        <div className="py-2">
+          <p className="mb-4 text-sm text-text-muted">
             Upload an Excel or CSV file to bulk create/update parties.
           </p>
           <input
@@ -1658,7 +1643,7 @@ const DashboardClients = () => {
             onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
           />
           {bulkFile && (
-            <p style={{ marginTop: '8px', fontSize: '13px', color: '#666' }}>
+            <p className="mt-2 text-[13px] text-text-subtle">
               Selected: {bulkFile.name}
             </p>
           )}

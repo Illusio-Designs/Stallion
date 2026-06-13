@@ -451,36 +451,36 @@ const DashboardExpenses = () => {
     <div className="dash-page">
       <div className="dash-container">
         {/* Summary Cards */}
-        <div className="dash-row expenses-summary">
-          <div className="dash-card">
+        <div className="dash-row expenses-summary grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="dash-card p-5 lg:p-6">
             <h4>Total Expenses</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.totalExpenses}</div>
-            <div className="metric-sub">₹{summaryStats.totalAmount.toLocaleString('en-IN')}</div>
+            <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.totalExpenses}</div>
+            <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">₹{summaryStats.totalAmount.toLocaleString('en-IN')}</div>
           </div>
-          
-          <div className="dash-card">
+
+          <div className="dash-card p-5 lg:p-6">
             <h4>Pending</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingExpenses}</div>
-            <div className="metric-sub">Awaiting Approval</div>
+            <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingExpenses}</div>
+            <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">Awaiting Approval</div>
           </div>
-          
-          <div className="dash-card">
+
+          <div className="dash-card p-5 lg:p-6">
             <h4>Approved</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.approvedExpenses}</div>
-            <div className="metric-sub">₹{summaryStats.approvedAmount.toLocaleString('en-IN')}</div>
+            <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.approvedExpenses}</div>
+            <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">₹{summaryStats.approvedAmount.toLocaleString('en-IN')}</div>
           </div>
-          
-          <div className="dash-card">
+
+          <div className="dash-card p-5 lg:p-6">
             <h4>Rejected</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.rejectedExpenses}</div>
-            <div className="metric-sub">Need Review</div>
+            <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.rejectedExpenses}</div>
+            <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">Need Review</div>
           </div>
         </div>
 
         {/* Expenses Table */}
         <div className="dash-card">
-          <div className="card-header">
-            <h3>{shouldShowAdminFeatures ? 'All Salesman Expenses' : 'My Expenses'}</h3>
+          <div className="card-header flex flex-col items-stretch md:flex-row md:items-center md:justify-between gap-4 p-6 border-b border-border">
+            <h3 className="m-0 text-center md:text-left text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{shouldShowAdminFeatures ? 'All Salesman Expenses' : 'My Expenses'}</h3>
             {shouldShowSalesmanFeatures && (
               <Button onClick={() => setCreateModalOpen(true)}>
                 + Add Expense
@@ -509,10 +509,11 @@ const DashboardExpenses = () => {
         }}
         title="Add New Expense"
       >
-        <div className="modal-form">
-          <div className="form-group">
-            <label>Expense Date *</label>
+        <div className="modal-form flex flex-col gap-4">
+          <div className="form-group flex flex-col gap-2">
+            <label className="text-[length:var(--text-sm)] font-medium text-text">Expense Date *</label>
             <input
+              className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
               type="date"
               value={createFormData.expense_date}
               onChange={(e) => setCreateFormData({ ...createFormData, expense_date: e.target.value })}
@@ -520,9 +521,10 @@ const DashboardExpenses = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label>Expense Type *</label>
+          <div className="form-group flex flex-col gap-2">
+            <label className="text-[length:var(--text-sm)] font-medium text-text">Expense Type *</label>
             <select
+              className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
               value={createFormData.expense_type}
               onChange={(e) => setCreateFormData({ ...createFormData, expense_type: e.target.value })}
               required
@@ -534,9 +536,10 @@ const DashboardExpenses = () => {
             </select>
           </div>
 
-          <div className="form-group">
-            <label>Amount *</label>
+          <div className="form-group flex flex-col gap-2">
+            <label className="text-[length:var(--text-sm)] font-medium text-text">Amount *</label>
             <input
+              className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] placeholder:text-text-subtle transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
               type="number"
               placeholder="Enter amount"
               value={createFormData.expense_amount}
@@ -547,9 +550,10 @@ const DashboardExpenses = () => {
 
           {/* Show kilometers field for fuel and travel expenses */}
           {['fuel', 'travel'].includes(createFormData.expense_type) && (
-            <div className="form-group">
-              <label>Kilometers {createFormData.expense_type === 'fuel' ? '*' : ''}</label>
+            <div className="form-group flex flex-col gap-2">
+              <label className="text-[length:var(--text-sm)] font-medium text-text">Kilometers {createFormData.expense_type === 'fuel' ? '*' : ''}</label>
               <input
+                className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] placeholder:text-text-subtle transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
                 type="number"
                 placeholder="Enter kilometers"
                 value={createFormData.kilometers}
@@ -559,9 +563,10 @@ const DashboardExpenses = () => {
             </div>
           )}
 
-          <div className="form-group">
-            <label>Description *</label>
+          <div className="form-group flex flex-col gap-2">
+            <label className="text-[length:var(--text-sm)] font-medium text-text">Description *</label>
             <textarea
+              className="min-h-20 p-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] leading-[var(--leading-normal)] resize-y placeholder:text-text-subtle transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
               placeholder="Enter description"
               value={createFormData.expense_description}
               onChange={(e) => setCreateFormData({ ...createFormData, expense_description: e.target.value })}
@@ -570,29 +575,30 @@ const DashboardExpenses = () => {
             />
           </div>
 
-          <div className="form-group">
-            <label>Upload Bills</label>
+          <div className="form-group flex flex-col gap-2">
+            <label className="text-[length:var(--text-sm)] font-medium text-text">Upload Bills</label>
             <input
+              className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
               type="file"
               multiple
               accept="image/*"
               onChange={handleFileSelect}
             />
             {selectedFiles.length > 0 && (
-              <div className="file-preview-section">
-                <div className="file-list">
+              <div className="file-preview-section mt-2">
+                <div className="file-list flex flex-col gap-2 mt-2">
                   {selectedFiles.map((file, idx) => (
-                    <div key={idx} className="file-item">
+                    <div key={idx} className="file-item flex flex-col items-start gap-1 sm:flex-row sm:justify-between sm:items-center sm:gap-3 px-3 py-2 rounded-md bg-surface-muted text-[length:var(--text-sm)] text-text-muted">
                       <span>{file.name}</span>
-                      <span className="file-size">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                      <span className="file-size text-[length:var(--text-xs)] text-text-subtle tabular-nums">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
                     </div>
                   ))}
                 </div>
                 {filePreviewUrls.length > 0 && (
-                  <div className="image-preview-grid">
+                  <div className="image-preview-grid grid grid-cols-2 sm:[grid-template-columns:repeat(auto-fill,minmax(100px,1fr))] md:[grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] gap-4 mt-2">
                     {filePreviewUrls.map((url, idx) => (
-                      <div key={idx} className="image-preview-container">
-                        <img src={url} alt={`Preview ${idx + 1}`} className="bill-preview" />
+                      <div key={idx} className="image-preview-container group relative cursor-pointer rounded-lg overflow-hidden border border-border transition-[box-shadow,border-color] duration-[var(--transition)] hover:border-border-strong hover:shadow-sm focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
+                        <img src={url} alt={`Preview ${idx + 1}`} className="bill-preview block w-full h-[100px] md:h-[150px] object-cover transition-transform duration-[var(--transition)] group-hover:scale-[1.04]" />
                       </div>
                     ))}
                   </div>
@@ -601,7 +607,7 @@ const DashboardExpenses = () => {
             )}
           </div>
 
-          <div className="modal-actions">
+          <div className="modal-actions flex flex-col md:flex-row justify-end gap-3 mt-6 pt-4 border-t border-border [&_button]:w-full md:[&_button]:w-auto">
             <Button 
               variant="secondary" 
               onClick={() => {
@@ -631,61 +637,61 @@ const DashboardExpenses = () => {
         title="Expense Details"
       >
         {selectedExpense && (
-          <div className="expense-details">
-            <div className="detail-row">
-              <strong>Date:</strong>
-              <span>{new Date(selectedExpense.expense_date).toLocaleDateString('en-IN')}</span>
+          <div className="expense-details flex flex-col gap-1">
+            <div className="detail-row flex justify-between items-start gap-4 py-3 border-b border-border last:border-b-0">
+              <strong className="font-medium text-text-muted min-w-[120px]">Date:</strong>
+              <span className="flex-1 text-right text-text tabular-nums">{new Date(selectedExpense.expense_date).toLocaleDateString('en-IN')}</span>
             </div>
 
-            <div className="detail-row">
-              <strong>Type:</strong>
-              <span>{selectedExpense.expense_type?.toUpperCase()}</span>
+            <div className="detail-row flex justify-between items-start gap-4 py-3 border-b border-border last:border-b-0">
+              <strong className="font-medium text-text-muted min-w-[120px]">Type:</strong>
+              <span className="flex-1 text-right text-text tabular-nums">{selectedExpense.expense_type?.toUpperCase()}</span>
             </div>
 
-            <div className="detail-row">
-              <strong>Amount:</strong>
-              <span>₹{parseFloat(selectedExpense.expense_amount).toLocaleString('en-IN')}</span>
+            <div className="detail-row flex justify-between items-start gap-4 py-3 border-b border-border last:border-b-0">
+              <strong className="font-medium text-text-muted min-w-[120px]">Amount:</strong>
+              <span className="flex-1 text-right text-text tabular-nums">₹{parseFloat(selectedExpense.expense_amount).toLocaleString('en-IN')}</span>
             </div>
 
-            <div className="detail-row">
-              <strong>Description:</strong>
-              <span>{selectedExpense.expense_description}</span>
+            <div className="detail-row flex justify-between items-start gap-4 py-3 border-b border-border last:border-b-0">
+              <strong className="font-medium text-text-muted min-w-[120px]">Description:</strong>
+              <span className="flex-1 text-right text-text tabular-nums">{selectedExpense.expense_description}</span>
             </div>
 
             {selectedExpense.kilometers && (
-              <div className="detail-row">
-                <strong>Kilometers:</strong>
-                <span>{selectedExpense.kilometers} km</span>
+              <div className="detail-row flex justify-between items-start gap-4 py-3 border-b border-border last:border-b-0">
+                <strong className="font-medium text-text-muted min-w-[120px]">Kilometers:</strong>
+                <span className="flex-1 text-right text-text tabular-nums">{selectedExpense.kilometers} km</span>
               </div>
             )}
 
-            <div className="detail-row">
-              <strong>Status:</strong>
-              <span className={`status-${selectedExpense.status}`}>
+            <div className="detail-row flex justify-between items-start gap-4 py-3 border-b border-border last:border-b-0">
+              <strong className="font-medium text-text-muted min-w-[120px]">Status:</strong>
+              <span className={`status-${selectedExpense.status} inline-flex items-center px-2 py-0.5 rounded-pill text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] leading-[var(--leading-tight)] ${selectedExpense.status === 'pending' ? 'text-warning bg-warning-soft' : selectedExpense.status === 'approved' ? 'text-success bg-success-soft' : selectedExpense.status === 'rejected' ? 'text-error bg-error-soft' : ''}`}>
                 {selectedExpense.status?.toUpperCase()}
               </span>
             </div>
 
             {selectedExpense.remarks && (
-              <div className="detail-row">
-                <strong>Remarks:</strong>
-                <span>{selectedExpense.remarks}</span>
+              <div className="detail-row flex justify-between items-start gap-4 py-3 border-b border-border last:border-b-0">
+                <strong className="font-medium text-text-muted min-w-[120px]">Remarks:</strong>
+                <span className="flex-1 text-right text-text tabular-nums">{selectedExpense.remarks}</span>
               </div>
             )}
 
             {selectedExpense.images && selectedExpense.images.length > 0 && (
-              <div className="uploaded-bills">
-                <strong>Uploaded Bills:</strong>
-                <div className="image-preview-grid">
+              <div className="uploaded-bills mt-4">
+                <strong className="block mb-2 font-semibold text-text">Uploaded Bills:</strong>
+                <div className="image-preview-grid grid grid-cols-2 sm:[grid-template-columns:repeat(auto-fill,minmax(100px,1fr))] md:[grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] gap-4 mt-2">
                   {selectedExpense.images.map((img, idx) => (
-                    <div key={idx} className="image-preview-container">
-                      <img 
-                        src={img.startsWith('http') ? img : `${getBaseURL()}/${img}`} 
-                        alt={`Bill ${idx + 1}`} 
-                        className="bill-preview"
+                    <div key={idx} className="image-preview-container group relative cursor-pointer rounded-lg overflow-hidden border border-border transition-[box-shadow,border-color] duration-[var(--transition)] hover:border-border-strong hover:shadow-sm focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
+                      <img
+                        src={img.startsWith('http') ? img : `${getBaseURL()}/${img}`}
+                        alt={`Bill ${idx + 1}`}
+                        className="bill-preview block w-full h-[100px] md:h-[150px] object-cover transition-transform duration-[var(--transition)] group-hover:scale-[1.04]"
                         onClick={() => window.open(img.startsWith('http') ? img : `${getBaseURL()}/${img}`, '_blank')}
                       />
-                      <div className="image-preview-overlay">
+                      <div className="image-preview-overlay absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-[var(--transition)] bg-[rgba(24,18,101,0.72)] text-text-on-primary text-[length:var(--text-sm)] font-medium text-center p-2 group-hover:opacity-100 group-focus-visible:opacity-100">
                         <span>Click to view full size</span>
                       </div>
                     </div>
@@ -694,7 +700,7 @@ const DashboardExpenses = () => {
               </div>
             )}
 
-            <div className="modal-actions">
+            <div className="modal-actions flex flex-col md:flex-row justify-end gap-3 mt-6 pt-4 border-t border-border [&_button]:w-full md:[&_button]:w-auto">
               <Button 
                 variant="secondary" 
                 onClick={() => {

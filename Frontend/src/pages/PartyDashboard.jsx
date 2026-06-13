@@ -78,32 +78,32 @@ const PartyDashboard = () => {
   };
 
   return (
-    <div className="dash-page">
-      <div className="dash-container">
+    <div className="dash-page w-full">
+      <div className="dash-container flex flex-col gap-4">
         {/* Summary Cards */}
-        <div className="dash-row orders-summary">
-          <div className="dash-card metric orders-card">
-            <h4>Total Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
+        <div className="dash-row orders-summary grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
+          <div className="dash-card metric orders-card col-span-1 sm:col-span-6 lg:col-span-3 bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle mb-2">Total Orders</h4>
+            <div className="metric-value text-xl font-semibold leading-tight tracking-[-0.02em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Pending Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
+          <div className="dash-card metric orders-card col-span-1 sm:col-span-6 lg:col-span-3 bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle mb-2">Pending Orders</h4>
+            <div className="metric-value text-xl font-semibold leading-tight tracking-[-0.02em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Completed Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
+          <div className="dash-card metric orders-card col-span-1 sm:col-span-6 lg:col-span-3 bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle mb-2">Completed Orders</h4>
+            <div className="metric-value text-xl font-semibold leading-tight tracking-[-0.02em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Total Revenue</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
+          <div className="dash-card metric orders-card col-span-1 sm:col-span-6 lg:col-span-3 bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle mb-2">Total Revenue</h4>
+            <div className="metric-value text-xl font-semibold leading-tight tracking-[-0.02em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
           </div>
         </div>
 
         {/* Order Overview Table */}
-        <div className="dash-row">
-          <div className="dash-card" style={{gridColumn:'span 12'}}>
-            <h4 style={{color: '#000000', fontSize: '16px', fontWeight: '700'}}>My Orders</h4>
+        <div className="dash-row grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
+          <div className="dash-card col-span-1 sm:col-span-12 bg-surface border border-border rounded-lg shadow-sm p-5" style={{gridColumn:'span 12'}}>
+            <h4 className="text-base font-bold text-black">My Orders</h4>
             <div className="ui-table__scroll">
               <table style={{width:'100%', borderCollapse:'separate', borderSpacing:0}}>
                 <thead>

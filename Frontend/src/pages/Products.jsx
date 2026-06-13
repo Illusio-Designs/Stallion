@@ -517,30 +517,36 @@ const Products = ({ onPageChange }) => {
     return '/images/products/spac1.webp';
   };
 
+  const sectionHeaderClass = "filter-section-header flex justify-between items-center cursor-pointer py-4 select-none group";
+  const sectionTitleClass = "text-[length:var(--text-base)] font-semibold text-text transition-colors duration-[120ms] group-hover:text-primary";
+  const chevronBaseClass = "chevron flex items-center justify-center text-text-subtle transition-[transform,color] duration-300 group-hover:text-text-muted";
+  const checkboxLabelClass = "checkbox-label flex items-center gap-3 text-text-muted mb-1 p-2 -mx-2 rounded-sm cursor-pointer text-[length:var(--text-base)] min-h-[40px] box-border transition-[background,color] duration-[120ms] hover:text-text hover:bg-surface-muted";
+  const radioLabelClass = "radio-label flex items-center gap-3 text-text-muted mb-1 p-2 -mx-2 rounded-sm cursor-pointer text-[length:var(--text-base)] min-h-[40px] box-border transition-[background,color] duration-[120ms] hover:text-text hover:bg-surface-muted";
+
   const FilterContent = () => (
     <>
-      <div className="filter-header">
-        <h2>Filter</h2>
-        <button type="button" className="reset-button" onClick={handleReset}>Reset</button>
+      <div className="filter-header flex justify-between items-center mb-5">
+        <h2 className="text-[length:var(--text-lg)] font-semibold tracking-[-0.01em] text-text m-0">Filter</h2>
+        <button type="button" className="reset-button bg-transparent text-primary border-none py-1 px-2 -m-1 -mx-2 rounded-sm text-[length:var(--text-sm)] font-semibold cursor-pointer transition-[background,color] duration-[120ms] hover:bg-primary-soft hover:text-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-primary-soft-hover" onClick={handleReset}>Reset</button>
       </div>
 
       {/* Brands Filter */}
-      <div className="filter-section">
-        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.brands} onClick={() => toggleSection('brands')} onKeyDown={onKeyActivate(() => toggleSection('brands'))}>
-          <h3>Brands</h3>
-          <span className={`chevron ${expandedSections.brands ? 'expanded' : ''}`}>
+      <div className="filter-section border-b border-border last:border-b-0">
+        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.brands} onClick={() => toggleSection('brands')} onKeyDown={onKeyActivate(() => toggleSection('brands'))}>
+          <h3 className={sectionTitleClass}>Brands</h3>
+          <span className={`${chevronBaseClass} ${expandedSections.brands ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>
         </div>
         {expandedSections.brands && (
-          <div className="filter-section-content">
+          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
             {brandsData.map(brand => {
               const brandId = brand.brand_id || brand.id;
               const brandName = brand.brand_name || brand.name || '';
               return (
-                <label key={brandId} className="checkbox-label">
+                <label key={brandId} className={checkboxLabelClass}>
                   <input 
                     type="checkbox" 
                     checked={selectedBrands.includes(brandId)}
@@ -555,22 +561,22 @@ const Products = ({ onPageChange }) => {
       </div>
 
       {/* Frame Material Filter */}
-      <div className="filter-section">
-        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.frameMaterial} onClick={() => toggleSection('frameMaterial')} onKeyDown={onKeyActivate(() => toggleSection('frameMaterial'))}>
-          <h3>Frame Material</h3>
-          <span className={`chevron ${expandedSections.frameMaterial ? 'expanded' : ''}`}>
+      <div className="filter-section border-b border-border last:border-b-0">
+        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.frameMaterial} onClick={() => toggleSection('frameMaterial')} onKeyDown={onKeyActivate(() => toggleSection('frameMaterial'))}>
+          <h3 className={sectionTitleClass}>Frame Material</h3>
+          <span className={`${chevronBaseClass} ${expandedSections.frameMaterial ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>
         </div>
         {expandedSections.frameMaterial && (
-          <div className="filter-section-content">
+          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
             {frameMaterialsData.map(material => {
               const materialId = material.frame_material_id || material.id;
               const materialName = material.frame_material || material.frame_material_name || material.name || '';
               return (
-                <label key={materialId} className="checkbox-label">
+                <label key={materialId} className={checkboxLabelClass}>
                   <input 
                     type="checkbox"
                     checked={selectedFrameMaterials.includes(materialId)}
@@ -585,22 +591,22 @@ const Products = ({ onPageChange }) => {
       </div>
 
       {/* Shape Filter */}
-      <div className="filter-section">
-        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.shape} onClick={() => toggleSection('shape')} onKeyDown={onKeyActivate(() => toggleSection('shape'))}>
-          <h3>Shape</h3>
-          <span className={`chevron ${expandedSections.shape ? 'expanded' : ''}`}>
+      <div className="filter-section border-b border-border last:border-b-0">
+        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.shape} onClick={() => toggleSection('shape')} onKeyDown={onKeyActivate(() => toggleSection('shape'))}>
+          <h3 className={sectionTitleClass}>Shape</h3>
+          <span className={`${chevronBaseClass} ${expandedSections.shape ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>
         </div>
         {expandedSections.shape && (
-          <div className="filter-section-content">
+          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
             {shapesData.map(shape => {
               const shapeId = shape.shape_id || shape.id;
               const shapeName = shape.shape_name || shape.name || '';
               return (
-                <label key={shapeId} className="checkbox-label">
+                <label key={shapeId} className={checkboxLabelClass}>
                   <input 
                     type="checkbox"
                     checked={selectedShapes.includes(shapeId)}
@@ -615,22 +621,22 @@ const Products = ({ onPageChange }) => {
       </div>
 
       {/* Frame Type Filter */}
-      <div className="filter-section">
-        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.type} onClick={() => toggleSection('type')} onKeyDown={onKeyActivate(() => toggleSection('type'))}>
-          <h3>Frame Type</h3>
-          <span className={`chevron ${expandedSections.type ? 'expanded' : ''}`}>
+      <div className="filter-section border-b border-border last:border-b-0">
+        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.type} onClick={() => toggleSection('type')} onKeyDown={onKeyActivate(() => toggleSection('type'))}>
+          <h3 className={sectionTitleClass}>Frame Type</h3>
+          <span className={`${chevronBaseClass} ${expandedSections.type ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>
         </div>
         {expandedSections.type && (
-          <div className="filter-section-content">
+          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
             {frameTypesData.map(frameType => {
               const typeId = frameType.frame_type_id || frameType.id;
               const typeName = frameType.frame_type || frameType.frame_type_name || frameType.name || '';
               return (
-                <label key={typeId} className="radio-label">
+                <label key={typeId} className={radioLabelClass}>
                   <input 
                     type="radio" 
                     name="type"
@@ -646,22 +652,22 @@ const Products = ({ onPageChange }) => {
       </div>
 
       {/* Gender Filter */}
-      <div className="filter-section">
-        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.gender} onClick={() => toggleSection('gender')} onKeyDown={onKeyActivate(() => toggleSection('gender'))}>
-          <h3>Gender</h3>
-          <span className={`chevron ${expandedSections.gender ? 'expanded' : ''}`}>
+      <div className="filter-section border-b border-border last:border-b-0">
+        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.gender} onClick={() => toggleSection('gender')} onKeyDown={onKeyActivate(() => toggleSection('gender'))}>
+          <h3 className={sectionTitleClass}>Gender</h3>
+          <span className={`${chevronBaseClass} ${expandedSections.gender ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>
         </div>
         {expandedSections.gender && (
-          <div className="filter-section-content">
+          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
             {gendersData.map(gender => {
               const genderId = gender.gender_id || gender.id;
               const genderName = gender.gender_name || gender.name || '';
               return (
-                <label key={genderId} className="checkbox-label">
+                <label key={genderId} className={checkboxLabelClass}>
                   <input 
                     type="checkbox"
                     checked={selectedGender.includes(genderId)}
@@ -676,18 +682,18 @@ const Products = ({ onPageChange }) => {
       </div>
 
       {/* Lens Colour Filter */}
-      <div className="filter-section">
-        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.lensColor} onClick={() => toggleSection('lensColor')} onKeyDown={onKeyActivate(() => toggleSection('lensColor'))}>
-          <h3>Lens Colour</h3>
-          <span className={`chevron ${expandedSections.lensColor ? 'expanded' : ''}`}>
+      <div className="filter-section border-b border-border last:border-b-0">
+        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.lensColor} onClick={() => toggleSection('lensColor')} onKeyDown={onKeyActivate(() => toggleSection('lensColor'))}>
+          <h3 className={sectionTitleClass}>Lens Colour</h3>
+          <span className={`${chevronBaseClass} ${expandedSections.lensColor ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>
         </div>
         {expandedSections.lensColor && (
-          <div className="filter-section-content">
-            <div className="color-swatches">
+          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
+            <div className="color-swatches flex flex-wrap gap-3 py-1">
               {lensColorsData.map(lensColor => {
                 const colorId = lensColor.lens_color_id || lensColor.id;
                 const colorName = lensColor.lens_color || lensColor.name || '';
@@ -699,7 +705,7 @@ const Products = ({ onPageChange }) => {
                     tabIndex={0}
                     aria-pressed={selectedLensColor === colorId}
                     aria-label={colorName}
-                    className={`color-swatch ${selectedLensColor === colorId ? 'active' : ''}`}
+                    className={`color-swatch w-7 h-7 rounded-pill cursor-pointer border border-border-strong shadow-xs transition-[transform,box-shadow] duration-[120ms] hover:scale-110 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] ${selectedLensColor === colorId ? 'active' : ''}`}
                     style={{ backgroundColor: colorHex }}
                     onClick={() => setSelectedLensColor(selectedLensColor === colorId ? null : colorId)}
                     onKeyDown={onKeyActivate(() => setSelectedLensColor(selectedLensColor === colorId ? null : colorId))}
@@ -713,22 +719,22 @@ const Products = ({ onPageChange }) => {
       </div>
 
       {/* Lens Material Filter */}
-      <div className="filter-section">
-        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.lensMaterial} onClick={() => toggleSection('lensMaterial')} onKeyDown={onKeyActivate(() => toggleSection('lensMaterial'))}>
-          <h3>Lens Material</h3>
-          <span className={`chevron ${expandedSections.lensMaterial ? 'expanded' : ''}`}>
+      <div className="filter-section border-b border-border last:border-b-0">
+        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.lensMaterial} onClick={() => toggleSection('lensMaterial')} onKeyDown={onKeyActivate(() => toggleSection('lensMaterial'))}>
+          <h3 className={sectionTitleClass}>Lens Material</h3>
+          <span className={`${chevronBaseClass} ${expandedSections.lensMaterial ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>
         </div>
         {expandedSections.lensMaterial && (
-          <div className="filter-section-content">
+          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
             {lensMaterialsData.map(material => {
               const materialId = material.lens_material_id || material.id;
               const materialName = material.lens_material || material.lens_material_name || material.name || '';
               return (
-                <label key={materialId} className="checkbox-label">
+                <label key={materialId} className={checkboxLabelClass}>
                   <input 
                     type="checkbox"
                     checked={selectedLensMaterial.includes(materialId)}
@@ -743,18 +749,18 @@ const Products = ({ onPageChange }) => {
       </div>
 
       {/* Frame Colour Filter */}
-      <div className="filter-section">
-        <div className="filter-section-header" role="button" tabIndex={0} aria-expanded={expandedSections.frameColor} onClick={() => toggleSection('frameColor')} onKeyDown={onKeyActivate(() => toggleSection('frameColor'))}>
-          <h3>Frame Colour</h3>
-          <span className={`chevron ${expandedSections.frameColor ? 'expanded' : ''}`}>
+      <div className="filter-section border-b border-border last:border-b-0">
+        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.frameColor} onClick={() => toggleSection('frameColor')} onKeyDown={onKeyActivate(() => toggleSection('frameColor'))}>
+          <h3 className={sectionTitleClass}>Frame Colour</h3>
+          <span className={`${chevronBaseClass} ${expandedSections.frameColor ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
           </span>
         </div>
         {expandedSections.frameColor && (
-          <div className="filter-section-content">
-            <div className="color-swatches">
+          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
+            <div className="color-swatches flex flex-wrap gap-3 py-1">
               {frameColorsData.map(frameColor => {
                 const colorId = frameColor.frame_color_id || frameColor.id;
                 const colorName = frameColor.frame_color || frameColor.name || '';
@@ -766,7 +772,7 @@ const Products = ({ onPageChange }) => {
                     tabIndex={0}
                     aria-pressed={selectedFrameColor === colorId}
                     aria-label={colorName}
-                    className={`color-swatch ${selectedFrameColor === colorId ? 'active' : ''}`}
+                    className={`color-swatch w-7 h-7 rounded-pill cursor-pointer border border-border-strong shadow-xs transition-[transform,box-shadow] duration-[120ms] hover:scale-110 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] ${selectedFrameColor === colorId ? 'active' : ''}`}
                     style={{ backgroundColor: colorHex }}
                     onClick={() => setSelectedFrameColor(selectedFrameColor === colorId ? null : colorId)}
                     onKeyDown={onKeyActivate(() => setSelectedFrameColor(selectedFrameColor === colorId ? null : colorId))}
@@ -782,15 +788,15 @@ const Products = ({ onPageChange }) => {
   );
 
   return (
-    <div className="products-page">
-      <div className="products-container">
+    <div className="products-page bg-bg mt-0 py-5 px-3 sm:py-6 sm:px-4 md:py-10 md:px-[5%]">
+      <div className="products-container block md:flex md:items-start gap-6 lg:gap-8 max-w-[1440px] mx-auto pt-0">
         {/* Desktop Filter Sidebar (kept for larger viewports) */}
-        <aside className="filter-sidebar">
+        <aside className="filter-sidebar hidden md:block md:w-[280px] md:flex-[0_0_280px] lg:w-[300px] lg:flex-[0_0_300px] bg-surface p-6 overflow-y-auto overflow-x-hidden border border-border rounded-lg shadow-sm max-h-[calc(100vh-64px-var(--header-height))] sticky top-[calc(var(--header-height)+8px)] [scrollbar-width:thin]">
           <FilterContent />
         </aside>
 
         {/* Mobile filter toggle - visible via CSS on small screens */}
-        <button type="button" className="filter-toggle-btn" onClick={() => setMobileFilterOpen(true)}>
+        <button type="button" className="filter-toggle-btn inline-flex md:!hidden items-center gap-2 fixed left-1/2 -translate-x-1/2 bottom-6 bg-primary text-text-on-primary min-h-[48px] px-5 rounded-pill z-[1200] shadow-lg border-none cursor-pointer text-[length:var(--text-base)] font-semibold transition-colors duration-[120ms] hover:bg-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring),var(--shadow-lg)] active:bg-primary-active" onClick={() => setMobileFilterOpen(true)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M4 6h16M7 12h10M10 18h4" />
           </svg>
@@ -799,11 +805,11 @@ const Products = ({ onPageChange }) => {
 
         {/* Mobile centered modal for filter (closes when clicking backdrop) */}
         {mobileFilterOpen && (
-          <div className="mobile-filter-modal open" onClick={() => setMobileFilterOpen(false)} role="dialog" aria-modal="true" aria-label="Product filters">
-            <div className="mobile-filter-modal__panel" onClick={(e) => e.stopPropagation()}>
-              <aside className="filter-sidebar">
-                <div className="mobile-filter-modal__close-row">
-                  <button type="button" className="mobile-filter-close" onClick={() => setMobileFilterOpen(false)} aria-label="Close filters">
+          <div className="mobile-filter-modal open fixed inset-0 bg-[rgba(26,27,35,0.55)] backdrop-blur-[2px] z-[1500] flex items-center justify-center p-4" onClick={() => setMobileFilterOpen(false)} role="dialog" aria-modal="true" aria-label="Product filters">
+            <div className="mobile-filter-modal__panel w-[min(520px,100%)]" onClick={(e) => e.stopPropagation()}>
+              <aside className="filter-sidebar block w-full max-h-[calc(100vh-64px)] relative top-auto left-auto bg-surface rounded-xl p-6 shadow-xl overflow-y-auto border border-border [scrollbar-width:thin]">
+                <div className="mobile-filter-modal__close-row flex justify-end mb-2">
+                  <button type="button" className="mobile-filter-close inline-flex items-center justify-center w-10 h-10 border-none rounded-md bg-surface-muted text-text-muted text-[length:var(--text-xl)] leading-none cursor-pointer transition-[background,color] duration-[120ms] hover:bg-grey-200 hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]" onClick={() => setMobileFilterOpen(false)} aria-label="Close filters">
                     <span aria-hidden="true">&times;</span>
                   </button>
                 </div>
@@ -814,9 +820,9 @@ const Products = ({ onPageChange }) => {
         )}
 
         {/* Products Grid */}
-        <main className="products-main">
-          <div className="products-header">
-            <h2>
+        <main className="products-main flex-1 min-w-0 bg-transparent p-0 min-h-[calc(100vh-var(--header-height))]">
+          <div className="products-header flex justify-between items-center gap-4 mb-6 flex-wrap">
+            <h2 className="text-[length:var(--text-lg)] sm:text-[length:var(--text-xl)] font-semibold tracking-[-0.01em] leading-[1.2] text-text m-0">
               {loading ? '' : searchQuery ?
                 `${totalResults} results for "${searchQuery}"` :
                 'Products'
@@ -825,7 +831,7 @@ const Products = ({ onPageChange }) => {
             {searchQuery && (
               <button
                 type="button"
-                className="clear-search-btn"
+                className="clear-search-btn inline-flex items-center justify-center min-h-[40px] bg-surface text-text border border-border-strong py-2 px-4 rounded-md cursor-pointer text-[length:var(--text-base)] font-medium transition-[background,border-color] duration-[120ms] hover:bg-surface-muted hover:border-grey-400 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-grey-200"
                 onClick={() => {
                   setSearchQuery('');
                   setPage(1);
@@ -843,20 +849,20 @@ const Products = ({ onPageChange }) => {
           </div>
 
           {activeFilterChips.length > 0 && (
-            <div className="active-filters">
-              <span className="active-filters__label">Filters:</span>
+            <div className="active-filters flex flex-wrap items-center gap-2 mb-5">
+              <span className="active-filters__label text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle mr-1">Filters:</span>
               {activeFilterChips.map(chip => (
-                <button key={chip.key} type="button" className="filter-chip" onClick={chip.remove} aria-label={`Remove filter ${chip.label}`} title={`Remove ${chip.label}`}>
-                  <span className="filter-chip__label">{chip.label}</span>
-                  <span className="filter-chip__x" aria-hidden="true">&times;</span>
+                <button key={chip.key} type="button" className="filter-chip group inline-flex items-center gap-2 min-h-[32px] py-1 pr-2 pl-3 border border-border-strong rounded-pill bg-surface text-primary text-[length:var(--text-sm)] font-medium cursor-pointer transition-[background,border-color,color] duration-[120ms] hover:bg-primary-soft hover:border-primary focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)] active:bg-primary-soft-hover" onClick={chip.remove} aria-label={`Remove filter ${chip.label}`} title={`Remove ${chip.label}`}>
+                  <span className="filter-chip__label leading-none">{chip.label}</span>
+                  <span className="filter-chip__x inline-flex items-center justify-center w-[18px] h-[18px] rounded-pill text-[length:var(--text-md)] leading-none text-text-subtle transition-[background,color] duration-[120ms] group-hover:bg-primary-soft-hover group-hover:text-primary" aria-hidden="true">&times;</span>
                 </button>
               ))}
-              <button type="button" className="filter-chip-clear" onClick={handleReset}>Clear all</button>
+              <button type="button" className="filter-chip-clear inline-flex items-center min-h-[32px] py-1 px-3 border-none bg-transparent text-error text-[length:var(--text-sm)] font-semibold cursor-pointer rounded-sm transition-[background] duration-[120ms] hover:bg-error-soft focus-visible:outline-none focus-visible:shadow-[var(--focus-ring-error)] active:bg-error-soft active:brightness-[0.97]" onClick={handleReset}>Clear all</button>
             </div>
           )}
 
           {error ? (
-            <div className="ui-state ui-state--error products-state">
+            <div className="ui-state ui-state--error products-state bg-surface border border-border rounded-lg shadow-sm">
               <span className="ui-state__icon" aria-hidden="true">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="9" />
@@ -873,9 +879,9 @@ const Products = ({ onPageChange }) => {
               </div>
             </div>
           ) : loading ? (
-            <div className="products-grid-container" aria-busy="true" aria-live="polite">
+            <div className="products-grid-container grid grid-cols-2 lg:grid-cols-3 gap-2 min-[381px]:gap-3 sm:gap-6 w-full items-stretch pb-16 md:pb-0" aria-busy="true" aria-live="polite">
               {Array.from({ length: limit }).map((_, i) => (
-                <div key={`product-skeleton-${i}`} className="product-skeleton">
+                <div key={`product-skeleton-${i}`} className="product-skeleton flex flex-col box-border bg-surface border border-border rounded-lg p-3 min-[381px]:p-4 sm:p-5 shadow-sm">
                   <Skeleton width="100%" height={180} radius={12} />
                   <Skeleton width="70%" height={16} className="product-skeleton__line" />
                   <Skeleton width="40%" height={14} className="product-skeleton__line" />
@@ -883,7 +889,7 @@ const Products = ({ onPageChange }) => {
               ))}
             </div>
           ) : products.length > 0 ? (
-            <div className="products-grid-container">
+            <div className="products-grid-container grid grid-cols-2 lg:grid-cols-3 gap-2 min-[381px]:gap-3 sm:gap-6 w-full items-stretch pb-16 md:pb-0">
               {products.map(product => {
                 const productId = product.product_id || product.id;
                 const productName = product.model_no || product.name || 'Product';
@@ -903,7 +909,7 @@ const Products = ({ onPageChange }) => {
               })}
             </div>
           ) : (
-            <div className="ui-state ui-state--empty products-state">
+            <div className="ui-state ui-state--empty products-state bg-surface border border-border rounded-lg shadow-sm">
               <span className="ui-state__icon" aria-hidden="true">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="11" cy="11" r="7" />
@@ -930,21 +936,21 @@ const Products = ({ onPageChange }) => {
           
           {/* Pagination Controls */}
           {!loading && products.length > 0 && totalPages > 1 && (
-            <nav className="products-pagination" aria-label="Products pagination">
+            <nav className="products-pagination flex justify-center items-center gap-4 mt-10 py-5" aria-label="Products pagination">
               <button
                 type="button"
-                className="pagination-btn"
+                className="pagination-btn inline-flex items-center justify-center min-h-[40px] bg-surface text-primary border border-border-strong py-2 px-5 rounded-md text-[length:var(--text-base)] font-medium cursor-pointer transition-[background,border-color,color] duration-[120ms] hover:not-disabled:bg-primary-soft hover:not-disabled:border-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:not-disabled:bg-primary-soft-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:text-text-subtle"
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
               >
                 Previous
               </button>
-              <div className="pagination-info" aria-live="polite">
+              <div className="pagination-info text-text-muted text-[length:var(--text-base)] font-medium min-w-[120px] text-center" aria-live="polite">
                 Page {page} of {totalPages}
               </div>
               <button
                 type="button"
-                className="pagination-btn"
+                className="pagination-btn inline-flex items-center justify-center min-h-[40px] bg-surface text-primary border border-border-strong py-2 px-5 rounded-md text-[length:var(--text-base)] font-medium cursor-pointer transition-[background,border-color,color] duration-[120ms] hover:not-disabled:bg-primary-soft hover:not-disabled:border-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:not-disabled:bg-primary-soft-hover disabled:opacity-50 disabled:cursor-not-allowed disabled:text-text-subtle"
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
               >

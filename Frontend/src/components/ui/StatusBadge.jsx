@@ -2,12 +2,15 @@
 import React from 'react';
 import '../../styles/components/ui.css';
 
+const BASE =
+  'ui-badge inline-flex items-center gap-1 py-[2px] px-2 min-h-[22px] text-[length:var(--text-xs)] leading-[1.4] rounded-pill font-semibold whitespace-nowrap';
+
 const MAP = {
-  pending: 'ui-badge ui-badge--warning',
-  processing: 'ui-badge ui-badge--info',
-  completed: 'ui-badge ui-badge--success',
-  cancelled: 'ui-badge ui-badge--danger',
-  default: 'ui-badge',
+  pending: `${BASE} ui-badge--warning bg-warning-soft text-warning`,
+  processing: `${BASE} ui-badge--info bg-primary-soft text-primary`,
+  completed: `${BASE} ui-badge--success bg-success-soft text-success`,
+  cancelled: `${BASE} ui-badge--danger bg-error-soft text-error`,
+  default: `${BASE} bg-grey-100 text-grey-700`,
 };
 
 export default function StatusBadge({ status, children, className = '' }) {

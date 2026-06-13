@@ -197,25 +197,26 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed }) => {
   };
 
   return (
-    <header className={`dashboard-header ${isCollapsed ? 'collapsed' : 'expanded'}`}>
-      <div className="dashboard-header-content">
-        <div className="dashboard-title">Welcome {userName}</div>
+    <header className={`dashboard-header sticky top-0 z-[5] bg-surface border-b border-border ml-0 ${isCollapsed ? 'collapsed' : 'expanded'}`}>
+      <div className="dashboard-header-content flex items-center justify-between gap-4 px-5 py-3 min-h-[var(--header-height)] md:px-5 max-md:px-4">
+        <div className="dashboard-title text-[length:var(--text-md)] text-text font-semibold whitespace-nowrap overflow-hidden text-ellipsis">Welcome {userName}</div>
 
-        <div className="dashboard-header-actions">
-          <a href="/products" className="dashboard-back-shop">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <div className="dashboard-header-actions flex items-center gap-3 min-w-0">
+          <a href="/products" className="dashboard-back-shop inline-flex items-center gap-1 px-4 py-2 min-h-[40px] rounded-md bg-primary text-text-on-primary text-[length:var(--text-sm)] font-semibold no-underline whitespace-nowrap transition duration-200 ease-[ease] hover:bg-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-primary-active active:scale-[0.98] motion-reduce:transition-none max-[480px]:px-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
               <polyline points="9 22 9 12 15 12 15 22"/>
             </svg>
-            <span className="dashboard-back-shop__label">Back to Shop</span>
+            <span className="dashboard-back-shop__label max-[480px]:hidden">Back to Shop</span>
           </a>
-          <div className="dashboard-search-bar">
-            <svg className="dashboard-search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <div className="dashboard-search-bar hidden md:flex items-center gap-2 bg-surface-muted border border-border rounded-pill px-3 py-2 transition duration-200 ease-[ease] motion-reduce:transition-none focus-within:border-primary focus-within:shadow-[var(--focus-ring)] focus-within:bg-surface">
+            <svg className="dashboard-search-icon text-text-subtle shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             <input
               type="text"
               placeholder="Search..."
+              className="border-none outline-none bg-transparent text-text w-full text-[length:var(--text-base)] placeholder:text-text-subtle"
               onChange={(e) => {
                 const q = e.target.value;
                 try {
@@ -226,20 +227,20 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed }) => {
             />
           </div>
 
-          <div className="dashboard-action-icons">
+          <div className="dashboard-action-icons flex items-center gap-2">
             <Tooltip label="Notifications" placement="bottom">
-              <button className="dashboard-icon-btn" aria-label="Notifications">
-                <img src="/images/icons/bell.webp" alt="Notifications" className="dashboard-icon-image" />
+              <button className="dashboard-icon-btn bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]" aria-label="Notifications">
+                <img src="/images/icons/bell.webp" alt="Notifications" className="dashboard-icon-image w-[18px] h-[18px] object-contain" />
               </button>
             </Tooltip>
             <Tooltip label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} placement="bottom">
-              <button className="dashboard-icon-btn" aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} onClick={toggleFullscreen}>
+              <button className="dashboard-icon-btn bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]" aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} onClick={toggleFullscreen}>
                 {isFullscreen ? <FiMinimize size={20} /> : <FiMaximize size={20} />}
               </button>
             </Tooltip>
-            <div className="dashboard-user-menu" ref={userMenuRef}>
+            <div className="dashboard-user-menu relative" ref={userMenuRef}>
               <button
-                className="dashboard-avatar-btn has-tooltip"
+                className="dashboard-avatar-btn has-tooltip group relative bg-primary-soft border border-border w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer overflow-visible transition duration-200 ease-[ease] motion-reduce:transition-none hover:border-border-strong focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
                 onClick={() => setIsUserDropdownOpen((v) => !v)}
                 aria-label="User Menu"
                 aria-haspopup="menu"
@@ -247,16 +248,16 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed }) => {
                 title="User Menu"
               >
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt={userName} className="dashboard-avatar-image" />
+                  <img src={avatarUrl} alt={userName} className="dashboard-avatar-image w-full h-full object-cover rounded-pill" />
                 ) : (
-                  <span className="dashboard-avatar-initials">{initials || 'U'}</span>
+                  <span className="dashboard-avatar-initials text-[length:var(--text-sm)] font-semibold text-primary leading-none">{initials || 'U'}</span>
                 )}
-                <span className="header-tooltip">User Menu</span>
+                <span className="header-tooltip pointer-events-none absolute -bottom-9 left-1/2 -translate-x-1/2 translate-y-[-6px] bg-grey-900 text-text-on-primary px-2 py-1 rounded-sm text-[length:var(--text-xs)] whitespace-nowrap opacity-0 transition duration-[120ms] ease-[ease] motion-reduce:transition-none z-50 shadow-md group-hover:opacity-100 group-hover:translate-y-0 group-focus-visible:opacity-100 group-focus-visible:translate-y-0">User Menu</span>
               </button>
               {isUserDropdownOpen && (
-                <div className="dashboard-user-dropdown" role="menu">
+                <div className="dashboard-user-dropdown absolute right-0 top-[calc(100%+0.5rem)] min-w-[184px] bg-surface border border-border rounded-lg shadow-lg p-1 z-[100]" role="menu">
                   <button
-                    className="dropdown-item"
+                    className="dropdown-item block w-full text-left px-3 py-2 min-h-[40px] border-none bg-transparent text-text text-[length:var(--text-base)] cursor-pointer rounded-md transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-primary-soft"
                     role="menuitem"
                     onClick={() => {
                       setIsUserDropdownOpen(false);
@@ -266,7 +267,7 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed }) => {
                     Edit Profile
                   </button>
                   <button
-                    className="dropdown-item dropdown-item--danger"
+                    className="dropdown-item dropdown-item--danger block w-full text-left px-3 py-2 min-h-[40px] border-none bg-transparent text-error text-[length:var(--text-base)] cursor-pointer rounded-md transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-error-soft focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-primary-soft"
                     role="menuitem"
                     onClick={() => {
                       setIsUserDropdownOpen(false);

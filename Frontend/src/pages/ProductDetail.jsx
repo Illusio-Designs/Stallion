@@ -579,22 +579,22 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   // Show loading state (shimmer placeholder mimicking the detail layout)
   if (loading) {
     return (
-      <div className="product-detail-page">
-        <div className="pd-skeleton" aria-busy="true" aria-live="polite">
-          <Skeleton className="pd-skeleton__media" height="100%" radius={12} />
-          <div className="pd-skeleton__panel">
-            <Skeleton className="pd-skeleton__line" width="60%" height={28} radius={6} />
-            <Skeleton className="pd-skeleton__line" width="40%" height={20} radius={6} />
+      <div className="product-detail-page bg-primary-active px-[5%] py-8 min-h-[calc(100vh-200px)]">
+        <div className="pd-skeleton grid grid-cols-1 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-6 md:gap-8 p-6 bg-surface rounded-lg shadow-sm" aria-busy="true" aria-live="polite">
+          <Skeleton className="pd-skeleton__media block min-h-[240px] md:min-h-[340px]" height="100%" radius={12} />
+          <div className="pd-skeleton__panel flex flex-col gap-3">
+            <Skeleton className="pd-skeleton__line block" width="60%" height={28} radius={6} />
+            <Skeleton className="pd-skeleton__line block" width="40%" height={20} radius={6} />
             {Array.from({ length: 6 }).map((_, i) => (
               <Skeleton
                 key={`pd-skeleton-${i}`}
-                className="pd-skeleton__line"
+                className="pd-skeleton__line block"
                 width={`${80 - i * 6}%`}
                 height={14}
                 radius={6}
               />
             ))}
-            <Skeleton className="pd-skeleton__cta" width={160} height={44} radius={8} />
+            <Skeleton className="pd-skeleton__cta block mt-4" width={160} height={44} radius={8} />
           </div>
         </div>
       </div>
@@ -604,8 +604,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   // Show error state
   if (error) {
     return (
-      <div className="product-detail-page">
-        <div className="ui-state ui-state--error" role="alert">
+      <div className="product-detail-page bg-primary-active px-[5%] py-8 min-h-[calc(100vh-200px)]">
+        <div className="ui-state ui-state--error bg-surface rounded-lg shadow-sm my-4 mx-auto max-w-[560px]" role="alert">
           <div className="ui-state__icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
@@ -634,8 +634,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   // Show empty state
   if (productVariations.length === 0) {
     return (
-      <div className="product-detail-page">
-        <div className="ui-state ui-state--empty">
+      <div className="product-detail-page bg-primary-active px-[5%] py-8 min-h-[calc(100vh-200px)]">
+        <div className="ui-state ui-state--empty bg-surface rounded-lg shadow-sm my-4 mx-auto max-w-[560px]">
           <div className="ui-state__icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="7" />
@@ -650,16 +650,17 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   }
 
   return (
-    <div className="product-detail-page">
+    <div className="product-detail-page bg-primary-active px-[3%] py-3 sm:px-[4%] sm:py-5 md:py-6 lg:py-7 xl:px-[5%] xl:py-8 min-h-[calc(100vh-200px)]">
       {/* List View */}
       {viewMode === "list" && (
-        <div className="list-view-container">
+        <div className="list-view-container flex flex-col gap-5">
           {productVariations.map((variation, index) => (
-            <div key={variation.id} className="list-view-item">
-              <div className="list-item-image">
-                <img 
-                  src={variation.image || '/images/products/spac1.webp'} 
+            <div key={variation.id} className="list-view-item bg-surface rounded-lg p-4 sm:p-5 lg:p-5 xl:p-6 grid grid-cols-1 sm:grid-cols-[160px_1fr] lg:grid-cols-[220px_1fr] xl:grid-cols-[280px_1fr] gap-4 sm:gap-4 xl:gap-6 items-start border border-border shadow-sm transition duration-200 hover:shadow-md">
+              <div className="list-item-image w-full h-[180px] sm:h-[180px] lg:h-[200px] xl:h-[240px] flex items-center justify-center bg-surface-muted rounded-md overflow-hidden p-4">
+                <img
+                  src={variation.image || '/images/products/spac1.webp'}
                   alt={variation.name}
+                  className="max-w-full max-h-full object-contain"
                   onError={(e) => {
                     // Fallback to default image if image fails to load
                     if (e.target.src !== '/images/products/spac1.webp') {
@@ -668,67 +669,67 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                   }}
                 />
               </div>
-              <div className="list-item-details">
-                <div className="detail-grid">
-                  <div className="detail-item">
-                    <span className="detail-label">Brand</span>
-                    <span className="detail-value">{display(variation.brand)}</span>
+              <div className="list-item-details flex flex-col gap-5 justify-between">
+                <div className="detail-grid grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-y-4 md:gap-x-5 lg:grid-cols-5 lg:gap-y-5 lg:gap-x-6">
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Brand</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.brand)}</span>
                   </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Model</span>
-                    <span className="detail-value">{display(variation.model)}</span>
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Model</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.model)}</span>
                   </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Type</span>
-                    <span className="detail-value">{display(variation.type)}</span>
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Type</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.type)}</span>
                   </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Gender</span>
-                    <span className="detail-value">{display(variation.gender)}</span>
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Gender</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.gender)}</span>
                   </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Shape</span>
-                    <span className="detail-value">{display(variation.shape)}</span>
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Shape</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.shape)}</span>
                   </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Frame Colour</span>
-                    <span className="detail-value">
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Frame Colour</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">
                       {display(variation.frameColour)}
                     </span>
                   </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Frame Material</span>
-                    <span className="detail-value">
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Frame Material</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">
                       {display(variation.frameMaterial)}
                     </span>
                   </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Lense Colour</span>
-                    <span className="detail-value">
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Lense Colour</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">
                       {display(variation.lenseColour)}
                     </span>
                   </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Lense Material</span>
-                    <span className="detail-value">
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Lense Material</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">
                       {display(variation.lenseMaterial)}
                     </span>
                   </div>
-                  <div className="detail-item">
-                    <span className="detail-label">Size</span>
-                    <span className="detail-value">{display(variation.size)}</span>
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Size</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.size)}</span>
                   </div>
                   {/* QTY label/value as a normal detail cell */}
-                  <div className="detail-item">
-                    <span className="detail-label">QTY</span>
-                    <span className="detail-value">{display(variation.qty)}</span>
+                  <div className="detail-item flex flex-col gap-1 min-w-0">
+                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">QTY</span>
+                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.qty)}</span>
                   </div>
                   {/* Quantity selector in 5th column */}
-                  <div className="quantity-selector-wrapper">
-                    <div className="quantity-selector">
+                  <div className="quantity-selector-wrapper flex items-end">
+                    <div className="quantity-selector w-full flex items-center justify-between gap-1 bg-surface border border-border-strong rounded-md p-1">
                       <button
                         type="button"
-                        className="qty-btn minus"
+                        className="qty-btn minus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
                         aria-label={`Decrease quantity for ${variation.name}`}
                         disabled={getQuantity(variation.id) <= 1}
                         onClick={(e) => handleQuantityDecrease(variation.id, e)}
@@ -736,7 +737,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                         <span aria-hidden="true">&minus;</span>
                       </button>
                       <input
-                        className="qty-number"
+                        className="qty-number text-center font-semibold text-text bg-transparent text-[length:var(--text-md)] px-2 border-none w-full min-w-[48px] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:m-0 focus-visible:outline-none focus-visible:rounded-sm focus-visible:shadow-[var(--focus-ring)]"
                         type="number"
                         inputMode="numeric"
                         min="1"
@@ -769,7 +770,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                       />
                       <button
                         type="button"
-                        className="qty-btn plus"
+                        className="qty-btn plus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
                         aria-label={`Increase quantity for ${variation.name}`}
                         onClick={(e) => handleQuantityIncrease(variation.id, e)}
                       >
@@ -778,10 +779,10 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                     </div>
                   </div>
                   {/* Add to Cart button in 6th column */}
-                  <div className="add-to-cart-wrapper">
+                  <div className="add-to-cart-wrapper flex items-end">
                     <button
                       type="button"
-                      className={`add-to-cart-btn-list ${addedIds[variation.id] ? "is-added" : ""}`}
+                      className={`add-to-cart-btn-list w-full min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${addedIds[variation.id] ? "is-added bg-success border-success text-text-on-primary" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active"}`}
                       onClick={(e) => handleAddToCart(variation, e)}
                     >
                       {addedIds[variation.id] ? "Added ✓" : "Add to Cart"}
@@ -796,16 +797,16 @@ const ProductDetail = ({ productId: propProductId = null }) => {
 
       {/* Grid View */}
       {viewMode === "grid" && (
-        <div className="grid-view-container">
+        <div className="grid-view-container flex flex-col gap-8">
           {/* Main Product Display Area */}
-          <div className="grid-main-section">
+          <div className="grid-main-section flex flex-col gap-8">
             {/* Slider Section */}
             {totalVariations > 3 && (
-              <div className="variation-slider-section">
+              <div className="variation-slider-section relative flex items-center gap-4">
                 {needsSlider && (
                   <button
                     type="button"
-                    className="slider-arrow left"
+                    className="slider-arrow left bg-surface text-primary border border-border w-11 h-11 rounded-pill cursor-pointer flex items-center justify-center transition duration-200 z-10 shrink-0 shadow-sm hover:enabled:bg-primary-soft hover:enabled:scale-[1.04] active:enabled:scale-[0.96] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
                     aria-label="Previous variations"
                     onClick={() => scrollSlider("prev")}
                     disabled={sliderPosition === 0}
@@ -827,8 +828,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                     </svg>
                   </button>
                 )}
-                <div className="variation-slider" ref={sliderRef}>
-                  <div className="variation-slider-track">
+                <div className="variation-slider flex-1 overflow-hidden relative min-w-0" ref={sliderRef}>
+                  <div className="variation-slider-track grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
                     {visibleVariations.map((variation, index) => {
                       // Calculate actual index based on which variations are shown
                       let actualIndex;
@@ -844,8 +845,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                       return (
                         <div
                           key={variation.id}
-                          className={`variation-card ${
-                            selectedVariation === actualIndex ? "active" : ""
+                          className={`variation-card bg-surface rounded-lg overflow-hidden cursor-pointer transition duration-200 border flex flex-col shadow-sm hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
+                            selectedVariation === actualIndex ? "active border-primary shadow-md" : "border-border"
                           }`}
                           role="button"
                           tabIndex={0}
@@ -859,10 +860,11 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                             }
                           }}
                         >
-                          <div className="variation-card-image">
-                            <img 
-                              src={variation.image || '/images/products/spac1.webp'} 
+                          <div className="variation-card-image w-full h-[240px] flex items-center justify-center bg-surface-muted overflow-hidden p-4">
+                            <img
+                              src={variation.image || '/images/products/spac1.webp'}
                               alt={variation.name}
+                              className="max-w-full max-h-full object-contain"
                               onError={(e) => {
                                 // Fallback to default image if image fails to load
                                 if (e.target.src !== '/images/products/spac1.webp') {
@@ -871,35 +873,35 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                               }}
                             />
                           </div>
-                          <div className="variation-card-details">
-                            <h4 className="variation-card-title">
+                          <div className="variation-card-details p-5 flex flex-col gap-4 bg-surface">
+                            <h4 className="variation-card-title text-[length:var(--text-lg)] text-text m-0 font-semibold leading-[var(--leading-snug)] tracking-[-0.01em]">
                               {display(variation.name)}
                             </h4>
-                            <div className="variation-specs">
-                              <div className="variation-spec-item">
-                                <span className="variation-spec-label">
+                            <div className="variation-specs flex flex-col gap-2">
+                              <div className="variation-spec-item flex justify-between gap-2 items-baseline">
+                                <span className="variation-spec-label text-[length:var(--text-sm)] text-text-muted font-normal">
                                   Frame Colour
                                 </span>
-                                <span className="variation-spec-value">
+                                <span className="variation-spec-value text-[length:var(--text-sm)] text-text font-medium text-right">
                                   {display(variation.frameColour)}
                                 </span>
                               </div>
-                              <div className="variation-spec-item">
-                                <span className="variation-spec-label">
+                              <div className="variation-spec-item flex justify-between gap-2 items-baseline">
+                                <span className="variation-spec-label text-[length:var(--text-sm)] text-text-muted font-normal">
                                   Lense Colour
                                 </span>
-                                <span className="variation-spec-value">
+                                <span className="variation-spec-value text-[length:var(--text-sm)] text-text font-medium text-right">
                                   {display(variation.lenseColour)}
                                 </span>
                               </div>
                             </div>
                             <div
-                              className="quantity-selector-small"
+                              className="quantity-selector-small w-full flex items-center justify-between gap-1 bg-surface border border-border-strong rounded-md p-1"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <button
                                 type="button"
-                                className="qty-btn-small minus"
+                                className="qty-btn-small minus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
                                 aria-label={`Decrease quantity for ${variation.name}`}
                                 disabled={getQuantity(variation.id) <= 1}
                                 onClick={(e) =>
@@ -909,7 +911,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                                 <span aria-hidden="true">&minus;</span>
                               </button>
                               <input
-                                className="qty-number-small"
+                                className="qty-number-small text-center font-semibold text-text bg-transparent text-[length:var(--text-md)] px-2 border-none w-full min-w-[48px] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:m-0 focus-visible:outline-none focus-visible:rounded-sm focus-visible:shadow-[var(--focus-ring)]"
                                 type="number"
                                 inputMode="numeric"
                                 min="1"
@@ -943,7 +945,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                               />
                               <button
                                 type="button"
-                                className="qty-btn-small plus"
+                                className="qty-btn-small plus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
                                 aria-label={`Increase quantity for ${variation.name}`}
                                 onClick={(e) =>
                                   handleQuantityIncrease(variation.id, e)
@@ -954,7 +956,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                             </div>
                             <button
                               type="button"
-                              className={`add-to-cart-btn-small ${addedIds[variation.id] ? "is-added" : ""}`}
+                              className={`add-to-cart-btn-small w-full min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${addedIds[variation.id] ? "is-added bg-success border-success text-text-on-primary" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active"}`}
                               onClick={(e) => handleAddToCart(variation, e)}
                             >
                               {addedIds[variation.id] ? "Added ✓" : "Add to Cart"}
@@ -968,7 +970,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                 {needsSlider && (
                   <button
                     type="button"
-                    className="slider-arrow right"
+                    className="slider-arrow right bg-surface text-primary border border-border w-11 h-11 rounded-pill cursor-pointer flex items-center justify-center transition duration-200 z-10 shrink-0 shadow-sm hover:enabled:bg-primary-soft hover:enabled:scale-[1.04] active:enabled:scale-[0.96] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
                     aria-label="Next variations"
                     onClick={() => scrollSlider("next")}
                     disabled={sliderPosition >= maxSliderPosition}
@@ -994,11 +996,12 @@ const ProductDetail = ({ productId: propProductId = null }) => {
             )}
 
             {/* Main Product Display */}
-            <div className="main-product-display">
-              <div className="main-product-image">
-                <img 
-                  src={currentProduct.image || '/images/products/spac1.webp'} 
+            <div className="main-product-display grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-10 bg-transparent pt-4 px-0 pb-0 items-center">
+              <div className="main-product-image w-full h-[320px] md:h-[400px] flex items-center justify-center bg-surface rounded-lg overflow-hidden p-6 shadow-lg">
+                <img
+                  src={currentProduct.image || '/images/products/spac1.webp'}
                   alt={currentProduct.name}
+                  className="max-w-full max-h-full object-contain"
                   onError={(e) => {
                     // Fallback to default image if image fails to load
                     if (e.target.src !== '/images/products/spac1.webp') {
@@ -1007,15 +1010,15 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                   }}
                 />
               </div>
-              <div className="main-product-info">
-                <h2 className="product-title">{display(currentProduct.name)}</h2>
-                <div className="color-selectors" role="group" aria-label="Select colour variation">
+              <div className="main-product-info flex flex-col gap-6">
+                <h2 className="product-title text-[length:var(--text-2xl)] text-text-on-primary m-0 font-semibold leading-[var(--leading-tight)] tracking-[-0.02em]">{display(currentProduct.name)}</h2>
+                <div className="color-selectors flex gap-3" role="group" aria-label="Select colour variation">
                   {productVariations.slice(0, 3).map((variation, index) => (
                     <button
                       type="button"
                       key={variation.id}
-                      className={`color-swatch ${
-                        selectedVariation === index ? "active" : ""
+                      className={`color-swatch w-8 h-8 p-0 rounded-pill border border-[rgba(255,255,255,0.35)] cursor-pointer transition duration-200 hover:scale-[1.08] active:scale-[0.96] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.45)] motion-reduce:transition-none ${
+                        selectedVariation === index ? "active shadow-[0_0_0_2px_var(--color-primary-active),0_0_0_4px_var(--color-accent)]" : ""
                       }`}
                       aria-label={`Colour variation ${index + 1}`}
                       aria-pressed={selectedVariation === index}
@@ -1031,21 +1034,21 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                     ></button>
                   ))}
                 </div>
-                <div className="price-info">
-                  <div className="price-item">
-                    <span className="price-label">MRP</span>
-                    <span className="price-value">{display(currentProduct.mrp)}</span>
+                <div className="price-info flex flex-col gap-2">
+                  <div className="price-item flex items-baseline gap-4">
+                    <span className="price-label text-[length:var(--text-sm)] text-[rgba(255,255,255,0.7)] font-normal uppercase tracking-[var(--tracking-label)] min-w-[44px]">MRP</span>
+                    <span className="price-value text-[length:var(--text-xl)] text-text-on-primary font-semibold">{display(currentProduct.mrp)}</span>
                   </div>
-                  <div className="price-item">
-                    <span className="price-label">WHP</span>
-                    <span className="price-value">{display(currentProduct.whp)}</span>
+                  <div className="price-item flex items-baseline gap-4">
+                    <span className="price-label text-[length:var(--text-sm)] text-[rgba(255,255,255,0.7)] font-normal uppercase tracking-[var(--tracking-label)] min-w-[44px]">WHP</span>
+                    <span className="price-value text-[length:var(--text-lg)] text-accent font-semibold">{display(currentProduct.whp)}</span>
                   </div>
                 </div>
-                <div className="main-selector-action-row">
-                  <div className="quantity-selector-small">
+                <div className="main-selector-action-row flex flex-wrap gap-4 items-center mt-2 sm:flex-nowrap">
+                  <div className="quantity-selector-small w-full sm:w-auto flex-none flex items-center justify-between gap-1 bg-surface border border-border-strong rounded-md p-1">
                     <button
                       type="button"
-                      className="qty-btn-small minus"
+                      className="qty-btn-small minus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label="Decrease quantity"
                       disabled={getQuantity(currentProduct.id) <= 1}
                       onClick={(e) =>
@@ -1055,7 +1058,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                       <span aria-hidden="true">&minus;</span>
                     </button>
                     <input
-                      className="qty-number-small"
+                      className="qty-number-small text-center font-semibold text-text bg-transparent text-[length:var(--text-md)] px-2 border-none w-full min-w-[48px] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:m-0 focus-visible:outline-none focus-visible:rounded-sm focus-visible:shadow-[var(--focus-ring)]"
                       type="number"
                       inputMode="numeric"
                       min="1"
@@ -1081,7 +1084,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                     />
                     <button
                       type="button"
-                      className="qty-btn-small plus"
+                      className="qty-btn-small plus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label="Increase quantity"
                       onClick={(e) =>
                         handleQuantityIncrease(currentProduct.id, e)
@@ -1092,7 +1095,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                   </div>
                   <button
                     type="button"
-                    className={`add-to-cart-btn-small ${addedIds[currentProduct.id] ? "is-added" : ""}`}
+                    className={`add-to-cart-btn-small w-full sm:w-auto sm:flex-1 min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${addedIds[currentProduct.id] ? "is-added bg-success border-success text-text-on-primary" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active"}`}
                     onClick={(e) => handleAddToCart(currentProduct, e)}
                   >
                     {addedIds[currentProduct.id] ? "Added ✓" : "Add to Cart"}
@@ -1103,7 +1106,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
 
             {/* Variation Thumbnails */}
             <div
-              className="variation-thumbnails"
+              className="variation-thumbnails flex gap-4 justify-start flex-wrap"
               role="listbox"
               aria-label="Product variation thumbnails"
             >
@@ -1113,8 +1116,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                   ref={(node) => {
                     thumbnailRefs.current[index] = node;
                   }}
-                  className={`thumbnail ${
-                    selectedVariation === index ? "active" : ""
+                  className={`thumbnail w-[88px] h-[88px] rounded-md overflow-hidden cursor-pointer border transition duration-200 bg-surface flex items-center justify-center p-2 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.45)] motion-reduce:transition-none ${
+                    selectedVariation === index ? "active border-accent shadow-[0_0_0_2px_var(--color-accent),var(--shadow-md)]" : "border-transparent"
                   }`}
                   role="option"
                   tabIndex={selectedVariation === index ? 0 : -1}
@@ -1128,6 +1131,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                   <img
                     src={variation.image || '/images/products/spac1.webp'}
                     alt={`${variation.name} - ${variation.lenseColour}`}
+                    className="w-full h-full object-contain"
                     onError={(e) => {
                       // Fallback to default image if image fails to load
                       if (e.target.src !== '/images/products/spac1.webp') {
@@ -1142,79 +1146,79 @@ const ProductDetail = ({ productId: propProductId = null }) => {
 
           {/* Features Box - Always shows selected variation's features */}
           {viewMode === "grid" && displayVariation && (
-            <div className="features-box-standalone">
-              <h3 className="features-title">Features</h3>
-              <div className="features-grid">
-                <div className="features-column">
-                  <div className="feature-item">
-                    <span className="feature-label">Brand</span>
-                    <span className="feature-separator">-</span>
-                    <span className="feature-value">
+            <div className="features-box-standalone bg-surface rounded-lg py-5 px-6 md:py-6 md:px-8 border border-border shadow-sm mt-6">
+              <h3 className="features-title text-[length:var(--text-lg)] text-text mt-0 mb-6 mx-0 font-semibold tracking-[-0.01em]">Features</h3>
+              <div className="features-grid grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-y-6 md:gap-x-10 relative">
+                <div className="features-column flex flex-col gap-4 items-stretch">
+                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
+                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Brand</span>
+                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
+                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
                       {display(displayVariation.brand)}
                     </span>
                   </div>
-                  <div className="feature-item">
-                    <span className="feature-label">Type</span>
-                    <span className="feature-separator">-</span>
-                    <span className="feature-value">
+                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
+                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Type</span>
+                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
+                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
                       {display(displayVariation.type)}
                     </span>
                   </div>
-                  <div className="feature-item">
-                    <span className="feature-label">Gender</span>
-                    <span className="feature-separator">-</span>
-                    <span className="feature-value">
+                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
+                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Gender</span>
+                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
+                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
                       {display(displayVariation.gender)}
                     </span>
                   </div>
-                  <div className="feature-item">
-                    <span className="feature-label">Shape</span>
-                    <span className="feature-separator">-</span>
-                    <span className="feature-value">
+                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
+                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Shape</span>
+                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
+                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
                       {display(displayVariation.shape)}
                     </span>
                   </div>
-                  <div className="feature-item">
-                    <span className="feature-label">Size</span>
-                    <span className="feature-separator">-</span>
-                    <span className="feature-value">
+                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
+                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Size</span>
+                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
+                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
                       {display(displayVariation.size)}
                     </span>
                   </div>
                 </div>
-                <div className="features-column">
-                  <div className="feature-item">
-                    <span className="feature-label">Frame Colour</span>
-                    <span className="feature-separator">-</span>
-                    <span className="feature-value">
+                <div className="features-column flex flex-col gap-4 items-stretch">
+                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
+                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Frame Colour</span>
+                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
+                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
                       {display(displayVariation.frameColour)}
                     </span>
                   </div>
-                  <div className="feature-item">
-                    <span className="feature-label">Frame Material</span>
-                    <span className="feature-separator">-</span>
-                    <span className="feature-value">
+                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
+                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Frame Material</span>
+                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
+                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
                       {display(displayVariation.frameMaterial)}
                     </span>
                   </div>
-                  <div className="feature-item">
-                    <span className="feature-label">Lense Colour</span>
-                    <span className="feature-separator">-</span>
-                    <span className="feature-value">
+                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
+                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Lense Colour</span>
+                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
+                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
                       {display(displayVariation.lenseColour)}
                     </span>
                   </div>
-                  <div className="feature-item">
-                    <span className="feature-label">Lense Material</span>
-                    <span className="feature-separator">-</span>
-                    <span className="feature-value">
+                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
+                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Lense Material</span>
+                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
+                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
                       {display(displayVariation.lenseMaterial)}
                     </span>
                   </div>
-                  <div className="feature-item">
-                    <span className="feature-label">QTY</span>
-                    <span className="feature-separator">-</span>
-                    <span className="feature-value">
+                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
+                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">QTY</span>
+                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
+                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
                       {display(displayVariation.qty)}
                     </span>
                   </div>

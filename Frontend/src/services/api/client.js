@@ -225,7 +225,9 @@ const handleResponse = async (response) => {
  * Make API request
  */
 const apiRequest = async (endpoint, options = {}) => {
-  const { method = 'GET', body = null, includeAuth = true } = options;
+  // `silent` suppresses the error console.log for expected failures (e.g. the
+  // states->cities->zones walk where many "not found" 404s are normal).
+  const { method = 'GET', body = null, includeAuth = true, silent = false } = options;
 
   // Check if token exists before making authenticated requests
   // If token is missing and we need auth, log out immediately
@@ -326,7 +328,7 @@ const apiRequest = async (endpoint, options = {}) => {
   const config = {
     method: actualMethod,
     headers: getHeaders(includeAuth),
-    credentials: 'include', // Include cookies for CORS
+    credentials: 'omit', // Bearer-token auth (no cookies) — sending credentials forbids a wildcard CORS origin and gets the request blocked by the browser
   };
 
   // Add body for POST/PUT/PATCH requests
@@ -354,7 +356,7 @@ const apiRequest = async (endpoint, options = {}) => {
     const response = await fetch(fullUrl, config);
     return await handleResponse(response);
   } catch (error) {
-    console.error(`API Error [${method} ${fullUrl}]:`, error);
+    if (!silent) console.error(`API Error [${method} ${fullUrl}]:`, error);
     throw error;
   }
 };

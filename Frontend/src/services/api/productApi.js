@@ -418,7 +418,7 @@ export const uploadProductImage = async (productImages, productId) => {
   const response = await fetch(fullUrl, {
     method: 'POST',
     headers,
-    credentials: 'include',
+    credentials: 'omit',
     body: formData,
   });
   
@@ -448,7 +448,7 @@ export const bulkUploadProducts = async (file) => {
   const response = await fetch(fullUrl, {
     method: 'POST',
     headers,
-    credentials: 'include',
+    credentials: 'omit',
     body: formData,
   });
   

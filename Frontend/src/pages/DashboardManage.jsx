@@ -1552,11 +1552,15 @@ const DashboardManage = () => {
     <div className="dash-page">
       <div className="dash-container">
         <div className="dash-row">
-          <div className="order-tabs-container">
+          <div className="order-tabs-container col-span-full flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm [scrollbar-color:var(--color-grey-300)_transparent] [scrollbar-width:thin]">
             {tabs.map(tab => (
               <button
                 key={tab}
-                className={`order-tab ${activeTab === tab ? 'active' : ''}`}
+                className={`order-tab inline-flex min-h-10 flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-4 py-2 text-[length:var(--text-base)] font-semibold leading-[var(--leading-snug)] transition-[background,color,box-shadow] duration-[var(--transition-fast)] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] ${
+                  activeTab === tab
+                    ? 'active bg-primary text-text-on-primary hover:bg-primary'
+                    : 'text-text-muted hover:bg-primary-soft hover:text-primary'
+                }`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}

@@ -104,30 +104,30 @@ const Breadcrumb = ({ currentPage, onPageChange }) => {
 
   return (
     <nav
-      className={`breadcrumb ${showActions ? 'breadcrumb-with-actions' : ''} ${showContinueShopping ? 'breadcrumb-with-continue' : ''}`}
+      className={`breadcrumb ${showActions ? 'breadcrumb-with-actions' : ''} ${showContinueShopping ? 'breadcrumb-with-continue' : ''} relative z-[999] bg-primary px-[5%] pb-4 pt-[calc(var(--header-height)+0.5rem)] sm:pt-[calc(var(--header-height)+1rem)]`}
       aria-label="Breadcrumb"
     >
-      <div className="breadcrumb-container">
-        <ol className="breadcrumb-content">
+      <div className="breadcrumb-container flex w-full flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <ol className="breadcrumb-content m-0 flex min-w-0 list-none flex-wrap items-center gap-0.5 p-0 sm:gap-1 leading-[var(--leading-snug)] text-white/70 text-[length:var(--text-sm)] md:text-[length:var(--text-base)] lg:text-[length:var(--text-md)]">
           {breadcrumbItems.map((item, index) => {
             const isCurrent = item.isLast || index === breadcrumbItems.length - 1 || currentPage === item.id;
             return (
-              <li className="breadcrumb-crumb" key={item.id}>
+              <li className="breadcrumb-crumb inline-flex min-w-0 items-center" key={item.id}>
                 {index > 0 && (
-                  <span className="breadcrumb-separator" aria-hidden="true">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <span className="breadcrumb-separator inline-flex shrink-0 items-center text-white/45" aria-hidden="true">
+                    <svg className="h-3.5 w-3.5 sm:h-4 sm:w-4" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <path d="M9 18L15 12L9 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </span>
                 )}
                 {isCurrent ? (
-                  <span className="breadcrumb-item active" aria-current="page" title={item.text}>
+                  <span className="breadcrumb-item active m-0 inline-block max-w-none cursor-default whitespace-normal rounded-sm px-2 py-1 font-semibold text-white/60" aria-current="page" title={item.text}>
                     {item.text}
                   </span>
                 ) : (
                   <button
                     type="button"
-                    className="breadcrumb-item"
+                    className="breadcrumb-item m-0 inline-block max-w-[110px] cursor-pointer overflow-hidden text-ellipsis whitespace-nowrap rounded-sm border-none bg-transparent px-1 py-1 text-white/90 transition-colors duration-200 ease-[ease] hover:bg-white/10 hover:text-white active:bg-white/[0.16] focus-visible:shadow-[0_0_0_2px_rgba(255,255,255,0.65)] focus-visible:outline-none motion-reduce:transition-none sm:max-w-[150px] md:max-w-[220px] md:px-2"
                     onClick={() => onPageChange(item.id)}
                   >
                     {item.text}
@@ -138,7 +138,7 @@ const Breadcrumb = ({ currentPage, onPageChange }) => {
           })}
         </ol>
         {showActions && (
-          <div className="breadcrumb-actions">
+          <div className="breadcrumb-actions flex w-full shrink-0 items-center gap-3 sm:w-auto">
             <div className="view-toggle">
               <button
                 className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
@@ -156,9 +156,9 @@ const Breadcrumb = ({ currentPage, onPageChange }) => {
           </div>
         )}
         {showContinueShopping && (
-          <div className="continue-shopping-action">
-            <button 
-              className="continue-shopping-btn"
+          <div className="continue-shopping-action flex w-full shrink-0 items-center sm:w-auto">
+            <button
+              className="continue-shopping-btn inline-flex min-h-10 w-full cursor-pointer items-center justify-center whitespace-nowrap rounded-md border-none bg-surface px-6 py-2 font-semibold text-primary text-[length:var(--text-base)] transition duration-200 ease-[ease] hover:bg-accent hover:text-[var(--color-text-on-accent)] active:scale-[0.98] focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.65)] focus-visible:outline-none motion-reduce:transition-none sm:w-auto"
               onClick={handleContinueShopping}
             >
               Continue Shopping

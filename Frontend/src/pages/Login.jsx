@@ -660,20 +660,20 @@ const Login = ({ onPageChange }) => {
   };
 
   return (
-    <div className="login-page">
+    <div className="login-page relative flex min-h-screen flex-col bg-[var(--color-primary-active)]">
       <Header onPageChange={handlePageChange} currentPage="login" />
-      <div className="login-background">
-        <img src="/images/banners/loginbg.webp" alt="Login Background" className="login-bg-image" />
-        <div className="login-gradient-overlay"></div>
+      <div className="login-background absolute left-0 top-0 z-0 w-full">
+        <img src="/images/banners/loginbg.webp" alt="Login Background" className="login-bg-image h-auto w-full object-cover opacity-45" />
+        <div className="login-gradient-overlay absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(18,14,77,0)_0%,var(--color-primary-active)_92%)]"></div>
       </div>
-      <div className="login-content">
-        <div className="login-container">
+      <div className="login-content relative z-[2] flex flex-1 items-center justify-center px-4 py-10 md:py-16">
+        <div className="login-container box-border w-full max-w-[440px] rounded-xl border border-border bg-surface px-5 py-6 shadow-xl sm:px-6 sm:py-8 md:px-10 md:py-12">
           {!showOTP ? (
             <>
-              <h1 className="login-title">Sign in</h1>
-              <p className="login-subtitle">Enter your mobile number to receive a one-time code.</p>
-              <form className="login-form" onSubmit={handleSubmit} noValidate>
-                <div className="login-input-group">
+              <h1 className="login-title m-0 mb-2 text-center text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Sign in</h1>
+              <p className="login-subtitle m-0 mb-8 text-center text-[length:var(--text-base)] font-normal leading-[var(--leading-normal)] text-text-muted">Enter your mobile number to receive a one-time code.</p>
+              <form className="login-form flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
+                <div className="login-input-group flex flex-col gap-2">
                   <label className="ui-label" htmlFor="phone">Mobile number</label>
                   <PhoneInput
                     country={'in'}
@@ -699,7 +699,7 @@ const Login = ({ onPageChange }) => {
                 </div>
                 <button
                   type="submit"
-                  className={`ui-btn ui-btn--primary ui-btn--lg login-submit${loading ? ' ui-btn--loading' : ''}`}
+                  className={`ui-btn ui-btn--primary ui-btn--lg login-submit w-full${loading ? ' ui-btn--loading' : ''}`}
                   disabled={loading}
                 >
                   <span className="ui-btn__label">{loading ? 'Sending code…' : 'Send code'}</span>
@@ -708,16 +708,16 @@ const Login = ({ onPageChange }) => {
             </>
           ) : (
             <>
-              <h1 className="login-title">Verify your number</h1>
-              <p className="login-subtitle">
+              <h1 className="login-title m-0 mb-2 text-center text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Verify your number</h1>
+              <p className="login-subtitle m-0 mb-8 text-center text-[length:var(--text-base)] font-normal leading-[var(--leading-normal)] text-text-muted">
                 We sent a 6-digit code to
-                {phoneNumber ? <strong className="login-phone-hint"> +{String(phoneNumber).replace(/^\+/, '')}</strong> : ' your phone'}.
+                {phoneNumber ? <strong className="login-phone-hint whitespace-nowrap font-semibold text-text"> +{String(phoneNumber).replace(/^\+/, '')}</strong> : ' your phone'}.
               </p>
-              <form className="login-form" onSubmit={handleOTPVerify} noValidate>
-                <div className="login-input-group">
+              <form className="login-form flex flex-col gap-6" onSubmit={handleOTPVerify} noValidate>
+                <div className="login-input-group flex flex-col gap-2">
                   <span className="ui-label" id="otp-label">One-time code</span>
                   <div
-                    className={`otp-container${otpError ? ' otp-container--error' : ''}`}
+                    className={`otp-container flex justify-between gap-2${otpError ? ' otp-container--error' : ''}`}
                     role="group"
                     aria-labelledby="otp-label"
                   >
@@ -733,7 +733,7 @@ const Login = ({ onPageChange }) => {
                         onChange={(e) => handleOTPChange(index, e.target.value)}
                         onKeyDown={(e) => handleOTPKeyDown(index, e)}
                         onPaste={handleOTPPaste}
-                        className="otp-input"
+                        className={`otp-input h-[46px] min-w-0 flex-1 rounded-md border bg-surface text-center text-[length:var(--text-lg)] font-semibold text-text transition-[border-color,box-shadow] duration-200 ease-[ease] hover:enabled:border-grey-400 focus-visible:outline-none focus-visible:border-primary disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle motion-reduce:transition-none sm:h-[52px] sm:text-[length:var(--text-xl)] ${otpError ? 'border-error focus-visible:shadow-[var(--focus-ring-error)]' : 'border-border-strong focus-visible:shadow-[var(--focus-ring)]'}`}
                         aria-label={`Digit ${index + 1}`}
                         aria-invalid={otpError ? 'true' : 'false'}
                         required
@@ -747,15 +747,15 @@ const Login = ({ onPageChange }) => {
                 </div>
                 <button
                   type="submit"
-                  className={`ui-btn ui-btn--primary ui-btn--lg login-submit${loading ? ' ui-btn--loading' : ''}`}
+                  className={`ui-btn ui-btn--primary ui-btn--lg login-submit w-full${loading ? ' ui-btn--loading' : ''}`}
                   disabled={loading}
                 >
                   <span className="ui-btn__label">{loading ? 'Verifying…' : 'Verify code'}</span>
                 </button>
-                <div className="resend-otp-container">
+                <div className="resend-otp-container -mt-2 text-center">
                   <button
                     type="button"
-                    className="resend-otp-btn"
+                    className="resend-otp-btn cursor-pointer rounded-sm border-none bg-transparent px-3 py-2 text-[length:var(--text-sm)] font-medium text-primary transition-[color,background] duration-200 ease-[ease] hover:enabled:bg-primary-soft hover:enabled:text-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:text-text-subtle motion-reduce:transition-none"
                     onClick={handleResendOTP}
                     disabled={resendDisabled || loading}
                   >

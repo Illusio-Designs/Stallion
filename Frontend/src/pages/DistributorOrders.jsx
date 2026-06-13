@@ -394,32 +394,36 @@ const DistributorOrders = () => {
     <div className="dash-page">
       <div className="dash-container">
         {/* Summary Cards */}
-        <div className="dash-row orders-summary">
-          <div className="dash-card metric orders-card">
-            <h4>Total Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
+        <div className="dash-row orders-summary mb-5">
+          <div className="dash-card metric orders-card p-5">
+            <h4 className="text-text-subtle text-xs font-medium tracking-[var(--tracking-label)] mb-3 uppercase">Total Orders</h4>
+            <div className="metric-value text-[var(--text-lg)] font-semibold text-text mb-2 leading-tight tracking-[-0.01em]">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Pending Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
+          <div className="dash-card metric orders-card p-5">
+            <h4 className="text-text-subtle text-xs font-medium tracking-[var(--tracking-label)] mb-3 uppercase">Pending Orders</h4>
+            <div className="metric-value text-[var(--text-lg)] font-semibold text-text mb-2 leading-tight tracking-[-0.01em]">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Completed Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
+          <div className="dash-card metric orders-card p-5">
+            <h4 className="text-text-subtle text-xs font-medium tracking-[var(--tracking-label)] mb-3 uppercase">Completed Orders</h4>
+            <div className="metric-value text-[var(--text-lg)] font-semibold text-text mb-2 leading-tight tracking-[-0.01em]">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Total Revenue</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
+          <div className="dash-card metric orders-card p-5">
+            <h4 className="text-text-subtle text-xs font-medium tracking-[var(--tracking-label)] mb-3 uppercase">Total Revenue</h4>
+            <div className="metric-value text-[var(--text-lg)] font-semibold text-text mb-2 leading-tight tracking-[-0.01em]">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
           </div>
         </div>
 
         {/* Order Status Tabs */}
         <div className="dash-row">
-          <div className="order-tabs-container">
+          <div className="order-tabs-container bg-surface border border-border rounded-lg shadow-sm flex gap-2 overflow-x-auto px-3 py-2 w-full [grid-column:1/-1] [scrollbar-width:thin]">
             {['All', 'Pending', 'Processing', 'Hold by Trey', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].map(tab => (
               <button
                 key={tab}
-                className={`order-tab ${activeTab === tab ? 'active' : ''}`}
+                className={`order-tab inline-flex items-center min-h-10 px-4 py-2 rounded-md font-semibold text-[var(--text-base)] leading-snug cursor-pointer whitespace-nowrap shrink-0 transition-[background,color,box-shadow] duration-[0.12s] ease-[ease] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] ${
+                  activeTab === tab
+                    ? 'active bg-primary text-text-on-primary'
+                    : 'text-text-muted hover:bg-primary-soft hover:text-primary'
+                }`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}

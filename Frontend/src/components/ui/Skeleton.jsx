@@ -11,7 +11,7 @@ import '../../styles/components/skeleton.css';
 export function Skeleton({ width = '100%', height = 16, radius = 6, style = {}, className = '' }) {
   return (
     <span
-      className={`ui-skeleton ${className}`}
+      className={`ui-skeleton inline-block relative overflow-hidden align-middle rounded-sm bg-grey-200 ${className}`}
       style={{
         width: typeof width === 'number' ? `${width}px` : width,
         height: typeof height === 'number' ? `${height}px` : height,
@@ -32,7 +32,7 @@ export function SkeletonRows({ rows = 8, cols = 5 }) {
       {Array.from({ length: rows }).map((_, r) => (
         <tr key={`sk-${r}`} className="ui-skeleton-row">
           {Array.from({ length: cols }).map((_, c) => (
-            <td key={`sk-${r}-${c}`} style={{ padding: '16px 8px' }}>
+            <td key={`sk-${r}-${c}`} className="py-4 px-2 border-b border-border">
               <Skeleton height={14} width={c === 0 ? '50%' : '75%'} />
             </td>
           ))}

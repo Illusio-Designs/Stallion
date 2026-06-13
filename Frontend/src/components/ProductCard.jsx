@@ -123,36 +123,36 @@ const ProductCard = ({
   const isDiscounted = hasPrice && hasMrp && Number(mrp) > Number(whp);
 
   return (
-    <div className="product-card">
-      <div className="product-image">
-        {!imgLoaded && <span className="pc-image-placeholder" aria-hidden="true" />}
+    <div className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
+      <div className="product-image relative overflow-hidden rounded-md">
+        {!imgLoaded && <span className="pc-image-placeholder absolute inset-0" aria-hidden="true" />}
         <img
           src={imageUrl}
           alt={productName}
           loading="lazy"
-          className={`pc-image-img${imgLoaded ? ' is-loaded' : ''}`}
+          className={`pc-image-img transition duration-300 ease-[ease] motion-reduce:transition-none ${imgLoaded ? 'is-loaded opacity-100 group-hover:scale-105' : 'opacity-0'}`}
           onLoad={() => setImgLoaded(true)}
           onError={handleImageError}
         />
       </div>
-      <h3 className="product-name">{productName}</h3>
+      <h3 className="product-name block overflow-hidden [-webkit-box-orient:vertical] [display:-webkit-box] [-webkit-line-clamp:2] [line-clamp:2] min-h-[calc(2*var(--leading-snug)*var(--text-md))]">{productName}</h3>
 
       {hasPrice && (
-        <div className="pc-price">
-          <span className="pc-price-label">WHP</span>
-          <span className="pc-price-now">{formatPrice(whp)}</span>
+        <div className="pc-price flex items-baseline flex-wrap gap-2 mb-3">
+          <span className="pc-price-label self-center text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle">WHP</span>
+          <span className="pc-price-now text-[length:var(--text-md)] font-semibold text-text leading-[var(--leading-tight)]">{formatPrice(whp)}</span>
           {isDiscounted && (
-            <span className="pc-price-mrp">{formatPrice(mrp)}</span>
+            <span className="pc-price-mrp text-[length:var(--text-sm)] font-normal text-text-subtle line-through">{formatPrice(mrp)}</span>
           )}
         </div>
       )}
 
-      <div className="color-options">
+      <div className="color-options flex flex-wrap items-center gap-3 mt-2 mb-3">
         {colors.map((colorItem, index) => (
           <button
             type="button"
             key={index}
-            className={`color-swatch ${activeColor === index ? 'active' : ''}`}
+            className={`color-swatch h-[22px] w-[22px] flex-none cursor-pointer appearance-none rounded-pill border p-0 shadow-xs transition duration-[120ms] ease-[ease] hover:scale-110 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] ${activeColor === index ? 'active border-surface shadow-[0_0_0_2px_var(--color-surface),0_0_0_4px_var(--color-primary)]' : 'border-border-strong'}`}
             style={{backgroundColor: colorItem.color}}
             onClick={() => handleColorClick(index)}
             title={colorItem.name}
@@ -161,10 +161,10 @@ const ProductCard = ({
           ></button>
         ))}
       </div>
-      <div className="pc-actions">
+      <div className="pc-actions flex w-full flex-wrap items-center gap-2 mt-3">
         <button
           type="button"
-          className="pc-icon-btn"
+          className="pc-icon-btn inline-flex h-10 w-10 flex-none cursor-pointer items-center justify-center rounded-md border border-primary bg-surface text-primary transition duration-[120ms] ease-[ease] hover:bg-primary hover:text-text-on-primary active:scale-[0.94] disabled:cursor-not-allowed disabled:bg-surface disabled:text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
           onClick={handleViewMoreClick}
           title="View details"
           aria-label="View product details"
@@ -175,24 +175,24 @@ const ProductCard = ({
           </svg>
         </button>
 
-        <div className="pc-qty" role="group" aria-label="Quantity selector">
+        <div className="pc-qty inline-flex h-10 flex-none items-center overflow-hidden rounded-md border border-border-strong bg-surface" role="group" aria-label="Quantity selector">
           <button
             type="button"
-            className="pc-qty-btn"
+            className="pc-qty-btn h-full w-9 cursor-pointer border-none bg-primary-soft text-primary text-[length:var(--text-lg)] leading-none transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-soft-hover active:not-disabled:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle focus-visible:relative focus-visible:z-[1] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
             onClick={() => setQty(q => Math.max(1, q - 1))}
             disabled={qty <= 1}
             aria-label="Decrease quantity"
           >&minus;</button>
-          <span className="pc-qty-value" aria-live="polite">{qty}</span>
+          <span className="pc-qty-value min-w-8 text-center text-[length:var(--text-base)] font-semibold text-text" aria-live="polite">{qty}</span>
           <button
             type="button"
-            className="pc-qty-btn"
+            className="pc-qty-btn h-full w-9 cursor-pointer border-none bg-primary-soft text-primary text-[length:var(--text-lg)] leading-none transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-soft-hover active:not-disabled:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle focus-visible:relative focus-visible:z-[1] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
             onClick={() => setQty(q => q + 1)}
             aria-label="Increase quantity"
           >+</button>
         </div>
 
-        <button type="button" className="pc-add-btn" onClick={handleAddToCart}>
+        <button type="button" className="pc-add-btn flex-[1_1_120px] min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary text-[length:var(--text-sm)] font-semibold tracking-[var(--tracking-label)] transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-primary disabled:opacity-55 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]" onClick={handleAddToCart}>
           ADD TO CART
         </button>
       </div>

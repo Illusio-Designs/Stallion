@@ -75,12 +75,16 @@ export default function DropdownSelector({
   };
 
   return (
-    <div 
+    <div
       ref={dropdownRef}
-      className={`ui-dropdown-custom ${className} ${disabled ? 'ui-dropdown-custom--disabled' : ''} ${isOpen ? 'ui-dropdown-custom--open' : ''}`}
+      className={`ui-dropdown-custom relative inline-block w-auto min-w-[120px] ${isOpen ? 'z-[99998]' : 'z-[1]'} ${className} ${disabled ? 'ui-dropdown-custom--disabled' : ''} ${isOpen ? 'ui-dropdown-custom--open' : ''}`}
     >
       <div
-        className="ui-dropdown-custom__trigger"
+        className={`ui-dropdown-custom__trigger flex items-center justify-between gap-2 px-3 min-h-[40px] rounded-pill border bg-surface cursor-pointer transition duration-200 ease-[ease] ${
+          isOpen
+            ? 'border-primary shadow-[var(--focus-ring)]'
+            : 'border-border-strong hover:border-grey-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)]'
+        } ${disabled ? 'opacity-55 cursor-not-allowed bg-grey-100' : ''}`}
         onClick={handleToggle}
         role="button"
         tabIndex={disabled ? -1 : 0}
@@ -98,10 +102,10 @@ export default function DropdownSelector({
           }
         }}
       >
-        <span className={`ui-dropdown-custom__value ${!hasValue ? 'ui-dropdown-custom__value--placeholder' : ''}`}>{displayValue}</span>
-        <svg 
-          className="ui-dropdown-custom__chevron"
-          width="16" 
+        <span className={`ui-dropdown-custom__value flex-1 text-left whitespace-nowrap overflow-hidden text-ellipsis text-[length:var(--text-base)] font-normal ${!hasValue ? 'ui-dropdown-custom__value--placeholder text-text-subtle' : 'text-text'}`}>{displayValue}</span>
+        <svg
+          className={`ui-dropdown-custom__chevron shrink-0 ml-2 w-4 h-4 transition duration-200 ease-[ease] ${isOpen ? 'rotate-180 text-primary' : 'text-text-muted'}`}
+          width="16"
           height="16" 
           viewBox="0 0 24 24" 
           fill="none" 
@@ -115,13 +119,13 @@ export default function DropdownSelector({
       </div>
       
       {isOpen && !disabled && (
-        <div className="ui-dropdown-custom__menu">
+        <div className="ui-dropdown-custom__menu absolute top-[calc(100%+6px)] left-0 right-0 min-w-full z-[99999] overflow-hidden bg-surface border border-border rounded-lg shadow-lg">
           {searchable && options.length > 5 && (
-            <div className="ui-dropdown-custom__search">
+            <div className="ui-dropdown-custom__search p-2 border-b border-border bg-surface">
               <input
                 ref={searchInputRef}
                 type="text"
-                className="ui-dropdown-custom__search-input"
+                className="ui-dropdown-custom__search-input w-full px-3 min-h-[36px] border border-border-strong rounded-sm text-[length:var(--text-base)] text-text outline-none transition duration-200 ease-[ease] placeholder:text-text-subtle focus:border-primary focus:shadow-[var(--focus-ring)]"
                 placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -129,14 +133,18 @@ export default function DropdownSelector({
               />
             </div>
           )}
-          <div className="ui-dropdown-custom__options">
+          <div className="ui-dropdown-custom__options max-h-[220px] overflow-y-auto py-1">
             {filteredOptions.length > 0 ? (
               filteredOptions.map((opt, index) => {
                 const isSelected = String(opt.value) === String(value);
                 return (
                   <div
                     key={opt.value != null ? String(opt.value) : `opt-${index}`}
-                    className={`ui-dropdown-custom__option ${isSelected ? 'ui-dropdown-custom__option--selected' : ''}`}
+                    className={`ui-dropdown-custom__option px-3 py-2 text-[length:var(--text-base)] cursor-pointer transition-colors duration-[120ms] ease-[ease] ${
+                      isSelected
+                        ? 'ui-dropdown-custom__option--selected bg-primary-soft text-primary font-medium'
+                        : 'text-text font-normal hover:bg-grey-100'
+                    }`}
                     onClick={() => handleSelect(opt.value)}
                   >
                     {opt.label}
@@ -144,7 +152,7 @@ export default function DropdownSelector({
                 );
               })
             ) : (
-              <div className="ui-dropdown-custom__no-results">
+              <div className="ui-dropdown-custom__no-results p-3 text-[length:var(--text-base)] text-text-subtle text-center">
                 No results found
               </div>
             )}

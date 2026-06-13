@@ -2284,26 +2284,11 @@ const DashboardProducts = () => {
         {error && (
           <div className="dash-row">
             <div className="dash-card full">
-              <div style={{ 
-                padding: '16px', 
-                backgroundColor: '#fee', 
-                border: '1px solid #fcc', 
-                borderRadius: '8px',
-                color: '#c33',
-                marginBottom: '16px'
-              }}>
+              <div className="p-4 bg-error-soft border border-error rounded-md text-error mb-4">
                 <strong>Error:</strong> {error}
-                <button 
+                <button
                   onClick={() => setError(null)}
-                  style={{
-                    float: 'right',
-                    background: 'none',
-                    border: 'none',
-                    color: '#c33',
-                    cursor: 'pointer',
-                    fontSize: '18px',
-                    fontWeight: 'bold'
-                  }}
+                  className="float-right bg-transparent border-none text-error cursor-pointer text-lg font-bold"
                 >
                   ×
                 </button>
@@ -2311,7 +2296,7 @@ const DashboardProducts = () => {
             </div>
           </div>
         )}
-        <div className="dash-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="dash-row flex justify-between items-center">
           <div className="order-tabs-container">
             {['Products', 'Media Gallery', 'Unuploaded Media Gallery'].map(tab => (
               <button
@@ -2325,10 +2310,9 @@ const DashboardProducts = () => {
           </div>
           {activeTab === 'Media Gallery' && (
             <button
-              className="ui-btn ui-btn--primary"
+              className="ui-btn ui-btn--primary whitespace-nowrap px-4 py-2.5"
               onClick={handleOpenMediaUpload}
               disabled={uploadingImage}
-              style={{ whiteSpace: 'nowrap', padding: '10px 16px' }}
             >
               {uploadingImage ? 'Uploading...' : 'Upload Images'}
             </button>
@@ -2361,34 +2345,16 @@ const DashboardProducts = () => {
                 {loading ? (
                   <LoadingSpinner />
                 ) : (
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
-                      gap: '20px',
-                      padding: '20px'
-                    }}
-                  >
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-5 p-5">
                     {allMediaImages.length === 0 && (
-                      <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: '#666', padding: '40px' }}>
+                      <div className="col-span-full text-center text-text-muted p-10">
                         No uploaded images found.
                       </div>
                     )}
                     {allMediaImages.map(item => (
                     <div
                       key={item.id}
-                      style={{
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '12px',
-                        overflow: 'hidden',
-                        background: '#fff',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                        position: 'relative',
-                        transition: 'transform 0.2s, box-shadow 0.2s',
-                        cursor: 'pointer'
-                      }}
+                      className="border border-border rounded-xl overflow-hidden bg-surface flex flex-col shadow-md relative transition-[transform,box-shadow] duration-200 cursor-pointer"
                       onMouseEnter={(e) => {
                         e.currentTarget.style.transform = 'translateY(-4px)';
                         e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
@@ -2399,46 +2365,17 @@ const DashboardProducts = () => {
                       }}
                     >
                       {/* Status Tag - Always show assigned/unassigned status */}
-                      <div style={{
-                        position: 'absolute',
-                        top: '12px',
-                        left: '12px',
-                        background: (item.type === 'assigned') ? '#4caf50' : '#ff9800',
-                        color: '#fff',
-                        padding: '6px 12px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        zIndex: 2,
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.5px',
-                        boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                      }}>
+                      <div
+                        className="absolute top-3 left-3 text-white px-3 py-1.5 rounded-md text-xs font-semibold z-[2] uppercase tracking-[0.5px] shadow-sm"
+                        style={{ background: (item.type === 'assigned') ? 'var(--color-success)' : 'var(--color-warning)' }}
+                      >
                         {item.type === 'assigned' ? 'Assigned' : 'Unassigned'}
                       </div>
                       
                       {/* Delete Button */}
                       <button
-                        style={{
-                          position: 'absolute',
-                          top: '12px',
-                          right: '12px',
-                          background: '#f44336',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '50%',
-                          width: '36px',
-                          height: '36px',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          zIndex: 2,
-                          fontSize: '18px',
-                          fontWeight: 'bold',
-                          transition: 'background 0.2s',
-                          boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
-                        }}
+                        className="absolute top-3 right-3 text-white border-none rounded-full w-9 h-9 cursor-pointer flex items-center justify-center z-[2] text-lg font-bold transition-[background] duration-200 shadow-sm"
+                        style={{ background: '#f44336' }}
                         onClick={async (e) => {
                           e.stopPropagation();
 
@@ -2485,29 +2422,12 @@ const DashboardProducts = () => {
                       </button>
                       
                       {/* Image Container */}
-                      <div style={{ 
-                        width: '100%', 
-                        aspectRatio: '4/3', 
-                        background: '#f5f5f5', 
-                        position: 'relative',
-                        minHeight: '250px',
-                        overflow: 'hidden',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
+                      <div className="w-full aspect-[4/3] bg-surface-muted relative min-h-[250px] overflow-hidden flex items-center justify-center">
                         {item.image_url ? (
                           <img
                             src={item.image_url}
                             alt={item.model_no || 'Product image'}
-                            style={{ 
-                              width: '100%', 
-                              height: '100%', 
-                              objectFit: 'contain', // Changed from 'cover' to 'contain' to show full image
-                              display: 'block',
-                              maxWidth: '100%',
-                              maxHeight: '100%'
-                            }}
+                            className="w-full h-full object-contain block max-w-full max-h-full"
                             onError={(e) => {
                               const img = e.target;
                               const normalizedUrl = item.image_url;
@@ -3077,12 +2997,11 @@ const DashboardProducts = () => {
             const imgs = parseImageUrls(editRow.data);
             return (
               <div className="form-group form-group--full">
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                  <label className="ui-label" style={{ margin: 0 }}>Assigned Images</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="ui-label m-0">Assigned Images</label>
                   <button
                     type="button"
-                    className="ui-btn ui-btn--secondary"
-                    style={{ fontSize: '13px', padding: '6px 14px' }}
+                    className="ui-btn ui-btn--secondary text-[13px] px-3.5 py-1.5"
                     disabled={loading || productModelLoading}
                     onClick={() => handleAttachImage(editRow)}
                   >
@@ -3090,18 +3009,15 @@ const DashboardProducts = () => {
                   </button>
                 </div>
                 {imgs.length > 0 ? (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                  <div className="flex flex-wrap gap-2.5">
                     {imgs.map((url, idx) => {
                       const fullUrl = normalizeImageUrl(url);
                       return (
-                        <div key={idx} style={{ position: 'relative', width: '100px' }}>
+                        <div key={idx} className="relative w-[100px]">
                           <img
                             src={fullUrl}
                             alt={`Image ${idx + 1}`}
-                            style={{
-                              width: '100px', height: '75px', objectFit: 'cover',
-                              borderRadius: '6px', border: '1px solid #e5e7eb', display: 'block'
-                            }}
+                            className="w-[100px] h-[75px] object-cover rounded-md border border-border block"
                             onError={(e) => { e.target.style.opacity = '0.3'; }}
                           />
                           <button
@@ -3109,14 +3025,8 @@ const DashboardProducts = () => {
                             title="Unassign image"
                             onClick={() => handleUnassignImage(editRow.data, url)}
                             disabled={loading || productModelLoading}
-                            style={{
-                              position: 'absolute', top: '3px', right: '3px',
-                              background: '#f44336', color: '#fff', border: 'none',
-                              borderRadius: '50%', width: '20px', height: '20px',
-                              cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              lineHeight: 1, padding: 0
-                            }}
+                            className="absolute top-[3px] right-[3px] text-white border-none rounded-full w-5 h-5 cursor-pointer text-[11px] font-bold flex items-center justify-center leading-none p-0"
+                            style={{ background: '#f44336' }}
                           >
                             ✕
                           </button>
@@ -3125,7 +3035,7 @@ const DashboardProducts = () => {
                     })}
                   </div>
                 ) : (
-                  <p style={{ color: '#aaa', fontSize: '13px', margin: 0 }}>No images assigned. Click "+ Assign Image" to add.</p>
+                  <p className="text-text-subtle text-[13px] m-0">No images assigned. Click "+ Assign Image" to add.</p>
                 )}
               </div>
             );
@@ -3176,7 +3086,7 @@ const DashboardProducts = () => {
               disabled={uploadingBulk}
             />
             {selectedBulkFile && (
-              <p style={{ marginTop: '8px', color: '#666', fontSize: '14px' }}>
+              <p className="mt-2 text-text-muted text-sm">
                 Selected: {selectedBulkFile.name} ({(selectedBulkFile.size / 1024).toFixed(2)} KB)
               </p>
             )}
@@ -3236,42 +3146,26 @@ const DashboardProducts = () => {
           </>
         )}
       >
-        <div style={{ padding: '16px' }}>
+        <div className="p-4">
           {availableImagesForModal.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+            <div className="text-center p-10 text-text-muted">
               <p>No unassigned images available.</p>
-              <p style={{ marginTop: '8px', fontSize: '14px' }}>
+              <p className="mt-2 text-sm">
                 Click "Upload New Image" to upload an image for this product.
               </p>
             </div>
           ) : (
             <>
-              <p style={{ marginBottom: '16px', color: '#666', fontSize: '14px' }}>
+              <p className="mb-4 text-text-muted text-sm">
                 Select one or more images from the gallery below to attach to this product. Click on images to select/deselect them, then click "Attach Selected" to assign them all at once. You can also upload a new image.
               </p>
               {selectedImageIds.size > 0 && (
-                <div style={{
-                  marginBottom: '16px',
-                  padding: '12px',
-                  background: '#eff6ff',
-                  border: '1px solid #3b82f6',
-                  borderRadius: '8px',
-                  color: '#1e40af',
-                  fontSize: '14px'
-                }}>
+                <div className="mb-4 p-3 bg-accent-soft border border-accent rounded-md text-accent text-sm">
                   <strong>{selectedImageIds.size}</strong> image{selectedImageIds.size > 1 ? 's' : ''} selected. Click "Attach Selected" to assign them to this product.
                 </div>
               )}
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
-                  gap: '16px',
-                  maxHeight: '500px',
-                  overflowY: 'auto',
-                  padding: '8px'
-                }}
-              >
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-4 max-h-[500px] overflow-y-auto p-2">
+
                 {availableImagesForModal.map(item => {
                   const isSelected = selectedImageIds.has(item.id);
                   return (
@@ -3331,17 +3225,12 @@ const DashboardProducts = () => {
                         <span style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold' }}>✓</span>
                       )}
                     </div>
-                    <div style={{ width: '100%', aspectRatio: '4/3', background: '#f5f5f5', position: 'relative' }}>
+                    <div className="w-full aspect-[4/3] bg-surface-muted relative">
                       {item.image_url ? (
                         <img
                           src={item.image_url}
                           alt={item.model_no || 'Unassigned image'}
-                          style={{ 
-                            width: '100%', 
-                            height: '100%', 
-                            objectFit: 'cover',
-                            display: 'block'
-                          }}
+                          className="w-full h-full object-cover block"
                           onError={(e) => {
                             // Mark this image URL as invalid
                             setInvalidImageUrls(prev => new Set([...prev, item.image_url]));
@@ -3378,14 +3267,7 @@ const DashboardProducts = () => {
                         No Image
                       </div>
                     </div>
-                    <div style={{ 
-                      padding: '8px', 
-                      background: '#ff9800', 
-                      color: '#fff', 
-                      fontSize: '11px', 
-                      fontWeight: 600,
-                      textAlign: 'center'
-                    }}>
+                    <div className="p-2 bg-warning text-white text-[11px] font-semibold text-center">
                       Unassigned
                     </div>
                     <div style={{

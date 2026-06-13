@@ -35,7 +35,7 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
   }, [isSidebarCollapsed]);
 
   return (
-    <div className={`dashboard-layout ${layoutClassName}`}>
+    <div className={`dashboard-layout ${layoutClassName} flex min-h-screen bg-surface-muted text-text`}>
       <DashboardSidebar
         currentPage={currentPage}
         onPageChange={onPageChange}
@@ -43,14 +43,21 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
         onToggleCollapse={toggleSidebar}
       />
 
-      <div className="dashboard-shell">
+      <div
+        className={`dashboard-shell flex min-h-screen min-w-0 flex-1 flex-col ml-0 transition-[margin-left] duration-200 ease-[ease] motion-reduce:transition-none ${
+          isSidebarCollapsed ? 'md:ml-16' : 'md:ml-60'
+        }`}
+      >
         <DashboardHeader
           currentPage={currentPage}
           onPageChange={onPageChange}
           isCollapsed={isSidebarCollapsed}
         />
 
-        <main className="dashboard-content page-enter" key={currentPage}>
+        <main
+          className="dashboard-content page-enter w-full max-w-[1440px] flex-1 mx-auto px-4 py-4 sm:py-5 md:p-6"
+          key={currentPage}
+        >
           {children}
         </main>
 

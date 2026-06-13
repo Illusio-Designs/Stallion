@@ -38,27 +38,27 @@ export default function SalesRevenueChart({
   }, [data, height]);
 
   const legend = (
-    <div className="srchart__legend" aria-hidden="true">
-      <span className="srchart__legend-item srchart__legend-item--sales">Sales</span>
-      <span className="srchart__legend-item srchart__legend-item--revenue">Revenue</span>
+    <div className="srchart__legend static z-[1] mb-2 flex justify-end gap-4 sm:absolute sm:top-0 sm:right-0 sm:mb-0 sm:justify-normal" aria-hidden="true">
+      <span className="srchart__legend-item srchart__legend-item--sales inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium text-text-muted">Sales</span>
+      <span className="srchart__legend-item srchart__legend-item--revenue inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium text-text-muted">Revenue</span>
     </div>
   );
 
   // Loading state — skeleton bars + spinner, respects reduced-motion via CSS.
   if (loading) {
     return (
-      <div className="srchart srchart--loading" style={{ height }} role="status" aria-live="polite">
+      <div className="srchart srchart--loading relative flex w-full items-end" style={{ height }} role="status" aria-live="polite">
         {legend}
-        <div className="srchart__skeleton" aria-hidden="true">
+        <div className="srchart__skeleton flex h-full w-full items-end justify-between gap-2 pt-6" aria-hidden="true">
           {Array.from({ length: 12 }).map((_, i) => (
             <span
               key={i}
-              className="srchart__skeleton-bar"
+              className="srchart__skeleton-bar min-w-[6px] flex-1 rounded-t-sm"
               style={{ height: `${30 + ((i * 37) % 60)}%` }}
             />
           ))}
         </div>
-        <span className="srchart__sr-only">Loading chart data…</span>
+        <span className="srchart__sr-only sr-only">Loading chart data…</span>
       </div>
     );
   }
@@ -66,27 +66,27 @@ export default function SalesRevenueChart({
   // Empty state — reuse the canonical .ui-state--empty block.
   if (!data.length) {
     return (
-      <div className="srchart srchart--empty" style={{ height }}>
-        <div className="ui-state ui-state--empty">
-          <div className="ui-state__icon" aria-hidden="true">
+      <div className="srchart srchart--empty relative flex w-full items-center justify-center" style={{ height }}>
+        <div className="ui-state ui-state--empty flex min-h-[200px] flex-col items-center justify-center gap-3 px-6 py-12 text-center">
+          <div className="ui-state__icon inline-flex h-12 w-12 items-center justify-center rounded-pill bg-grey-100 text-text-subtle" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="6" y1="20" x2="6" y2="14" />
               <line x1="12" y1="20" x2="12" y2="9" />
               <line x1="18" y1="20" x2="18" y2="4" />
             </svg>
           </div>
-          <p className="ui-state__title">No data yet</p>
-          <p className="ui-state__desc">Sales and revenue will appear here once orders are recorded.</p>
+          <p className="ui-state__title text-[length:var(--text-md)] font-semibold text-text">No data yet</p>
+          <p className="ui-state__desc max-w-[360px] text-base leading-normal text-text-muted">Sales and revenue will appear here once orders are recorded.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="srchart">
+    <div className="srchart relative w-full">
       {legend}
       <svg
-        className="srchart__svg"
+        className="srchart__svg block w-full overflow-visible"
         viewBox={`0 0 ${cfg.width} ${height}`}
         width="100%"
         height={height}
@@ -99,14 +99,14 @@ export default function SalesRevenueChart({
           return (
             <g key={`g-${i}`}>
               <line
-                className="srchart__grid-line"
+                className="srchart__grid-line stroke-[var(--color-border)] [stroke-width:1]"
                 x1={cfg.margin.left}
                 x2={cfg.margin.left + cfg.innerW}
                 y1={yPos}
                 y2={yPos}
                 strokeDasharray="4 4"
               />
-              <text className="srchart__axis-label" x={cfg.margin.left + 2} y={yPos - 4} textAnchor="start">
+              <text className="srchart__axis-label fill-[var(--color-text-subtle)] text-xs font-medium" x={cfg.margin.left + 2} y={yPos - 4} textAnchor="start">
                 {cfg.formatK(t)}
               </text>
             </g>
@@ -117,7 +117,7 @@ export default function SalesRevenueChart({
         {data.map((d, i) => (
           <rect
             key={`rev-${i}`}
-            className="srchart__bar srchart__bar--revenue"
+            className="srchart__bar srchart__bar--revenue fill-[var(--color-accent)] [transition:opacity_var(--transition-fast)]"
             x={cfg.xRevenue(i)}
             y={cfg.y(d.revenue || 0)}
             width={cfg.barW}
@@ -130,7 +130,7 @@ export default function SalesRevenueChart({
         {data.map((d, i) => (
           <rect
             key={`sal-${i}`}
-            className="srchart__bar srchart__bar--sales"
+            className="srchart__bar srchart__bar--sales fill-[var(--color-primary)] [transition:opacity_var(--transition-fast)]"
             x={cfg.xSales(i)}
             y={cfg.y(d.sales || 0)}
             width={cfg.barW}
@@ -145,7 +145,7 @@ export default function SalesRevenueChart({
         {data.map((d, i) => (
           <text
             key={`l-${i}`}
-            className="srchart__axis-label"
+            className="srchart__axis-label fill-[var(--color-text-subtle)] text-xs font-medium"
             x={cfg.margin.left + cfg.band * i + cfg.band / 2}
             y={height - 6}
             textAnchor="middle"

@@ -849,37 +849,37 @@ const DashboardOrders = () => {
     <div className="dash-page">
       <div className="dash-container">
         {/* Summary Cards */}
-        <div className="dash-row orders-summary">
-          <div className="dash-card metric orders-card">
-            <h4>Total Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
-            <div className="metric-sub">Retail {summaryStats.retailOrders} | Bulk {summaryStats.bulkOrders}</div>
+        <div className="dash-row orders-summary mb-5">
+          <div className="dash-card metric orders-card p-5">
+            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Orders</h4>
+            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
+            <div className="metric-sub flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-text-muted">Retail {summaryStats.retailOrders} | Bulk {summaryStats.bulkOrders}</div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Pending Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
-            <div className="metric-sub green">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <div className="dash-card metric orders-card p-5">
+            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Pending Orders</h4>
+            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
+            <div className="metric-sub green flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-success">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0">
                 <path d="M18 15L12 9L6 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               12% vs last month
             </div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Completed Orders</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
-            <div className="metric-sub red">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <div className="dash-card metric orders-card p-5">
+            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Completed Orders</h4>
+            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
+            <div className="metric-sub red flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-error">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0">
                 <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               10% vs last month
             </div>
           </div>
-          <div className="dash-card metric orders-card">
-            <h4>Total Revenue</h4>
-            <div className="metric-value">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
-            <div className="metric-sub green">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <div className="dash-card metric orders-card p-5">
+            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Revenue</h4>
+            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
+            <div className="metric-sub green flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-success">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0">
                 <path d="M18 15L12 9L6 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
               </svg>
               12% vs last month
@@ -889,11 +889,11 @@ const DashboardOrders = () => {
 
         {/* Order Status Tabs */}
         <div className="dash-row">
-          <div className="order-tabs-container">
+          <div className="order-tabs-container col-[1/-1] flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm">
             {['All', 'Pending', 'Processing', 'Hold by Trey', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].map(tab => (
               <button
                 key={tab}
-                className={`order-tab ${activeTab === tab ? 'active' : ''}`}
+                className={`order-tab inline-flex min-h-10 flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-4 py-2 text-[length:var(--text-base)] font-semibold leading-[var(--leading-snug)] transition-[background,color,box-shadow] duration-[0.12s] ease-out focus-visible:outline-none active:scale-[0.98] ${activeTab === tab ? 'active bg-primary text-text-on-primary' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}

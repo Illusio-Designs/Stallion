@@ -183,42 +183,42 @@ const Dashboard = () => {
   }, [orders]);
 
   return (
-    <div className="dash-page">
-      <div className="dash-container">
-        <div className="dash-row">
-          <div className="dash-card metric">
-            <h4>Total Sales (This Month)</h4>
-            <div className="metric-value">
+    <div className="dash-page w-full">
+      <div className="dash-container flex flex-col gap-4">
+        <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
+          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Sales (This Month)</h4>
+            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
               {loading ? <Skeleton width={90} height={24} /> : `₹${stats.totalSales.toLocaleString('en-IN')}`}
             </div>
-            <div className="metric-sub green">↑ 12% vs last month</div>
+            <div className="metric-sub green text-[var(--text-xs)] font-medium text-success [font-variant-numeric:tabular-nums]">↑ 12% vs last month</div>
           </div>
-          <div className="dash-card metric">
-            <h4>Total Orders</h4>
-            <div className="metric-value">
+          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Orders</h4>
+            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
               {loading ? <Skeleton width={90} height={24} /> : `${stats.totalOrders} Orders`}
             </div>
-            <div className="metric-sub">Retail {stats.retailOrders} | Bulk {stats.bulkOrders}</div>
+            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">Retail {stats.retailOrders} | Bulk {stats.bulkOrders}</div>
           </div>
-          <div className="dash-card metric">
-            <h4>Active Clients</h4>
-            <div className="metric-value">
+          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Active Clients</h4>
+            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
               {loading ? <Skeleton width={90} height={24} /> : stats.activeClients}
             </div>
-            <div className="metric-sub">Optical Stores + Enterprises</div>
+            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">Optical Stores + Enterprises</div>
           </div>
-          <div className="dash-card metric">
-            <h4>Pending Payments</h4>
-            <div className="metric-value">
+          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Pending Payments</h4>
+            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
               {loading ? <Skeleton width={90} height={24} /> : `₹${stats.pendingPayments.toLocaleString('en-IN')}`}
             </div>
-            <div className="metric-sub red">↓ 10% vs last month</div>
+            <div className="metric-sub red text-[var(--text-xs)] font-medium text-error [font-variant-numeric:tabular-nums]">↓ 10% vs last month</div>
           </div>
         </div>
 
         {!isSalesman && (
-        <div className="dash-row">
-          <div className="dash-card tall equal">
+        <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
+          <div className="dash-card tall equal col-span-9 max-[900px]:col-span-full max-[560px]:col-span-full h-[280px] max-[560px]:h-auto max-[560px]:min-h-[240px] flex flex-col [&>*:last-child]:flex-[1_1_auto] bg-surface border border-border rounded-lg shadow-sm p-5">
             <div className="chart-header" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6}}>
               <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700'}}>Sales & Revenue</h4>
               <select className="ui-select ui-pill chart-period-select" value={period} onChange={(e)=>setPeriod(e.target.value)} style={{height:28, padding:'0px 10px', fontSize:'12px'}}>
@@ -242,9 +242,9 @@ const Dashboard = () => {
               { label: 'Dec', sales: 44, revenue: 36 },
             ]), [])} height={220} />
           </div>
-          <div className="dash-card side equal">
+          <div className="dash-card side equal col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full h-[280px] max-[560px]:h-auto max-[560px]:min-h-[240px] flex flex-col [&>*:last-child]:flex-[1_1_auto] bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700'}}>Quick Actions</h4>
-            <div className="btn-col">
+            <div className="btn-col flex flex-col gap-2">
               <button className="ui-btn ui-btn--primary">Add New Product</button>
               <button className="ui-btn ui-btn--primary">Create Bulk Order</button>
               <button className="ui-btn ui-btn--primary">Generate Report</button>
@@ -255,36 +255,36 @@ const Dashboard = () => {
         )}
 
         {!isSalesman && (
-        <div className="dash-row">
-          <div className="dash-card">
-            <h4 className="card-title">Top Selling Products</h4>
+        <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
+          <div className="dash-card col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Top Selling Products</h4>
             <div className="mini-list">
               {[
                 {img:'/images/products/spac1.webp', name:'Anti-Fog Safety Goggles', units:'320 Units'},
                 {img:'/images/products/spac2.webp', name:'Anti-Fog Safety Goggles', units:'275 Units'},
                 {img:'/images/products/spac3.webp', name:'Anti-Fog Safety Goggles', units:'145 Units'},
               ].map((p,i)=> (
-                <div key={i} className="row">
-                  <img src={p.img} alt={p.name} className="prod-icon" />
-                  <div className="name">{p.name}</div>
-                  <div className="units">{p.units}</div>
+                <div key={i} className="row grid grid-cols-[50px_1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
+                  <img src={p.img} alt={p.name} className="prod-icon w-10 h-10 object-contain block rounded-sm" />
+                  <div className="name text-text font-medium text-[var(--text-sm)] leading-snug">{p.name}</div>
+                  <div className="units text-text-muted text-[var(--text-xs)] [font-variant-numeric:tabular-nums]">{p.units}</div>
                 </div>
               ))}
             </div>
           </div>
-          <div className="dash-card">
-            <h4 className="card-title">Inventory Alerts</h4>
+          <div className="dash-card col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Inventory Alerts</h4>
             <div className="inv-list">
               {[
                 {tag:'LOW STOCKS', type:'warn', img:'/images/products/spac1.webp', name:'Anti-Fog Safety Goggles', left:'43 Left'},
                 {tag:'OUT OF STOCKS', type:'danger', img:'/images/products/spac2.webp', name:'Anti-Fog Safety Goggles', left:'0 Left'},
                 {tag:'OUT OF STOCKS', type:'danger', img:'/images/products/spac3.webp', name:'Anti-Fog Safety Goggles', left:'0 Left'},
               ].map((r,i)=> (
-                <div key={i} className="row">
-                  <span className={`stock-badge ${r.type}`}>{r.tag}</span>
-                  <img src={r.img} alt={r.name} className="prod-icon" />
-                  <div className="name">{r.name}</div>
-                  <div className="units">{r.left}</div>
+                <div key={i} className="row grid grid-cols-[auto_50px_1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
+                  <span className={`stock-badge ${r.type} inline-flex items-center px-2 py-1 rounded-pill text-[var(--text-xs)] font-semibold leading-tight [font-variant-numeric:tabular-nums] ${r.type === 'warn' ? 'bg-warning-soft text-warning' : 'bg-error-soft text-error'}`}>{r.tag}</span>
+                  <img src={r.img} alt={r.name} className="prod-icon w-10 h-10 object-contain block rounded-sm" />
+                  <div className="name text-text font-medium text-[var(--text-sm)] leading-snug">{r.name}</div>
+                  <div className="units text-text-muted text-[var(--text-xs)] [font-variant-numeric:tabular-nums]">{r.left}</div>
                 </div>
               ))}
             </div>
@@ -296,8 +296,8 @@ const Dashboard = () => {
 
       {/* Salesman Targets - before Order Overview */}
       {isSalesman && (
-        <div className="dash-row" style={{marginTop:'16px'}}>
-          <div className="dash-card" style={{gridColumn:'span 12'}}>
+        <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3" style={{marginTop:'16px'}}>
+          <div className="dash-card col-span-12 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5" style={{gridColumn:'span 12'}}>
             <h4 style={{color:'#000000', fontSize:'14px', fontWeight:'700', marginBottom:'14px'}}>My Targets</h4>
             <div className="ui-table__scroll">
               <table style={{width:'100%', borderCollapse:'separate', borderSpacing:0}}>
@@ -338,8 +338,8 @@ const Dashboard = () => {
       )}
 
       {/* Order Overview */}
-      <div className="dash-row" style={{marginTop:'16px'}}>
-        <div className="dash-card" style={{gridColumn:'span 12'}}>
+      <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3" style={{marginTop:'16px'}}>
+        <div className="dash-card col-span-12 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5" style={{gridColumn:'span 12'}}>
           <h4 style={{color:'#000000', fontSize:'14px', fontWeight:'700', marginBottom:'10px'}}>Order Overview</h4>
           <div className="ui-table__scroll">
             <table style={{width:'100%', borderCollapse:'separate', borderSpacing:0}}>

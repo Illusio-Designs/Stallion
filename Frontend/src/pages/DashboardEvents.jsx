@@ -266,10 +266,10 @@ const DashboardEvents = () => {
   const rows = useMemo(() => events, [events]);
 
   return (
-    <div className="dash-page">
-      <div className="dash-container">
-        <div className="dash-row">
-          <div className="dash-card full">
+    <div className="dash-page w-full">
+      <div className="dash-container flex flex-col gap-4">
+        <div className="dash-row grid grid-cols-1 gap-3 min-[560px]:grid-cols-12 min-[560px]:gap-4">
+          <div className="dash-card full col-span-full bg-surface border border-border rounded-lg shadow-sm p-0">
             <TableWithControls
               title="Event Management"
               columns={columns}
@@ -304,38 +304,38 @@ const DashboardEvents = () => {
           </>
         )}
       >
-        <div className="ui-form">
-          <div className="form-group">
-            <label className="ui-label">Event Name <span style={{ color: 'red' }}>*</span></label>
+        <div className="ui-form grid grid-cols-1 gap-4 min-[560px]:grid-cols-2">
+          <div className="form-group flex flex-col gap-2">
+            <label className="ui-label text-sm font-medium text-text">Event Name <span style={{ color: 'red' }}>*</span></label>
             <input
-              className="ui-input"
+              className="ui-input w-full"
               placeholder="Enter event name"
               value={form.event_name}
               onChange={(e) => setForm((p) => ({ ...p, event_name: e.target.value }))}
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Start Date <span style={{ color: 'red' }}>*</span></label>
+          <div className="form-group flex flex-col gap-2">
+            <label className="ui-label text-sm font-medium text-text">Start Date <span style={{ color: 'red' }}>*</span></label>
             <input
               type="date"
-              className="ui-input"
+              className="ui-input w-full"
               value={form.start_date}
               onChange={(e) => setForm((p) => ({ ...p, start_date: e.target.value }))}
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">End Date <span style={{ color: 'red' }}>*</span></label>
+          <div className="form-group flex flex-col gap-2">
+            <label className="ui-label text-sm font-medium text-text">End Date <span style={{ color: 'red' }}>*</span></label>
             <input
               type="date"
-              className="ui-input"
+              className="ui-input w-full"
               value={form.end_date}
               onChange={(e) => setForm((p) => ({ ...p, end_date: e.target.value }))}
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Event Location <span style={{ color: 'red' }}>*</span></label>
+          <div className="form-group flex flex-col gap-2">
+            <label className="ui-label text-sm font-medium text-text">Event Location <span style={{ color: 'red' }}>*</span></label>
             <input
-              className="ui-input"
+              className="ui-input w-full"
               placeholder="Enter event location"
               value={form.event_location}
               onChange={(e) => setForm((p) => ({ ...p, event_location: e.target.value }))}
@@ -360,37 +360,37 @@ const DashboardEvents = () => {
           </>
         )}
       >
-        <div className="ui-form">
-          <div className="form-group">
-            <label className="ui-label">Event Name <span style={{ color: 'red' }}>*</span></label>
+        <div className="ui-form grid grid-cols-1 gap-4 min-[560px]:grid-cols-2">
+          <div className="form-group flex flex-col gap-2">
+            <label className="ui-label text-sm font-medium text-text">Event Name <span style={{ color: 'red' }}>*</span></label>
             <input
-              className="ui-input"
+              className="ui-input w-full"
               value={form.event_name}
               onChange={(e) => setForm((p) => ({ ...p, event_name: e.target.value }))}
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Start Date <span style={{ color: 'red' }}>*</span></label>
+          <div className="form-group flex flex-col gap-2">
+            <label className="ui-label text-sm font-medium text-text">Start Date <span style={{ color: 'red' }}>*</span></label>
             <input
               type="date"
-              className="ui-input"
+              className="ui-input w-full"
               value={form.start_date}
               onChange={(e) => setForm((p) => ({ ...p, start_date: e.target.value }))}
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">End Date <span style={{ color: 'red' }}>*</span></label>
+          <div className="form-group flex flex-col gap-2">
+            <label className="ui-label text-sm font-medium text-text">End Date <span style={{ color: 'red' }}>*</span></label>
             <input
               type="date"
-              className="ui-input"
+              className="ui-input w-full"
               value={form.end_date}
               onChange={(e) => setForm((p) => ({ ...p, end_date: e.target.value }))}
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Event Location <span style={{ color: 'red' }}>*</span></label>
+          <div className="form-group flex flex-col gap-2">
+            <label className="ui-label text-sm font-medium text-text">Event Location <span style={{ color: 'red' }}>*</span></label>
             <input
-              className="ui-input"
+              className="ui-input w-full"
               placeholder="Enter event location"
               value={form.event_location}
               onChange={(e) => setForm((p) => ({ ...p, event_location: e.target.value }))}

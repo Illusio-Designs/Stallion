@@ -937,49 +937,50 @@ const Cart = ({ onPageChange = null }) => {
   };
 
   return (
-    <div className="cart-page">
-      <div className="cart-container">
-        <div className="cart-content">
+    <div className="cart-page bg-bg px-[5%] py-8 min-h-[60vh] max-md:px-4 max-md:py-6">
+      <div className="cart-container max-w-[1200px] mx-auto">
+        <div className="cart-content grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 items-start">
           {/* Shopping Cart Section */}
-          <div className="shopping-cart-section">
-            <h2 className="section-title">Shopping Cart</h2>
+          <div className="shopping-cart-section bg-surface border border-border rounded-lg p-7 shadow-sm max-md:p-5">
+            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.01em] font-bold text-text m-0 mb-6">Shopping Cart</h2>
 
             {cartItems.length === 0 ? (
-              <div className="empty-cart">
-                <span className="empty-cart__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <div className="empty-cart flex flex-col items-center text-center gap-3 py-10 px-5">
+                <span className="empty-cart__icon w-12 h-12 rounded-pill flex items-center justify-center bg-surface-muted text-text-subtle mb-1" aria-hidden="true">
+                  <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="9" cy="21" r="1" />
                     <circle cx="20" cy="21" r="1" />
                     <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
                   </svg>
                 </span>
-                <p className="empty-cart__title">Your cart is empty</p>
-                <p className="empty-cart__desc">
+                <p className="empty-cart__title text-[length:var(--text-md)] font-semibold text-text m-0">Your cart is empty</p>
+                <p className="empty-cart__desc text-[length:var(--text-base)] text-text-muted max-w-[360px] m-0 leading-[var(--leading-normal)]">
                   Looks like you haven&apos;t added anything yet. Browse our collection to find your next pair.
                 </p>
                 <button
                   type="button"
-                  className="checkout-btn empty-cart__action"
+                  className="checkout-btn empty-cart__action mt-3 w-full min-h-12 bg-primary text-text-on-primary border border-primary px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
                   onClick={() => handlePageChange('products')}
                 >
                   Browse Products
                 </button>
               </div>
             ) : (
-              <div className="cart-items">
-                <div className="cart-items-header">
-                  <div className="header-item">ITEMS</div>
-                  <div className="header-qty">QTY</div>
-                  <div className="header-subtotal">SUBTOTAL</div>
-                  <div className="header-remove"></div>
+              <div className="cart-items flex flex-col">
+                <div className="cart-items-header grid grid-cols-[1fr_auto_auto] sm:grid-cols-[4fr_1fr_1fr_auto] gap-4 pb-3 border-b border-border font-semibold text-[length:var(--text-xs)] text-text-subtle uppercase tracking-[var(--tracking-label)]">
+                  <div className="header-item col-[1]">ITEMS</div>
+                  <div className="header-qty col-[2] text-center">QTY</div>
+                  <div className="header-subtotal col-[3] text-right hidden sm:block">SUBTOTAL</div>
+                  <div className="header-remove col-[4] w-8"></div>
                 </div>
 
                 {cartItems.map((item) => (
-                  <div key={item.id} className="cart-item">
-                  <div className="item-info">
-                    <div className="item-image">
-                      <img 
-                        src={item.image || '/images/products/spac1.webp'} 
+                  <div key={item.id} className="cart-item grid grid-cols-[1fr_auto] [grid-template-areas:'info_remove''qty_subtotal'] sm:grid-cols-[4fr_1fr_1fr_auto] sm:[grid-template-areas:none] gap-3 sm:gap-4 border-b border-border last:border-b-0 items-center py-4">
+                  <div className="item-info [grid-area:info] flex gap-4 items-center min-w-0">
+                    <div className="item-image w-14 h-14 sm:w-[72px] sm:h-[72px] flex-shrink-0 overflow-hidden flex items-center justify-center bg-surface-muted rounded-md">
+                      <img
+                        className="max-w-full max-h-full object-contain"
+                        src={item.image || '/images/products/spac1.webp'}
                         alt={item.name}
                         onError={(e) => {
                           // Fallback to default image if image fails to load
@@ -989,15 +990,15 @@ const Cart = ({ onPageChange = null }) => {
                         }}
                       />
                     </div>
-                    <div className="item-details">
-                      <h3 className="item-name">{getDisplayName(item)}</h3>
+                    <div className="item-details flex-1 min-w-0">
+                      <h3 className="item-name text-[length:var(--text-md)] leading-[var(--leading-snug)] font-medium text-text m-0">{getDisplayName(item)}</h3>
                     </div>
                   </div>
-                    <div className="item-qty">
-                      <div className="quantity-selector-cart">
+                    <div className="item-qty [grid-area:qty] flex justify-start sm:justify-center">
+                      <div className="quantity-selector-cart inline-flex items-center gap-1 bg-surface border border-border-strong rounded-md p-1 w-fit transition duration-[120ms] focus-within:border-primary focus-within:shadow-[var(--focus-ring)]">
                         <button
                           type="button"
-                          className="qty-btn-cart minus"
+                          className="qty-btn-cart minus bg-primary rounded-sm border border-primary cursor-pointer text-[length:var(--text-md)] leading-none text-text-on-primary w-8 h-8 flex items-center justify-center transition duration-[120ms] p-0 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.96] disabled:opacity-45 disabled:cursor-not-allowed"
                           onClick={() => handleQuantityDecrease(item.id)}
                           disabled={item.quantity <= 1}
                           aria-label="Decrease quantity"
@@ -1005,7 +1006,7 @@ const Cart = ({ onPageChange = null }) => {
                           -
                         </button>
                         <input
-                          className="qty-number-cart"
+                          className="qty-number-cart text-center font-semibold text-text bg-transparent text-[length:var(--text-base)] w-12 border-none [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:m-0 focus:outline-none focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] focus-visible:rounded-sm"
                           type="number"
                           step="1"
                           min="1"
@@ -1030,7 +1031,7 @@ const Cart = ({ onPageChange = null }) => {
                         />
                         <button
                           type="button"
-                          className="qty-btn-cart plus"
+                          className="qty-btn-cart plus bg-primary rounded-sm border border-primary cursor-pointer text-[length:var(--text-md)] leading-none text-text-on-primary w-8 h-8 flex items-center justify-center transition duration-[120ms] p-0 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.96] disabled:opacity-45 disabled:cursor-not-allowed"
                           onClick={() => handleQuantityIncrease(item.id)}
                           aria-label="Increase quantity"
                         >
@@ -1038,13 +1039,13 @@ const Cart = ({ onPageChange = null }) => {
                         </button>
                       </div>
                     </div>
-                    <div className="item-subtotal">
+                    <div className="item-subtotal [grid-area:subtotal] self-center sm:self-auto text-right text-[length:var(--text-md)] font-semibold text-text [font-variant-numeric:tabular-nums]">
                       {formatPrice(parseFloat(String(item.whp || item.mrp || 0).replace(/[₹,]/g, '')) * (parseInt(editingQuantities[item.id], 10) > 0 ? parseInt(editingQuantities[item.id], 10) : item.quantity))}
                     </div>
-                    <div className="item-remove">
+                    <div className="item-remove [grid-area:remove] self-start sm:self-auto w-8 flex justify-end sm:justify-center">
                       <button
                         type="button"
-                        className="remove-btn"
+                        className="remove-btn bg-none border-none text-text-subtle text-[length:var(--text-xl)] leading-none cursor-pointer w-8 h-8 flex items-center justify-center transition duration-[120ms] rounded-pill hover:bg-error-soft hover:text-error focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] focus-visible:text-error active:scale-[0.94]"
                         onClick={() => handleRemoveItem(item.id)}
                         title="Remove item"
                         aria-label={`Remove ${getDisplayName(item)} from cart`}
@@ -1059,17 +1060,17 @@ const Cart = ({ onPageChange = null }) => {
           </div>
 
           {/* Summary Section */}
-          <div className="summary-section">
-            <h2 className="section-title">Summary</h2>
+          <div className="summary-section bg-surface border border-border rounded-lg p-7 shadow-sm h-fit sticky top-[calc(var(--header-height)+1.25rem)] lg:static max-md:p-5 max-md:sticky max-md:bottom-0 max-md:top-auto">
+            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.01em] font-bold text-text m-0 mb-6">Summary</h2>
 
-            <div className="summary-form">
+            <div className="summary-form flex flex-col gap-4">
               {/* Order Type Dropdown - Only for Salesman */}
               {isSalesman && (
-                <div className="form-group">
-                  <label htmlFor="order-type" className="form-label">Order Type</label>
+                <div className="form-group flex flex-col gap-2">
+                  <label htmlFor="order-type" className="form-label text-[length:var(--text-sm)] font-medium text-text">Order Type</label>
                   <select
                     id="order-type"
-                    className="summary-dropdown"
+                    className="summary-dropdown w-full min-h-10 px-3 border border-border-strong rounded-md text-[length:var(--text-base)] text-text bg-surface cursor-pointer transition duration-[120ms] hover:border-grey-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)]"
                     value={orderType}
                     onChange={(e) => {
                       const newOrderType = e.target.value;
@@ -1095,11 +1096,11 @@ const Cart = ({ onPageChange = null }) => {
 
               {/* Country Dropdown - For Distributor and Salesman (when party selection is needed) */}
               {shouldShowCountryDropdown() && (
-                <div className="form-group">
-                  <label htmlFor="country" className="form-label">Country</label>
+                <div className="form-group flex flex-col gap-2">
+                  <label htmlFor="country" className="form-label text-[length:var(--text-sm)] font-medium text-text">Country</label>
                   <select
                     id="country"
-                    className="summary-dropdown"
+                    className="summary-dropdown w-full min-h-10 px-3 border border-border-strong rounded-md text-[length:var(--text-base)] text-text bg-surface cursor-pointer transition duration-[120ms] hover:border-grey-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)]"
                     value={selectedCountry}
                     onChange={(e) => {
                       setSelectedCountry(e.target.value);
@@ -1119,11 +1120,11 @@ const Cart = ({ onPageChange = null }) => {
 
               {/* Event Dropdown - Only for Salesman when event_order is selected */}
               {shouldShowEventDropdown() && (
-                <div className="form-group">
-                  <label htmlFor="event" className="form-label">Event</label>
+                <div className="form-group flex flex-col gap-2">
+                  <label htmlFor="event" className="form-label text-[length:var(--text-sm)] font-medium text-text">Event</label>
                   <select
                     id="event"
-                    className="summary-dropdown"
+                    className="summary-dropdown w-full min-h-10 px-3 border border-border-strong rounded-md text-[length:var(--text-base)] text-text bg-surface cursor-pointer transition duration-[120ms] hover:border-grey-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)]"
                     value={selectedEvent}
                     onChange={(e) => setSelectedEvent(e.target.value)}
                   >
@@ -1139,11 +1140,11 @@ const Cart = ({ onPageChange = null }) => {
 
               {/* Party Dropdown - For Distributor and Salesman (after order type selected) */}
               {shouldShowPartyDropdown() && (
-                <div className="form-group">
-                  <label htmlFor="party" className="form-label">Party</label>
+                <div className="form-group flex flex-col gap-2">
+                  <label htmlFor="party" className="form-label text-[length:var(--text-sm)] font-medium text-text">Party</label>
                   <select
                     id="party"
-                    className="summary-dropdown"
+                    className="summary-dropdown w-full min-h-10 px-3 border border-border-strong rounded-md text-[length:var(--text-base)] text-text bg-surface cursor-pointer transition duration-[120ms] hover:border-grey-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)]"
                     value={selectedParty}
                     onChange={(e) => setSelectedParty(e.target.value)}
                   >
@@ -1158,16 +1159,16 @@ const Cart = ({ onPageChange = null }) => {
               )}
             </div>
 
-            <div className="summary-breakdown">
-              <div className="breakdown-item">
-                <span className="breakdown-label">Subtotal:</span>
-                <span className="breakdown-value">
+            <div className="summary-breakdown flex flex-col gap-3 pt-6 mb-6 mt-6 border-t border-border">
+              <div className="breakdown-item flex justify-between items-baseline gap-4">
+                <span className="breakdown-label text-[length:var(--text-base)] text-text-muted font-normal">Subtotal:</span>
+                <span className="breakdown-value text-[length:var(--text-base)] text-text font-semibold [font-variant-numeric:tabular-nums]">
                   {formatPrice(calculateSubtotal())}
                 </span>
               </div>
-              <div className="breakdown-item total">
-                <span className="breakdown-label">Total:</span>
-                <span className="breakdown-value">
+              <div className="breakdown-item total flex justify-between items-baseline gap-4 pt-4 border-t border-border">
+                <span className="breakdown-label text-[length:var(--text-md)] text-text font-semibold">Total:</span>
+                <span className="breakdown-value text-[length:var(--text-lg)] text-text font-bold [font-variant-numeric:tabular-nums]">
                   {formatPrice(calculateTotal())}
                 </span>
               </div>
@@ -1175,12 +1176,12 @@ const Cart = ({ onPageChange = null }) => {
 
             <button
               type="button"
-              className="checkout-btn"
+              className="checkout-btn w-full min-h-12 bg-primary text-text-on-primary border border-primary px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleCheckout}
               disabled={loading}
               aria-busy={loading}
             >
-              {loading && <span className="checkout-btn__spinner" aria-hidden="true" />}
+              {loading && <span className="checkout-btn__spinner w-4 h-4 rounded-pill border-2 border-[rgba(255,255,255,0.4)] border-t-[var(--color-text-on-primary)] animate-spin motion-reduce:animate-none flex-shrink-0" aria-hidden="true" />}
               {loading ? 'PLACING ORDER...' : 'CHECKOUT'}
             </button>
           </div>
