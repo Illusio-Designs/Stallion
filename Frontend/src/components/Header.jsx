@@ -291,7 +291,7 @@ const Header = ({ onPageChange, currentPage }) => {
           </div>
           <div className="action-icons flex items-center gap-2">
             <button type="button" className="icon-btn cart-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text-on-primary transition-[background,transform] duration-200 ease-[ease] hover:bg-white/12 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.5)] active:scale-[0.94]" onClick={() => onPageChange('cart')} aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}>
-              <svg className="h-[22px] w-[22px] max-[500px]:h-5 max-[500px]:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+              <svg className="h-6 w-6 max-[500px]:h-[22px] max-[500px]:w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
                 <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
                 <path d="M3 6h18" />
                 <path d="M16 10a4 4 0 0 1-8 0" />
@@ -309,7 +309,7 @@ const Header = ({ onPageChange, currentPage }) => {
                 aria-haspopup={loggedIn ? 'menu' : undefined}
                 aria-expanded={loggedIn ? isUserDropdownOpen : undefined}
               >
-                <svg className="h-[22px] w-[22px] max-[500px]:h-5 max-[500px]:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <svg className="h-6 w-6 max-[500px]:h-[22px] max-[500px]:w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
                 <circle cx="12" cy="7" r="4" />
               </svg>
@@ -337,7 +337,7 @@ const Header = ({ onPageChange, currentPage }) => {
             </div>
             {!isMenuOpen && (
               <button type="button" ref={menuBtnRef} className="icon-btn menu-btn z-[1004] inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text-on-primary transition-[background,transform] duration-200 ease-[ease] hover:bg-white/12 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.5)] active:scale-[0.94] md:hidden" aria-label="Open menu" aria-expanded={isMenuOpen} aria-haspopup="dialog" onClick={() => setIsMenuOpen(true)}>
-                <svg className="h-[22px] w-[22px] max-[500px]:h-5 max-[500px]:w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                <svg className="h-6 w-6 max-[500px]:h-[22px] max-[500px]:w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
                   <path d="M3 6h18" /><path d="M3 12h18" /><path d="M3 18h18" />
                 </svg>
               </button>

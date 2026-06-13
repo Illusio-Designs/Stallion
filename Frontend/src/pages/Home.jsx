@@ -196,11 +196,19 @@ const Home = ({ onPageChange }) => {
 
         <div className="products-grid mx-auto grid max-w-[1400px] grid-cols-3 justify-start gap-8 lg:grid-cols-2 lg:gap-6 max-[426px]:grid-cols-2 max-[426px]:gap-4">
           {loadingProducts ? (
-            Array.from({ length: 8 }).map((_, i) => (
-              <div key={`home-product-skeleton-${i}`} style={{ padding: 8 }}>
-                <Skeleton width="100%" height={180} radius={12} />
-                <Skeleton width="70%" height={16} style={{ marginTop: 12, display: 'block' }} />
-                <Skeleton width="40%" height={14} style={{ marginTop: 8, display: 'block' }} />
+            Array.from({ length: 6 }).map((_, i) => (
+              <div
+                key={`home-product-skeleton-${i}`}
+                className="box-border h-full rounded-lg border border-border bg-surface p-4 shadow-sm"
+              >
+                <Skeleton width="100%" height={260} radius={8} />
+                <Skeleton width="70%" height={16} style={{ marginTop: 16, display: 'block' }} />
+                <Skeleton width="40%" height={16} style={{ marginTop: 12, display: 'block' }} />
+                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+                  <Skeleton width={22} height={22} radius={999} />
+                  <Skeleton width={22} height={22} radius={999} />
+                  <Skeleton width={22} height={22} radius={999} />
+                </div>
               </div>
             ))
           ) : featuredProducts.length > 0 ? (
@@ -298,12 +306,12 @@ const Home = ({ onPageChange }) => {
 
       {/* About Us Section */}
       <section className="about-section overflow-hidden bg-primary-active p-0">
-        <div className="about-container grid min-h-[500px] grid-cols-2">
+        <div className="about-container grid min-h-[360px] grid-cols-2">
           <div className="about-image relative w-[130%] overflow-hidden bg-primary-active max-md:w-[200%]">
             <img src="/images/banners/hero3.webp" alt="About Us" className="h-full w-full object-cover opacity-50 lg:w-[85%] max-md:w-full" />
             <div className="about-image-overlay absolute inset-0 z-[1] bg-[linear-gradient(304.14deg,var(--color-primary-active)_21.59%,rgba(18,14,77,0.4)_72.31%,var(--color-primary-active)_89.86%)]"></div>
           </div>
-          <div className="about-content relative z-[2] flex flex-col justify-center py-12 pl-0 pr-16 text-text-on-primary max-md:-ml-[90%] max-md:py-10 max-md:pr-6">
+          <div className="about-content relative z-[2] flex flex-col justify-center py-10 pl-0 pr-16 text-text-on-primary max-md:-ml-[90%] max-md:py-8 max-md:pr-6">
             <div className="about-goggles-icon pointer-events-none absolute right-16 top-10 z-10 opacity-[0.13] max-md:hidden">
               <img src="/images/banners/spacs.webp" alt="Goggles" className="relative right-[-115px] top-5 h-auto w-[300px] rotate-[-13deg] brightness-0 invert" />
             </div>
