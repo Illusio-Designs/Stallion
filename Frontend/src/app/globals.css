@@ -109,6 +109,9 @@
   --transition-fast: 0.12s ease;
   --transition: 0.2s ease;
   --transition-slow: 0.3s ease;
+
+  /* ---- Effects ---- */
+  --backdrop-blur: 3px;
 }
 
 

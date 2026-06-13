@@ -567,7 +567,7 @@
     position: fixed;
     inset: 0;
     background: rgba(26, 27, 35, 0.55);
-    backdrop-filter: blur(2px);
+    backdrop-filter: blur(var(--backdrop-blur));
     z-index: 1500;
     align-items: center;
     justify-content: center;

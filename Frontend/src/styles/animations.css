@@ -25,6 +25,10 @@
   from { opacity: 0; transform: translateX(12px); }
   to   { opacity: 1; transform: none; }
 }
+/* Canonical spinner keyframe — used by all loaders/buttons. */
+@keyframes ui-spin {
+  to { transform: rotate(360deg); }
+}
 
 /* The single easing curve used across the app (decelerate / ease-out). */
 :root {

@@ -836,7 +836,7 @@
   border: 3px solid rgba(255, 255, 255, 0.3);
   border-top-color: var(--color-text-on-primary);
   border-radius: 50%;
-  animation: spin 0.8s linear infinite;
+  animation: ui-spin 0.8s linear infinite;
   margin: 0 auto;
 }
 
@@ -848,11 +848,6 @@
   width: 100%;
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
 
 @media (prefers-reduced-motion: reduce) {
   .white-loader {

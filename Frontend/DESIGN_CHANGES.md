@@ -26,6 +26,10 @@
 - [x] **P2-13:** broken-image affordance — ProductCard/ProductDetail show an "image unavailable" state instead of blank space.
 - [x] **P2-11:** reusable `.price` / `.price--mrp` / `.price--accent` classes added to `ui.css`.
 - [x] **P1-6:** `.dash-card` + `.ui-card`/`.ui-panel` now carry a consistent `--shadow-sm` resting elevation.
+- [x] **P1-9:** spinner keyframes consolidated to one canonical `ui-spin` (in `animations.css`); removed the `ui-btn-spin`/`cart-spin`/`spin` duplicates.
+- [x] **P2-12:** `--backdrop-blur` token added; modal backdrops (ui.css, Products mobile filter) use it consistently.
+- ⏭️ **P1-7 (type) / P1-8 (breakpoints):** left as advisory — type-scale enforcement is a codebase-wide review, and breakpoint *tokens* aren't possible in plain CSS `@media` (custom properties can't be used in media queries).
+- ⏭️ **P2-14 (link semantics) / P2-16 (dropdown motion):** minor; deferred to avoid global-link regressions / low impact.
 - ⏸️ **P1-10 (deferred, by design):** dashboard phone pickers NOT migrated — would change the stored phone value format (`919…` → `+919…`) in party/distributor/user create/update payloads; needs backend agreement. Public Login flag is done.
 - ⏸️ **P0-4 (your call):** CSS↔Tailwind teardown — destructive + visually unverifiable; do as a QA'd step. CSS edits currently take effect since unlayered CSS wins.
 
