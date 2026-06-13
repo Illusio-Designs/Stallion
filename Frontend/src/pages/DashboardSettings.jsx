@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
-import PhoneInput from 'react-phone-input-2';
-import 'react-phone-input-2/lib/style.css';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 import { showSuccess, showError } from '../services/notificationService';
 import { updateUser, getUsers } from '../services/apiService';
 import { getUser } from '../services/authService';
@@ -602,18 +602,13 @@ const DashboardSettings = () => {
                 <div className="form-group flex flex-col gap-2">
                   <label className="ui-label">Phone Number</label>
                   <PhoneInput
-                    country={'in'}
-                    value={phone}
-                    onChange={setPhone}
+                    defaultCountry="in"
+                    value={phone ? (String(phone).startsWith('+') ? String(phone) : '+' + phone) : ''}
+                    onChange={(phone) => setPhone(phone.replace(/^\+/, ''))}
+                    className="phone-intl"
                     inputProps={{
                       placeholder: 'Enter your phone number',
                     }}
-                    containerClass="phone-input-container"
-                    inputClass="phone-input-field"
-                    buttonClass="phone-input-button"
-                    dropdownClass="phone-input-dropdown"
-                    disableDropdown={false}
-                    disableCountryGuess={false}
                   />
                 </div>
 

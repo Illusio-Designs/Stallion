@@ -3,8 +3,8 @@ import TableWithControls from '../components/ui/TableWithControls';
 import Modal from '../components/ui/Modal';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import PhoneInput from 'react-phone-input-2';
-import 'react-phone-input-2/lib/style.css';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 import {
   getDistributors,
   createDistributor,
@@ -1457,19 +1457,14 @@ const DashboardDistributor = () => {
           <div className="form-group">
             <label className="ui-label">Phone *</label>
             <PhoneInput
-              country={'in'}
-              value={formData.phone}
-              onChange={(value) => handleInputChange('phone', value)}
+              defaultCountry="in"
+              value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
+              onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
+              className="phone-intl"
               inputProps={{
                 required: true,
                 placeholder: 'Enter your phone number',
               }}
-              containerClass="phone-input-container"
-              inputClass="phone-input-field"
-              buttonClass="phone-input-button"
-              dropdownClass="phone-input-dropdown"
-              disableDropdown={false}
-              disableCountryGuess={false}
             />
           </div>
           <div className="form-group">

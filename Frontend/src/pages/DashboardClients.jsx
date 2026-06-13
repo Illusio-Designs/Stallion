@@ -3,8 +3,8 @@ import TableWithControls from '../components/ui/TableWithControls';
 import Modal from '../components/ui/Modal';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import PhoneInput from 'react-phone-input-2';
-import 'react-phone-input-2/lib/style.css';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 import {
   getParties,
   createParty,
@@ -1279,19 +1279,14 @@ const DashboardClients = () => {
           <div className="form-group">
             <label className="ui-label">Phone *</label>
             <PhoneInput
-              country={'in'}
-              value={formData.phone}
-              onChange={(value) => handleInputChange('phone', value)}
+              defaultCountry="in"
+              value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
+              onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
+              className="phone-intl"
               inputProps={{
                 required: true,
                 placeholder: 'Enter your phone number',
               }}
-              containerClass="phone-input-container"
-              inputClass="phone-input-field"
-              buttonClass="phone-input-button"
-              dropdownClass="phone-input-dropdown"
-              disableDropdown={false}
-              disableCountryGuess={false}
             />
           </div>
           <div className="form-group">
@@ -1312,8 +1307,8 @@ const DashboardClients = () => {
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Address</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               placeholder="Address"
               value={formData.address}
               onChange={(e) => handleInputChange('address', e.target.value)}
@@ -1321,8 +1316,8 @@ const DashboardClients = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">Pincode</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               placeholder="Pincode"
               value={formData.pincode}
               onChange={(e) => handleInputChange('pincode', e.target.value)}
@@ -1390,8 +1385,8 @@ const DashboardClients = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">GSTIN</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               placeholder="GSTIN"
               value={formData.gstin}
               onChange={(e) => handleInputChange('gstin', e.target.value)}
@@ -1399,8 +1394,8 @@ const DashboardClients = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">PAN</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               placeholder="PAN"
               value={formData.pan}
               onChange={(e) => handleInputChange('pan', e.target.value)}
@@ -1408,8 +1403,8 @@ const DashboardClients = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">Credit Days</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               type="number"
               placeholder="Credit Days"
               value={formData.credit_days}
@@ -1502,19 +1497,14 @@ const DashboardClients = () => {
           <div className="form-group">
             <label className="ui-label">Phone *</label>
             <PhoneInput
-              country={'in'}
-              value={formData.phone}
-              onChange={(value) => handleInputChange('phone', value)}
+              defaultCountry="in"
+              value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
+              onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
+              className="phone-intl"
               inputProps={{
                 required: true,
                 placeholder: 'Enter your phone number',
               }}
-              containerClass="phone-input-container"
-              inputClass="phone-input-field"
-              buttonClass="phone-input-button"
-              dropdownClass="phone-input-dropdown"
-              disableDropdown={false}
-              disableCountryGuess={false}
             />
           </div>
           <div className="form-group">

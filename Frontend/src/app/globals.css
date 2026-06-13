@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../styles/animations.css";
+@import "../styles/components/phone-input.css";
 
 /* ============================================================
    Design tokens — single source of truth for theme values.

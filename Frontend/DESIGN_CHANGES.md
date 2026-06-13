@@ -30,7 +30,7 @@
 - [x] **P2-12:** `--backdrop-blur` token added; modal backdrops (ui.css, Products mobile filter) use it consistently.
 - ⏭️ **P1-7 (type) / P1-8 (breakpoints):** left as advisory — type-scale enforcement is a codebase-wide review, and breakpoint *tokens* aren't possible in plain CSS `@media` (custom properties can't be used in media queries).
 - ⏭️ **P2-14 (link semantics) / P2-16 (dropdown motion):** minor; deferred to avoid global-link regressions / low impact.
-- ⏸️ **P1-10 (deferred, by design):** dashboard phone pickers NOT migrated — would change the stored phone value format (`919…` → `+919…`) in party/distributor/user create/update payloads; needs backend agreement. Public Login flag is done.
+- [x] **P1-10 (DONE):** all 5 dashboard forms (Clients, Suppliers, Distributor, OfficeTeam, Settings — 10 inputs) migrated to `react-international-phone` (crisp flags, shared `.phone-intl` theme). **Payload-safe**: value normalized to `+91…` for display but the leading `+` is stripped on change so the stored/sent value stays `919…` — identical to before. `react-phone-input-2` removed. (Note: the Add-Distributor modal uses a plain text input by pre-existing design — left as-is to avoid changing its create payload.)
 - ⏸️ **P0-4 (your call):** CSS↔Tailwind teardown — destructive + visually unverifiable; do as a QA'd step. CSS edits currently take effect since unlayered CSS wins.
 
 ---

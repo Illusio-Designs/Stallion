@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import PhoneInput from 'react-phone-input-2';
-import 'react-phone-input-2/lib/style.css';
+import { PhoneInput } from 'react-international-phone';
+import 'react-international-phone/style.css';
 import TableWithControls from '../components/ui/TableWithControls';
 import Modal from '../components/ui/Modal';
 import RowActions from '../components/ui/RowActions';
@@ -587,19 +587,14 @@ const DashboardOfficeTeam = () => {
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
             <label className="ui-label text-[var(--text-sm)] font-medium text-text">Phone Number *</label>
             <PhoneInput
-              country={'in'}
-              value={formData.phoneNumber}
-              onChange={(value) => handleInputChange('phoneNumber', value)}
+              defaultCountry="in"
+              value={formData.phoneNumber ? (String(formData.phoneNumber).startsWith('+') ? String(formData.phoneNumber) : '+' + formData.phoneNumber) : ''}
+              onChange={(phone) => handleInputChange('phoneNumber', phone.replace(/^\+/, ''))}
+              className="phone-intl"
               inputProps={{
                 required: true,
                 placeholder: 'Enter your phone number',
               }}
-              containerClass="phone-input-container"
-              inputClass="phone-input-field"
-              buttonClass="phone-input-button"
-              dropdownClass="phone-input-dropdown"
-              disableDropdown={false}
-              disableCountryGuess={false}
             />
           </div>
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
@@ -666,19 +661,14 @@ const DashboardOfficeTeam = () => {
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
             <label className="ui-label text-[var(--text-sm)] font-medium text-text">Phone Number *</label>
             <PhoneInput
-              country={'in'}
-              value={editFormData.phoneNumber}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, phoneNumber: value }))}
+              defaultCountry="in"
+              value={editFormData.phoneNumber ? (String(editFormData.phoneNumber).startsWith('+') ? String(editFormData.phoneNumber) : '+' + editFormData.phoneNumber) : ''}
+              onChange={(phone) => setEditFormData(prev => ({ ...prev, phoneNumber: phone.replace(/^\+/, '') }))}
+              className="phone-intl"
               inputProps={{
                 required: true,
                 placeholder: 'Enter phone number',
               }}
-              containerClass="phone-input-container"
-              inputClass="phone-input-field"
-              buttonClass="phone-input-button"
-              dropdownClass="phone-input-dropdown"
-              disableDropdown={false}
-              disableCountryGuess={false}
             />
           </div>
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
