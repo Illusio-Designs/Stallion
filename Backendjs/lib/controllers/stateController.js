@@ -16,6 +16,22 @@ class StateController {
         }
     }
 
+    async getStateById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ error: 'State ID is required' });
+            }
+            const state = await State.findOne({ where: { id } });
+            if (!state) {
+                return res.status(404).json({ error: 'State not found' });
+            }
+            res.status(200).json(state);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async createState(req, res) {
         try {
             const user = req.user;

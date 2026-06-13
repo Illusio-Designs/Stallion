@@ -12,6 +12,22 @@ class FrameTypeController {
             res.status(500).json({ error: error.message });
         }
     }
+    async getFrameTypeById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ error: 'Frame type ID is required' });
+            }
+            const frameType = await FrameType.findOne({ where: { frame_type_id: id } });
+            if (!frameType) {
+                return res.status(404).json({ error: 'Frame type not found' });
+            }
+            res.status(200).json(frameType);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async createFrameType(req, res) {
         try {
             const user = req.user;

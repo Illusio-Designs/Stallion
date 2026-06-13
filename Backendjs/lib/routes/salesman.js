@@ -5,6 +5,7 @@ const { authenticateToken } = require('../middleware/auth');
 
 router.get('/', authenticateToken, salesmanController.getSalesman);
 router.get('/parties', authenticateToken, salesmanController.getSalesmanParties);
+router.get('/:id', authenticateToken, salesmanController.getSalesmanById);
 router.post('/get', authenticateToken, salesmanController.getSalesmen);
 router.post('/', authenticateToken, salesmanController.createSalesman);
 router.put('/:id', authenticateToken, salesmanController.updateSalesman);

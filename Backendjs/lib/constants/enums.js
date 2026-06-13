@@ -21,6 +21,16 @@ const OrderStatus = {
     COMPLETED: 'completed',
 };
 
+const OrderStatusTransitions = {
+    [OrderStatus.PENDING]: [OrderStatus.PROCESSED, OrderStatus.CANCELLED],
+    [OrderStatus.PROCESSED]: [OrderStatus.HOLD_BY_TRAY, OrderStatus.CANCELLED],
+    [OrderStatus.HOLD_BY_TRAY]: [OrderStatus.DISPATCHED, OrderStatus.PARTIALLY_DISPATCHED, OrderStatus.CANCELLED],
+    [OrderStatus.DISPATCHED]: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+    [OrderStatus.PARTIALLY_DISPATCHED]: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+    [OrderStatus.COMPLETED]: [],
+    [OrderStatus.CANCELLED]: [],
+};
+
 const OrderType = {
     PARTY_ORDER: 'party_order',
     DISTRIBUTOR_ORDER: 'distributor_order',
@@ -34,4 +44,4 @@ const EventStatus = {
     ONGOING: 'ongoing',
     PAST: 'past',
 };
-module.exports = { TrayStatus, TrayProductStatus, OrderStatus, OrderType, EventStatus };
+module.exports = { TrayStatus, TrayProductStatus, OrderStatus, OrderStatusTransitions, OrderType, EventStatus };

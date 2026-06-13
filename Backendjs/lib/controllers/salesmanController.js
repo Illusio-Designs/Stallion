@@ -46,6 +46,23 @@ class SalesmanController {
         }
     }
 
+    async getSalesmanById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ error: 'Salesman ID is required' });
+            }
+            const salesman = await Salesman.findOne({ where: { salesman_id: id } });
+            if (!salesman) {
+                return res.status(404).json({ error: 'Salesman not found' });
+            }
+            const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: id } });
+            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async getSalesmen(req, res) {
         try {
             const salesmen = await Salesman.findAll({ where: { is_active: true } });

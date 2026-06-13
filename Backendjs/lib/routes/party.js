@@ -8,6 +8,7 @@ const parsePartyFile = require('../middleware/party_parser');
 router.get('/', authenticateToken, partyController.getPartie);
 router.get('/my', authenticateToken, partyController.getMyParties);
 router.get('/salesman/:salesman_id', authenticateToken, partyController.getPartiesBySalesmanId);
+router.get('/:id', authenticateToken, partyController.getPartyById);
 router.post('/get', authenticateToken, partyController.getParties);
 router.post('/', authenticateToken, partyController.createParty);
 router.put('/:id', authenticateToken, partyController.updateParty);

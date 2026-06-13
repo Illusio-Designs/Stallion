@@ -13,6 +13,22 @@ class FrameColorController {
             res.status(500).json({ error: error.message });
         }
     }
+    async getFrameColorById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ error: 'Frame color ID is required' });
+            }
+            const frameColor = await FrameColor.findOne({ where: { frame_color_id: id } });
+            if (!frameColor) {
+                return res.status(404).json({ error: 'Frame color not found' });
+            }
+            res.status(200).json(frameColor);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async createFrameColor(req, res) {
         try {
             const user = req.user;

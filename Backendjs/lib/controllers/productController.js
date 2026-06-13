@@ -15,6 +15,19 @@ const path = require('path');
 const fs = require('fs');
 const { Op, Sequelize } = require('sequelize');
 
+const productIncludes = [
+    { model: Gender, as: 'gender' },
+    { model: ColorCode, as: 'color_code' },
+    { model: Shape, as: 'shape' },
+    { model: LensColor, as: 'lens_color' },
+    { model: FrameColor, as: 'frame_color' },
+    { model: FrameType, as: 'frame_type' },
+    { model: LensMaterial, as: 'lens_material' },
+    { model: FrameMaterial, as: 'frame_material' },
+    { model: Brand, as: 'brand' },
+    { model: Collection, as: 'collection' },
+];
+
 class ProductController {
     async getFeaturedProducts(req, res) {
         try {
@@ -39,60 +52,84 @@ class ProductController {
 
     async getProducts(req, res) {
         try {
-            const { page, limit } = req.query;
+            const { page, limit, search: searchQuery } = req.query;
             if (!page || !limit) {
                 return res.status(400).json({ error: 'Page and limit are required' });
             }
             if (isNaN(page) || isNaN(limit)) {
                 return res.status(400).json({ error: 'Page and limit must be numbers' });
             }
-            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id } = req.body;
-            const filter = {};
+            const pageNum = parseInt(page, 10);
+            const limitNum = parseInt(limit, 10);
+            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody } = req.body;
+            const search = (searchQuery || searchBody || '').trim();
+            const conditions = [];
 
             if (collection_id) {
-                filter.collection_id = collection_id;
+                conditions.push({ collection_id });
             }
             if (brand_id) {
-                filter.brand_id = brand_id;
+                conditions.push({ brand_id });
             }
             if (color_code_id) {
-                filter.color_code_id = color_code_id;
+                conditions.push({ color_code_id });
             }
             if (shape_id) {
-                filter.shape_id = shape_id;
+                conditions.push({ shape_id });
             }
             if (lens_color_id) {
-                filter.lens_color_id = lens_color_id;
+                conditions.push({ lens_color_id });
             }
             if (frame_color_id) {
-                filter.frame_color_id = frame_color_id;
+                conditions.push({ frame_color_id });
             }
             if (frame_type_id) {
-                filter.frame_type_id = frame_type_id;
+                conditions.push({ frame_type_id });
             }
             if (lens_material_id) {
-                filter.lens_material_id = lens_material_id;
+                conditions.push({ lens_material_id });
             }
             if (frame_material_id) {
-                filter.frame_material_id = frame_material_id;
+                conditions.push({ frame_material_id });
             }
             if (gender_id) {
-                filter.gender_id = gender_id;
+                conditions.push({ gender_id });
             }
             if (price) {
-                filter.mrp = {
-                    [Op.gte]: price.min,
-                    [Op.lte]: price.max
-                };
-            }
-            const products = await Product.findAll(
-                {
-                    where: filter, limit: parseInt(limit), offset: (parseInt(page) - 1) * parseInt(limit)
+                conditions.push({
+                    mrp: {
+                        [Op.gte]: price.min,
+                        [Op.lte]: price.max
+                    }
                 });
-            if (!products || products.length === 0) {
-                return res.status(404).json({ error: 'Products not found' });
             }
-            res.status(200).json(products);
+            if (search) {
+                const searchTerm = `%${search}%`;
+                conditions.push({
+                    [Op.or]: [
+                        { model_no: { [Op.like]: searchTerm } },
+                        { size_mm: { [Op.like]: searchTerm } },
+                        { status: { [Op.like]: searchTerm } },
+                    ]
+                });
+            }
+            const where = conditions.length > 0 ? { [Op.and]: conditions } : {};
+            const { count, rows: products } = await Product.findAndCountAll({
+                where,
+                include: productIncludes,
+                limit: limitNum,
+                offset: (pageNum - 1) * limitNum,
+                distinct: true,
+            });
+            res.status(200).json({
+                data: products,
+                pagination: {
+                    page: pageNum,
+                    limit: limitNum,
+                    total: count,
+                    totalPages: Math.ceil(count / limitNum) || 0,
+                }
+            });
         } catch (error) {
             console.log(error);
             res.status(500).json({ error: error.message });

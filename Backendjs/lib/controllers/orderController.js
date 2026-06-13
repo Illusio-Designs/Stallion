@@ -5,7 +5,7 @@ const Distributor = require('../models/distributor');
 const Salesman = require('../models/Salesman');
 const Product = require('../models/Product');
 const TrayProducts = require('../models/TrayProducts');
-const { TrayProductStatus, OrderStatus, OrderType } = require('../constants/enums');
+const { TrayProductStatus, OrderStatus, OrderStatusTransitions, OrderType } = require('../constants/enums');
 const { generateUniqueOrderNumber } = require('../services/order_number_generator');
 const Event = require('../models/event');
 const OrderOperation = require('../models/OrderOperation');
@@ -496,6 +496,24 @@ class OrderController {
             const order = await Order.findOne({ where: { order_id: id } });
             if (!order) {
                 return res.status(404).json({ error: 'Order not found' });
+            }
+            if (!Object.values(OrderStatus).includes(order_status)) {
+                return res.status(400).json({ error: 'Invalid order status. Allowed values are: ' + Object.values(OrderStatus).join(', ') });
+            }
+            const currentStatus = order.order_status;
+            if (currentStatus !== order_status) {
+                const allowedNextStatuses = OrderStatusTransitions[currentStatus] || [];
+                if (!allowedNextStatuses.includes(order_status)) {
+                    if (currentStatus === OrderStatus.CANCELLED) {
+                        return res.status(400).json({ error: 'Cancelled orders cannot be updated' });
+                    }
+                    if (currentStatus === OrderStatus.COMPLETED) {
+                        return res.status(400).json({ error: 'Completed orders cannot be updated' });
+                    }
+                    return res.status(400).json({
+                        error: `Cannot update order status from '${currentStatus}' to '${order_status}'`
+                    });
+                }
             }
             if (order_status === OrderStatus.DISPATCHED || order_status === OrderStatus.PARTIALLY_DISPATCHED) {
                 if (!courier_name || !courier_tracking_number) {

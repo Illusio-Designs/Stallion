@@ -12,6 +12,22 @@ class FrameMaterialController {
             res.status(500).json({ error: error.message });
         }
     }
+    async getFrameMaterialById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ error: 'Frame material ID is required' });
+            }
+            const frameMaterial = await FrameMaterial.findOne({ where: { frame_material_id: id } });
+            if (!frameMaterial) {
+                return res.status(404).json({ error: 'Frame material not found' });
+            }
+            res.status(200).json(frameMaterial);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async createFrameMaterial(req, res) {
         try {
             const user = req.user;

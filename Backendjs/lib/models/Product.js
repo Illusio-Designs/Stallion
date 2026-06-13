@@ -207,4 +207,26 @@ const Product = sequelize.define('Product', {
     ]
 });
 
+const Brand = require('./Brand');
+const Collection = require('./Collection');
+const ColorCode = require('./ColorCode');
+const Shape = require('./Shape');
+const LensColor = require('./LensColor');
+const FrameColor = require('./FrameColor');
+const FrameType = require('./FrameType');
+const LensMaterial = require('./LensMaterial');
+const FrameMaterial = require('./FrameMaterial');
+const Gender = require('./Gender');
+
+Product.belongsTo(Gender, { foreignKey: 'gender_id', as: 'gender' });
+Product.belongsTo(ColorCode, { foreignKey: 'color_code_id', as: 'color_code' });
+Product.belongsTo(Shape, { foreignKey: 'shape_id', as: 'shape' });
+Product.belongsTo(LensColor, { foreignKey: 'lens_color_id', as: 'lens_color' });
+Product.belongsTo(FrameColor, { foreignKey: 'frame_color_id', as: 'frame_color' });
+Product.belongsTo(FrameType, { foreignKey: 'frame_type_id', as: 'frame_type' });
+Product.belongsTo(LensMaterial, { foreignKey: 'lens_material_id', as: 'lens_material' });
+Product.belongsTo(FrameMaterial, { foreignKey: 'frame_material_id', as: 'frame_material' });
+Product.belongsTo(Brand, { foreignKey: 'brand_id', as: 'brand' });
+Product.belongsTo(Collection, { foreignKey: 'collection_id', as: 'collection' });
+
 module.exports = Product;

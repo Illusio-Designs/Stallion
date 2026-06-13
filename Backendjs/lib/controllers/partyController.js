@@ -40,6 +40,22 @@ class PartyController {
         }
     }
 
+    async getPartyById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ error: 'Party ID is required' });
+            }
+            const party = await Party.findOne({ where: { party_id: id } });
+            if (!party) {
+                return res.status(404).json({ error: 'Party not found' });
+            }
+            res.status(200).json(party);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
 
     async getMyParties(req, res) {
         try {

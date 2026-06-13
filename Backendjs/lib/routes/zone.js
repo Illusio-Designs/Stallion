@@ -4,6 +4,7 @@ const router = express.Router();
 const zoneController = require('../controllers/zoneController');
 const { authenticateToken } = require('../middleware/auth');
 
+router.get('/:id', authenticateToken, zoneController.getZoneById);
 router.post('/get', authenticateToken, zoneController.getZones);
 router.post('/my', authenticateToken, zoneController.getMyZones);
 router.post('/', authenticateToken, zoneController.createZone);

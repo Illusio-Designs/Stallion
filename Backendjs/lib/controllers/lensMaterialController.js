@@ -13,6 +13,22 @@ class LensMaterialController {
             res.status(500).json({ error: error.message });
         }
     }
+    async getLensMaterialById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ error: 'Lens material ID is required' });
+            }
+            const lensMaterial = await LensMaterial.findOne({ where: { lens_material_id: id } });
+            if (!lensMaterial) {
+                return res.status(404).json({ error: 'Lens material not found' });
+            }
+            res.status(200).json(lensMaterial);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async createLensMaterial(req, res) {
         try {
             const user = req.user;

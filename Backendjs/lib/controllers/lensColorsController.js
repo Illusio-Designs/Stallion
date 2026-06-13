@@ -12,6 +12,22 @@ class LensColorsController {
             res.status(500).json({ error: error.message });
         }
     }
+    async getLensColorById(req, res) {
+        try {
+            const { id } = req.params;
+            if (!id) {
+                return res.status(400).json({ error: 'Lens color ID is required' });
+            }
+            const lensColor = await LensColor.findOne({ where: { lens_color_id: id } });
+            if (!lensColor) {
+                return res.status(404).json({ error: 'Lens color not found' });
+            }
+            res.status(200).json(lensColor);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async createLensColor(req, res) {
         try {
             const user = req.user;
