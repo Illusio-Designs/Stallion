@@ -21,13 +21,10 @@ const API_DEBUG = process.env.NEXT_PUBLIC_API_DEBUG === 'true';
  * Always uses live API URL directly
  */
 const getBaseURL = () => {
-  // In development, route through the same-origin Next.js rewrite proxy
-  // (/api -> live API) so the browser never makes a cross-origin request to the
-  // API from localhost — this avoids the CORS "Failed to fetch" in dev.
-  // Production calls the API directly via NEXT_PUBLIC_API_URL.
-  if (process.env.NODE_ENV === 'development') {
-    return '/api';
-  }
+  // Always call the API directly (no proxy) in both dev and production.
+  // CORS and bot-protection are server concerns: the API must allow the site
+  // origin (CORS) and exclude /api from Imunify360 bot-protection.
+  // Configure the URL via NEXT_PUBLIC_API_URL.
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
   if (envUrl) {
     let url = envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
@@ -36,7 +33,6 @@ const getBaseURL = () => {
     }
     return url;
   }
-  // Default to live API URL (matches NEXT_PUBLIC_API_URL in .env / deploy env).
   return 'https://api.stallioneyewear.in/api';
 };
 
