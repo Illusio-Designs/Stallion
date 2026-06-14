@@ -328,10 +328,17 @@ export const updateProduct = async (productId, productData) => {
  * @returns {Promise<Array>} Array of product model objects
  */
 export const getProductById = async (productId) => {
-  return apiRequest(`/products/${productId}`, {
-    method: 'GET',
+  // The backend has no GET /products/:id route. Resolve a product by querying the
+  // real list endpoint (POST /products) and matching product_id client-side.
+  // This is a legacy fallback — the primary product flow is model_no based.
+  if (!productId) return null;
+  const resp = await apiRequest('/products?page=1&limit=1000', {
+    method: 'POST',
+    body: {},
     includeAuth: true,
   });
+  const list = Array.isArray(resp) ? resp : (resp?.data || []);
+  return list.find((p) => String(p.product_id) === String(productId)) || null;
 };
 
 export const getProductModels = async (modelNo) => {
