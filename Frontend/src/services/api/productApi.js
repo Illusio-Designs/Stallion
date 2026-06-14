@@ -6,7 +6,7 @@ import { getCached, invalidateCache } from '../cacheService';
 /**
  * Get all products
  * @param {number} [page=1] - Page number (default: 1)
- * @param {number} [limit=21] - Items per page (default: 21)
+ * @param {number} [limit=20] - Items per page (default: 20)
  * @param {Object} [filters={}] - Filter options
  * @param {number|Array<number>} [filters.gender_id] - Gender ID(s)
  * @param {number|Array<number>} [filters.color_code_id] - Color code ID(s)
@@ -22,9 +22,9 @@ import { getCached, invalidateCache } from '../cacheService';
  * @param {number} [filters.price.max] - Maximum price
  * @returns {Promise<Array>} Array of product objects
  */
-const fetchProductsUncached = async (page = 1, limit = 21, filters = {}) => {
+const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
   try {
-    // Build query string for page and limit (matching Postman: /products/?page=1&limit=21)
+    // Build query string for page and limit (matching Postman: /products/?page=1&limit=20)
     const queryParams = new URLSearchParams();
     queryParams.append('page', page.toString());
     queryParams.append('limit', limit.toString());
@@ -164,11 +164,11 @@ const fetchProductsUncached = async (page = 1, limit = 21, filters = {}) => {
  * automatically whenever a product is created, updated, or deleted.
  *
  * @param {number} [page=1] - Page number
- * @param {number} [limit=21] - Items per page
+ * @param {number} [limit=20] - Items per page
  * @param {Object|null} [filters={}] - Filter object (null = all products)
  * @returns {Promise<Array>}
  */
-export const getProducts = async (page = 1, limit = 21, filters = {}) => {
+export const getProducts = async (page = 1, limit = 20, filters = {}) => {
   const key = `products:${page}:${limit}:${JSON.stringify(filters ?? null)}`;
   return getCached(key, () => fetchProductsUncached(page, limit, filters), TTL_PRODUCTS);
 };
