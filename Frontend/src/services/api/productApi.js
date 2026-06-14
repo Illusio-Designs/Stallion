@@ -390,7 +390,7 @@ export const uploadProductImage = async (productImages, productId) => {
   const fullUrl = `${baseUrl}/products/image-upload`;
   
   const token = getAuthToken();
-  const headers = {};
+  const headers = { Accept: 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
@@ -438,7 +438,7 @@ export const bulkUploadProducts = async (file) => {
   formData.append('file', file);
   
   const token = getAuthToken();
-  const headers = {};
+  const headers = { Accept: 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }

@@ -174,7 +174,7 @@ export const updateUser = async (userId, userData) => {
     console.log('image_url:', image_url || '');
     
     const token = getAuthToken();
-    const headers = {};
+    const headers = { Accept: 'application/json' };
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
@@ -233,7 +233,7 @@ export const uploadProfileImage = async (userId, profileImage) => {
   formData.append('file', profileImage);
   
   const token = getAuthToken();
-  const headers = {};
+  const headers = { Accept: 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }

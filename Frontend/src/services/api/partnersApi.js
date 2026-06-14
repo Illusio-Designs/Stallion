@@ -884,7 +884,7 @@ export const bulkUploadParties = async (file) => {
   const formData = new FormData();
   formData.append('file', file);
   const token = getAuthToken();
-  const headers = {};
+  const headers = { Accept: 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   const response = await fetch(fullUrl, {
     method: 'POST',

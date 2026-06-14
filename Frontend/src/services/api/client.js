@@ -63,11 +63,12 @@ const getAuthToken = () => {
  * Get headers for API requests
  */
 const getHeaders = (includeAuth = true) => {
-  // NOTE: Content-Type is intentionally NOT set here. apiRequest adds
-  // 'application/json' only when it actually sends a JSON body. Sending a
-  // Content-Type on a bodyless GET/DELETE makes the API (openresty) reject it
-  // with 415 Unsupported Media Type.
-  const headers = {};
+  // Always advertise JSON in Accept: the openresty layer in front of the API
+  // returns 415 for any request whose Accept is */* (fetch's default), so this
+  // header is REQUIRED on every request. Content-Type is NOT set here — apiRequest
+  // adds it only when a JSON body is sent (a Content-Type on a bodyless GET/DELETE
+  // also triggers the 415).
+  const headers = { Accept: 'application/json' };
 
   if (includeAuth) {
     const token = getAuthToken();
