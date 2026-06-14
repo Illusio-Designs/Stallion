@@ -17,12 +17,19 @@ const nextConfig = {
     ],
   },
   async rewrites() {
-    // Same-origin proxy: forward /api/* to the live API server-side so the
-    // browser never makes a cross-origin (CORS) request from localhost in dev.
-    // The client uses a relative `/api` base in development (see getBaseURL);
-    // production calls the API directly.
-    const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'https://api.stallioneyewear.in/api').replace(/\/+$/, '');
-    return [{ source: '/api/:path*', destination: `${apiBase}/:path*` }];
+    // Same-origin dev proxy: forward /api/* to a backend server-side so the
+    // browser never makes a cross-origin (CORS) request from localhost.
+    // Default target is the LOCAL backend (http://localhost:3000/api) — the live
+    // host api.stallioneyewear.in currently returns HTTP 415 for EVERY request
+    // (an openresty/deployment misconfig on the backend, not a frontend issue).
+    // Override with API_PROXY_TARGET to point dev at a different backend.
+    const target = (
+      process.env.API_PROXY_TARGET ||
+      (process.env.NODE_ENV === 'development'
+        ? 'http://localhost:3000/api'
+        : (process.env.NEXT_PUBLIC_API_URL || 'https://api.stallioneyewear.in/api'))
+    ).replace(/\/+$/, '');
+    return [{ source: '/api/:path*', destination: `${target}/:path*` }];
   },
   async headers() {
     // Baseline security headers. (A strict Content-Security-Policy is
