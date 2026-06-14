@@ -32,7 +32,15 @@ export default function SalesRevenueChart({
 
     // y ticks at 0, 0.5, 1.0, 1.5 of max
     const yTicksVals = [0, 0.5, 1.0, 1.5].map(m => m * maxVal);
-    const formatK = (v) => `$${(v / 1000).toFixed(1)}k`;
+    // Compact, readable axis labels (Indian units). Show the raw number for
+    // small values instead of collapsing everything to "$0.0k".
+    const formatK = (v) => {
+      const n = Math.round(v);
+      if (n >= 1e7) return `₹${(n / 1e7).toFixed(1)}Cr`;
+      if (n >= 1e5) return `₹${(n / 1e5).toFixed(1)}L`;
+      if (n >= 1e3) return `₹${(n / 1e3).toFixed(1)}k`;
+      return `₹${n}`;
+    };
 
     return { margin, width, height, innerW, innerH, visualMax, band, barW, gap, xSales, xRevenue, y, yTicksVals, formatK };
   }, [data, height]);

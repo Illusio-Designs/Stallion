@@ -39,6 +39,15 @@ const AnalyticsReports = () => {
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
+        {/* No API configured — this page currently renders placeholder data */}
+        <div className="analytics-noapi flex items-start gap-3 rounded-lg border border-warning bg-warning-soft px-4 py-3" role="status">
+          <svg className="mt-0.5 h-5 w-5 shrink-0 text-warning" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <p className="m-0 text-[length:var(--text-sm)] leading-[var(--leading-normal)] text-text">
+            <strong className="font-semibold">No API configured for Reports &amp; Analytics.</strong> The figures and table below are placeholder data — connect an analytics endpoint to show live targets, achievements, and visits.
+          </p>
+        </div>
         {/* Summary cards */}
         <div className="dash-row analytics-summary grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
           <div className="dash-card metric analytics-card flex flex-col gap-1 bg-surface border border-border rounded-lg shadow-sm p-5 col-span-1 sm:col-span-6 lg:col-span-3">
