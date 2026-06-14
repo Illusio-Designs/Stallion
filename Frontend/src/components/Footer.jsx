@@ -30,6 +30,9 @@ const Footer = ({ onPageChange }) => {
           <p className="footer-text m-0 text-white/80 text-[length:var(--text-base)] leading-[var(--leading-normal)]"><a href="mailto:support@stallion.com" className="footer-link footer-link--inline inline-flex items-center text-white/80 text-[length:var(--text-base)] leading-[var(--leading-normal)] rounded-sm transition-colors duration-[120ms] motion-reduce:transition-none underline underline-offset-2 decoration-white/40 hover:text-text-on-primary hover:decoration-white active:text-white/70 focus-visible:outline-none focus-visible:text-text-on-primary focus-visible:decoration-white focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.35)]">support@stallion.com</a></p>
         </div>
       </div>
+      <div className="footer-bottom relative z-[3] mx-auto mt-8 max-w-[1280px] border-t border-white/12 px-6 pt-5 min-[385px]:px-[5%]">
+        <p className="footer-copyright m-0 text-center text-[length:var(--text-xs)] text-white/55">© {new Date().getFullYear()} Stallion Eyewear LLP. All rights reserved.</p>
+      </div>
     </footer>
   );
 };
