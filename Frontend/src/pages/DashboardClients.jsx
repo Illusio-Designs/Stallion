@@ -6,7 +6,7 @@ import DropdownSelector from '../components/ui/DropdownSelector';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import {
-  getParties,
+  getPartiesForRole,
   createParty,
   updateParty,
   deleteParty,
@@ -203,7 +203,9 @@ const DashboardClients = () => {
       }
       
       console.log('[fetchPartiesForCountry] Fetching parties for country:', cleanCountryId);
-      const partiesData = await getParties(cleanCountryId);
+      // Role-aware: salesman/distributor/party get their own scoped parties;
+      // admin & *_manager roles get the full country-filtered list.
+      const partiesData = await getPartiesForRole(userRole, cleanCountryId);
       
       console.log('[fetchPartiesForCountry] Received', partiesData?.length || 0, 'parties from API');
       

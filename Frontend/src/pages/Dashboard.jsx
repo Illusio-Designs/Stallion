@@ -3,7 +3,7 @@ import Skeleton from '../components/ui/Skeleton';
 import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
-import { getOrders, getProducts, getSalesmanTargets, getSalesmanProfile, getParties } from '../services/apiService';
+import { getOrders, getProducts, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
 
 const Dashboard = () => {
@@ -58,7 +58,7 @@ const Dashboard = () => {
         if (missingPartyIds.length > 0) {
           try {
             // One call for all parties instead of one getPartyById per order (N+1)
-            const allParties = await getParties();
+            const allParties = await getPartiesForRole(userRole);
             const map = {};
             (allParties || []).forEach(p => {
               const id = p.id || p.party_id;

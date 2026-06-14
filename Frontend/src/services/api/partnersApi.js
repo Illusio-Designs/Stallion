@@ -401,6 +401,43 @@ export const deleteDistributor = async (distributorId) => {
  * @param {string} [countryId] - Optional country ID (UUID) to filter parties by country
  * @returns {Promise<Array>} Array of party objects
  */
+// ==================== ROLE-SCOPED PARTY ENDPOINTS ====================
+// These derive everything from the JWT (no body needed), so they're callable
+// from the browser. Used to show end-user roles only their own parties.
+
+const scopedList = async (endpoint) => {
+  try {
+    const response = await apiRequest(endpoint, { method: 'GET', includeAuth: true });
+    return Array.isArray(response) ? response : (response?.data || []);
+  } catch (error) {
+    const msg = `${error.message || ''} ${error.errorData?.error || error.errorData?.message || ''}`.toLowerCase();
+    if (error.statusCode === 404 || msg.includes('not found')) return [];
+    throw error;
+  }
+};
+
+// GET /salesmen/parties — parties assigned to the authenticated salesman.
+export const getSalesmanParties = async () => scopedList('/salesmen/parties');
+// GET /distributors/parties — parties under the authenticated distributor.
+export const getDistributorParties = async () => scopedList('/distributors/parties');
+// GET /parties/my — parties for the current user's role.
+export const getMyParties = async () => scopedList('/parties/my');
+
+/**
+ * Role-aware party fetch. End-user roles get their own token-scoped parties;
+ * admin / *_manager roles get the full list (POST /parties/get).
+ * @param {string} role - current user role (getUserRole())
+ * @param {string} [countryId] - only used for the admin list
+ */
+export const getPartiesForRole = async (role, countryId) => {
+  switch ((role || '').toLowerCase()) {
+    case 'salesman': return getSalesmanParties();
+    case 'distributor': return getDistributorParties();
+    case 'party': return getMyParties();
+    default: return getParties(countryId);
+  }
+};
+
 export const getParties = async (countryId) => {
   // If no countryId provided, use POST /parties/get with empty body to get all parties
   if (!countryId) {
