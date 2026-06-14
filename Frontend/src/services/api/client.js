@@ -21,7 +21,13 @@ const API_DEBUG = process.env.NEXT_PUBLIC_API_DEBUG === 'true';
  * Always uses live API URL directly
  */
 const getBaseURL = () => {
-  // Always use the live API URL directly (no proxy)
+  // In development, route through the same-origin Next.js rewrite proxy
+  // (/api -> live API) so the browser never makes a cross-origin request to the
+  // API from localhost — this avoids the CORS "Failed to fetch" in dev.
+  // Production calls the API directly via NEXT_PUBLIC_API_URL.
+  if (process.env.NODE_ENV === 'development') {
+    return '/api';
+  }
   const envUrl = process.env.NEXT_PUBLIC_API_URL;
   if (envUrl) {
     let url = envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
@@ -57,9 +63,11 @@ const getAuthToken = () => {
  * Get headers for API requests
  */
 const getHeaders = (includeAuth = true) => {
-  const headers = {
-    'Content-Type': 'application/json',
-  };
+  // NOTE: Content-Type is intentionally NOT set here. apiRequest adds
+  // 'application/json' only when it actually sends a JSON body. Sending a
+  // Content-Type on a bodyless GET/DELETE makes the API (openresty) reject it
+  // with 415 Unsupported Media Type.
+  const headers = {};
 
   if (includeAuth) {
     const token = getAuthToken();

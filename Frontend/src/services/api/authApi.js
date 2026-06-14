@@ -78,10 +78,10 @@ export const login = async (phoneNumber) => {
  * @returns {Promise<Object>} Response with user data
  */
 export const register = async (userData) => {
-  const { phoneNumber, fullName, roleId } = userData;
+  const { phoneNumber, fullName, email, roleId } = userData;
   return apiRequest('/auth/register', {
     method: 'POST',
-    body: { phoneNumber, fullName, roleId },
+    body: { phoneNumber, full_name: fullName, email, role_id: roleId },
     includeAuth: false,
   });
 };
@@ -139,8 +139,8 @@ export const updateUser = async (userId, userData) => {
   // Otherwise, use JSON with profile_image as base64
   if (profileImageFile && !profile_image) {
     const baseUrl = getBaseURL();
-    const fullUrl = `${baseUrl}/users/${userId}`;
-    
+    const fullUrl = `${baseUrl}/users`;
+
     const formData = new FormData();
     // Ensure all required fields are sent with proper values
     const nameValue = name ? String(name).trim() : '';
@@ -191,7 +191,7 @@ export const updateUser = async (userId, userData) => {
   }
   
   // Otherwise, use regular JSON request
-  return apiRequest(`/users/${userId}`, {
+  return apiRequest('/users', {
     method: 'PUT',
     body: {
       name,
@@ -213,7 +213,7 @@ export const updateUser = async (userId, userData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const deleteUser = async (userId) => {
-  return apiRequest(`/users/${userId}`, {
+  return apiRequest('/users', {
     method: 'DELETE',
     includeAuth: true,
   });
@@ -227,10 +227,10 @@ export const deleteUser = async (userId) => {
  */
 export const uploadProfileImage = async (userId, profileImage) => {
   const baseUrl = getBaseURL();
-  const fullUrl = `${baseUrl}/users/${userId}/upload-profile`;
-  
+  const fullUrl = `${baseUrl}/users/upload-profile`;
+
   const formData = new FormData();
-  formData.append('profile_image', profileImage);
+  formData.append('file', profileImage);
   
   const token = getAuthToken();
   const headers = {};

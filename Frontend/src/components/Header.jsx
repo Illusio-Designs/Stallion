@@ -3,6 +3,7 @@ import '../styles/components/Header.css';
 import { getCartCount, registerCartListener } from '../services/cartService';
 import { isLoggedIn, logout as authLogout } from '../services/authService';
 import { showLogoutSuccess } from '../services/notificationService';
+import { FiSearch, FiShoppingCart, FiUser, FiMenu, FiX } from 'react-icons/fi';
 
 const Header = ({ onPageChange, currentPage }) => {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -243,10 +244,7 @@ const Header = ({ onPageChange, currentPage }) => {
                 <img src="/images/logo/logo.webp" alt="Stallion" className="logo-image" />
               </div>
               <button type="button" className="icon-btn drawer-close-btn text-text-on-primary" onClick={() => setIsMenuOpen(false)} aria-label="Close menu">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-                  <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  <path d="M6 6L18 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <FiX size={20} aria-hidden="true" />
               </button>
             </div>
           )}
@@ -276,9 +274,7 @@ const Header = ({ onPageChange, currentPage }) => {
         <div className="header-actions flex items-center gap-2 md:gap-5">
           <div className="search-bar relative hidden items-center rounded-pill border border-white/22 bg-white/[0.06] px-4 py-2 transition-[background,border-color,box-shadow] duration-200 ease-[ease] hover:bg-white/10 focus-within:border-white/70 focus-within:bg-white/12 focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.16)] sm:flex sm:min-w-[150px] md:min-w-[220px]">
             <form onSubmit={handleSearchSubmit} role="search" className="flex w-full items-center">
-              <svg className="search-icon mr-2 shrink-0 text-white/85" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
-                <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <FiSearch size={18} className="search-icon mr-2 shrink-0 text-white/85" aria-hidden="true" />
               <input
                 type="text"
                 placeholder="Search products..."
@@ -291,11 +287,7 @@ const Header = ({ onPageChange, currentPage }) => {
           </div>
           <div className="action-icons flex items-center gap-2">
             <button type="button" className="icon-btn cart-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text-on-primary transition-[background,transform] duration-200 ease-[ease] hover:bg-white/12 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.5)] active:scale-[0.94]" onClick={() => onPageChange('cart')} aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}>
-              <svg className="h-6 w-6 max-[500px]:h-[22px] max-[500px]:w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-                <path d="M3 6h18" />
-                <path d="M16 10a4 4 0 0 1-8 0" />
-              </svg>
+              <FiShoppingCart size={28} style={{ width: 28, height: 28 }} aria-hidden="true" />
               {cartCount > 0 && (
                 <span className="cart-badge absolute right-0.5 top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill border-2 border-primary bg-accent px-[5px] text-[length:var(--text-xs)] font-bold leading-none text-text-on-accent" aria-hidden="true">{cartCount > 99 ? '99+' : cartCount}</span>
               )}
@@ -309,10 +301,7 @@ const Header = ({ onPageChange, currentPage }) => {
                 aria-haspopup={loggedIn ? 'menu' : undefined}
                 aria-expanded={loggedIn ? isUserDropdownOpen : undefined}
               >
-                <svg className="h-6 w-6 max-[500px]:h-[22px] max-[500px]:w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
+                <FiUser size={28} style={{ width: 28, height: 28 }} aria-hidden="true" />
               </button>
               {loggedIn && isUserDropdownOpen && (
                 <div className="user-dropdown absolute right-0 top-[calc(100%+0.5rem)] z-[1001] min-w-[184px] max-[768px]:min-w-[168px] overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg" role="menu">
@@ -337,9 +326,7 @@ const Header = ({ onPageChange, currentPage }) => {
             </div>
             {!isMenuOpen && (
               <button type="button" ref={menuBtnRef} className="icon-btn menu-btn z-[1004] inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text-on-primary transition-[background,transform] duration-200 ease-[ease] hover:bg-white/12 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.5)] active:scale-[0.94] md:hidden" aria-label="Open menu" aria-expanded={isMenuOpen} aria-haspopup="dialog" onClick={() => setIsMenuOpen(true)}>
-                <svg className="h-6 w-6 max-[500px]:h-[22px] max-[500px]:w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-                  <path d="M3 6h18" /><path d="M3 12h18" /><path d="M3 18h18" />
-                </svg>
+                <FiMenu size={28} style={{ width: 28, height: 28 }} aria-hidden="true" />
               </button>
             )}
           </div>

@@ -9,7 +9,7 @@ import { getCached, invalidateCache } from '../cacheService';
  */
 export const getTrays = async () => {
   try {
-    const response = await apiRequest('/trays/', {
+    const response = await apiRequest('/trays', {
       method: 'GET',
       includeAuth: true,
     });
@@ -41,7 +41,7 @@ export const getTrays = async () => {
  */
 export const createTray = async (trayData) => {
   const { tray_name, tray_status } = trayData;
-  return apiRequest('/trays/', {
+  return apiRequest('/trays', {
     method: 'POST',
     body: { tray_name, tray_status },
     includeAuth: true,
@@ -85,7 +85,7 @@ export const deleteTray = async (trayId) => {
  * @returns {Promise<Array>} Assigned tray records
  */
 export const getAssignedTrays = async (salesmanId) => {
-  return apiRequest('/salesman_trays/', {
+  return apiRequest('/salesman_trays', {
     method: 'POST',
     body: { salesman_id: salesmanId },
     includeAuth: true,
@@ -147,7 +147,7 @@ export const addProductToTray = async (trayProductData) => {
   if (qty !== undefined) {
     body.qty = qty;
   }
-  return apiRequest('/tray_products/', {
+  return apiRequest('/tray_products', {
     method: 'POST',
     body,
     includeAuth: true,
@@ -185,7 +185,7 @@ export const updateProductInTray = async (trayProductData) => {
  */
 export const deleteProductFromTray = async (trayProductData) => {
   const { tray_id, product_id } = trayProductData;
-  return apiRequest('/tray_products/', {
+  return apiRequest('/tray_products', {
     method: 'DELETE',
     body: { tray_id, product_id },
     includeAuth: true,
@@ -199,7 +199,7 @@ export const deleteProductFromTray = async (trayProductData) => {
  * @returns {Promise<Array>} Array of event objects
  */
 export const getEvents = async () => {
-  return getCached('events', () => apiRequest('/events/', {
+  return getCached('events', () => apiRequest('/events', {
     method: 'GET',
     includeAuth: true,
   }), TTL_TRANSACTIONAL);
@@ -216,7 +216,7 @@ export const getEvents = async () => {
  */
 export const createEvent = async (eventData) => {
   const { event_name, start_date, end_date, event_location } = eventData;
-  const result = await apiRequest('/events/', {
+  const result = await apiRequest('/events', {
     method: 'POST',
     body: { event_name, start_date, end_date, event_location },
     includeAuth: true,
@@ -268,7 +268,7 @@ export const deleteEvent = async (eventId) => {
  */
 export const getOrders = async () => getCached('orders', async () => {
   try {
-    return await apiRequest('/orders/', {
+    return await apiRequest('/orders', {
       method: 'GET',
       includeAuth: true,
     });
@@ -387,7 +387,7 @@ export const createOrder = async (orderData) => {
     console.log('[createOrder] 🚀 Making API request to /orders/...');
   }
 
-  const result = await apiRequest('/orders/', {
+  const result = await apiRequest('/orders', {
     method: 'POST',
     body,
     includeAuth: true,

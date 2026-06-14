@@ -16,6 +16,14 @@ const nextConfig = {
       { protocol: 'https', hostname: 'api.stallioneyewear.in' },
     ],
   },
+  async rewrites() {
+    // Same-origin proxy: forward /api/* to the live API server-side so the
+    // browser never makes a cross-origin (CORS) request from localhost in dev.
+    // The client uses a relative `/api` base in development (see getBaseURL);
+    // production calls the API directly.
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL || 'https://api.stallioneyewear.in/api').replace(/\/+$/, '');
+    return [{ source: '/api/:path*', destination: `${apiBase}/:path*` }];
+  },
   async headers() {
     // Baseline security headers. (A strict Content-Security-Policy is
     // intentionally omitted for now — it needs per-source tuning against the

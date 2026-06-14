@@ -25,7 +25,7 @@ export const getCountries = async () => {
  */
 export const createCountry = async (countryData) => {
   const { name, code, phone_code, currency } = countryData;
-  const result = await apiRequest('/countries/', {
+  const result = await apiRequest('/countries', {
     method: 'POST',
     body: { name, code, phone_code, currency },
     includeAuth: true,
@@ -116,7 +116,7 @@ export const getStates = async (countryId) => {
  */
 export const createState = async (stateData) => {
   const { name, code, country_id } = stateData;
-  return apiRequest('/states/', {
+  return apiRequest('/states', {
     method: 'POST',
     body: { name, code, country_id },
     includeAuth: true,
@@ -198,7 +198,7 @@ export const getCities = async (stateId) => {
  */
 export const createCity = async (cityData) => {
   const { name, state_id } = cityData;
-  return apiRequest('/cities/', {
+  return apiRequest('/cities', {
     method: 'POST',
     body: { name, state_id },
     includeAuth: true,
@@ -366,7 +366,7 @@ export const getAllZones = async (countryId) => {
  */
 export const createZone = async (zoneData) => {
   const { name, description, city_id, state_id, country_id, zone_code } = zoneData;
-  const result = await apiRequest('/zones/', {
+  const result = await apiRequest('/zones', {
     method: 'POST',
     body: { name, description, city_id, state_id, country_id, zone_code },
     includeAuth: true,

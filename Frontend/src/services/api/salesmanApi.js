@@ -7,7 +7,7 @@ import { apiRequest } from './client';
  * @returns {Promise<Array>} Array of check-in objects
  */
 export const getAllSalesmanCheckins = async () => {
-  return apiRequest('/salesman_checkins/', {
+  return apiRequest('/salesman_checkins', {
     method: 'GET',
     includeAuth: true,
   });

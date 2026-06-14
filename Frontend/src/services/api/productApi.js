@@ -47,9 +47,8 @@ const fetchProductsUncached = async (page = 1, limit = 21, filters = {}) => {
         price: null
       };
       
-      // Use GET method (matching Postman), apiRequest will convert to POST since body exists
       const response = await apiRequest(endpoint, {
-        method: 'GET',
+        method: 'POST',
         body: filterBody,
         includeAuth: true,
       });
@@ -340,7 +339,7 @@ export const getProductModels = async (modelNo) => {
     const response = await apiRequest('/products/product-models', {
       method: 'POST',
       body: {
-        model_no: modelNo,
+        search: modelNo,
       },
       includeAuth: true,
     });
@@ -407,11 +406,11 @@ export const uploadProductImage = async (productImages, productId) => {
   if (Array.isArray(productImages)) {
     // Multiple files - append each one
     productImages.forEach((file) => {
-      formData.append('product_image', file);
+      formData.append('file', file);
     });
   } else {
     // Single file
-    formData.append('product_image', productImages);
+    formData.append('file', productImages);
   }
   
   // Make the request

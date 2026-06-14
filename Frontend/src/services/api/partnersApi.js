@@ -229,7 +229,7 @@ export const createDistributor = async (distributorData) => {
   
   console.log('[Create Distributor] Sending request with distributor_name:', requestBody.distributor_name);
   
-  return apiRequest('/distributors/', {
+  return apiRequest('/distributors', {
     method: 'POST',
     body: requestBody,
     includeAuth: true,
@@ -717,7 +717,7 @@ const getCityId = () => {
   console.log('[Create Party] Request Body Keys:', Object.keys(requestBody));
   console.log('[Create Party] Has undefined values:', Object.values(requestBody).some(v => v === undefined));
   
-  return apiRequest('/parties/', {
+  return apiRequest('/parties', {
     method: 'POST',
     body: requestBody,
     includeAuth: true,
@@ -1214,7 +1214,7 @@ export const createSalesman = async (salesmanData) => {
   console.log('[Create Salesman] Request body:', JSON.stringify(requestBody, null, 2));
   console.log('[Create Salesman] reporting_manager value:', requestBody.reporting_manager, 'type:', typeof requestBody.reporting_manager);
   
-  return apiRequest('/salesmen/', {
+  return apiRequest('/salesmen', {
     method: 'POST',
     body: requestBody,
     includeAuth: true,
