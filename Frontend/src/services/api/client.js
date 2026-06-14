@@ -21,19 +21,12 @@ const API_DEBUG = process.env.NEXT_PUBLIC_API_DEBUG === 'true';
  * Always uses live API URL directly
  */
 const getBaseURL = () => {
-  // Always call the API directly (no proxy) in both dev and production.
-  // CORS and bot-protection are server concerns: the API must allow the site
-  // origin (CORS) and exclude /api from Imunify360 bot-protection.
-  // Configure the URL via NEXT_PUBLIC_API_URL.
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (envUrl) {
-    let url = envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
-    if (!url.includes('/api')) {
-      url = `${url}/api`;
-    }
-    return url;
-  }
-  return 'https://api.stallioneyewear.in/api';
+  // The browser always calls THIS app's own origin at /api; Next forwards it to
+  // the real API server-side (see rewrites in next.config, target =
+  // NEXT_PUBLIC_API_URL). Same-origin from the browser's view, so there is NO
+  // CORS and NO OPTIONS preflight at all. The only server requirement is that the
+  // API accepts the app server's IP (Imunify360 whitelist) — no per-browser CORS.
+  return '/api';
 };
 
 // Get BASE_URL - will be evaluated at module load time
