@@ -944,7 +944,9 @@ export const getPartiesByZoneId = async () => {
  * @returns {Promise<Object>} Salesman object with zones array
  */
 export const getSalesmanProfile = async () => {
-  return apiRequest('/salesman', {
+  // Role-based: GET /salesmen returns the salesman record for the authenticated
+  // user (per the token), not a list — used by the salesman-role dashboard.
+  return apiRequest('/salesmen', {
     method: 'GET',
     includeAuth: true,
   });
