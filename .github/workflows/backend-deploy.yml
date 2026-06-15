@@ -58,25 +58,6 @@ jobs:
             - name: Install lftp
               run: sudo apt-get update && sudo apt-get install -y lftp
 
-            - name: Prepare staging area
-              run: |
-                  STAGING_DIR="build"
-                  rm -rf "$STAGING_DIR"
-                  mkdir "$STAGING_DIR"
-
-                  if [ -f ".gitignore" ]; then
-                    rsync -a \
-                      --exclude-from=".gitignore" \
-                      --exclude="package-lock.json" \
-                      --exclude=".git" \
-                      ./ "$STAGING_DIR/"
-                  else
-                    rsync -a \
-                      --exclude=".git" \
-                      --exclude="package-lock.json" \
-                      ./ "$STAGING_DIR/"
-                  fi
-
             - name: Validate FTP configuration
               env:
                   FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -130,10 +111,30 @@ jobs:
 
                   export LFTP_PASSWORD="$FTP_PASS"
 
+                  MIRROR_EXCLUDES=""
+                  append_exclude() {
+                    local pattern="$1"
+                    pattern="${pattern%/}"
+                    pattern="${pattern#/}"
+                    [[ -z "$pattern" ]] && return
+                    MIRROR_EXCLUDES+=" --exclude-glob $pattern"
+                    MIRROR_EXCLUDES+=" --exclude-glob $pattern/**"
+                  }
+                  if [ -f ".gitignore" ]; then
+                    while IFS= read -r pattern || [ -n "$pattern" ]; do
+                      [[ -z "$pattern" || "$pattern" =~ ^# ]] && continue
+                      append_exclude "$pattern"
+                    done < .gitignore
+                  fi
+                  append_exclude ".git"
+                  append_exclude ".gitignore"
+                  append_exclude ".DS_Store"
+                  append_exclude "deploy.sh"
+
                   lftp -u "$FTP_USER" "$FTP_SERVER" <<EOF
                   set ftp:ssl-allow yes
                   set ssl:verify-certificate no
-                  mirror --reverse --delete --verbose --parallel=10 build $FTP_REMOTE_DIR
+                  mirror --reverse --delete --verbose --parallel=10$MIRROR_EXCLUDES . $FTP_REMOTE_DIR
                   bye
                   EOF
 
