@@ -131,7 +131,7 @@ jobs:
                   append_exclude ".DS_Store"
                   append_exclude "deploy.sh"
 
-                  lftp -u "$FTP_USER" "$FTP_SERVER" <<EOF
+                  lftp -u "$FTP_USER" --env-password "$FTP_SERVER" <<EOF
                   set ftp:ssl-allow yes
                   set ssl:verify-certificate no
                   mirror --reverse --delete --verbose --parallel=10$MIRROR_EXCLUDES . $FTP_REMOTE_DIR
