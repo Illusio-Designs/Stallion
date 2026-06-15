@@ -199,7 +199,7 @@ const DistributorOrders = () => {
 
       // Calculate totals for the order
       const totalQuantity = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
-      const totalValue = parseFloat(order.order_total || order.total_value || order.total_amount || 0);
+      const totalValue = parseFloat(order.order_total || Number(order.order_total) || order.total_value || order.total_amount || 0);
       
       // Display product information
       let productDisplay = 'No items';
@@ -246,10 +246,10 @@ const DistributorOrders = () => {
     const pendingOrders = orders.filter(o => o.order_status?.toLowerCase() === 'pending').length;
     const completedOrders = orders.filter(o => o.order_status?.toLowerCase() === 'completed');
     const completedValue = completedOrders.reduce((sum, o) => {
-      return sum + (o.total_value || o.total_amount || 0);
+      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
     }, 0);
     const totalRevenue = orders.reduce((sum, o) => {
-      return sum + (o.total_value || o.total_amount || 0);
+      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
     }, 0);
 
     return {

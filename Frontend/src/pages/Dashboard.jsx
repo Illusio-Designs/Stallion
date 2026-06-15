@@ -125,7 +125,7 @@ const Dashboard = () => {
     
     // Calculate total sales for current month
     const totalSales = currentMonthOrders.reduce((sum, order) => {
-      return sum + (order.total_value || order.total_amount || 0);
+      return sum + (Number(order.order_total) || order.total_value || order.total_amount || 0);
     }, 0);
     
     // Calculate total orders
@@ -144,7 +144,7 @@ const Dashboard = () => {
       o.order_status?.toLowerCase() === 'completed'
     );
     const completedValue = completedOrders.reduce((sum, o) => {
-      return sum + (o.total_value || o.total_amount || 0);
+      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
     }, 0);
     
     // Calculate pending payments (orders that are not completed)
@@ -153,7 +153,7 @@ const Dashboard = () => {
       o.order_status?.toLowerCase() !== 'cancelled'
     );
     const pendingPayments = pendingOrders.reduce((sum, o) => {
-      return sum + (o.total_value || o.total_amount || 0);
+      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
     }, 0);
     
     // Get unique clients count
@@ -405,7 +405,7 @@ const Dashboard = () => {
                   const orderType = (order.order_type || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'N/A';
                   const party = order.party?.party_name || order.party_name || order.party?.name || partyNamesMap[order.party_id] || '-';
                   const status = (order.order_status || 'pending').toUpperCase();
-                  const value = parseFloat(order.order_total || order.total_value || order.total_amount || 0);
+                  const value = parseFloat(order.order_total || Number(order.order_total) || order.total_value || order.total_amount || 0);
                   const date = order.created_at || order.order_date;
                   const statusColor = status === 'COMPLETED' ? {bg:'#d4edda', color:'#155724'} : status === 'CANCELLED' ? {bg:'#f8d7da', color:'#721c24'} : {bg:'#fff3cd', color:'#856404'};
                   return (
