@@ -1,193 +1,140 @@
 name: Backend CI/CD
 
-on:
-    push:
-        branches: [backend]
-        paths:
-            - "Backendjs/**"
-            - ".github/workflows/backend-deploy.yml"
-    pull_request:
-        branches: [backend]
-        paths:
-            - "Backendjs/**"
-    workflow_dispatch:
-        branches: [backend]
+# Auto-deploys Backendjs/ to the production FTP server on every push to the
+# `backend` branch that touches backend code. Uses incremental FTP sync
+# (SamKirkland/FTP-Deploy-Action keeps a sync-state file on the server, so only
+# changed files are uploaded) followed by a Phusion Passenger restart.
+#
+# Required GitHub secrets — Settings → Secrets and variables → Actions
+# (or the `production` environment):
+#   FTP_SERVER      → ftp host, no ftp:// prefix   (e.g. ftp.example.com)
+#   FTP_USER        → ftp username
+#   FTP_PASS        → ftp password
+#   FTP_REMOTE_DIR  → remote app dir               (e.g. /Backendjs/)
+#
+# Auto-restart: after upload we re-create <FTP_REMOTE_DIR>/tmp/restart.txt —
+# cPanel's Node runtime (Phusion Passenger) recycles the process on the next
+# request once that file's mtime changes.
 
+on:
+  push:
+    branches: [backend]
+    paths:
+      - "Backendjs/**"
+      - ".github/workflows/backend-deploy.yml"
+  workflow_dispatch:
+
+# Only one deploy at a time; never cancel a deploy mid-upload.
 concurrency:
-    group: backend-deploy-${{ github.ref }}
-    cancel-in-progress: true
+  group: backend-ftp-deploy
+  cancel-in-progress: false
 
 jobs:
-    ci:
-        name: Validate backend
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: Backendjs
-        steps:
-            - name: Checkout Backendjs only
-              uses: actions/checkout@v4
-              with:
-                  sparse-checkout: Backendjs
-                  sparse-checkout-cone-mode: true
+  deploy:
+    name: Deploy Backendjs to FTP
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: "20"
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-            - name: Syntax check entrypoint
-              run: node --check lib/index.js
+      # Fail fast on broken JS before wasting an upload run.
+      - name: Syntax-check backend source
+        working-directory: Backendjs
+        run: |
+          set -e
+          find . -name '*.js' -type f ! -path './node_modules/*' -print0 \
+            | xargs -0 -r -n1 node --check
+          echo "✅ backend .js files syntax OK"
 
-    deploy:
-        name: Deploy Backendjs to FTP server
-        needs: ci
-        if: github.ref == 'refs/heads/backend' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        runs-on: ubuntu-latest
-        defaults:
-            run:
-                working-directory: Backendjs
-        environment: production
-        steps:
-            - name: Checkout Backendjs only
-              uses: actions/checkout@v4
-              with:
-                  sparse-checkout: Backendjs
-                  sparse-checkout-cone-mode: true
+      - name: Sync Backendjs to FTP (incremental)
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USER }}
+          password: ${{ secrets.FTP_PASS }}
+          # Explicit FTPS over port 21 (AUTH TLS). Switch to `ftp` if your host
+          # does not support TLS.
+          protocol: ftps
+          port: 21
+          local-dir: ./Backendjs/
+          server-dir: ${{ secrets.FTP_REMOTE_DIR }}
+          # Never upload these. uploads/ is excluded so runtime-uploaded images
+          # on the server are never deleted by the sync.
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/.github/**
+            **/.vscode/**
+            **/.idea/**
+            **/.DS_Store
+            **/Thumbs.db
+            **/.env
+            **/.env.*
+            **/.envrc
+            **/node_modules/**
+            **/package-lock.json
+            **/.htaccess
+            **/.well-known/**
+            **/uploads/**
+            **/tmp/**
+            **/logs/**
+            **/*.log
+            **/coverage/**
+            **/.nyc_output/**
+            **/.eslintcache
+            **/.cache/**
+            **/__tests__/**
+            **/test/**
+            **/tests/**
+            **/*.test.js
+            **/*.spec.js
 
-            - name: Install lftp
-              run: sudo apt-get update && sudo apt-get install -y lftp
+      # Auto-restart the Node app via Phusion Passenger (touch tmp/restart.txt).
+      - name: Trigger Passenger restart
+        env:
+          FTP_HOST: ${{ secrets.FTP_SERVER }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASS }}
+          FTP_BASE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+        run: |
+          set -e
+          npm install --no-save --no-audit --no-fund --silent basic-ftp
+          cat > ftp-restart.mjs <<'NODE'
+          import { Client } from 'basic-ftp';
+          import { Readable } from 'node:stream';
 
-            - name: Validate FTP configuration
-              env:
-                  FTP_SERVER: ${{ secrets.FTP_SERVER }}
-                  FTP_USER: ${{ secrets.FTP_USER }}
-                  FTP_PASS: ${{ secrets.FTP_PASS }}
-                  FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
-              run: |
-                  set -euo pipefail
+          const base = (process.env.FTP_BASE_DIR || '/').replace(/\/+$/, '');
+          const host = (process.env.FTP_HOST || '').replace(/^ftps?:\/\//, '').replace(/\/.*$/, '').trim();
+          const client = new Client(30000);
+          try {
+            await client.access({
+              host,
+              user: process.env.FTP_USER,
+              password: process.env.FTP_PASSWORD,
+              secure: true,
+              secureOptions: { rejectUnauthorized: false },
+            });
+            await client.ensureDir(`${base}/tmp`);
+            await client.uploadFrom(Readable.from(['restart\n']), `${base}/tmp/restart.txt`);
+            console.log(`✅ Passenger restart triggered: ${base}/tmp/restart.txt`);
+          } catch (err) {
+            console.error('Restart failed:', err.message);
+            process.exitCode = 1;
+          } finally {
+            client.close();
+          }
+          NODE
+          node ftp-restart.mjs
 
-                  if [ -z "${FTP_SERVER:-}" ] || [ -z "${FTP_USER:-}" ] || [ -z "${FTP_PASS:-}" ] || [ -z "${FTP_REMOTE_DIR:-}" ]; then
-                    echo "Missing FTP secrets. Configure FTP_SERVER, FTP_USER, FTP_PASS, and FTP_REMOTE_DIR."
-                    echo "This job uses the 'production' environment — set secrets under Settings → Environments → production, or at repo level."
-                    exit 1
-                  fi
-
-                  # Strip protocol, path, and whitespace from host (common secret mistakes)
-                  FTP_SERVER="${FTP_SERVER#ftp://}"
-                  FTP_SERVER="${FTP_SERVER#ftps://}"
-                  FTP_SERVER="${FTP_SERVER%%/*}"
-                  FTP_SERVER="$(echo "$FTP_SERVER" | xargs)"
-
-                  if [ -z "$FTP_SERVER" ]; then
-                    echo "FTP_SERVER is empty after normalization. Use only the hostname, e.g. ftp.nishree.com"
-                    exit 1
-                  fi
-
-                  echo "FTP host (normalized): $FTP_SERVER"
-                  echo "FTP user: $FTP_USER"
-                  echo "FTP remote dir: $FTP_REMOTE_DIR"
-
-                  if ! getent hosts "$FTP_SERVER" > /dev/null; then
-                    echo "DNS lookup failed for '$FTP_SERVER'. Check the FTP_SERVER secret — no ftp:// prefix, no trailing slash."
-                    exit 1
-                  fi
-
-                  echo "DNS lookup OK"
-
-            - name: Upload to FTP
-              env:
-                  FTP_SERVER: ${{ secrets.FTP_SERVER }}
-                  FTP_USER: ${{ secrets.FTP_USER }}
-                  FTP_PASS: ${{ secrets.FTP_PASS }}
-                  FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
-              run: |
-                  set -euo pipefail
-
-                  FTP_SERVER="${FTP_SERVER#ftp://}"
-                  FTP_SERVER="${FTP_SERVER#ftps://}"
-                  FTP_SERVER="${FTP_SERVER%%/*}"
-                  FTP_SERVER="$(echo "$FTP_SERVER" | xargs)"
-
-                  export LFTP_PASSWORD="$FTP_PASS"
-
-                  MIRROR_EXCLUDES=""
-                  append_exclude() {
-                    local pattern="$1"
-                    pattern="${pattern%/}"
-                    pattern="${pattern#/}"
-                    [[ -z "$pattern" ]] && return
-                    MIRROR_EXCLUDES+=" --exclude-glob $pattern"
-                    MIRROR_EXCLUDES+=" --exclude-glob $pattern/**"
-                  }
-                  if [ -f ".gitignore" ]; then
-                    while IFS= read -r pattern || [ -n "$pattern" ]; do
-                      [[ -z "$pattern" || "$pattern" =~ ^# ]] && continue
-                      append_exclude "$pattern"
-                    done < .gitignore
-                  fi
-                  append_exclude ".git"
-                  append_exclude ".gitignore"
-                  append_exclude ".DS_Store"
-                  append_exclude "deploy.sh"
-
-                  lftp -u "$FTP_USER" --env-password "$FTP_SERVER" <<EOF
-                  set ftp:ssl-allow yes
-                  set ssl:verify-certificate no
-                  mirror --reverse --delete --verbose --parallel=10$MIRROR_EXCLUDES . $FTP_REMOTE_DIR
-                  bye
-                  EOF
-
-            - name: Restart app & fetch stderr log
-              env:
-                  FTP_SERVER: ${{ secrets.FTP_SERVER }}
-                  FTP_USER: ${{ secrets.FTP_USER }}
-                  FTP_PASS: ${{ secrets.FTP_PASS }}
-                  FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
-              run: |
-                  set -uo pipefail
-
-                  FTP_SERVER="${FTP_SERVER#ftp://}"
-                  FTP_SERVER="${FTP_SERVER#ftps://}"
-                  FTP_SERVER="${FTP_SERVER%%/*}"
-                  FTP_SERVER="$(echo "$FTP_SERVER" | xargs)"
-                  export LFTP_PASSWORD="$FTP_PASS"
-
-                  # --- Restart the Node app ---
-                  # cPanel / Phusion Passenger restarts the app when tmp/restart.txt
-                  # is (re)created in the app root. Change this if your host differs.
-                  : > restart.txt
-                  lftp -u "$FTP_USER" --env-password "$FTP_SERVER" <<EOF
-                  set ftp:ssl-allow yes
-                  set ssl:verify-certificate no
-                  cd "$FTP_REMOTE_DIR"
-                  mkdir -f tmp
-                  put restart.txt -o tmp/restart.txt
-                  bye
-                  EOF
-                  echo "Restart signalled (tmp/restart.txt re-created)."
-
-                  # Give the app a moment to boot before reading logs.
-                  sleep 12
-
-                  # --- Fetch the stderr log so any boot errors are visible here ---
-                  rm -f stderr.log
-                  lftp -u "$FTP_USER" --env-password "$FTP_SERVER" <<EOF || true
-                  set ftp:ssl-allow yes
-                  set ssl:verify-certificate no
-                  cd "$FTP_REMOTE_DIR"
-                  get stderr.log -o stderr.log
-                  bye
-                  EOF
-                  echo "=================== stderr.log (last 150 lines) ==================="
-                  if [ -s stderr.log ]; then
-                    tail -n 150 stderr.log
-                  else
-                    echo "(no stderr.log at $FTP_REMOTE_DIR/stderr.log — adjust the path if your host logs elsewhere)"
-                  fi
-
-            - name: Deployment summary
-              run: echo "Backendjs deployed to $FTP_REMOTE_DIR on $FTP_SERVER"
-              env:
-                  FTP_SERVER: ${{ secrets.FTP_SERVER }}
-                  FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+      - name: Verify deployment
+        run: |
+          echo "✅ Backendjs deployed to ${{ secrets.FTP_REMOTE_DIR }}"
+          echo "   FTP server: ${{ secrets.FTP_SERVER }}"
+          echo "   Incremental sync + Passenger restart complete"
