@@ -3,6 +3,7 @@ import Skeleton from '../components/ui/Skeleton';
 import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
+import DropdownSelector from '../components/ui/DropdownSelector';
 import { getOrders, getProducts, getProductById, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
 
@@ -348,11 +349,16 @@ const Dashboard = () => {
           <div className="dash-card tall equal col-span-9 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
             <div className="chart-header" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10}}>
               <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700', margin: 0}}>Sales &amp; Revenue</h4>
-              <select className="ui-select ui-pill chart-period-select" value={period} onChange={(e)=>setPeriod(e.target.value)} style={{height:32, padding:'0px 12px', fontSize:'12px'}}>
-                <option>Monthly</option>
-                <option>Weekly</option>
-                <option>Yearly</option>
-              </select>
+              <DropdownSelector
+                options={[
+                  { value: 'Monthly', label: 'Monthly' },
+                  { value: 'Weekly', label: 'Weekly' },
+                  { value: 'Yearly', label: 'Yearly' },
+                ]}
+                value={period}
+                onChange={(value) => setPeriod(value)}
+                searchable={false}
+              />
             </div>
             <SalesRevenueChart data={chartData} height={210} />
           </div>
