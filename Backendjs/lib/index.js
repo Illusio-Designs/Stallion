@@ -84,6 +84,14 @@ const startServer = async () => {
 // Only start the server if not already started (important for LiteSpeed Node)
 if (require.main === module) {
     startServer();
+} else {
+    // Loaded by a Node runtime (Passenger / LiteSpeed / cPanel) which serves the
+    // exported `app` itself, so startServer()'s app.listen is skipped. We must
+    // still run DB initialization (table creation/sync) on process boot —
+    // otherwise new tables never get created on the deployed server.
+    DatabaseManager.initialize()
+        .then(() => console.log('✅ Database Manager completed (runtime-loaded)'))
+        .catch((err) => console.error('❌ DB init failed (runtime-loaded):', err));
 }
 
 module.exports = app;
