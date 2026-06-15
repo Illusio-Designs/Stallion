@@ -3,7 +3,7 @@ import Skeleton from '../components/ui/Skeleton';
 import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
-import { getOrders, getProducts, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
+import { getOrders, getProducts, getProductById, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
 
 const Dashboard = () => {
@@ -207,7 +207,7 @@ const Dashboard = () => {
   }, [orders]);
 
   // Top selling products — aggregate order_items by product_id across all orders
-  const topProducts = useMemo(() => {
+  const topProductRaw = useMemo(() => {
     if (!orders.length) return [];
     // order_items can come back as a JSON string OR an array — normalize first.
     const asItems = (raw) => {
@@ -229,15 +229,36 @@ const Dashboard = () => {
       .filter(([, qty]) => qty > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([pid, totalQty]) => {
-        const product = products.find(p => String(p.product_id ?? p.id) === String(pid));
-        return {
-          name: product?.model_no || product?.product_name || `Product ${pid}`,
-          img: product?.image_urls?.[0] || '/images/products/spac1.webp',
-          units: `${totalQty} Units`,
-        };
-      });
-  }, [orders, products]);
+      .map(([pid, qty]) => ({ pid: String(pid), qty }));
+  }, [orders]);
+
+  // Resolve names for top-selling product ids that aren't in the loaded list
+  // (limit 20) via an on-demand by-id lookup.
+  const [extraNames, setExtraNames] = useState({});
+  useEffect(() => {
+    const missing = topProductRaw
+      .map(t => t.pid)
+      .filter(pid => !extraNames[pid] && !products.find(p => String(p.product_id ?? p.id) === pid));
+    if (missing.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const map = {};
+      await Promise.all(missing.map(async (pid) => {
+        try { const p = await getProductById(pid); if (p) map[pid] = p.model_no || p.product_name || p.name; } catch { /* ignore */ }
+      }));
+      if (!cancelled && Object.keys(map).length) setExtraNames(prev => ({ ...prev, ...map }));
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topProductRaw, products]);
+
+  const topProducts = useMemo(() => topProductRaw.map(({ pid, qty }) => {
+    const product = products.find(p => String(p.product_id ?? p.id) === pid);
+    return {
+      name: product?.model_no || product?.product_name || extraNames[pid] || `Product ${pid.slice(0, 8)}…`,
+      units: `${qty} Units`,
+    };
+  }), [topProductRaw, products, extraNames]);
 
   // Inventory alerts — out-of-stock first, then low stock, derived from products
   const inventoryAlerts = useMemo(() => {
@@ -342,8 +363,7 @@ const Dashboard = () => {
                   <p className="ui-state__desc">No sales data available yet.</p>
                 </div>
               ) : topProducts.map((p,i)=> (
-                <div key={i} className="row grid grid-cols-[50px_1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
-                  <img src={p.img} alt={p.name} className="prod-icon w-10 h-10 object-contain block rounded-sm" />
+                <div key={i} className="row grid grid-cols-[1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
                   <div className="name text-text font-medium text-[var(--text-sm)] leading-snug">{p.name}</div>
                   <div className="units text-text-muted text-[var(--text-xs)] [font-variant-numeric:tabular-nums]">{p.units}</div>
                 </div>
@@ -366,9 +386,8 @@ const Dashboard = () => {
                   <p className="ui-state__desc">No sales data available yet.</p>
                 </div>
               ) : inventoryAlerts.map((r,i)=> (
-                <div key={i} className="row grid grid-cols-[auto_50px_1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
+                <div key={i} className="row grid grid-cols-[auto_1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
                   <span className={`stock-badge ${r.type} inline-flex items-center px-2 py-1 rounded-pill text-[var(--text-xs)] font-semibold leading-tight [font-variant-numeric:tabular-nums] ${r.type === 'warn' ? 'bg-warning-soft text-warning' : 'bg-error-soft text-error'}`}>{r.tag}</span>
-                  <img src={r.img} alt={r.name} className="prod-icon w-10 h-10 object-contain block rounded-sm" />
                   <div className="name text-text font-medium text-[var(--text-sm)] leading-snug">{r.name}</div>
                   <div className="units text-text-muted text-[var(--text-xs)] [font-variant-numeric:tabular-nums]">{r.left}</div>
                 </div>
