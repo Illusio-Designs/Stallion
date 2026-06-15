@@ -16,39 +16,49 @@ export default function SalesRevenueChart({
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
 
+    // Only plot series that actually carry data — avoids a lonely set of bars
+    // (e.g. Revenue is 0 until orders are marked completed).
+    const hasSales = data.some(d => (d.sales || 0) > 0);
+    const hasRevenue = data.some(d => (d.revenue || 0) > 0);
+    const series = [];
+    if (hasSales) series.push({ key: 'sales', cls: 'fill-[var(--color-primary)]', label: 'Sales' });
+    if (hasRevenue) series.push({ key: 'revenue', cls: 'fill-[var(--color-accent)]', label: 'Revenue' });
+    if (series.length === 0) series.push({ key: 'sales', cls: 'fill-[var(--color-primary)]', label: 'Sales' });
+    const count = series.length;
+
     const maxVal = Math.max(1, ...data.map(d => Math.max(d.sales || 0, d.revenue || 0)));
-    const visualMax = maxVal * 1.5; // headroom like mock
+    const visualMax = maxVal * 1.2; // a little headroom above the tallest bar
 
     const n = Math.max(1, data.length);
     const band = innerW / n;
-    // Thin bars with near-joined spacing like the mock
-    const gap = Math.max(1, Math.min(4, band * 0.08));
-    const barW = Math.max(6, Math.min(12, (band - gap) / 2));
+    const gap = count === 2 ? Math.max(3, Math.min(8, band * 0.12)) : 0;
+    const barW = count === 1
+      ? Math.max(14, Math.min(34, band * 0.52))
+      : Math.max(10, Math.min(20, (band * 0.62 - gap) / 2));
+    const groupW = barW * count + gap * (count - 1);
 
     const centerX = (i) => margin.left + band * i + band / 2;
-    const xRevenue = (i) => centerX(i) - gap / 2 - barW; // left (amber)
-    const xSales = (i) => centerX(i) + gap / 2;          // right (indigo)
+    const xOf = (i, sIdx) => centerX(i) - groupW / 2 + sIdx * (barW + gap);
     const y = (v) => margin.top + innerH - (v / visualMax) * innerH;
 
-    // y ticks at 0, 0.5, 1.0, 1.5 of max
-    const yTicksVals = [0, 0.5, 1.0, 1.5].map(m => m * maxVal);
-    // Compact, readable axis labels (Indian units). Show the raw number for
-    // small values instead of collapsing everything to "$0.0k".
+    const yTicksVals = [0, 0.5, 1.0].map(m => m * visualMax);
+    // Compact, readable axis labels (Indian units).
     const formatK = (v) => {
-      const n = Math.round(v);
-      if (n >= 1e7) return `₹${(n / 1e7).toFixed(1)}Cr`;
-      if (n >= 1e5) return `₹${(n / 1e5).toFixed(1)}L`;
-      if (n >= 1e3) return `₹${(n / 1e3).toFixed(1)}k`;
-      return `₹${n}`;
+      const num = Math.round(v);
+      if (num >= 1e7) return `₹${(num / 1e7).toFixed(1)}Cr`;
+      if (num >= 1e5) return `₹${(num / 1e5).toFixed(1)}L`;
+      if (num >= 1e3) return `₹${(num / 1e3).toFixed(1)}k`;
+      return `₹${num}`;
     };
 
-    return { margin, width, height, innerW, innerH, visualMax, band, barW, gap, xSales, xRevenue, y, yTicksVals, formatK };
+    return { margin, width, height, innerW, innerH, visualMax, band, barW, xOf, y, yTicksVals, formatK, series };
   }, [data, height]);
 
   const legend = (
     <div className="srchart__legend static z-[1] mb-2 flex justify-end gap-4 sm:absolute sm:top-0 sm:right-0 sm:mb-0 sm:justify-normal" aria-hidden="true">
-      <span className="srchart__legend-item srchart__legend-item--sales inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium text-text-muted">Sales</span>
-      <span className="srchart__legend-item srchart__legend-item--revenue inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium text-text-muted">Revenue</span>
+      {cfg.series.map((s) => (
+        <span key={s.key} className={`srchart__legend-item srchart__legend-item--${s.key} inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium text-text-muted`}>{s.label}</span>
+      ))}
     </div>
   );
 
@@ -121,33 +131,26 @@ export default function SalesRevenueChart({
           );
         })}
 
-        {/* Bars: revenue (amber) then sales (indigo) */}
-        {data.map((d, i) => (
-          <rect
-            key={`rev-${i}`}
-            className="srchart__bar srchart__bar--revenue fill-[var(--color-accent)] [transition:opacity_var(--transition-fast)]"
-            x={cfg.xRevenue(i)}
-            y={cfg.y(d.revenue || 0)}
-            width={cfg.barW}
-            height={cfg.margin.top + cfg.innerH - cfg.y(d.revenue || 0)}
-            rx="3"
-          >
-            <title>{`${d.label} — Revenue: ${d.revenue ?? 0}`}</title>
-          </rect>
-        ))}
-        {data.map((d, i) => (
-          <rect
-            key={`sal-${i}`}
-            className="srchart__bar srchart__bar--sales fill-[var(--color-primary)] [transition:opacity_var(--transition-fast)]"
-            x={cfg.xSales(i)}
-            y={cfg.y(d.sales || 0)}
-            width={cfg.barW}
-            height={cfg.margin.top + cfg.innerH - cfg.y(d.sales || 0)}
-            rx="3"
-          >
-            <title>{`${d.label} — Sales: ${d.sales ?? 0}`}</title>
-          </rect>
-        ))}
+        {/* Bars — one group per active series */}
+        {cfg.series.map((s, sIdx) => data.map((d, i) => {
+          const val = d[s.key] || 0;
+          const top = cfg.y(val);
+          const h = cfg.margin.top + cfg.innerH - top;
+          if (h <= 0) return null;
+          return (
+            <rect
+              key={`${s.key}-${i}`}
+              className={`srchart__bar srchart__bar--${s.key} ${s.cls} [transition:opacity_var(--transition-fast)]`}
+              x={cfg.xOf(i, sIdx)}
+              y={top}
+              width={cfg.barW}
+              height={h}
+              rx="3"
+            >
+              <title>{`${d.label} — ${s.label}: ${val}`}</title>
+            </rect>
+          );
+        }))}
 
         {/* X labels */}
         {data.map((d, i) => (
