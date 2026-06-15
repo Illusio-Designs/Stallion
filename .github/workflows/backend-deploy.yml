@@ -96,6 +96,50 @@ jobs:
             **/*.test.js
             **/*.spec.js
 
+      # Deploy the production .env automatically. It is gitignored (never in the
+      # repo), so its contents live in the BACKEND_ENV secret and are written to
+      # <FTP_REMOTE_DIR>/.env on every deploy. If the secret is empty the step is
+      # a no-op and the server keeps whatever .env is already there.
+      - name: Upload .env from secret
+        env:
+          FTP_HOST: ${{ secrets.FTP_SERVER }}
+          FTP_USER: ${{ secrets.FTP_USER }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASS }}
+          FTP_BASE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+          BACKEND_ENV: ${{ secrets.BACKEND_ENV }}
+        run: |
+          set -e
+          if [ -z "${BACKEND_ENV:-}" ]; then
+            echo "ℹ️  BACKEND_ENV secret is empty — skipping .env upload (server keeps its existing .env)."
+            exit 0
+          fi
+          printf '%s\n' "$BACKEND_ENV" > .env.deploy
+          npm install --no-save --no-audit --no-fund --silent basic-ftp
+          cat > ftp-env.mjs <<'NODE'
+          import { Client } from 'basic-ftp';
+          const base = (process.env.FTP_BASE_DIR || '/').replace(/\/+$/, '');
+          const host = (process.env.FTP_HOST || '').replace(/^ftps?:\/\//, '').replace(/\/.*$/, '').trim();
+          const client = new Client(30000);
+          try {
+            await client.access({
+              host,
+              user: process.env.FTP_USER,
+              password: process.env.FTP_PASSWORD,
+              secure: true,
+              secureOptions: { rejectUnauthorized: false },
+            });
+            await client.uploadFrom('.env.deploy', `${base}/.env`);
+            console.log(`✅ Uploaded .env -> ${base}/.env`);
+          } catch (err) {
+            console.error('.env upload failed:', err.message);
+            process.exitCode = 1;
+          } finally {
+            client.close();
+          }
+          NODE
+          node ftp-env.mjs
+          rm -f .env.deploy
+
       # Auto-restart the Node app via Phusion Passenger (touch tmp/restart.txt).
       - name: Trigger Passenger restart
         env:
