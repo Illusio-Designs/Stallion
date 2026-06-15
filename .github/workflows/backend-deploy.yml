@@ -1,0 +1,98 @@
+name: Backend CI/CD
+
+on:
+    push:
+        branches: [main]
+        paths:
+            - "Backendjs/**"
+            - ".github/workflows/backend-deploy.yml"
+    pull_request:
+        branches: [main]
+        paths:
+            - "Backendjs/**"
+    workflow_dispatch:
+
+concurrency:
+    group: backend-deploy-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    ci:
+        name: Validate backend
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: Backendjs
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: "20"
+
+            - name: Syntax check entrypoint
+              run: node --check lib/index.js
+
+    deploy:
+        name: Deploy to FTP server
+        needs: ci
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        runs-on: ubuntu-latest
+        defaults:
+            run:
+                working-directory: Backendjs
+        environment: production
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
+
+            - name: Install lftp
+              run: sudo apt-get update && sudo apt-get install -y lftp
+
+            - name: Prepare staging area
+              run: |
+                  STAGING_DIR="build"
+                  rm -rf "$STAGING_DIR"
+                  mkdir "$STAGING_DIR"
+
+                  if [ -f ".gitignore" ]; then
+                    rsync -a \
+                      --exclude-from=".gitignore" \
+                      --exclude="package-lock.json" \
+                      --exclude=".git" \
+                      ./ "$STAGING_DIR/"
+                  else
+                    rsync -a \
+                      --exclude=".git" \
+                      --exclude="package-lock.json" \
+                      ./ "$STAGING_DIR/"
+                  fi
+
+            - name: Upload to FTP
+              env:
+                  FTP_SERVER: ${{ secrets.FTP_SERVER }}
+                  FTP_USER: ${{ secrets.FTP_USER }}
+                  FTP_PASS: ${{ secrets.FTP_PASS }}
+                  FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+              run: |
+                  if [ -z "$FTP_SERVER" ] || [ -z "$FTP_USER" ] || [ -z "$FTP_PASS" ] || [ -z "$FTP_REMOTE_DIR" ]; then
+                    echo "Missing FTP secrets. Configure FTP_SERVER, FTP_USER, FTP_PASS, and FTP_REMOTE_DIR in repository secrets."
+                    exit 1
+                  fi
+
+                  lftp -c "
+                  set ftp:ssl-allow yes;
+                  set ssl:verify-certificate no;
+                  open -u '$FTP_USER','$FTP_PASS' '$FTP_SERVER';
+                  echo 'Connected. Starting sync...';
+                  mirror --reverse --delete --verbose --parallel=10 'build' '$FTP_REMOTE_DIR';
+                  bye;
+                  "
+
+            - name: Deployment summary
+              run: echo "Backend deployed to $FTP_REMOTE_DIR on $FTP_SERVER"
+              env:
+                  FTP_SERVER: ${{ secrets.FTP_SERVER }}
+                  FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
