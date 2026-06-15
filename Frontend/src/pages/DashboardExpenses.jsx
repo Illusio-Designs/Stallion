@@ -5,6 +5,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import RowActions from '../components/ui/RowActions';
+import DropdownSelector from '../components/ui/DropdownSelector';
 import {
   getSalesmanExpenses,
   getAllAdminExpenses,
@@ -563,17 +564,18 @@ const DashboardExpenses = () => {
 
           <div className="form-group flex flex-col gap-2">
             <label className="text-[length:var(--text-sm)] font-medium text-text">Expense Type *</label>
-            <select
-              className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
+            <DropdownSelector
+              options={[
+                { value: 'travel', label: 'Travel' },
+                { value: 'hotel', label: 'Hotel' },
+                { value: 'fuel', label: 'Fuel' },
+                { value: 'other', label: 'Other' },
+              ]}
               value={createFormData.expense_type}
-              onChange={(e) => setCreateFormData({ ...createFormData, expense_type: e.target.value })}
-              required
-            >
-              <option value="travel">Travel</option>
-              <option value="hotel">Hotel</option>
-              <option value="fuel">Fuel</option>
-              <option value="other">Other</option>
-            </select>
+              onChange={(value) => setCreateFormData({ ...createFormData, expense_type: value })}
+              searchable={false}
+              className="ui-dropdown-custom--full-width"
+            />
           </div>
 
           <div className="form-group flex flex-col gap-2">

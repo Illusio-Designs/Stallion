@@ -5,6 +5,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import RowActions from '../components/ui/RowActions';
+import DropdownSelector from '../components/ui/DropdownSelector';
 import { 
   getOrders, 
   createOrder, 
@@ -556,20 +557,19 @@ const DistributorOrders = () => {
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
                     <div>
                       <label style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'block' }}>Product</label>
-                      <select 
-                        className="ui-select"
-                        value={item.product_id}
-                        onChange={(e) => handleProductSelect(index, e.target.value)}
-                        required
-                      >
-                        <option value="">Select Product</option>
-                        {products.map(product => (
-                          <option key={product.id || product.product_id} value={product.id || product.product_id}>
-                            {product.model_no || product.product_name || product.name} 
-                            {product.price ? ` - ₹${product.price}` : ''}
-                          </option>
-                        ))}
-                      </select>
+                      <DropdownSelector
+                        options={[
+                          { value: '', label: 'Select Product' },
+                          ...products.map(product => ({
+                            value: product.id || product.product_id,
+                            label: `${product.model_no || product.product_name || product.name}${product.price ? ` - ₹${product.price}` : ''}`,
+                          })),
+                        ]}
+                        value={item.product_id || ''}
+                        onChange={(value) => handleProductSelect(index, value)}
+                        placeholder="Select Product"
+                        className="ui-dropdown-custom--full-width"
+                      />
                     </div>
                     <div>
                       <label style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'block' }}>Quantity</label>
