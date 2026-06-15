@@ -1,0 +1,10 @@
+node_modules
+# Keep environment variables out of version control
+.env
+.env.local
+deploy.sh
+/generated/prisma
+prisma/generated
+package-lock.json
+postman/
+scripts/

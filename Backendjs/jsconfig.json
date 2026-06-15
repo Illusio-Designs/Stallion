@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "module": "CommonJS",
+        "moduleResolution": "Node",
+        "target": "ES2022",
+        "checkJs": false,
+        "strictNullChecks": true,
+        "strictFunctionTypes": true
+    },
+    "include": ["lib/**/*.js"],
+    "exclude": [
+        "node_modules",
+        "**/node_modules/*"
+    ]
+}
