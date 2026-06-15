@@ -795,13 +795,19 @@ textarea.ui-input {
   position: fixed;
   inset: 0;
   background: rgba(26, 27, 35, 0.45);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-4);
+  overflow-y: auto;
   z-index: 50;
   backdrop-filter: blur(var(--backdrop-blur));
   animation: uiBackdropFade var(--transition) ease-out;
+}
+/* Inner flex wrapper: centers short modals, scrolls the whole overlay for
+   tall ones (the modal grows naturally and the backdrop scrolls). */
+.ui-modal__scroll {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100%;
+  padding: var(--space-6) var(--space-4);
 }
 @keyframes uiBackdropFade {
   from { opacity: 0; }
@@ -810,7 +816,7 @@ textarea.ui-input {
 .ui-modal {
   width: 100%;
   max-width: 640px;
-  max-height: 90vh;
+  margin: auto;
   background: var(--color-surface);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-xl);
@@ -877,14 +883,8 @@ textarea.ui-input {
 }
 .ui-modal__body {
   padding: var(--space-6);
-  overflow-y: auto;
   overflow-x: hidden;
-  flex: 1 1 auto;
-  min-height: 0;
-  -webkit-overflow-scrolling: touch;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-grey-300) transparent;
+  flex: 0 0 auto;
 }
 .ui-modal__body::-webkit-scrollbar { width: 8px; }
 .ui-modal__body::-webkit-scrollbar-track { background: transparent; }

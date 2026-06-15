@@ -1147,17 +1147,6 @@ const DashboardOrders = () => {
                   <div className="ord-notes">{order.order_notes}</div>
                 </div>
               )}
-
-              <div className="ord-view__actions">
-                <button type="button" className="ui-btn ui-btn--secondary ui-btn--sm" onClick={() => handleDownload(viewRow)}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ marginRight: 6 }}>
-                    <path d="M12 3v12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    <path d="M7 11l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M5 21h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                  Download PDF
-                </button>
-              </div>
             </div>
           );
         })()}
