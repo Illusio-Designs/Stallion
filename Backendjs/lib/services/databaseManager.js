@@ -10,6 +10,32 @@ class DatabaseManager {
             console.log('🔄 Checking database tables...');
             await sequelize.authenticate();
             console.log('✅ Database connected successfully');
+
+            // Guarantee the state-coverage join tables exist. Done with raw SQL
+            // (CREATE TABLE IF NOT EXISTS) up-front so it can't be skipped by a
+            // later Sequelize sync error or fail on a FK/collation quirk.
+            try {
+                await sequelize.query(`CREATE TABLE IF NOT EXISTS salesman_states (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    salesman_id CHAR(36) NOT NULL,
+                    state_id CHAR(36) NOT NULL,
+                    UNIQUE KEY idx_salesman_states_unique (salesman_id, state_id),
+                    KEY idx_salesman_states_salesman_id (salesman_id),
+                    KEY idx_salesman_states_state_id (state_id)
+                )`);
+                await sequelize.query(`CREATE TABLE IF NOT EXISTS distributor_states (
+                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    distributor_id CHAR(36) NOT NULL,
+                    state_id CHAR(36) NOT NULL,
+                    UNIQUE KEY idx_distributor_states_unique (distributor_id, state_id),
+                    KEY idx_distributor_states_distributor_id (distributor_id),
+                    KEY idx_distributor_states_state_id (state_id)
+                )`);
+                console.log('✅ Ensured salesman_states & distributor_states tables');
+            } catch (e) {
+                console.error('❌ Failed creating state join tables:', e.message);
+            }
+
             // Define table schemas
             const schemas = {
                 users: {
