@@ -10,6 +10,7 @@ export const getAllSalesmanCheckins = async () => {
   return apiRequest('/salesman_checkins', {
     method: 'GET',
     includeAuth: true,
+    silent: true, // empty -> 404 "not found"; callers treat as empty list
   });
 };
 
@@ -34,6 +35,7 @@ export const getSalesmanCheckins = async (salesmanId) => {
   return apiRequest(`/salesman_checkins/${salesmanId}`, {
     method: 'GET',
     includeAuth: true,
+    silent: true, // empty -> 404 "not found"; callers treat as empty list
   });
 };
 
@@ -92,6 +94,7 @@ export const getAllSalesmanTargets = async () => {
   return apiRequest('/salesman_targets', {
     method: 'GET',
     includeAuth: true,
+    silent: true, // empty -> 404 "not found"; callers treat as empty list
   });
 };
 
@@ -104,6 +107,7 @@ export const getSalesmanTargets = async (salesmanId) => {
   return apiRequest(`/salesman_targets/${salesmanId}`, {
     method: 'GET',
     includeAuth: true,
+    silent: true, // empty -> 404 "not found"; callers treat as empty list
   });
 };
 
