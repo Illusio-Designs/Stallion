@@ -158,6 +158,7 @@ export const createDistributor = async (distributorData) => {
     state_id,
     city_id,
     zones,
+    state_ids,
     pincode,
     gstin,
     pan,
@@ -214,6 +215,7 @@ export const createDistributor = async (distributorData) => {
     state_id: state_id && String(state_id).trim() !== '' ? String(state_id).trim() : null,
     city_id: city_id && String(city_id).trim() !== '' ? String(city_id).trim() : null,
     zones: Array.isArray(zones) ? zones : [],
+    state_ids: Array.isArray(state_ids) ? state_ids : [],
     pincode: pincode ? String(pincode).trim() : '',
     gstin: gstin ? String(gstin) : '',
     pan: pan ? String(pan) : '',
@@ -282,6 +284,7 @@ export const updateDistributor = async (distributorId, distributorData) => {
     state_id,
     city_id,
     zones,
+    state_ids,
     pincode,
     gstin,
     pan,
@@ -341,6 +344,7 @@ export const updateDistributor = async (distributorId, distributorData) => {
     state_id: (state_id && String(state_id).trim() !== '') ? String(state_id).trim() : '',
     city_id: (city_id && String(city_id).trim() !== '') ? String(city_id).trim() : '',
     zones: Array.isArray(zones) ? zones : [],
+    state_ids: Array.isArray(state_ids) ? state_ids : [],
     pincode: pincode ? String(pincode).trim() : '',
     gstin: gstin ? String(gstin).trim() : '',
     pan: pan ? String(pan).trim() : '',
@@ -1202,6 +1206,7 @@ export const createSalesman = async (salesmanData) => {
   }
   
   const zonesArray = Array.isArray(salesmanData.zones) ? salesmanData.zones : [];
+  const stateIdsArray = Array.isArray(salesmanData.state_ids) ? salesmanData.state_ids : [];
 
   const requestBody = {
     user_id: trimmedUserId,
@@ -1215,6 +1220,7 @@ export const createSalesman = async (salesmanData) => {
     state_id: state_id && String(state_id).trim() !== '' ? String(state_id).trim() : null,
     city_id: city_id && String(city_id).trim() !== '' ? String(city_id).trim() : null,
     zones: zonesArray,
+    state_ids: stateIdsArray,
     zone_preference: salesmanData.zone_preference || '',
     joining_date: joining_date || new Date().toISOString(),
   };
@@ -1347,6 +1353,7 @@ export const updateSalesman = async (salesmanId, salesmanData) => {
   }
   
   const zonesArray = Array.isArray(salesmanData.zones) ? salesmanData.zones : [];
+  const stateIdsArray = Array.isArray(salesmanData.state_ids) ? salesmanData.state_ids : [];
 
   const requestBody = {
     user_id: trimmedUserId,
@@ -1360,6 +1367,7 @@ export const updateSalesman = async (salesmanId, salesmanData) => {
     state_id: state_id && String(state_id).trim() !== '' ? String(state_id).trim() : '',
     city_id: city_id && String(city_id).trim() !== '' ? String(city_id).trim() : '',
     zones: zonesArray,
+    state_ids: stateIdsArray,
     zone_preference: salesmanData.zone_preference || '',
     joining_date: joining_date || new Date().toISOString(),
   };
