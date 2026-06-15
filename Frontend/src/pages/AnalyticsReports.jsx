@@ -62,21 +62,31 @@ const AnalyticsReports = () => {
     setLoading(true);
     setLoadError(false);
     const asArray = (r) => (Array.isArray(r) ? r : r?.data || []);
-    const emptyOnNotFound = (e) => {
-      const msg = `${e?.message || ''} ${e?.errorData?.error || ''}`.toLowerCase();
-      if (e?.statusCode === 404 || msg.includes('not found')) return [];
-      throw e;
-    };
+    const isNotFound = (e) =>
+      e?.statusCode === 404 ||
+      `${e?.message || ''} ${e?.errorData?.error || ''}`.toLowerCase().includes('not found');
+
+    // Independent calls: an empty table (404) or one failing call must not break the other.
+    const [tRes, cRes] = await Promise.allSettled([
+      isSalesman && salesmanId ? getSalesmanTargets(salesmanId) : getAllSalesmanTargets(),
+      isSalesman && salesmanId ? getSalesmanCheckins(salesmanId) : getAllSalesmanCheckins(),
+    ]);
+
+    let realError = false;
+    let t = [];
+    let c = [];
+    if (tRes.status === 'fulfilled') t = asArray(tRes.value);
+    else if (!isNotFound(tRes.reason)) { realError = true; console.error('targets load failed:', tRes.reason); }
+    if (cRes.status === 'fulfilled') c = asArray(cRes.value);
+    else if (!isNotFound(cRes.reason)) { realError = true; console.error('check-ins load failed:', cRes.reason); }
+
+    setTargets(t);
+    setCheckins(c);
+    setLoadError(realError);
+    if (realError) showError('Could not load some reports.');
+
+    // Resolve names on-demand by id (best effort, never fatal).
     try {
-      const [targetsData, checkinsData] = await Promise.all([
-        (isSalesman && salesmanId ? getSalesmanTargets(salesmanId) : getAllSalesmanTargets()).catch(emptyOnNotFound),
-        (isSalesman && salesmanId ? getSalesmanCheckins(salesmanId) : getAllSalesmanCheckins()).catch(emptyOnNotFound),
-      ]);
-      const t = asArray(targetsData);
-      const c = asArray(checkinsData);
-      setTargets(t);
-      setCheckins(c);
-      // Resolve names on-demand by id (best effort, never fatal).
       const sIds = [...new Set([...t, ...c].map((x) => x.salesman_id).filter(Boolean))];
       const pIds = [...new Set(c.map((x) => x.party_id).filter(Boolean))];
       const [sResolved, pResolved] = await Promise.all([
@@ -85,15 +95,9 @@ const AnalyticsReports = () => {
       ]);
       setSalesmen(sResolved.filter(Boolean));
       setParties(pResolved.filter(Boolean));
-    } catch (e) {
-      console.error('Reports load failed:', e);
-      setLoadError(true);
-      showError('Could not load reports. Please try again.');
-      setTargets([]);
-      setCheckins([]);
-    } finally {
-      setLoading(false);
-    }
+    } catch { /* names fall back to ids */ }
+
+    setLoading(false);
   };
 
   const salesmanName = (id) => {
