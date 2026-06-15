@@ -11,6 +11,7 @@ const Dashboard = () => {
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false); // true when the API call failed
   const [targets, setTargets] = useState([]);
   const [targetsLoading, setTargetsLoading] = useState(true);
   const [mySalesmanId, setMySalesmanId] = useState(null);
@@ -29,6 +30,7 @@ const Dashboard = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setLoadError(false);
         const [ordersData, productsData] = await Promise.all([
           getOrders(),
           getProducts()
@@ -72,6 +74,7 @@ const Dashboard = () => {
       } catch (error) {
         console.error('Failed to fetch orders:', error);
         showError('Could not load dashboard data. Please try again.');
+        setLoadError(true);
         setOrders([]);
       } finally {
         setLoading(false);
@@ -288,6 +291,24 @@ const Dashboard = () => {
       .slice(0, 10);
   }, [orders]);
 
+  // Shown when the API call failed (backend unreachable / erroring)
+  const backendDownState = (
+    <div className="ui-state ui-state--error">
+      <div className="ui-state__icon">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="2" y="3" width="20" height="8" rx="2" />
+          <rect x="2" y="13" width="20" height="8" rx="2" />
+          <line x1="6" y1="7" x2="6.01" y2="7" />
+          <line x1="6" y1="17" x2="6.01" y2="17" />
+          <line x1="18" y1="6" x2="22" y2="10" />
+          <line x1="22" y1="6" x2="18" y2="10" />
+        </svg>
+      </div>
+      <p className="ui-state__title">Backend not working</p>
+      <p className="ui-state__desc">We couldn't reach the server. Please try again later.</p>
+    </div>
+  );
+
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
@@ -352,6 +373,7 @@ const Dashboard = () => {
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Top Selling Products</h4>
             <div className="mini-list">
               {topProducts.length === 0 ? (
+                loadError ? backendDownState : (
                 <div className="ui-state ui-state--empty">
                   <div className="ui-state__icon">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -359,9 +381,10 @@ const Dashboard = () => {
                       <path d="m7 14 4-4 3 3 5-5" />
                     </svg>
                   </div>
-                  <p className="ui-state__title">Pending from backend</p>
-                  <p className="ui-state__desc">No sales data available yet.</p>
+                  <p className="ui-state__title">No sales data yet</p>
+                  <p className="ui-state__desc">Top products will appear once orders come in.</p>
                 </div>
+                )
               ) : topProducts.map((p,i)=> (
                 <div key={i} className="row grid grid-cols-[1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
                   <div className="name text-text font-medium text-[var(--text-sm)] leading-snug">{p.name}</div>
@@ -374,6 +397,7 @@ const Dashboard = () => {
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Inventory Alerts</h4>
             <div className="inv-list">
               {inventoryAlerts.length === 0 ? (
+                loadError ? backendDownState : (
                 <div className="ui-state ui-state--empty">
                   <div className="ui-state__icon">
                     <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -382,9 +406,10 @@ const Dashboard = () => {
                       <path d="M12 22V12" />
                     </svg>
                   </div>
-                  <p className="ui-state__title">Pending from backend</p>
-                  <p className="ui-state__desc">No sales data available yet.</p>
+                  <p className="ui-state__title">All stock levels healthy</p>
+                  <p className="ui-state__desc">No low or out-of-stock items right now.</p>
                 </div>
+                )
               ) : inventoryAlerts.map((r,i)=> (
                 <div key={i} className="row grid grid-cols-[auto_1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
                   <span className={`stock-badge ${r.type} inline-flex items-center px-2 py-1 rounded-pill text-[var(--text-xs)] font-semibold leading-tight [font-variant-numeric:tabular-nums] ${r.type === 'warn' ? 'bg-warning-soft text-warning' : 'bg-error-soft text-error'}`}>{r.tag}</span>
