@@ -59,7 +59,8 @@ const DashboardOrders = () => {
   const [viewItemsLoading, setViewItemsLoading] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
-  const [dateRange, setDateRange] = useState('Feb 24, 2023 - Mar 15, 2023');
+  const [dateFrom, setDateFrom] = useState(null); // 'YYYY-MM-DD' or null
+  const [dateTo, setDateTo] = useState(null);     // 'YYYY-MM-DD' or null
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -515,17 +516,30 @@ const DashboardOrders = () => {
     return tableRows;
   }, [orders, partyNamesMap]);
 
-  // Filter rows by active tab
+  // Filter rows by active tab + selected date range
   const filteredRowsByTab = useMemo(() => {
-    if (activeTab === 'All') return rows;
-    const apiStatus = mapUITabToApiStatus(activeTab);
-    if (!apiStatus) return rows;
-    
-    return rows.filter(row => {
-      const rowStatus = row.originalOrder?.order_status?.toLowerCase();
-      return rowStatus === apiStatus;
-    });
-  }, [rows, activeTab]);
+    let result = rows;
+
+    if (activeTab !== 'All') {
+      const apiStatus = mapUITabToApiStatus(activeTab);
+      if (apiStatus) {
+        result = result.filter(row => row.originalOrder?.order_status?.toLowerCase() === apiStatus);
+      }
+    }
+
+    if (dateFrom || dateTo) {
+      const fromTs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : -Infinity;
+      const toTs = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : Infinity;
+      result = result.filter(row => {
+        const raw = row.originalOrder?.order_date || row.originalOrder?.created_at;
+        if (!raw) return false;
+        const ts = new Date(raw).getTime();
+        return !Number.isNaN(ts) && ts >= fromTs && ts <= toTs;
+      });
+    }
+
+    return result;
+  }, [rows, activeTab, dateFrom, dateTo]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -904,32 +918,14 @@ const DashboardOrders = () => {
           <div className="dash-card metric orders-card p-5">
             <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Pending Orders</h4>
             <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
-            <div className="metric-sub green flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-success">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0">
-                <path d="M18 15L12 9L6 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              12% vs last month
-            </div>
           </div>
           <div className="dash-card metric orders-card p-5">
             <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Completed Orders</h4>
             <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
-            <div className="metric-sub red flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-error">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0">
-                <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              10% vs last month
-            </div>
           </div>
           <div className="dash-card metric orders-card p-5">
             <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Revenue</h4>
             <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
-            <div className="metric-sub green flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-success">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 shrink-0">
-                <path d="M18 15L12 9L6 15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              12% vs last month
-            </div>
           </div>
         </div>
 
@@ -980,10 +976,9 @@ const DashboardOrders = () => {
                 title="Order Overview"
                 columns={columns}
                 rows={filteredRowsByTab}
-                onImport={() => console.log('import orders')}
-                importText="Import All Orders Data"
-                dateRange={dateRange}
-                onDateChange={setDateRange}
+                dateFrom={dateFrom}
+                dateTo={dateTo}
+                onDateRangeChange={({ from, to }) => { setDateFrom(from); setDateTo(to); }}
                 itemName="Order"
                 loading={loading}
               />
@@ -1160,7 +1155,7 @@ const DashboardOrders = () => {
           </>
         )}
       >
-        <div className="ui-form" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+        <div className="ui-form">
           {/* Order Type - Hidden for admin and party roles */}
           {/* Salesman and Distributor can see order type dropdown */}
           {!isAdmin && !isParty && (

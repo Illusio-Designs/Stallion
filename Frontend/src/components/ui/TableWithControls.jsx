@@ -17,6 +17,9 @@ export default function TableWithControls({
   secondaryActions = [],
   dateRange = null,
   onDateChange,
+  dateFrom = null,
+  dateTo = null,
+  onDateRangeChange,
   rowSizeOptions = [8, 16, 24],
   selectable = true,
   addNewText = "Add New",
@@ -166,36 +169,18 @@ export default function TableWithControls({
       <div className="ui-table__controls">
         <div className="ui-table__control-row">
           <div className="ui-table__right">
-            {onDateChange && (
-              <div className="ui-pill">
-                <input
-                  type="text"
-                  className="ui-input ui-input--date"
-                  value={dateRange || ""}
-                  onChange={(e) => onDateChange?.(e.target.value)}
-                  placeholder="Feb 24, 2023 – Mar 15, 2023"
-                  style={{
-                    border: "none",
-                    boxShadow: "none",
-                    padding: "0 0 0 4px",
-                    fontFamily: "Spoof Trial",
-                  }}
-                />
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  style={{ width: "20px", height: "20px" }}
-                >
-                  <path
-                    d="M8 2V5M16 2V5M3 9H21M5 5H19C20.105 5 21 5.895 21 7V19C21 20.105 20.105 21 19 21H5C3.895 21 3 20.105 3 19V7C3 5.895 3.895 5 5 5Z"
-                    stroke="#000000"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
+            {(onDateRangeChange || onDateChange) && (
+              <DateRangePicker
+                from={dateFrom}
+                to={dateTo}
+                onChange={(range) => {
+                  onDateRangeChange?.(range);
+                  if (onDateChange) {
+                    const fmt = (d) => d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+                    onDateChange(range.from || range.to ? `${fmt(range.from)}${range.to ? ' – ' + fmt(range.to) : ''}` : '');
+                  }
+                }}
+              />
             )}
 
             {!serverPagination && (
@@ -412,6 +397,52 @@ export default function TableWithControls({
           />
         </div>
       </div>
+    </div>
+  );
+}
+
+// Working date-range picker: a pill that opens a popover with native date inputs.
+// Calls onChange({ from, to }) with 'YYYY-MM-DD' strings (or null).
+function DateRangePicker({ from, to, onChange }) {
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDoc = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  const fmt = (d) => (d ? new Date(`${d}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '');
+  const hasRange = Boolean(from || to);
+  const label = hasRange ? `${fmt(from) || '…'} – ${fmt(to) || '…'}` : 'Select dates';
+
+  return (
+    <div ref={wrapRef} style={{ position: 'relative', display: 'inline-block' }}>
+      <button type="button" className="ui-pill" onClick={() => setOpen((v) => !v)} title="Filter by date">
+        <span style={{ fontFamily: 'Spoof Trial', color: hasRange ? 'var(--color-text)' : 'var(--color-text-subtle)', whiteSpace: 'nowrap' }}>{label}</span>
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: 18 }}>
+          <path d="M8 2V5M16 2V5M3 9H21M5 5H19C20.105 5 21 5.895 21 7V19C21 20.105 20.105 21 19 21H5C3.895 21 3 20.105 3 19V7C3 5.895 3.895 5 5 5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: '#fff', border: '1px solid #E0E0E0', borderRadius: 10, boxShadow: '0 4px 16px rgba(24,18,101,.10)', padding: 14, zIndex: 60, minWidth: 240 }}
+        >
+          <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>From</label>
+          <input type="date" className="ui-input" value={from || ''} max={to || undefined} onChange={(e) => onChange({ from: e.target.value || null, to })} style={{ width: '100%', marginBottom: 12 }} />
+          <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>To</label>
+          <input type="date" className="ui-input" value={to || ''} min={from || undefined} onChange={(e) => onChange({ from, to: e.target.value || null })} style={{ width: '100%', marginBottom: 12 }} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+            <button type="button" className="ui-btn ui-btn--secondary ui-btn--sm" onClick={() => onChange({ from: null, to: null })}>Clear</button>
+            <button type="button" className="ui-btn ui-btn--primary ui-btn--sm" onClick={() => setOpen(false)}>Done</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

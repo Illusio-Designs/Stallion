@@ -276,7 +276,7 @@ const Dashboard = () => {
             <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
               {loading ? <Skeleton width={90} height={24} /> : `₹${stats.totalSales.toLocaleString('en-IN')}`}
             </div>
-            <div className="metric-sub green text-[var(--text-xs)] font-medium text-success [font-variant-numeric:tabular-nums]">↑ 12% vs last month</div>
+            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">This month's confirmed sales</div>
           </div>
           <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Orders</h4>
