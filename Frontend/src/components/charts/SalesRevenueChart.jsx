@@ -55,7 +55,7 @@ export default function SalesRevenueChart({
   }, [data, height]);
 
   const legend = (
-    <div className="srchart__legend static z-[1] mb-2 flex justify-end gap-4 sm:absolute sm:top-0 sm:right-0 sm:mb-0 sm:justify-normal" aria-hidden="true">
+    <div className="srchart__legend z-[1] mb-2 flex justify-end gap-4" aria-hidden="true">
       {cfg.series.map((s) => (
         <span key={s.key} className={`srchart__legend-item srchart__legend-item--${s.key} inline-flex items-center gap-2 whitespace-nowrap text-xs font-medium text-text-muted`}>{s.label}</span>
       ))}

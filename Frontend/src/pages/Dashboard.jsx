@@ -345,20 +345,20 @@ const Dashboard = () => {
 
         {!isSalesman && (
         <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
-          <div className="dash-card tall equal col-span-9 max-[900px]:col-span-full max-[560px]:col-span-full h-[280px] max-[560px]:h-auto max-[560px]:min-h-[240px] flex flex-col [&>*:last-child]:flex-[1_1_auto] bg-surface border border-border rounded-lg shadow-sm p-5">
-            <div className="chart-header" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:6}}>
-              <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700'}}>Sales & Revenue</h4>
-              <select className="ui-select ui-pill chart-period-select" value={period} onChange={(e)=>setPeriod(e.target.value)} style={{height:28, padding:'0px 10px', fontSize:'12px'}}>
+          <div className="dash-card tall equal col-span-9 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
+            <div className="chart-header" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10}}>
+              <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700', margin: 0}}>Sales &amp; Revenue</h4>
+              <select className="ui-select ui-pill chart-period-select" value={period} onChange={(e)=>setPeriod(e.target.value)} style={{height:32, padding:'0px 12px', fontSize:'12px'}}>
                 <option>Monthly</option>
                 <option>Weekly</option>
                 <option>Yearly</option>
               </select>
             </div>
-            <SalesRevenueChart data={chartData} height={220} />
+            <SalesRevenueChart data={chartData} height={210} />
           </div>
-          <div className="dash-card side equal col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full h-[280px] max-[560px]:h-auto max-[560px]:min-h-[240px] flex flex-col [&>*:last-child]:flex-[1_1_auto] bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700'}}>Quick Actions</h4>
-            <div className="btn-col flex flex-col gap-2">
+          <div className="dash-card side equal col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700', margin: '0 0 10px'}}>Quick Actions</h4>
+            <div className="btn-col flex flex-1 flex-col justify-center gap-3">
               <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/products'; }}>Add New Product</button>
               <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/orders'; }}>Create Bulk Order</button>
               <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/analytics'; }}>Generate Report</button>
