@@ -73,33 +73,43 @@ class SalesmanTargetsController {
     async updateTargetFromOrder(order) {
         try {
             const { salesman_id, order_date } = order;
+            if (!salesman_id) return;
+
+            // DECIMAL columns come back as strings in MySQL — always do the math
+            // with Number() so we add the value instead of concatenating strings.
+            const orderTotal = Number(order.order_total) || 0;
+            if (orderTotal <= 0) return;
 
             const salesmanTargets = await SalesmanTargets.findAll({
                 where: {
                     salesman_id: salesman_id,
-                    // Use date range logic: update targets whose end_date is
-                    // on/after the order_date (not strict equality).
+                    // Targets whose window still covers this order date.
                     end_date: { [Op.gte]: new Date(order_date) }
                 }
             });
             if (!salesmanTargets || salesmanTargets.length === 0) {
                 return;
             }
-            for (const salesmanTarget of salesmanTargets) {
-                if (salesmanTarget.completed_amount >= salesmanTarget.target_amount) {
-                    continue;
+
+            for (const target of salesmanTargets) {
+                const completed = Number(target.completed_amount) || 0;
+                const targetAmount = Number(target.target_amount) || 0;
+                if (targetAmount > 0 && completed >= targetAmount) {
+                    continue; // already achieved
                 }
-                if (salesmanTarget.order_type === order.order_type) {
-                    salesmanTarget.completed_amount += order.order_total;
+                // Count when the target is "overall" (no order_type) OR matches this order's type.
+                if (target.order_type == null || target.order_type === order.order_type) {
+                    const next = completed + orderTotal;
+                    target.completed_amount = next;
+                    if (targetAmount > 0 && next >= targetAmount) {
+                        target.target_status = 'completed';
+                    }
+                    await target.save();
                 }
-                if (salesmanTarget.order_type == null) {
-                    salesmanTarget.completed_amount += order.order_total;
-                }
-                await salesmanTarget.save();
             }
         }
         catch (error) {
-            res.status(500).json({ error: error.message });
+            console.error('updateTargetFromOrder failed:', error.message);
         }
     }
 
