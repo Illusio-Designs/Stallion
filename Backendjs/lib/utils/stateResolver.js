@@ -16,9 +16,10 @@ async function resolveStateIds(values) {
     for (const raw of (values || [])) {
         if (raw === null || raw === undefined || String(raw).trim() === '') continue;
         const v = String(raw).trim();
+        // MySQL LIKE is case-insensitive by default (Op.iLike is Postgres-only).
         const where = UUID_RE.test(v)
             ? { id: v }
-            : { name: { [Op.iLike]: v } };
+            : { name: { [Op.like]: v } };
         const state = await State.findOne({ where });
         if (!state) {
             const err = new Error(`State not found: ${v}`);

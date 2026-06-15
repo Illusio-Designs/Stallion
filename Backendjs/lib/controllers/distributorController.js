@@ -76,7 +76,10 @@ class DistributorController {
             console.log("distributors", distributors.length);
             const distributorIds = distributors.map(distributor => distributor.distributor_id);
             const distributorZones = await DistributorZones.findAll({ where: { distributor_id: distributorIds } });
-            const distributorStates = await DistributorStates.findAll({ where: { distributor_id: distributorIds } });
+            // Resilient: don't let a not-yet-synced states table break the list.
+            let distributorStates = [];
+            try { distributorStates = await DistributorStates.findAll({ where: { distributor_id: distributorIds } }); }
+            catch (e) { console.warn('distributor_states read skipped:', e.message); }
             const response = distributors.map(distributor => {
                 return {
                     ...distributor.toJSON(),
