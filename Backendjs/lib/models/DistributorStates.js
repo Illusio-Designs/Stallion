@@ -2,22 +2,17 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../constants/database');
 
+// NOTE: no FK `references` here on purpose — the join table is created plainly
+// so it can never fail to sync on a MySQL foreign-key/collation mismatch.
+// Integrity (valid state/distributor ids) is enforced in the controllers.
 const DistributorStates = sequelize.define('DistributorStates', {
     state_id: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: {
-            model: 'states',
-            key: 'id'
-        }
     },
     distributor_id: {
         type: DataTypes.UUID,
         allowNull: false,
-        references: {
-            model: 'distributors',
-            key: 'distributor_id'
-        }
     },
 }, {
     tableName: 'distributor_states',
