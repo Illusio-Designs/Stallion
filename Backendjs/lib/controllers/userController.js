@@ -3,11 +3,13 @@ const path = require('path');
 const fs = require('fs');
 const User = require('../models/User');
 const Role = require('../models/Role');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const UserRole = require('../models/UserRole');
 const Salesman = require('../models/Salesman');
 const Party = require('../models/Party');
 const Distributor = require('../models/distributor');
+const { canManageUsers } = require('../utils/roleHelpers');
+
 class UserController {
     async getUsers(req, res) {
         try {
@@ -36,22 +38,24 @@ class UserController {
     }
     async deleteUser(req, res) {
         try {
-            const { id } = req.params;
+            const id = req.params.id;
+            if (!id) {
+                return res.status(400).json({ error: 'User ID is required' });
+            }
             const user = await User.findByPk(id);
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
             }
+            const snapshot = user.toJSON();
             await user.destroy();
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'User deleted',
-                table_name: 'users',
-                record_id: user.user_id,
-                old_values: user.toJSON(),
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'users',
+                recordId: user.user_id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'User deleted successfully' });
         }
@@ -81,16 +85,14 @@ class UserController {
                 user_id: user.user_id,
                 role_id: role_id
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'User created',
-                table_name: 'users',
-                record_id: user.user_id,
-                old_values: null,
-                new_values: user.toJSON(),
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'users',
+                recordId: user.user_id,
+                oldValues: null,
+                newValues: user,
             });
             res.status(200).json(user);
         } catch (error) {
@@ -107,19 +109,32 @@ class UserController {
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
             }
-            const role = await Role.findByPk(role_id);
-            if (!role) {
-                return res.status(404).json({ error: 'Role not found' });
+
+            const updates = {
+                full_name: name !== undefined ? name : user.full_name,
+                phone: phone !== undefined ? phone : user.phone,
+                email: email !== undefined ? email : user.email,
+                profile_image: image_url !== undefined ? image_url : user.profile_image,
+                updated_at: new Date(),
+            };
+
+            if (is_active !== undefined) {
+                updates.is_active = is_active;
             }
-            await user.update({
-                full_name: name || user.full_name,
-                phone: phone || user.phone,
-                email: email || user.email,
-                role_id: role_id || user.role_id,
-                is_active: is_active || user.is_active,
-                profile_image: image_url || user.profile_image,
-                updated_at: new Date()
-            });
+
+            if (role_id !== undefined && canManageUsers(req.userRoleName)) {
+                const role = await Role.findByPk(role_id);
+                if (!role) {
+                    return res.status(404).json({ error: 'Role not found' });
+                }
+                updates.role_id = role_id;
+            } else if (role_id !== undefined && role_id !== user.role_id) {
+                return res.status(403).json({ error: 'Only admins can change user roles' });
+            }
+
+            const oldSnapshot = user.toJSON();
+
+            await user.update(updates);
             const salesmen = await Salesman.findOne({ where: { user_id: user.user_id } });
             if (salesmen) {
                 await salesmen.update({
@@ -148,23 +163,14 @@ class UserController {
                 });
             }
 
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'User updated',
-                table_name: 'users',
-                record_id: user.user_id,
-                old_values: user.toJSON(),
-                new_values: {
-                    full_name: name || user.full_name,
-                    phone: phone || user.phone,
-                    role_id: role_id || user.role_id,
-                    is_active: is_active || user.is_active,
-                    profile_image: image_url || user.profile_image,
-                    updated_at: new Date()
-                },
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'users',
+                recordId: user.user_id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...updates },
             });
             const updatedUser = await User.findByPk(id);
             res.status(200).json(updatedUser);

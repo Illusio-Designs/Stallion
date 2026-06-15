@@ -1,79 +1,49 @@
-const { User, RoleType } = require('../models');
+const { hasRole, normalizeRole } = require('../utils/roleHelpers');
 
 /**
- * Role-based Authorization Middleware
- * Checks if user has required role(s)
- * @param {string|string[]} roles - Required role(s)
+ * Require the authenticated user to have one of the given roles.
+ * Expects req.userRoleName to be set by authenticateToken.
  */
 const checkRole = (roles) => {
-    return async (req, res, next) => {
-        try {
-            if (!req.user) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'Authentication required'
-                });
-            }
+    const allowedRoles = (Array.isArray(roles) ? roles : [roles]).map(normalizeRole);
 
-            // Get user with role
-            const user = await User.findOne({
-                where: { id: req.user.id },
-                include: [{
-                    model: RoleType,
-                    as: 'roleType',
-                    attributes: ['type']
-                }]
-            });
-
-            if (!user) {
-                return res.status(401).json({
-                    success: false,
-                    message: 'User not found'
-                });
-            }
-
-            const userRole = user.roleType?.type;
-            const allowedRoles = Array.isArray(roles) ? roles : [roles];
-
-            if (!userRole || !allowedRoles.includes(userRole)) {
-                return res.status(403).json({
-                    success: false,
-                    message: 'Access denied - insufficient permissions'
-                });
-            }
-
-            // Add role to request for convenience
-            req.userRole = userRole;
-            next();
-        } catch (error) {
-            console.error('Role Authorization Error:', error);
-            res.status(500).json({
-                success: false,
-                message: 'Authorization error',
-                error: error.message
-            });
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ success: false, message: 'Authentication required' });
         }
+
+        const userRole = normalizeRole(req.userRoleName);
+        if (!userRole || !allowedRoles.includes(userRole)) {
+            return res.status(403).json({ success: false, message: 'Access denied - insufficient permissions' });
+        }
+
+        next();
     };
 };
 
-/**
- * Middleware to check if user has admin privileges
- */
-const isAdmin = checkRole(['Admin']);
-
-/**
- * Middleware to check if user has manager privileges
- */
-const isManager = checkRole(['Admin', 'Manager']);
-
-/**
- * Middleware to check if user is a salesman
- */
-const isSalesman = checkRole(['Salesman']);
+const isAdmin = checkRole(['admin']);
+const isOrderManager = checkRole(['admin', 'order_manager']);
+const isPartyManager = checkRole(['admin', 'party_manager', 'sales_manager']);
+const isProductManager = checkRole(['admin', 'product_manager']);
+const isInventoryManager = checkRole(['admin', 'tray_manager']);
+const isOfficeStaff = checkRole([
+    'admin',
+    'sales_manager',
+    'expense_manager',
+    'tray_manager',
+    'order_manager',
+    'reports_manager',
+    'product_manager',
+    'party_manager',
+    'distributor_manager',
+]);
 
 module.exports = {
     checkRole,
     isAdmin,
-    isManager,
-    isSalesman
+    isOrderManager,
+    isPartyManager,
+    isProductManager,
+    isInventoryManager,
+    isOfficeStaff,
 };

@@ -1,5 +1,5 @@
 const Gender = require('../models/Gender');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 class GenderController {
     async getGenders(req, res) {
         try {
@@ -30,7 +30,6 @@ class GenderController {
 
     async createGender(req, res) {
         try {
-            const user = req.user;
             const { gender_name } = req.body;
             if (!gender_name) {
                 return res.status(400).json({ error: 'Gender name is required' });
@@ -40,16 +39,14 @@ class GenderController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Gender created',
-                table_name: 'gender',
-                record_id: gender.gender_id,
-                old_values: null,
-                new_values: gender,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'gender',
+                recordId: gender.gender_id,
+                oldValues: null,
+                newValues: gender,
             });
             res.status(200).json(gender);
         } catch (error) {
@@ -58,29 +55,29 @@ class GenderController {
     }
     async updateGender(req, res) {
         try {
-            const user = req.user;
             const { gender_name } = req.body;
             const { id } = req.params;
             if (!id || !gender_name) {
                 return res.status(400).json({ error: 'Gender ID and gender name are required' });
             }
-            const gender = await Gender.update({
-                gender_name: gender_name,
-                updated_at: new Date(),
-            }, { where: { gender_id: id } });
+            const gender = await Gender.findOne({ where: { gender_id: id } });
             if (!gender) {
                 return res.status(404).json({ error: 'Gender not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const oldSnapshot = gender.toJSON();
+            const payload = {
+                gender_name: gender_name,
+                updated_at: new Date(),
+            };
+            await Gender.update(payload, { where: { gender_id: id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Gender updated',
-                table_name: 'gender',
-                record_id: id,
-                old_values: gender,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'gender',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Gender updated successfully' });
         } catch (error) {
@@ -89,25 +86,24 @@ class GenderController {
     }
     async deleteGender(req, res) {
         try {
-            const user = req.user;
             const { id } = req.params;
             if (!id) {
                 return res.status(400).json({ error: 'Gender ID is required' });
             }
-            const gender = await Gender.destroy({ where: { gender_id: id } });
+            const gender = await Gender.findOne({ where: { gender_id: id } });
             if (!gender) {
                 return res.status(404).json({ error: 'Gender not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = gender.toJSON();
+            await gender.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Gender deleted',
-                table_name: 'gender',
-                record_id: id,
-                old_values: gender,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'gender',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Gender deleted successfully' });
         } catch (error) {
@@ -116,4 +112,4 @@ class GenderController {
     }
 }
 
-module.exports = new GenderController();  
+module.exports = new GenderController();

@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../constants/database');
+const { DB_INDEXES } = require('../constants/dbIndexes');
 const Country = require('../models/Country');
 const State = require('../models/State');
 
@@ -135,7 +136,11 @@ class DatabaseManager {
                         allowNull: true
                     },
                     action: {
-                        type: DataTypes.STRING,
+                        type: DataTypes.ENUM('create', 'update', 'delete'),
+                        allowNull: false
+                    },
+                    description: {
+                        type: DataTypes.STRING(255),
                         allowNull: true
                     },
                     table_name: {
@@ -143,7 +148,7 @@ class DatabaseManager {
                         allowNull: true
                     },
                     record_id: {
-                        type: DataTypes.UUID,
+                        type: DataTypes.STRING(36),
                         allowNull: true
                     },
                     old_values: {
@@ -431,6 +436,9 @@ class DatabaseManager {
                 }
             }
 
+            // Idempotent index sync for all tables (safe on existing live databases)
+            await this.syncIndexes();
+
             await Country.initializeDefaultCountries();
             await State.initializeDefaultStates();
             console.log('✨ Database initialization completed');
@@ -443,8 +451,15 @@ class DatabaseManager {
 
     static async checkTableExists(tableName) {
         try {
-            await sequelize.getQueryInterface().showTable(tableName);
-            return true;
+            const [results] = await sequelize.query(`
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                LIMIT 1
+            `, { replacements: [tableName] });
+
+            return results.length > 0;
         } catch (error) {
             return false;
         }
@@ -506,6 +521,136 @@ class DatabaseManager {
             // If cleanup fails, log but don't throw - allow sync to continue
             console.log(`⚠️ Warning cleaning up orphaned records in ${childTable}:`, error.message);
         }
+    }
+
+    /**
+     * Returns existing non-primary indexes grouped by name for a table.
+     */
+    static async getTableIndexes(tableName) {
+        const [rows] = await sequelize.query(`
+            SELECT
+                INDEX_NAME,
+                NON_UNIQUE,
+                GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) AS columns
+            FROM information_schema.STATISTICS
+            WHERE TABLE_SCHEMA = DATABASE()
+              AND TABLE_NAME = ?
+            GROUP BY INDEX_NAME, NON_UNIQUE
+        `, { replacements: [tableName] });
+
+        return rows;
+    }
+
+    /**
+     * Check whether an index with the same columns and uniqueness already exists.
+     */
+    static indexColumnsMatch(existingIndex, fields, unique) {
+        if (!existingIndex || existingIndex.INDEX_NAME === 'PRIMARY') {
+            return false;
+        }
+        const existingColumns = existingIndex.columns;
+        const expectedColumns = fields.join(',');
+        const existingIsUnique = existingIndex.NON_UNIQUE === 0;
+        return existingColumns === expectedColumns && existingIsUnique === Boolean(unique);
+    }
+
+    /**
+     * Add missing indexes from lib/constants/dbIndexes.js without failing startup.
+     * Skips indexes that already exist (by name or equivalent columns).
+     */
+    static async syncIndexes(indexDefinitions = DB_INDEXES) {
+        console.log('📇 Syncing database indexes...');
+        const queryInterface = sequelize.getQueryInterface();
+        let added = 0;
+        let skipped = 0;
+        let warned = 0;
+
+        for (const definition of indexDefinitions) {
+            const { table, fields, name, unique = false } = definition;
+
+            if (!table || !fields?.length || !name) {
+                console.log(`⚠️ Skipping invalid index definition: ${JSON.stringify(definition)}`);
+                warned++;
+                continue;
+            }
+
+            const tableExists = await this.checkTableExists(table);
+            if (!tableExists) {
+                skipped++;
+                continue;
+            }
+
+            let existingIndexes = [];
+            try {
+                existingIndexes = await this.getTableIndexes(table);
+            } catch (error) {
+                console.log(`⚠️ Could not read indexes for ${table}:`, error.message);
+                warned++;
+                continue;
+            }
+
+            if (existingIndexes.some((idx) => idx.INDEX_NAME === name)) {
+                skipped++;
+                continue;
+            }
+
+            const equivalent = existingIndexes.find((idx) => this.indexColumnsMatch(idx, fields, unique));
+            if (equivalent) {
+                console.log(`ℹ️  Index already covered on ${table}: ${equivalent.INDEX_NAME} (${fields.join(', ')})`);
+                skipped++;
+                continue;
+            }
+
+            // Verify columns exist before creating index
+            try {
+                const columns = await this.getTableColumns(table);
+                const missingColumns = fields.filter((field) => !columns.includes(field));
+                if (missingColumns.length > 0) {
+                    console.log(`⚠️ Skipping index ${name} on ${table}: missing columns ${missingColumns.join(', ')}`);
+                    warned++;
+                    continue;
+                }
+            } catch (error) {
+                console.log(`⚠️ Could not describe ${table} for index ${name}:`, error.message);
+                warned++;
+                continue;
+            }
+
+            try {
+                await queryInterface.addIndex(table, {
+                    fields,
+                    name,
+                    unique,
+                });
+                console.log(`📇 Added index ${name} on ${table} (${fields.join(', ')})`);
+                added++;
+            } catch (error) {
+                const message = error.message || '';
+                const mysqlCode = error.original && error.original.code;
+
+                if (
+                    message.includes('Duplicate key name')
+                    || message.includes('already exists')
+                    || mysqlCode === 'ER_DUP_KEYNAME'
+                ) {
+                    skipped++;
+                    continue;
+                }
+
+                if (unique && (mysqlCode === 'ER_DUP_ENTRY' || message.includes('Duplicate entry'))) {
+                    console.log(
+                        `⚠️ Could not add unique index ${name} on ${table}: duplicate data exists — clean data then re-run sync`
+                    );
+                    warned++;
+                    continue;
+                }
+
+                console.log(`⚠️ Warning adding index ${name} on ${table}:`, message);
+                warned++;
+            }
+        }
+
+        console.log(`📇 Index sync complete: ${added} added, ${skipped} skipped, ${warned} warnings`);
     }
 }
 

@@ -1,5 +1,5 @@
 const Order = require('../models/Order');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const Party = require('../models/Party');
 const Distributor = require('../models/distributor');
 const Salesman = require('../models/Salesman');
@@ -11,40 +11,53 @@ const Event = require('../models/event');
 const OrderOperation = require('../models/OrderOperation');
 const Zone = require('../models/Zone');
 const User = require('../models/User');
+const sequelize = require('../constants/database');
 const { Op } = require('sequelize');
 const salesmanTargetsController = require('./salesmanTargetsController');
 const DistributorZones = require('../models/DistributorZones');
+const { canManageOrders, normalizeRole } = require('../utils/roleHelpers');
+const { resolveUserScope, canViewAllOrders } = require('../utils/scopeHelpers');
 
 // Helper function to reverse an order operation (does not depend on controller instance)
-async function reverseOrderOperation(orderId) {
-    const orderOperations = await OrderOperation.findAll({ where: { order_id: orderId } });
+async function reverseOrderOperation(orderId, transaction) {
+    const orderOperations = await OrderOperation.findAll({
+        where: { order_id: orderId },
+        transaction,
+    });
     for (let i = 0; i < orderOperations.length; i++) {
         const orderOperation = orderOperations[i];
         const warehouseReducedQty = orderOperation.warehouse_reduced_qty;
         const trayReducedQty = orderOperation.tray_reduced_qty;
         const totalReducedQty = orderOperation.total_reduced_qty;
-        const product = await Product.findOne({ where: { product_id: orderOperation.product_id } });
+        const product = await Product.findOne({
+            where: { product_id: orderOperation.product_id },
+            transaction,
+            lock: transaction.LOCK.UPDATE,
+        });
         if (!product) {
             continue;
         }
         product.warehouse_qty = product.warehouse_qty + warehouseReducedQty;
         product.tray_qty = product.tray_qty + trayReducedQty;
         product.total_qty = product.total_qty + totalReducedQty;
-        await product.save();
+        await product.save({ transaction });
         const trayIds = orderOperation.tray_ids;
         for (let j = 0; j < trayIds.length; j++) {
             const trayId = trayIds[j].tray_id;
             const qty = trayIds[j].qty;
             const status = trayIds[j].status;
-            const trayProduct = await TrayProducts.findOne({ where: { tray_id: trayId } });
+            const trayProduct = await TrayProducts.findOne({
+                where: { tray_id: trayId, product_id: orderOperation.product_id },
+                transaction,
+            });
             if (!trayProduct) {
                 continue;
             }
             trayProduct.qty = trayProduct.qty + qty;
             trayProduct.status = status;
-            await trayProduct.save();
+            await trayProduct.save({ transaction });
         }
-        await orderOperation.destroy();
+        await orderOperation.destroy({ transaction });
     }
 }
 
@@ -57,35 +70,36 @@ class OrderController {
             if (!user) {
                 return res.status(401).json({ error: 'Unauthorized' });
             }
-            const { role } = req.body;
+
+            const role = normalizeRole(req.userRoleName);
             if (!role) {
-                return res.status(400).json({ error: 'Role is required' });
+                return res.status(400).json({ error: 'User role is required' });
             }
-            console.log("role", role);
-            console.log("user", user.user_id);
+
+            const scope = await resolveUserScope(user.user_id, role);
             let whereClause = {};
+
             if (role === 'party') {
-                const party = await Party.findOne({ where: { user_id: user.user_id } });
-                if (!party) {
+                if (!scope.partyId) {
                     return res.status(404).json({ error: 'Party not found' });
                 }
-                whereClause.party_id = party.party_id;
-            }
-            if (role === 'distributor') {
-                const distributor = await Distributor.findOne({ where: { user_id: user.user_id } });
-                if (!distributor) {
+                whereClause.party_id = scope.partyId;
+            } else if (role === 'distributor') {
+                if (!scope.distributorId) {
                     return res.status(404).json({ error: 'Distributor not found' });
                 }
-                whereClause.distributor_id = distributor.distributor_id;
-            }
-            if (role === 'salesman') {
-                const salesman = await Salesman.findOne({ where: { user_id: user.user_id } });
-                if (!salesman) {
+                whereClause.distributor_id = scope.distributorId;
+            } else if (role === 'salesman') {
+                if (!scope.salesmanId) {
                     return res.status(404).json({ error: 'Salesman not found' });
                 }
-                whereClause.salesman_id = salesman.salesman_id;
+                whereClause.salesman_id = scope.salesmanId;
+            } else if (canViewAllOrders(role)) {
+                return this.getOrders(req, res);
+            } else {
+                return res.status(403).json({ error: 'Access denied' });
             }
-            console.log("whereClause", whereClause);
+
             const orders = await Order.findAll({ where: whereClause });
             if (!orders || orders.length === 0) {
                 return res.status(404).json({ error: 'Orders not found' });
@@ -98,6 +112,9 @@ class OrderController {
     }
     async getOrders(req, res) {
         try {
+            if (!canViewAllOrders(req.userRoleName)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
             const orders = await Order.findAll();
             if (!orders || orders.length === 0) {
                 return res.status(404).json({ error: 'Orders not found' });
@@ -305,11 +322,9 @@ class OrderController {
                     console.log("item", typeof item);
                     return res.status(400).json({ error: 'Order items must be an array of objects' });
                 }
-                console.log("item", item.product_id, item.quantity, item.price);
-                // if item does not have product_id, quantity, price, return error
-                if (!item.product_id || !item.quantity || !item.price) {
-                    console.log("item", item.product_id, item.quantity, item.price);
-                    return res.status(400).json({ error: 'All fields are required' });
+                console.log("item", item.product_id, item.quantity);
+                if (!item.product_id || !item.quantity) {
+                    return res.status(400).json({ error: 'product_id and quantity are required for each order item' });
                 }
                 // if product_id is not a string, return error
                 if (typeof item.product_id !== 'string') {
@@ -317,14 +332,8 @@ class OrderController {
                     return res.status(400).json({ error: 'Product ID must be a string' });
                 }
                 // if quantity is not a number, return error
-                if (typeof item.quantity !== 'number') {
-                    console.log("item", typeof item.quantity);
-                    return res.status(400).json({ error: 'Quantity must be a number' });
-                }
-                // if price is not a number, return error
-                if (typeof item.price !== 'number') {
-                    console.log("item", typeof item.price);
-                    return res.status(400).json({ error: 'Price must be a number' });
+                if (typeof item.quantity !== 'number' || item.quantity <= 0) {
+                    return res.status(400).json({ error: 'Quantity must be a positive number' });
                 }
                 const product = await Product.findOne({ where: { product_id: item.product_id } });
                 if (!product) {
@@ -333,157 +342,195 @@ class OrderController {
                 }
             }
 
-            let orderOperationData = {};
+            const userScope = await resolveUserScope(user.user_id, req.userRoleName);
+            if (isPartyRequired && party_id && userScope.role === 'party' && userScope.partyId !== party_id) {
+                return res.status(403).json({ error: 'Cannot create orders for another party' });
+            }
+            if (isDistributorRequired && distributor_id && userScope.role === 'distributor' && userScope.distributorId !== distributor_id) {
+                return res.status(403).json({ error: 'Cannot create orders for another distributor' });
+            }
+            if (isSalesmanRequired && salesman_id && userScope.role === 'salesman' && userScope.salesmanId !== salesman_id) {
+                return res.status(403).json({ error: 'Cannot create orders for another salesman' });
+            }
+
+            let orderTotal = 0;
             const resolvedOrderItems = [];
+            const orderOperationsToCreate = [];
 
-            for (let i = 0; i < order_items.length; i++) {
-                const item = order_items[i];
-                const product = await Product.findOne({ where: { product_id: item.product_id } });
-                if (!product) {
-                    console.log("product", product);
-                    return res.status(404).json({ error: 'Product not found' });
-                }
-                if (product.total_qty < item.quantity) {
-                    console.log("product", product.total_qty, item.quantity);
-                    return res.status(400).json({ error: `${product.model_no} Product quantity is not available in warehouse` });
-                }
-                const warehouse_qty = product.warehouse_qty;
-                if (item.quantity > warehouse_qty) {
-                    const left = item.quantity - warehouse_qty;
-                    product.warehouse_qty = 0;
-                    product.tray_qty = product.tray_qty - left;
-                    product.total_qty = product.total_qty - item.quantity;
-                    const trayProducts = await TrayProducts.findAll({
-                        where: { product_id: product.product_id, status: TrayProductStatus.ALLOTED }
+            await sequelize.transaction(async (transaction) => {
+                for (let i = 0; i < order_items.length; i++) {
+                    const item = order_items[i];
+                    const product = await Product.findOne({
+                        where: { product_id: item.product_id },
+                        transaction,
+                        lock: transaction.LOCK.UPDATE,
                     });
-                    let remainingQty = left;
-                    let trayIds = [];
-                    for (let i = 0; i < trayProducts.length; i++) {
-                        const trayProduct = trayProducts[i];
-                        if (trayProduct.qty >= remainingQty) {
-                            trayProduct.qty = trayProduct.qty - remainingQty;
-                            trayIds.push({
-                                tray_id: trayProduct.tray_id,
-                                qty: remainingQty,
-                                status: trayProduct.status,
-                            });
-                            trayProduct.status = TrayProductStatus.PARTIALLY_BOOKED;
-                            remainingQty = 0;
-                        }
-                        else {
-                            remainingQty = remainingQty - trayProduct.qty;
-                            trayIds.push({
-                                tray_id: trayProduct.tray_id,
-                                qty: trayProduct.qty,
-                                status: trayProduct.status
-                            });
-                            trayProduct.qty = 0;
-                            trayProduct.status = TrayProductStatus.PRIORITY_BOOKED;
-                        }
-                        await trayProduct.save();
-                        if (remainingQty === 0) {
-                            break;
-                        }
+                    if (!product) {
+                        throw new Error(`Product not found: ${item.product_id}`);
                     }
-                    orderOperationData = {
-                        warehouse_reduced_qty: warehouse_qty,
-                        tray_reduced_qty: left,
-                        total_reduced_qty: item.quantity,
-                        tray_ids: trayIds,
-                        product_id: product.product_id,
+                    if (product.total_qty < item.quantity) {
+                        throw new Error(`${product.model_no} Product quantity is not available in warehouse`);
+                    }
+
+                    const unitPrice = parseFloat(product.mrp);
+                    if (Number.isNaN(unitPrice) || unitPrice < 0) {
+                        throw new Error(`Invalid MRP for product ${product.model_no}`);
+                    }
+
+                    const warehouse_qty = product.warehouse_qty;
+                    let orderOperationData;
+
+                    const oldProductSnapshot = product.toJSON();
+
+                    if (item.quantity > warehouse_qty) {
+                        const left = item.quantity - warehouse_qty;
+                        product.warehouse_qty = 0;
+                        product.tray_qty = product.tray_qty - left;
+                        product.total_qty = product.total_qty - item.quantity;
+                        const trayProducts = await TrayProducts.findAll({
+                            where: { product_id: product.product_id, status: TrayProductStatus.ALLOTED },
+                            transaction,
+                        });
+                        let remainingQty = left;
+                        const trayIds = [];
+                        for (let t = 0; t < trayProducts.length; t++) {
+                            const trayProduct = trayProducts[t];
+                            if (trayProduct.qty >= remainingQty) {
+                                trayProduct.qty = trayProduct.qty - remainingQty;
+                                trayIds.push({
+                                    tray_id: trayProduct.tray_id,
+                                    qty: remainingQty,
+                                    status: trayProduct.status,
+                                });
+                                trayProduct.status = TrayProductStatus.PARTIALLY_BOOKED;
+                                remainingQty = 0;
+                            } else {
+                                remainingQty = remainingQty - trayProduct.qty;
+                                trayIds.push({
+                                    tray_id: trayProduct.tray_id,
+                                    qty: trayProduct.qty,
+                                    status: trayProduct.status,
+                                });
+                                trayProduct.qty = 0;
+                                trayProduct.status = TrayProductStatus.PRIORITY_BOOKED;
+                            }
+                            await trayProduct.save({ transaction });
+                            if (remainingQty === 0) {
+                                break;
+                            }
+                        }
+                        if (remainingQty > 0) {
+                            throw new Error(`${product.model_no} insufficient tray stock`);
+                        }
+                        orderOperationData = {
+                            warehouse_reduced_qty: warehouse_qty,
+                            tray_reduced_qty: left,
+                            total_reduced_qty: item.quantity,
+                            tray_ids: trayIds,
+                            product_id: product.product_id,
+                        };
+                    } else {
+                        product.warehouse_qty = warehouse_qty - item.quantity;
+                        product.total_qty = product.total_qty - item.quantity;
+                        orderOperationData = {
+                            warehouse_reduced_qty: item.quantity,
+                            tray_reduced_qty: 0,
+                            total_reduced_qty: item.quantity,
+                            tray_ids: [],
+                            product_id: product.product_id,
+                        };
+                    }
+
+                    await product.save({ transaction });
+                    orderOperationsToCreate.push(orderOperationData);
+
+                    const resolvedItem = {
+                        product_id: item.product_id,
+                        quantity: item.quantity,
+                        price: unitPrice,
                     };
+                    resolvedOrderItems.push(resolvedItem);
+                    orderTotal += unitPrice * item.quantity;
+
+                    await logAudit({
+                        req,
+                        transaction,
+                        action: 'update',
+                        description: 'Product quantity updated',
+                        tableName: 'product',
+                        recordId: product.product_id,
+                        oldValues: oldProductSnapshot,
+                        newValues: product,
+                    });
                 }
-                else {
-                    product.warehouse_qty = warehouse_qty - item.quantity;
-                    product.total_qty = product.total_qty - item.quantity;
-                    orderOperationData = {
-                        warehouse_reduced_qty: item.quantity,
-                        tray_reduced_qty: 0,
-                        total_reduced_qty: item.quantity,
-                        tray_ids: [],
-                        product_id: product.product_id,
-                    };
-                }
-                const updatedProduct = await product.save();
-                await AuditLog.create({
-                    user_id: user.user_id,
-                    action: 'update',
-                    description: 'Product quantity updated',
-                    table_name: 'products',
-                    record_id: product.product_id,
-                    old_values: product,
-                    new_values: updatedProduct,
-                    ip_address: req.ip,
+
+                const orderNumber = generateUniqueOrderNumber();
+                const orderData = {
+                    order_number: orderNumber,
+                    order_date,
+                    order_type,
+                    order_total: orderTotal,
+                    order_items: resolvedOrderItems,
+                    order_notes,
                     created_at: new Date(),
+                    updated_at: new Date(),
+                    order_status: OrderStatus.PENDING,
+                    event_id,
+                    latitude,
+                    longitude,
+                };
+
+                if (isPartyRequired && party_id) {
+                    orderData.party_id = party_id;
+                }
+                if (isDistributorRequired && distributor_id) {
+                    orderData.distributor_id = distributor_id;
+                }
+                if (isSalesmanRequired && salesman_id) {
+                    orderData.salesman_id = salesman_id;
+                }
+
+                const order = await Order.create(orderData, { transaction });
+
+                for (const operationData of orderOperationsToCreate) {
+                    await OrderOperation.create({
+                        order_id: order.order_id,
+                        ...operationData,
+                    }, { transaction });
+                }
+
+                if (normalizeRole(req.userRoleName) === 'salesman') {
+                    await salesmanTargetsController.updateTargetFromOrder(order);
+                }
+
+                await logAudit({
+                    req,
+                    transaction,
+                    action: 'create',
+                    description: 'Order created',
+                    tableName: 'order',
+                    recordId: order.order_id,
+                    oldValues: null,
+                    newValues: order,
                 });
-                resolvedOrderItems.push(item);
-            }
-            const orderTotal = resolvedOrderItems.reduce(
-                (acc, item) => acc + item.quantity * item.price, 0);
-            const orderNumber = generateUniqueOrderNumber();
 
-            // Build order data object
-            const orderData = {
-                order_number: orderNumber,
-                order_date,
-                order_type,
-                order_total: orderTotal,
-                order_items: resolvedOrderItems,
-                order_notes,
-                created_at: new Date(),
-                updated_at: new Date(),
-                order_status: OrderStatus.PENDING,
-                event_id,
-                latitude,
-                longitude,
-            };
-
-            // Only add party_id if party is required
-            if (isPartyRequired && party_id) {
-                orderData.party_id = party_id;
-            }
-
-            // Only add distributor_id if distributor is required
-            if (isDistributorRequired && distributor_id) {
-                orderData.distributor_id = distributor_id;
-            }
-
-            // Only add salesman_id if salesman is required
-            if (isSalesmanRequired && salesman_id) {
-                orderData.salesman_id = salesman_id;
-            }
-
-            const order = await Order.create(orderData);
-            await OrderOperation.create({
-                order_id: order.order_id,
-                ...orderOperationData
+                req._createdOrder = order;
             });
-            if (req.user.role === 'salesman') {
-                await salesmanTargetsController.updateTargetFromOrder(order);
-            }
-            console.log("order_total type", typeof orderTotal);
-            console.log("order_total", orderTotal);
-            console.log("order order_total type", typeof order.order_total);
-            await AuditLog.create({
-                user_id: user.user_id,
-                action: 'create',
-                description: 'Order created',
-                table_name: 'orders',
-                record_id: order.order_id,
-                old_values: null,
-                new_values: order,
-                ip_address: req.ip,
-                created_at: new Date(),
-            });
-            res.status(201).json(order);
+
+            res.status(201).json(req._createdOrder);
         } catch (error) {
             console.error('Error creating order:', error);
-            res.status(500).json({ error: 'Failed to create order' });
+            const message = error.message || 'Failed to create order';
+            const status = message.includes('not found') ? 404 : message.includes('Cannot') || message.includes('another') ? 403 : 400;
+            res.status(status).json({ error: message });
         }
     }
 
     async updateOrderStatus(req, res) {
         try {
+            if (!canManageOrders(req.userRoleName)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
             const user = req.user;
             const { id } = req.params;
             if (!id) {
@@ -497,6 +544,7 @@ class OrderController {
             if (!order) {
                 return res.status(404).json({ error: 'Order not found' });
             }
+            const oldSnapshot = order.toJSON();
             if (!Object.values(OrderStatus).includes(order_status)) {
                 return res.status(400).json({ error: 'Invalid order status. Allowed values are: ' + Object.values(OrderStatus).join(', ') });
             }
@@ -529,21 +577,21 @@ class OrderController {
                 order.partial_dispatch_qty = partial_dispatch_qty;
             }
             if (order_status === OrderStatus.CANCELLED) {
-                await reverseOrderOperation(order.order_id);
+                await sequelize.transaction(async (transaction) => {
+                    await reverseOrderOperation(order.order_id, transaction);
+                });
             }
             order.order_status = order_status;
             order.updated_at = new Date();
             await order.save();
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Order status updated',
-                table_name: 'orders',
-                record_id: order.order_id,
-                old_values: order,
-                new_values: order,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'order',
+                recordId: order.order_id,
+                oldValues: oldSnapshot,
+                newValues: order,
             });
             res.status(200).json(order);
         }
@@ -555,6 +603,9 @@ class OrderController {
 
     async deleteOrder(req, res) {
         try {
+            if (!canManageOrders(req.userRoleName)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
             const { id } = req.params;
             if (!id) {
                 return res.status(400).json({ error: 'Order ID is required' });
@@ -564,19 +615,20 @@ class OrderController {
                 return res.status(404).json({ error: 'Order not found' });
             }
             if (order.order_status !== OrderStatus.CANCELLED && order.order_status !== OrderStatus.COMPLETED) {
-                await reverseOrderOperation(order.order_id);
+                await sequelize.transaction(async (transaction) => {
+                    await reverseOrderOperation(order.order_id, transaction);
+                });
             }
+            const snapshot = order.toJSON();
             await order.destroy();
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Order deleted',
-                table_name: 'orders',
-                record_id: order.order_id,
-                old_values: order,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'order',
+                recordId: order.order_id,
+                oldValues: snapshot,
+                newValues: null,
             });
             return res.status(200).json({ message: 'Order deleted successfully' });
         }

@@ -1,5 +1,5 @@
 const City = require('../models/Cities');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const State = require('../models/State');
 class CityController {
 
@@ -55,16 +55,14 @@ class CityController {
                 updated_at: new Date(),
                 is_active: true
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'City created',
-                table_name: 'cities',
-                record_id: newCity.id,
-                old_values: null,
-                new_values: newCity,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'cities',
+                recordId: newCity.id,
+                oldValues: null,
+                newValues: newCity,
             });
             res.status(201).json(newCity);
         } catch (error) {
@@ -80,25 +78,26 @@ class CityController {
             }
             const { name, state_id } = req.body;
             const user = req.user;
-            const city = await City.update({
+            const city = await City.findOne({ where: { id } });
+            if (!city) {
+                return res.status(404).json({ error: 'City not found' });
+            }
+            const oldSnapshot = city.toJSON();
+            const payload = {
                 name: name || city.name,
                 state_id: state_id || city.state_id,
                 updated_at: new Date(),
                 updated_by: user.user_id
-            }, { where: { id: id } });
-            if (!city) {
-                return res.status(404).json({ error: 'City not found' });
-            }
-            await AuditLog.create({
-                user_id: user.user_id,
+            };
+            await City.update(payload, { where: { id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'City updated',
-                table_name: 'cities',
-                record_id: id,
-                old_values: city,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'cities',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'City updated successfully' });
         } catch (error) {
@@ -111,21 +110,20 @@ class CityController {
             if (!id) {
                 return res.status(400).json({ error: 'City ID is required' });
             }
-            const city = await City.destroy({ where: { id: id } });
+            const city = await City.findOne({ where: { id } });
             if (!city) {
                 return res.status(404).json({ error: 'City not found' });
             }
-            const user = req.user;
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = city.toJSON();
+            await city.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'City deleted',
-                table_name: 'cities',
-                record_id: id,
-                old_values: city,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'cities',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'City deleted successfully' });
         } catch (error) {

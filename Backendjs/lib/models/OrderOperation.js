@@ -46,7 +46,12 @@ const OrderOperation = sequelize.define('OrderOperation', {
     tableName: 'order_operation',
     timestamps: false,
     createdAt: false,
-    updatedAt: false
+    updatedAt: false,
+    indexes: [
+        { fields: ['order_id'], name: 'idx_order_operation_order_id' },
+        { fields: ['product_id'], name: 'idx_order_operation_product_id' },
+        { fields: ['order_id', 'product_id'], name: 'idx_order_operation_order_product' },
+    ],
 });
 
 OrderOperation.belongsTo(Order, {

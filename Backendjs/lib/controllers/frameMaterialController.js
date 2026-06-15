@@ -1,5 +1,5 @@
 const FrameMaterial = require('../models/FrameMaterial');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 class FrameMaterialController {
     async getFrameMaterials(req, res) {
         try {
@@ -30,7 +30,6 @@ class FrameMaterialController {
 
     async createFrameMaterial(req, res) {
         try {
-            const user = req.user;
             const { frame_material } = req.body;
             if (!frame_material) {
                 return res.status(400).json({ error: 'Frame material is required' });
@@ -40,16 +39,14 @@ class FrameMaterialController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Frame material created',
-                table_name: 'frame_material',
-                record_id: frameMaterial.frame_material_id,
-                old_values: null,
-                new_values: frameMaterial,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'frame_material',
+                recordId: frameMaterial.frame_material_id,
+                oldValues: null,
+                newValues: frameMaterial,
             });
             res.status(200).json(frameMaterial);
         } catch (error) {
@@ -58,29 +55,29 @@ class FrameMaterialController {
     }
     async updateFrameMaterial(req, res) {
         try {
-            const user = req.user;
             const { frame_material } = req.body;
             const { id } = req.params;
             if (!id || !frame_material) {
                 return res.status(400).json({ error: 'Frame material ID and frame material are required' });
             }
-            const frameMaterial = await FrameMaterial.update({
-                frame_material: frame_material,
-                updated_at: new Date(),
-            }, { where: { frame_material_id: id } });
+            const frameMaterial = await FrameMaterial.findOne({ where: { frame_material_id: id } });
             if (!frameMaterial) {
                 return res.status(404).json({ error: 'Frame material not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const oldSnapshot = frameMaterial.toJSON();
+            const payload = {
+                frame_material: frame_material,
+                updated_at: new Date(),
+            };
+            await FrameMaterial.update(payload, { where: { frame_material_id: id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Frame material updated',
-                table_name: 'frame_material',
-                record_id: id,
-                old_values: frameMaterial,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'frame_material',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Frame material updated successfully' });
         }
@@ -90,25 +87,24 @@ class FrameMaterialController {
     }
     async deleteFrameMaterial(req, res) {
         try {
-            const user = req.user;
             const { id } = req.params;
             if (!id) {
                 return res.status(400).json({ error: 'Frame material ID is required' });
             }
-            const frameMaterial = await FrameMaterial.destroy({ where: { frame_material_id: id } });
+            const frameMaterial = await FrameMaterial.findOne({ where: { frame_material_id: id } });
             if (!frameMaterial) {
                 return res.status(404).json({ error: 'Frame material not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = frameMaterial.toJSON();
+            await frameMaterial.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Frame material deleted',
-                table_name: 'frame_material',
-                record_id: id,
-                old_values: frameMaterial,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'frame_material',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Frame material deleted successfully' });
         }
@@ -118,4 +114,4 @@ class FrameMaterialController {
     }
 }
 
-module.exports = new FrameMaterialController();  
+module.exports = new FrameMaterialController();

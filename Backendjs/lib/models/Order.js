@@ -102,7 +102,18 @@ const Order = sequelize.define('Order', {
     tableName: 'order',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    indexes: [
+        { fields: ['party_id'], name: 'idx_order_party_id' },
+        { fields: ['distributor_id'], name: 'idx_order_distributor_id' },
+        { fields: ['salesman_id'], name: 'idx_order_salesman_id' },
+        { fields: ['order_status'], name: 'idx_order_status' },
+        { fields: ['order_date'], name: 'idx_order_order_date' },
+        { fields: ['event_id'], name: 'idx_order_event_id' },
+        { fields: ['order_number'], name: 'idx_order_order_number' },
+        { fields: ['salesman_id', 'order_date'], name: 'idx_order_salesman_date' },
+        { fields: ['party_id', 'order_status'], name: 'idx_order_party_status' },
+    ],
 });
 
 module.exports = Order;

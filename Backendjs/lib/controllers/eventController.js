@@ -1,4 +1,4 @@
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const Event = require('../models/event');
 const { EventStatus } = require('../constants/enums');
 class EventController {
@@ -57,16 +57,14 @@ class EventController {
                 event_status: eventStatus,
                 event_location,
             });
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Event created',
-                table_name: 'events',
-                record_id: event.event_id,
-                old_values: null,
-                new_values: event,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'events',
+                recordId: event.event_id,
+                oldValues: null,
+                newValues: event,
             });
             res.status(201).json(event);
         } catch (error) {
@@ -128,24 +126,24 @@ class EventController {
                     eventStatus = EventStatus.UPCOMING;
                 }
             }
-            const updatedEvent = await Event.update({
+            const oldSnapshot = event.toJSON();
+            const payload = {
                 event_name: event_name || event.event_name,
                 start_date: start_date || event.start_date,
                 end_date: end_date || event.end_date,
                 event_location: event_location || event.event_location,
                 updated_at: new Date(),
                 event_status: eventStatus || event.event_status,
-            }, { where: { event_id: id } });
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            };
+            await Event.update(payload, { where: { event_id: id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Event updated',
-                table_name: 'events',
-                record_id: id,
-                old_values: event,
-                new_values: updatedEvent,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'events',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Event updated successfully' });
         } catch (error) {
@@ -163,17 +161,16 @@ class EventController {
             if (!event) {
                 return res.status(404).json({ error: 'Event not found' });
             }
+            const snapshot = event.toJSON();
             await event.destroy();
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Event deleted',
-                table_name: 'events',
-                record_id: id,
-                old_values: event,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'events',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Event deleted successfully' });
         } catch (error) {

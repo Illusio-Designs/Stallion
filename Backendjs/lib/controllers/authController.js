@@ -4,6 +4,8 @@ const Role = require('../models/Role');
 const UserRole = require('../models/UserRole');
 const msg91Service = require('../services/msg91Service');
 const { allowedNumbers } = require('../constants/constants');
+const { markPhoneVerified, consumePhoneVerification, normalizePhone } = require('../services/otpSession');
+const { getJwtSecret } = require('../utils/jwtSecret');
 
 class AuthController {
 
@@ -13,7 +15,7 @@ class AuthController {
             if (!token) {
                 return res.status(400).json({ error: 'Token is required' });
             }
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const decoded = jwt.verify(token, getJwtSecret());
             const user = await User.findByPk(decoded.userId);
             if (!user) {
                 return res.status(400).json({ error: 'User not found' });
@@ -31,12 +33,12 @@ class AuthController {
             if (!token) {
                 return res.status(400).json({ error: 'Token is required' });
             }
-            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const decoded = jwt.verify(token, getJwtSecret());
             const user = await User.findByPk(decoded.userId);
             if (!user) {
                 return res.status(400).json({ error: 'User not found' });
             }
-            const newToken = jwt.sign({ userId: user.user_id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+            const newToken = jwt.sign({ userId: user.user_id }, getJwtSecret(), { expiresIn: '1h' });
             await user.update({ last_login: new Date() });
             res.status(200).json({ token: newToken });
         } catch (error) {
@@ -53,8 +55,8 @@ class AuthController {
             const user = await User.findOne({
                 where: {
                     phone: phoneNumber,
-                    is_active: true
-                }
+                    is_active: true,
+                },
             });
             if (!user) {
                 return res.status(400).json({ error: 'User not found' });
@@ -71,43 +73,49 @@ class AuthController {
             if (!phoneNumber) {
                 return res.status(400).json({ error: 'Phone number is required' });
             }
+
+            const normalizedPhone = normalizePhone(phoneNumber);
+            const isBypassNumber = allowedNumbers.some((n) => normalizePhone(n) === normalizedPhone);
+
+            if (!isBypassNumber && !consumePhoneVerification(phoneNumber)) {
+                return res.status(401).json({ error: 'OTP verification required before login' });
+            }
+
             const user = await User.findOne({
                 where: {
                     phone: phoneNumber,
-                    is_active: true
-                }
+                    is_active: true,
+                },
             });
             if (!user) {
                 return res.status(400).json({ error: 'User not found' });
             }
-            const userRole = await UserRole.findOne({
-                where: {
-                    user_id: user.user_id
-                }
-            });
+
+            const userRole = await UserRole.findOne({ where: { user_id: user.user_id } });
             if (!userRole) {
                 return res.status(400).json({ error: 'User role not found' });
             }
-            const role = await Role.findOne({
-                where: {
-                    role_id: userRole.role_id
-                }
-            });
+
+            const role = await Role.findOne({ where: { role_id: userRole.role_id } });
             if (!role) {
                 return res.status(400).json({ error: 'Role not found' });
             }
+
             const token = jwt.sign(
                 {
                     userId: user.user_id,
                     phone: user.phone,
                     email: user.email,
                     full_name: user.full_name,
-                    role: role.role_name
+                    role: role.role_name,
                 },
-                process.env.JWT_SECRET || 'default_jwt_secret',
+                getJwtSecret(),
                 { expiresIn: '24h' }
             );
-            res.status(200).json({ message: 'Login successful', token: token, role: role.role_name });
+
+            await user.update({ last_login: new Date() });
+
+            res.status(200).json({ message: 'Login successful', token, role: role.role_name });
         } catch (error) {
             console.log(error);
             res.status(500).json({ error: error.message });
@@ -120,26 +128,22 @@ class AuthController {
             if (!phoneNumber || !fullName || !roleId) {
                 return res.status(400).json({ error: 'Phone number, full name and role id are required' });
             }
-            console.log("phoneNumber", phoneNumber);
-            console.log("fullName", fullName);
-            console.log("roleId", roleId);
+
             const existingUser = await User.findOne({
                 where: {
                     phone: phoneNumber,
-                    is_active: true
-                }
+                    is_active: true,
+                },
             });
             if (existingUser) {
                 return res.status(400).json({ error: 'User already exists' });
             }
-            const role = await Role.findOne({
-                where: {
-                    role_id: roleId
-                }
-            });
+
+            const role = await Role.findOne({ where: { role_id: roleId } });
             if (!role) {
                 return res.status(400).json({ error: 'Role not found' });
             }
+
             const user = await User.create({
                 phone: phoneNumber,
                 full_name: fullName,
@@ -148,12 +152,12 @@ class AuthController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            console.log("user", user.toJSON());
+
             await UserRole.create({
                 user_id: user.user_id,
-                role_id: role.role_id
+                role_id: role.role_id,
             });
-            console.log("UserRole created");
+
             res.status(200).json(user.toJSON());
         } catch (error) {
             console.log(error);
@@ -168,24 +172,23 @@ class AuthController {
             if (!phoneNumber) {
                 return res.status(400).json({ error: 'Phone number is required' });
             }
+
             if (allowedNumbers.includes(phoneNumber)) {
-                return res.status(200).json({
-                    message: 'OTP sent successfully',
-                });
+                return res.status(200).json({ message: 'OTP sent successfully' });
             }
-            // Send OTP via MSG91
+
             const result = await msg91Service.sendOtp(phoneNumber);
 
             if (!result.success) {
                 return res.status(500).json({
                     error: result.message || 'Failed to send OTP',
-                    details: result.error
+                    details: result.error,
                 });
             }
 
             res.status(200).json({
                 message: 'OTP sent successfully',
-                data: result.data
+                data: result.data,
             });
         } catch (error) {
             console.error('Send OTP Error:', error);
@@ -202,28 +205,28 @@ class AuthController {
             }
 
             if (allowedNumbers.includes(phoneNumber)) {
-                return res.status(200).json({
-                    message: 'OTP verified successfully',
-                });
+                markPhoneVerified(phoneNumber);
+                return res.status(200).json({ message: 'OTP verified successfully' });
             }
 
             if (!otp) {
                 return res.status(400).json({ error: 'OTP is required' });
             }
 
-            // Verify OTP via MSG91
             const result = await msg91Service.verifyOtp(phoneNumber, otp);
 
             if (!result.success) {
                 return res.status(400).json({
                     error: result.message || 'Invalid OTP',
-                    details: result.error
+                    details: result.error,
                 });
             }
 
+            markPhoneVerified(phoneNumber);
+
             res.status(200).json({
                 message: 'OTP verified successfully',
-                data: result.data
+                data: result.data,
             });
         } catch (error) {
             console.error('Verify OTP Error:', error);

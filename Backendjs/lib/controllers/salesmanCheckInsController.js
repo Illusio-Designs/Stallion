@@ -1,5 +1,5 @@
 const SalesmanCheckIns = require('../models/SalesmanCheckIns');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 
 class SalesmanCheckInsController {
 
@@ -22,15 +22,14 @@ class SalesmanCheckInsController {
                 updated_at: new Date(),
             });
 
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Salesman check-in created',
-                table_name: 'salesman_check_ins',
-                record_id: salesmanCheckIn.id,
-                old_values: null,
-                new_values: salesmanCheckIn,
-                ip_address: req.ip,
+                tableName: 'salesman_check_ins',
+                recordId: salesmanCheckIn.id,
+                oldValues: null,
+                newValues: salesmanCheckIn,
             });
 
             res.status(201).json(salesmanCheckIn);
@@ -85,6 +84,7 @@ class SalesmanCheckInsController {
                 return res.status(404).json({ error: 'Salesman check-in not found' });
             }
 
+            const oldSnapshot = existingCheckIn.toJSON();
             const updatedFields = {
                 salesman_id: salesman_id !== undefined ? salesman_id : existingCheckIn.salesman_id,
                 check_in_date: check_in_date !== undefined ? check_in_date : existingCheckIn.check_in_date,
@@ -97,15 +97,14 @@ class SalesmanCheckInsController {
 
             await SalesmanCheckIns.update(updatedFields, { where: { id } });
 
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Salesman check-in updated',
-                table_name: 'salesman_check_ins',
-                record_id: id,
-                old_values: existingCheckIn,
-                new_values: updatedFields,
-                ip_address: req.ip,
+                tableName: 'salesman_check_ins',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...updatedFields },
             });
 
             const updatedCheckIn = await SalesmanCheckIns.findOne({ where: { id } });
@@ -128,17 +127,17 @@ class SalesmanCheckInsController {
                 return res.status(404).json({ error: 'Salesman check-in not found' });
             }
 
-            await SalesmanCheckIns.destroy({ where: { id } });
+            const snapshot = existingCheckIn.toJSON();
+            await existingCheckIn.destroy();
 
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Salesman check-in deleted',
-                table_name: 'salesman_check_ins',
-                record_id: id,
-                old_values: existingCheckIn,
-                new_values: null,
-                ip_address: req.ip,
+                tableName: 'salesman_check_ins',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
 
             res.status(200).json({ message: 'Salesman check-in deleted successfully' });

@@ -1,5 +1,5 @@
 const Product = require('../models/Product');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const Brand = require('../models/Brand');
 const Collection = require('../models/Collection');
 const ColorCode = require('../models/ColorCode');
@@ -14,6 +14,7 @@ const { PRODUCT_IMAGE_UPLOAD_DIR } = require('../constants/multer');
 const path = require('path');
 const fs = require('fs');
 const { Op, Sequelize } = require('sequelize');
+const { canManageInventory } = require('../utils/roleHelpers');
 
 const productIncludes = [
     { model: Gender, as: 'gender' },
@@ -182,16 +183,14 @@ class ProductController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Product created',
-                table_name: 'products',
-                record_id: product.product_id,
-                old_values: null,
-                new_values: product,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'product',
+                recordId: product.product_id,
+                oldValues: null,
+                newValues: product,
             });
             res.status(200).json(product);
         } catch (error) {
@@ -221,39 +220,45 @@ class ProductController {
             if (!collection) {
                 return res.status(404).json({ error: 'Collection not found' });
             }
-            await Product.update({
-                model_no: model_no || product.model_no,
-                gender_id: gender_id || product.gender_id,
-                color_code_id: color_code_id || product.color_code_id,
-                shape_id: shape_id || product.shape_id,
-                lens_color_id: lens_color_id || product.lens_color_id,
-                frame_color_id: frame_color_id || product.frame_color_id,
-                frame_type_id: frame_type_id || product.frame_type_id,
-                lens_material_id: lens_material_id || product.lens_material_id,
-                frame_material_id: frame_material_id || product.frame_material_id,
-                image_urls: image_urls || product.image_urls,
-                mrp: mrp || product.mrp,
-                whp: whp || product.whp,
-                size_mm: size_mm || product.size_mm,
-                warehouse_qty: warehouse_qty || product.warehouse_qty,
-                tray_qty: tray_qty || product.tray_qty,
-                total_qty: total_qty || product.total_qty,
-                status: status || product.status,
-                brand_id: brand_id || product.brand_id,
-                collection_id: collection_id || product.collection_id,
+            const oldSnapshot = product.toJSON();
+            const updatePayload = {
+                model_no: model_no !== undefined ? model_no : product.model_no,
+                gender_id: gender_id !== undefined ? gender_id : product.gender_id,
+                color_code_id: color_code_id !== undefined ? color_code_id : product.color_code_id,
+                shape_id: shape_id !== undefined ? shape_id : product.shape_id,
+                lens_color_id: lens_color_id !== undefined ? lens_color_id : product.lens_color_id,
+                frame_color_id: frame_color_id !== undefined ? frame_color_id : product.frame_color_id,
+                frame_type_id: frame_type_id !== undefined ? frame_type_id : product.frame_type_id,
+                lens_material_id: lens_material_id !== undefined ? lens_material_id : product.lens_material_id,
+                frame_material_id: frame_material_id !== undefined ? frame_material_id : product.frame_material_id,
+                image_urls: image_urls !== undefined ? image_urls : product.image_urls,
+                mrp: mrp !== undefined ? mrp : product.mrp,
+                whp: whp !== undefined ? whp : product.whp,
+                size_mm: size_mm !== undefined ? size_mm : product.size_mm,
+                status: status !== undefined ? status : product.status,
+                brand_id: brand_id !== undefined ? brand_id : product.brand_id,
+                collection_id: collection_id !== undefined ? collection_id : product.collection_id,
                 updated_at: new Date(),
-            }, { where: { product_id: id } });
+            };
 
-            await AuditLog.create({
-                user_id: user.user_id,
+            if (canManageInventory(req.userRoleName)) {
+                if (warehouse_qty !== undefined) updatePayload.warehouse_qty = warehouse_qty;
+                if (tray_qty !== undefined) updatePayload.tray_qty = tray_qty;
+                if (total_qty !== undefined) updatePayload.total_qty = total_qty;
+            } else if (warehouse_qty !== undefined || tray_qty !== undefined || total_qty !== undefined) {
+                return res.status(403).json({ error: 'Only admin or tray manager can update inventory quantities' });
+            }
+
+            await Product.update(updatePayload, { where: { product_id: id } });
+
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Product updated',
-                table_name: 'products',
-                record_id: id,
-                old_values: product,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'product',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...updatePayload },
             });
             res.status(200).json({ message: 'Product updated successfully' });
         } catch (error) {
@@ -268,20 +273,20 @@ class ProductController {
             if (!id) {
                 return res.status(400).json({ error: 'Product ID is required' });
             }
-            const product = await Product.destroy({ where: { product_id: id } });
+            const product = await Product.findOne({ where: { product_id: id } });
             if (!product) {
                 return res.status(404).json({ error: 'Product not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = product.toJSON();
+            await product.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Product deleted',
-                table_name: 'products',
-                record_id: id,
-                old_values: product,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'product',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Product deleted successfully' });
         } catch (error) {
@@ -393,16 +398,14 @@ class ProductController {
             );
 
             // Create audit log
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Product image saved',
-                table_name: 'products',
-                record_id: product.product_id,
-                old_values: { image_urls: oldImageUrls },
-                new_values: { image_urls: image_urls },
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'product',
+                recordId: product.product_id,
+                oldValues: { image_urls: oldImageUrls },
+                newValues: { image_urls: image_urls },
             });
 
             // Fetch updated product
@@ -581,7 +584,7 @@ class ProductController {
                         }
                     });
                     if (existingProduct) {
-                        Product.update({
+                        const bulkUpdatePayload = {
                             status: status,
                             warehouse_qty: warehouse_qty,
                             mrp: mrp,
@@ -598,34 +601,17 @@ class ProductController {
                             lens_material_id: lensMaterialModel.lens_material_id,
                             frame_material_id: frameMaterialModel.frame_material_id,
                             updated_at: new Date(),
-                        }, { where: { product_id: existingProduct.product_id } });
-                        await AuditLog.create({
-                            user_id: user.user_id,
+                        };
+                        const oldSnapshot = existingProduct.toJSON();
+                        Product.update(bulkUpdatePayload, { where: { product_id: existingProduct.product_id } });
+                        await logAudit({
+                            req,
                             action: 'update',
                             description: 'Product updated via bulk upload',
-                            table_name: 'products',
-                            record_id: existingProduct.product_id,
-                            old_values: existingProduct,
-                            new_values: {
-                                status: status,
-                                warehouse_qty: warehouse_qty,
-                                mrp: mrp,
-                                whp: whp,
-                                size_mm: size_mm,
-                                brand_id: brandModel.brand_id,
-                                collection_id: collectionModel.collection_id,
-                                gender_id: genderModel.gender_id,
-                                color_code_id: colorCodeModel.color_code_id,
-                                shape_id: shapeModel.shape_id,
-                                lens_color_id: lensColorModel.lens_color_id,
-                                frame_color_id: frameColorModel.frame_color_id,
-                                frame_type_id: frameTypeModel.frame_type_id,
-                                lens_material_id: lensMaterialModel.lens_material_id,
-                                frame_material_id: frameMaterialModel.frame_material_id,
-                                updated_at: new Date(),
-                            },
-                            ip_address: req.ip || 'N/A',
-                            created_at: new Date()
+                            tableName: 'product',
+                            recordId: existingProduct.product_id,
+                            oldValues: oldSnapshot,
+                            newValues: { ...oldSnapshot, ...bulkUpdatePayload },
                         });
                         updatedProducts.push(existingProduct);
                         successCount++;
@@ -660,16 +646,14 @@ class ProductController {
 
                     // Create audit log if user is provided
                     if (user && req) {
-                        await AuditLog.create({
-                            user_id: user.user_id,
+                        await logAudit({
+                            req,
                             action: 'create',
                             description: 'Product created via bulk upload',
-                            table_name: 'products',
-                            record_id: product.product_id,
-                            old_values: null,
-                            new_values: product,
-                            ip_address: req.ip || 'N/A',
-                            created_at: new Date()
+                            tableName: 'product',
+                            recordId: product.product_id,
+                            oldValues: null,
+                            newValues: product,
                         });
                     }
 

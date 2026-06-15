@@ -1,6 +1,9 @@
 const { Sequelize } = require('sequelize');
 require('dotenv').config();
 
+// Index definitions: lib/constants/dbIndexes.js
+// Applied idempotently on startup via DatabaseManager.syncIndexes()
+
 const sequelize = new Sequelize(
   process.env.DB_NAME,
   process.env.DB_USER,

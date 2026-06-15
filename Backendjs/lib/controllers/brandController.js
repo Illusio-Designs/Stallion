@@ -1,5 +1,6 @@
 const Brand = require('../models/Brand');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
+
 class BrandController {
     async getBrands(req, res) {
         try {
@@ -14,7 +15,6 @@ class BrandController {
     }
     async createBrand(req, res) {
         try {
-            const user = req.user;
             const { brand_name } = req.body;
             if (!brand_name) {
                 return res.status(400).json({ error: 'Brand name is required' });
@@ -24,14 +24,14 @@ class BrandController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
-                table_name: 'brand',
-                record_id: brand.brand_id,
-                old_values: null,
-                new_values: brand,
-                ip_address: req.ip
+                description: 'Brand created',
+                tableName: 'brand',
+                recordId: brand.brand_id,
+                oldValues: null,
+                newValues: brand,
             });
             res.status(201).json(brand);
         } catch (error) {
@@ -40,27 +40,26 @@ class BrandController {
     }
     async updateBrand(req, res) {
         try {
-            const user = req.user;
             const { brand_name } = req.body;
             const { id } = req.params;
             if (!id || !brand_name) {
                 return res.status(400).json({ error: 'Brand ID and brand name are required' });
             }
-            const brand = await Brand.update({
-                brand_name: brand_name,
-                updated_at: new Date(),
-            }, { where: { brand_id: id } });
+            const brand = await Brand.findOne({ where: { brand_id: id } });
             if (!brand) {
                 return res.status(404).json({ error: 'Brand not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const oldSnapshot = brand.toJSON();
+            const payload = { brand_name, updated_at: new Date() };
+            await Brand.update(payload, { where: { brand_id: id } });
+            await logAudit({
+                req,
                 action: 'update',
-                table_name: 'brand',
-                record_id: id,
-                old_values: brand,
-                new_values: { brand_name },
-                ip_address: req.ip
+                description: 'Brand updated',
+                tableName: 'brand',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Brand updated successfully' });
         } catch (error) {
@@ -69,23 +68,24 @@ class BrandController {
     }
     async deleteBrand(req, res) {
         try {
-            const user = req.user;
             const { id } = req.params;
             if (!id) {
                 return res.status(400).json({ error: 'Brand ID is required' });
             }
-            const brand = await Brand.destroy({ where: { brand_id: id } });
+            const brand = await Brand.findOne({ where: { brand_id: id } });
             if (!brand) {
                 return res.status(404).json({ error: 'Brand not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = brand.toJSON();
+            await brand.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
-                table_name: 'brand',
-                record_id: id,
-                old_values: brand,
-                new_values: null,
-                ip_address: req.ip
+                description: 'Brand deleted',
+                tableName: 'brand',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Brand deleted successfully' });
         } catch (error) {

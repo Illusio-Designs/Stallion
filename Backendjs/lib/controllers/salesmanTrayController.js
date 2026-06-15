@@ -1,5 +1,5 @@
 const SalesmanTray = require('../models/SalesmanTray');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const Salesman = require('../models/Salesman');
 const Tray = require('../models/Tray');
 const { TrayStatus } = require('../constants/enums');
@@ -48,16 +48,14 @@ class SalesmanTrayController {
                 updated_at: new Date(),
                 assigned_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Salesman tray created',
-                table_name: 'salesman_tray',
-                record_id: salesmanTray.id,
-                old_values: null,
-                new_values: salesmanTray,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'salesman_tray',
+                recordId: salesmanTray.id,
+                oldValues: null,
+                newValues: salesmanTray,
             });
             const updatedTray = await SalesmanTray.findOne({ where: { tray_id, salesman_id }, include: [Tray] });
             res.status(200).json({ message: 'Salesman tray assigned successfully', data: updatedTray });
@@ -73,7 +71,6 @@ class SalesmanTrayController {
             if (!id) {
                 return res.status(400).json({ error: 'Salesman tray ID is required' });
             }
-            const user = req.user;
             const salesmanTray = await SalesmanTray.findOne({ where: { tray_id: id } });
             if (!salesmanTray) {
                 return res.status(404).json({ error: 'Salesman tray not found' });
@@ -90,17 +87,16 @@ class SalesmanTrayController {
                 tray_status: TrayStatus.AVAILABLE,
                 updated_at: new Date(),
             }, { where: { tray_id: salesmanTray.tray_id } });
+            const snapshot = salesmanTray.toJSON();
             await SalesmanTray.destroy({ where: { id } });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Salesman tray deleted',
-                table_name: 'salesman_tray',
-                record_id: id,
-                old_values: salesmanTray,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'salesman_tray',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Salesman tray unassigned successfully' });
         } catch (error) {

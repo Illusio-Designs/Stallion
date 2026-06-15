@@ -1,88 +1,88 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const UserRole = require('../models/UserRole');
+const Role = require('../models/Role');
+const { getJwtSecret } = require('../utils/jwtSecret');
+
+async function attachUserRole(req) {
+    const userRole = await UserRole.findOne({ where: { user_id: req.user.user_id } });
+    if (!userRole) {
+        req.userRoleName = null;
+        return;
+    }
+    const role = await Role.findOne({ where: { role_id: userRole.role_id } });
+    req.userRoleName = role ? role.role_name : null;
+}
+
 /**
  * JWT Authentication Middleware
- * Verifies JWT token and attaches user to request object
+ * Verifies JWT token and attaches user + role to request object
  */
 async function authenticateToken(req, res, next) {
-  try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
 
-    if (!token) {
-      console.log("No token provided");
-      return res.status(401).json({
-        success: false,
-        message: 'Access token required'
-      });
-    }
+        if (!token) {
+            return res.status(401).json({
+                success: false,
+                message: 'Access token required',
+            });
+        }
 
-    // Verify JWT token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
+        const decoded = jwt.verify(token, getJwtSecret());
+        const user = await User.findByPk(decoded.userId);
+        if (!user || !user.is_active) {
+            return res.status(401).json({
+                success: false,
+                message: 'Invalid token - user not found',
+            });
+        }
 
-    // Find user in database
-    const user = await User.findByPk(decoded.userId);
-    if (!user) {
-      console.log("User not found");
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token - user not found'
-      });
-    }
-
-    // Attach user to request object
-    req.user = user;
-    console.log("user authenticted successfully");
-    next();
-  } catch (error) {
-    console.error('JWT Authentication Error:', error.message);
-
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
-    }
-
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expired'
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      message: 'Authentication error'
-    });
-  }
-};
-
-/**
- * Optional Authentication Middleware
- * Attaches user to request if token is valid, but doesn't require it
- */
-async function optionalAuth(req, res, next) {
-  try {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (token) {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'your-secret-key');
-      const user = await User.findByPk(decoded.id);
-      if (user) {
         req.user = user;
-      }
-    }
+        await attachUserRole(req);
+        next();
+    } catch (error) {
+        console.error('JWT Authentication Error:', error.message);
 
-    next();
-  } catch (error) {
-    // Continue without authentication if token is invalid
-    next();
-  }
-};
+        if (error.message === 'JWT_SECRET environment variable is required') {
+            return res.status(500).json({ success: false, message: 'Server authentication is not configured' });
+        }
+
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ success: false, message: 'Invalid token' });
+        }
+
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ success: false, message: 'Token expired' });
+        }
+
+        return res.status(500).json({ success: false, message: 'Authentication error' });
+    }
+}
+
+async function optionalAuth(req, res, next) {
+    try {
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (token) {
+            const decoded = jwt.verify(token, getJwtSecret());
+            const user = await User.findByPk(decoded.userId);
+            if (user && user.is_active) {
+                req.user = user;
+                await attachUserRole(req);
+            }
+        }
+
+        next();
+    } catch (error) {
+        next();
+    }
+}
 
 module.exports = {
-  authenticateToken,
-  optionalAuth
-}; 
+    authenticateToken,
+    optionalAuth,
+    attachUserRole,
+};

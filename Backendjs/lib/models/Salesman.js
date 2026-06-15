@@ -144,6 +144,11 @@ const Salesman = sequelize.define('Salesman', {
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
+    indexes: [
+        { fields: ['user_id'], name: 'idx_salesmen_user_id' },
+        { fields: ['is_active'], name: 'idx_salesmen_is_active' },
+        { fields: ['employee_code'], name: 'idx_salesmen_employee_code' },
+    ],
 });
 
 module.exports = Salesman;

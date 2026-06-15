@@ -1,5 +1,5 @@
 const State = require('../models/State');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const Country = require('../models/Country');
 
 class StateController {
@@ -52,16 +52,14 @@ class StateController {
                 updated_at: new Date(),
                 is_active: true
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'State created',
-                table_name: 'states',
-                record_id: state.id,
-                old_values: null,
-                new_values: state.toJSON(),
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'states',
+                recordId: state.id,
+                oldValues: null,
+                newValues: state,
             });
             res.status(200).json(state);
         } catch (error) {
@@ -77,26 +75,27 @@ class StateController {
             }
             const { name, code, country_id } = req.body;
             const user = req.user;
-            const state = await State.update({
+            const state = await State.findOne({ where: { id } });
+            if (!state) {
+                return res.status(404).json({ error: 'State not found' });
+            }
+            const oldSnapshot = state.toJSON();
+            const payload = {
                 name: name || state.name,
                 code: code || state.code,
                 country_id: country_id || state.country_id,
                 updated_at: new Date(),
                 updated_by: user.user_id
-            }, { where: { id: id } });
-            if (!state) {
-                return res.status(404).json({ error: 'State not found' });
-            }
-            await AuditLog.create({
-                user_id: user.user_id,
+            };
+            await State.update(payload, { where: { id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'State updated',
-                table_name: 'states',
-                record_id: id,
-                old_values: state,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'states',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'State updated successfully' });
         } catch (error) {
@@ -110,21 +109,20 @@ class StateController {
             if (!id) {
                 return res.status(400).json({ error: 'State ID is required' });
             }
-            const user = req.user;
-            const state = await State.destroy({ where: { id: id } });
+            const state = await State.findOne({ where: { id } });
             if (!state) {
                 return res.status(404).json({ error: 'State not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = state.toJSON();
+            await state.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'State deleted',
-                table_name: 'states',
-                record_id: id,
-                old_values: state,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'states',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'State deleted successfully' });
         } catch (error) {

@@ -1,10 +1,11 @@
 const Distributor = require('../models/distributor');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const User = require('../models/User');
 const { Op } = require('sequelize');
 const Party = require('../models/Party');
 const Zone = require('../models/Zone');
 const DistributorZones = require('../models/DistributorZones');
+const { findOrCreateRoleUser } = require('../utils/userFactory');
 
 class DistributorController {
     async getDistributor(req, res) {
@@ -86,7 +87,7 @@ class DistributorController {
             const user = req.user;
             const { distributor_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zones, pincode, gstin, pan, territory, commission_rate } = req.body;
 
-            // Find existing user by email or phone
+            // Find or create login user by email or phone
             const whereConditions = [];
             if (email) whereConditions.push({ email });
             if (phone) whereConditions.push({ phone });
@@ -95,14 +96,21 @@ class DistributorController {
             if (whereConditions.length > 0) {
                 distributorUser = await User.findOne({
                     where: {
-                        [Op.or]: whereConditions
-                    }
+                        [Op.or]: whereConditions,
+                    },
                 });
             }
 
-            // If no user found, return error
             if (!distributorUser) {
-                return res.status(404).json({ error: 'User not found with the provided email or phone number' });
+                if (!phone) {
+                    return res.status(400).json({ error: 'Phone is required to create distributor login' });
+                }
+                distributorUser = await findOrCreateRoleUser({
+                    phone,
+                    email,
+                    fullName: contact_person || distributor_name,
+                    roleName: 'distributor',
+                });
             }
 
             // Create distributor record and link to user
@@ -139,16 +147,14 @@ class DistributorController {
                 });
             }
 
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Distributor created',
-                table_name: 'distributors',
-                record_id: distributor.distributor_id,
-                old_values: null,
-                new_values: distributor.toJSON(),
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'distributors',
+                recordId: distributor.distributor_id,
+                oldValues: null,
+                newValues: distributor,
             });
             const distributorZones = await DistributorZones.findAll({ where: { distributor_id: distributor.distributor_id } });
             res.status(200).json({ ...distributor.toJSON(), zones: distributorZones });
@@ -168,7 +174,8 @@ class DistributorController {
             if (!distributor) {
                 return res.status(404).json({ error: 'Distributor not found' });
             }
-            const updatedDistributor = await Distributor.update({
+            const oldSnapshot = distributor.toJSON();
+            const payload = {
                 distributor_name: distributor_name || distributor.distributor_name,
                 trade_name: trade_name || distributor.trade_name,
                 contact_person: contact_person || distributor.contact_person,
@@ -186,10 +193,8 @@ class DistributorController {
                 is_active: is_active || distributor.is_active,
                 updated_at: new Date(),
                 updated_by: user.user_id
-            }, { where: { distributor_id: id } });
-            if (!updatedDistributor) {
-                return res.status(404).json({ error: 'Distributor not found' });
-            }
+            };
+            await Distributor.update(payload, { where: { distributor_id: id } });
             await DistributorZones.destroy({ where: { distributor_id: id } });
             for (const zone of zones) {
                 const existingZone = await Zone.findOne({ where: { id: zone } });
@@ -201,16 +206,14 @@ class DistributorController {
                     zone_id: existingZone.id
                 });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Distributor updated',
-                table_name: 'distributors',
-                record_id: id,
-                old_values: distributor,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'distributors',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Distributor updated successfully' });
         } catch (error) {
@@ -223,22 +226,21 @@ class DistributorController {
             if (!id) {
                 return res.status(400).json({ error: 'Distributor ID is required' });
             }
-            await DistributorZones.destroy({ where: { distributor_id: id } });
-            const distributor = await Distributor.destroy({ where: { distributor_id: id } });
+            const distributor = await Distributor.findOne({ where: { distributor_id: id } });
             if (!distributor) {
                 return res.status(404).json({ error: 'Distributor not found' });
             }
-            const user = req.user;
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = distributor.toJSON();
+            await DistributorZones.destroy({ where: { distributor_id: id } });
+            await distributor.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Distributor deleted',
-                table_name: 'distributors',
-                record_id: id,
-                old_values: distributor,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'distributors',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Distributor deleted successfully' });
         } catch (error) {

@@ -1,5 +1,5 @@
 const SalesmanTargets = require('../models/SalesmanTargets');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const { Op } = require('sequelize');
 
 class SalesmanTargetsController {
@@ -30,12 +30,14 @@ class SalesmanTargetsController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Salesman target created',
-                table_name: 'salesman_targets',
-                record_id: salesmanTarget.id,
+                tableName: 'salesman_targets',
+                recordId: salesmanTarget.id,
+                oldValues: null,
+                newValues: salesmanTarget,
             });
             res.status(200).json(salesmanTarget);
         } catch (error) {
@@ -123,7 +125,12 @@ class SalesmanTargetsController {
             if (startDate && endDate && startDate > endDate) {
                 return res.status(400).json({ error: 'Start date must be before end date' });
             }
-            const salesmanTarget = await SalesmanTargets.update({
+            const salesmanTarget = await SalesmanTargets.findOne({ where: { id } });
+            if (!salesmanTarget) {
+                return res.status(404).json({ error: 'Salesman target not found' });
+            }
+            const oldSnapshot = salesmanTarget.toJSON();
+            const payload = {
                 completed_amount,
                 target_amount,
                 start_date,
@@ -132,17 +139,16 @@ class SalesmanTargetsController {
                 target_description,
                 target_remarks,
                 updated_at: new Date(),
-            }, { where: { id: id } });
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            };
+            await SalesmanTargets.update(payload, { where: { id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Salesman target updated',
-                table_name: 'salesman_targets',
-                record_id: id,
-                old_values: salesmanTarget,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'salesman_targets',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             const updatedSalesmanTarget = await SalesmanTargets.findOne({ where: { id: id } });
             res.status(200).json(updatedSalesmanTarget);
@@ -154,13 +160,20 @@ class SalesmanTargetsController {
     async deleteSalesmanTarget(req, res) {
         try {
             const { id } = req.params;
-            await SalesmanTargets.destroy({ where: { id: id } });
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            const salesmanTarget = await SalesmanTargets.findOne({ where: { id } });
+            if (!salesmanTarget) {
+                return res.status(404).json({ error: 'Salesman target not found' });
+            }
+            const snapshot = salesmanTarget.toJSON();
+            await salesmanTarget.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Salesman target deleted',
-                table_name: 'salesman_targets',
-                record_id: id,
+                tableName: 'salesman_targets',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Salesman target deleted successfully' });
         } catch (error) {

@@ -1,5 +1,5 @@
 const ColorCode = require('../models/ColorCode');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 
 class ColorCodesController {
     async getColorCodes(req, res) {
@@ -15,7 +15,6 @@ class ColorCodesController {
     }
     async createColorCode(req, res) {
         try {
-            const user = req.user;
             const { color_code } = req.body;
             if (!color_code) {
                 return res.status(400).json({ error: 'Color code is required' });
@@ -25,16 +24,14 @@ class ColorCodesController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Color code created',
-                table_name: 'color_code',
-                record_id: colorCode.color_code_id,
-                old_values: null,
-                new_values: colorCode,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'color_code',
+                recordId: colorCode.color_code_id,
+                oldValues: null,
+                newValues: colorCode,
             });
             res.status(200).json(colorCode);
         } catch (error) {
@@ -43,29 +40,29 @@ class ColorCodesController {
     }
     async updateColorCode(req, res) {
         try {
-            const user = req.user;
             const { color_code } = req.body;
             const { id } = req.params;
             if (!id || !color_code) {
                 return res.status(400).json({ error: 'Color code ID and color code are required' });
             }
-            const colorCode = await ColorCode.update({
-                color_code: color_code,
-                updated_at: new Date(),
-            }, { where: { color_code_id: id } });
+            const colorCode = await ColorCode.findOne({ where: { color_code_id: id } });
             if (!colorCode) {
                 return res.status(404).json({ error: 'Color code not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const oldSnapshot = colorCode.toJSON();
+            const payload = {
+                color_code: color_code,
+                updated_at: new Date(),
+            };
+            await ColorCode.update(payload, { where: { color_code_id: id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Color code updated',
-                table_name: 'color_code',
-                record_id: id,
-                old_values: colorCode,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'color_code',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Color code updated successfully' });
         }
@@ -76,25 +73,24 @@ class ColorCodesController {
 
     async deleteColorCode(req, res) {
         try {
-            const user = req.user;
             const { id } = req.params;
             if (!id) {
                 return res.status(400).json({ error: 'Color code ID is required' });
             }
-            const colorCode = await ColorCode.destroy({ where: { color_code_id: id } });
+            const colorCode = await ColorCode.findOne({ where: { color_code_id: id } });
             if (!colorCode) {
                 return res.status(404).json({ error: 'Color code not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = colorCode.toJSON();
+            await colorCode.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Color code deleted',
-                table_name: 'color_code',
-                record_id: id,
-                old_values: colorCode,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'color_code',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Color code deleted successfully' });
         }
@@ -104,4 +100,4 @@ class ColorCodesController {
     }
 }
 
-module.exports = new ColorCodesController();  
+module.exports = new ColorCodesController();

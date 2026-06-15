@@ -1,5 +1,5 @@
 const LensMaterial = require('../models/LensMaterial');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 
 class LensMaterialController {
     async getLensMaterials(req, res) {
@@ -31,7 +31,6 @@ class LensMaterialController {
 
     async createLensMaterial(req, res) {
         try {
-            const user = req.user;
             const { lens_material } = req.body;
             if (!lens_material) {
                 return res.status(400).json({ error: 'Lens material is required' });
@@ -41,16 +40,14 @@ class LensMaterialController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Lens material created',
-                table_name: 'lens_material',
-                record_id: lensMaterial.lens_material_id,
-                old_values: null,
-                new_values: lensMaterial,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'lens_material',
+                recordId: lensMaterial.lens_material_id,
+                oldValues: null,
+                newValues: lensMaterial,
             });
             res.status(200).json(lensMaterial);
         } catch (error) {
@@ -59,29 +56,29 @@ class LensMaterialController {
     }
     async updateLensMaterial(req, res) {
         try {
-            const user = req.user;
             const { lens_material } = req.body;
             const { id } = req.params;
             if (!id || !lens_material) {
                 return res.status(400).json({ error: 'Lens material ID and lens material are required' });
             }
-            const lensMaterial = await LensMaterial.update({
-                lens_material: lens_material,
-                updated_at: new Date(),
-            }, { where: { lens_material_id: id } });
+            const lensMaterial = await LensMaterial.findOne({ where: { lens_material_id: id } });
             if (!lensMaterial) {
                 return res.status(404).json({ error: 'Lens material not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const oldSnapshot = lensMaterial.toJSON();
+            const payload = {
+                lens_material: lens_material,
+                updated_at: new Date(),
+            };
+            await LensMaterial.update(payload, { where: { lens_material_id: id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Lens material updated',
-                table_name: 'lens_material',
-                record_id: id,
-                old_values: lensMaterial,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'lens_material',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Lens material updated successfully' });
         } catch (error) {
@@ -90,25 +87,24 @@ class LensMaterialController {
     }
     async deleteLensMaterial(req, res) {
         try {
-            const user = req.user;
             const { id } = req.params;
             if (!id) {
                 return res.status(400).json({ error: 'Lens material ID is required' });
             }
-            const lensMaterial = await LensMaterial.destroy({ where: { lens_material_id: id } });
+            const lensMaterial = await LensMaterial.findOne({ where: { lens_material_id: id } });
             if (!lensMaterial) {
                 return res.status(404).json({ error: 'Lens material not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = lensMaterial.toJSON();
+            await lensMaterial.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Lens material deleted',
-                table_name: 'lens_material',
-                record_id: id,
-                old_values: lensMaterial,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'lens_material',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Lens material deleted successfully' });
         } catch (error) {
@@ -117,4 +113,4 @@ class LensMaterialController {
     }
 }
 
-module.exports = new LensMaterialController();  
+module.exports = new LensMaterialController();

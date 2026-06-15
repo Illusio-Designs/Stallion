@@ -1,5 +1,5 @@
 const Country = require('../models/Country');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 
 class CountryController {
     async getCountries(req, res) {
@@ -34,16 +34,14 @@ class CountryController {
             const user = req.user;
             const { name, code, phone_code, currency } = req.body;
             const country = await Country.create({ name, code, phone_code, currency, created_by: user.user_id, created_at: new Date(), updated_at: new Date(), is_active: true });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Country created',
-                table_name: 'countries',
-                record_id: country.id,
-                old_values: null,
-                new_values: country.toJSON(),
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'countries',
+                recordId: country.id,
+                oldValues: null,
+                newValues: country,
             });
             res.status(200).json(country);
         } catch (error) {
@@ -52,26 +50,26 @@ class CountryController {
     }
     async updateCountry(req, res) {
         try {
-            const user = req.user;
             const id = req.params.id;
             if (!id) {
                 return res.status(400).json({ error: 'Country ID is required' });
             }
             const { name, code, phone_code, currency } = req.body;
-            const country = await Country.update({ name, code, phone_code, currency }, { where: { id: id } });
+            const country = await Country.findOne({ where: { id } });
             if (!country) {
                 return res.status(404).json({ error: 'Country not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const oldSnapshot = country.toJSON();
+            const payload = { name, code, phone_code, currency };
+            await Country.update(payload, { where: { id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Country updated',
-                table_name: 'countries',
-                record_id: id,
-                old_values: country,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'countries',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Country updated successfully' });
         } catch (error) {
@@ -80,25 +78,24 @@ class CountryController {
     }
     async deleteCountry(req, res) {
         try {
-            const user = req.user;
             const id = req.params.id;
             if (!id) {
                 return res.status(400).json({ error: 'Country ID is required' });
             }
-            const country = await Country.destroy({ where: { id: id } });
+            const country = await Country.findOne({ where: { id } });
             if (!country) {
                 return res.status(404).json({ error: 'Country not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = country.toJSON();
+            await country.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Country deleted',
-                table_name: 'countries',
-                record_id: id,
-                old_values: country,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'countries',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Country deleted successfully' });
         } catch (error) {

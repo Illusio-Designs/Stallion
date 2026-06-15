@@ -1,5 +1,5 @@
 const Tray = require('../models/Tray');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 
 class TrayController {
     async getTrays(req, res) {
@@ -25,16 +25,14 @@ class TrayController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: req.user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Tray created',
-                table_name: 'tray',
-                record_id: tray.tray_id,
-                old_values: null,
-                new_values: tray,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'tray',
+                recordId: tray.tray_id,
+                oldValues: null,
+                newValues: tray,
             });
             res.status(200).json(tray);
         } catch (error) {
@@ -52,26 +50,21 @@ class TrayController {
             if (!tray) {
                 return res.status(404).json({ error: 'Tray not found' });
             }
-            const user = req.user;
-            await tray.update({
+            const oldSnapshot = tray.toJSON();
+            const payload = {
                 tray_name: tray_name || tray.tray_name,
                 tray_status: tray_status || tray.tray_status,
                 updated_at: new Date(),
-            }, { where: { tray_id: id } });
-            await AuditLog.create({
-                user_id: user.user_id,
+            };
+            await tray.update(payload);
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Tray updated',
-                table_name: 'tray',
-                record_id: id,
-                old_values: tray,
-                new_values: {
-                    tray_name,
-                    tray_status,
-                    updated_at: new Date(),
-                },
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'tray',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Tray updated successfully' });
         } catch (error) {
@@ -88,18 +81,16 @@ class TrayController {
             if (!tray) {
                 return res.status(404).json({ error: 'Tray not found' });
             }
+            const snapshot = tray.toJSON();
             await tray.destroy();
-            const user = req.user;
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Tray deleted',
-                table_name: 'tray',
-                record_id: id,
-                old_values: tray,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'tray',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Tray deleted successfully' });
         } catch (error) {

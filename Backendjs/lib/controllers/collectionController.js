@@ -1,5 +1,5 @@
 const Collection = require('../models/Collection');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const Brand = require('../models/Brand');
 class CollectionController {
     async getCollections(req, res) {
@@ -16,7 +16,6 @@ class CollectionController {
 
     async createCollection(req, res) {
         try {
-            const user = req.user;
             const { collection_name, brand_id } = req.body;
             if (!collection_name || !brand_id) {
                 return res.status(400).json({ error: 'Collection name and brand ID are required' });
@@ -31,14 +30,14 @@ class CollectionController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
-                table_name: 'collection',
-                record_id: collection.collection_id,
-                old_values: null,
-                new_values: collection,
-                ip_address: req.ip
+                description: 'Collection created',
+                tableName: 'collection',
+                recordId: collection.collection_id,
+                oldValues: null,
+                newValues: collection,
             });
             res.status(201).json(collection);
         } catch (error) {
@@ -47,7 +46,6 @@ class CollectionController {
     }
     async updateCollection(req, res) {
         try {
-            const user = req.user;
             const { collection_name, brand_id } = req.body;
             const { id } = req.params;
             if (!id || !collection_name || !brand_id) {
@@ -57,22 +55,25 @@ class CollectionController {
             if (!brand) {
                 return res.status(404).json({ error: 'Brand not found' });
             }
-            const collection = await Collection.update({
-                collection_name: collection_name,
-                brand_id: brand_id,
-                updated_at: new Date(),
-            }, { where: { collection_id: id } });
+            const collection = await Collection.findOne({ where: { collection_id: id } });
             if (!collection) {
                 return res.status(404).json({ error: 'Collection not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const oldSnapshot = collection.toJSON();
+            const payload = {
+                collection_name: collection_name,
+                brand_id: brand_id,
+                updated_at: new Date(),
+            };
+            await Collection.update(payload, { where: { collection_id: id } });
+            await logAudit({
+                req,
                 action: 'update',
-                table_name: 'collection',
-                record_id: id,
-                old_values: collection,
-                new_values: { collection_name, brand_id },
-                ip_address: req.ip
+                description: 'Collection updated',
+                tableName: 'collection',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Collection updated successfully' });
         } catch (error) {
@@ -81,23 +82,24 @@ class CollectionController {
     }
     async deleteCollection(req, res) {
         try {
-            const user = req.user;
             const { id } = req.params;
             if (!id) {
                 return res.status(400).json({ error: 'Collection ID is required' });
             }
-            const collection = await Collection.destroy({ where: { collection_id: id } });
+            const collection = await Collection.findOne({ where: { collection_id: id } });
             if (!collection) {
                 return res.status(404).json({ error: 'Collection not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = collection.toJSON();
+            await collection.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
-                table_name: 'collection',
-                record_id: id,
-                old_values: collection,
-                new_values: null,
-                ip_address: req.ip
+                description: 'Collection deleted',
+                tableName: 'collection',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Collection deleted successfully' });
         } catch (error) {

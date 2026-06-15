@@ -165,6 +165,15 @@ const Party = sequelize.define('Party', {
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
+    indexes: [
+        { fields: ['salesman_id'], name: 'idx_parties_salesman_id' },
+        { fields: ['distributor_id'], name: 'idx_parties_distributor_id' },
+        { fields: ['zone_id'], name: 'idx_parties_zone_id' },
+        { fields: ['user_id'], name: 'idx_parties_user_id' },
+        { fields: ['is_active'], name: 'idx_parties_is_active' },
+        { fields: ['salesman_id', 'is_active'], name: 'idx_parties_salesman_active' },
+        { fields: ['phone'], name: 'idx_parties_phone' },
+    ],
 });
 
 module.exports = Party;

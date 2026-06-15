@@ -51,7 +51,14 @@ const TrayProducts = sequelize.define('TrayProducts', {
     tableName: 'tray_product',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    indexes: [
+        { fields: ['tray_id'], name: 'idx_tray_product_tray_id' },
+        { fields: ['product_id'], name: 'idx_tray_product_product_id' },
+        { fields: ['status'], name: 'idx_tray_product_status' },
+        { fields: ['tray_id', 'product_id'], name: 'idx_tray_product_tray_product_unique', unique: true },
+        { fields: ['product_id', 'status'], name: 'idx_tray_product_product_status' },
+    ],
 });
 
 // Define associations

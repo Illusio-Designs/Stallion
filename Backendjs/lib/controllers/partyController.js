@@ -1,5 +1,5 @@
 const Party = require('../models/Party');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const Distributor = require('../models/distributor');
 const User = require('../models/User');
 const Salesman = require('../models/Salesman');
@@ -11,6 +11,9 @@ const Cities = require('../models/Cities');
 const Zone = require('../models/Zone');
 const { Op } = require('sequelize');
 const DistributorZones = require('../models/DistributorZones');
+const { findOrCreateRoleUser } = require('../utils/userFactory');
+const { canManageParties, normalizeRole } = require('../utils/roleHelpers');
+const { resolveUserScope } = require('../utils/scopeHelpers');
 
 class PartyController {
     async getPartie(req, res) {
@@ -30,6 +33,9 @@ class PartyController {
     }
     async getParties(req, res) {
         try {
+            if (!canManageParties(req.userRoleName)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
             const parties = await Party.findAll({ where: { is_active: true } });
             if (!parties || parties.length === 0) {
                 return res.status(404).json({ error: 'Parties not found' });
@@ -50,6 +56,18 @@ class PartyController {
             if (!party) {
                 return res.status(404).json({ error: 'Party not found' });
             }
+
+            if (!canManageParties(req.userRoleName)) {
+                const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                const role = normalizeRole(req.userRoleName);
+                const allowed = (role === 'party' && scope.partyId === id)
+                    || (role === 'salesman' && party.salesman_id === scope.salesmanId)
+                    || (role === 'distributor' && party.distributor_id === scope.distributorId);
+                if (!allowed) {
+                    return res.status(403).json({ error: 'Access denied' });
+                }
+            }
+
             res.status(200).json(party);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -108,6 +126,12 @@ class PartyController {
     async getPartiesBySalesmanId(req, res) {
         try {
             const salesman_id = req.params.salesman_id;
+            if (!canManageParties(req.userRoleName)) {
+                const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                if (normalizeRole(req.userRoleName) !== 'salesman' || scope.salesmanId !== salesman_id) {
+                    return res.status(403).json({ error: 'Access denied' });
+                }
+            }
             const parties = await Party.findAll({ where: { salesman_id: salesman_id } });
             if (!parties || parties.length === 0) {
                 return res.status(404).json({ error: 'Parties not found' });
@@ -235,15 +259,26 @@ class PartyController {
 
     async createParty(req, res) {
         try {
-            const user = req.user;
-            const { distributor_id, salesman_id, user_id, party_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
-            if (!user_id) {
-                return res.status(400).json({ error: 'User ID is required' });
+            if (!canManageParties(req.userRoleName)) {
+                return res.status(403).json({ error: 'Access denied' });
             }
+            const user = req.user;
+            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
+            if (!party_name || !phone) {
+                return res.status(400).json({ error: 'Party name and phone are required' });
+            }
+
+            const loginUser = await findOrCreateRoleUser({
+                phone,
+                email,
+                fullName: contact_person || party_name,
+                roleName: 'party',
+            });
+
             const party = await Party.create({
                 distributor_id,
                 salesman_id,
-                user_id,
+                user_id: loginUser.user_id,
                 party_name,
                 trade_name,
                 contact_person,
@@ -264,16 +299,14 @@ class PartyController {
                 credit_days,
                 prefered_courier
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Party created',
-                table_name: 'parties',
-                record_id: party.party_id,
-                old_values: null,
-                new_values: party,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'parties',
+                recordId: party.party_id,
+                oldValues: null,
+                newValues: party,
             });
             res.status(200).json(party);
         } catch (error) {
@@ -287,44 +320,55 @@ class PartyController {
                 return res.status(400).json({ error: 'Party ID is required' });
             }
             const user = req.user;
-            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email,
-                phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
             const party = await Party.findOne({ where: { party_id: id } });
             if (!party) {
                 return res.status(404).json({ error: 'Party not found' });
             }
-            await Party.update({
-                distributor_id: distributor_id || party.distributor_id,
-                salesman_id: salesman_id || party.salesman_id,
-                party_name: party_name || party.party_name,
-                trade_name: trade_name || party.trade_name,
-                contact_person: contact_person || party.contact_person,
-                email: email || party.email,
-                phone: phone || party.phone,
-                address: address || party.address,
-                country_id: country_id || party.country_id,
-                state_id: state_id || party.state_id,
-                city_id: city_id || party.city_id,
-                zone_id: zone_id || party.zone_id,
-                pincode: pincode || party.pincode,
-                gstin: gstin || party.gstin,
-                pan: pan || party.pan,
-                credit_days: credit_days || party.credit_days,
-                prefered_courier: prefered_courier || party.prefered_courier,
+
+            if (!canManageParties(req.userRoleName)) {
+                const scope = await resolveUserScope(user.user_id, req.userRoleName);
+                const role = normalizeRole(req.userRoleName);
+                const allowed = (role === 'party' && scope.partyId === id)
+                    || (role === 'salesman' && party.salesman_id === scope.salesmanId);
+                if (!allowed) {
+                    return res.status(403).json({ error: 'Access denied' });
+                }
+            }
+
+            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email,
+                phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
+            const oldSnapshot = party.toJSON();
+            const payload = {
+                distributor_id: distributor_id !== undefined ? distributor_id : party.distributor_id,
+                salesman_id: salesman_id !== undefined ? salesman_id : party.salesman_id,
+                party_name: party_name !== undefined ? party_name : party.party_name,
+                trade_name: trade_name !== undefined ? trade_name : party.trade_name,
+                contact_person: contact_person !== undefined ? contact_person : party.contact_person,
+                email: email !== undefined ? email : party.email,
+                phone: phone !== undefined ? phone : party.phone,
+                address: address !== undefined ? address : party.address,
+                country_id: country_id !== undefined ? country_id : party.country_id,
+                state_id: state_id !== undefined ? state_id : party.state_id,
+                city_id: city_id !== undefined ? city_id : party.city_id,
+                zone_id: zone_id !== undefined ? zone_id : party.zone_id,
+                pincode: pincode !== undefined ? pincode : party.pincode,
+                gstin: gstin !== undefined ? gstin : party.gstin,
+                pan: pan !== undefined ? pan : party.pan,
+                credit_days: credit_days !== undefined ? credit_days : party.credit_days,
+                prefered_courier: prefered_courier !== undefined ? prefered_courier : party.prefered_courier,
                 updated_at: new Date(),
                 updated_by: user.user_id
-            }, { where: { party_id: id } });
+            };
+            await Party.update(payload, { where: { party_id: id } });
 
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Party updated',
-                table_name: 'parties',
-                record_id: id,
-                old_values: party,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'parties',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Party updated successfully' });
         } catch (error) {
@@ -337,21 +381,20 @@ class PartyController {
             if (!id) {
                 return res.status(400).json({ error: 'Party ID is required' });
             }
-            const party = await Party.destroy({ where: { party_id: id } });
+            const party = await Party.findOne({ where: { party_id: id } });
             if (!party) {
                 return res.status(404).json({ error: 'Party not found' });
             }
-            const user = req.user;
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = party.toJSON();
+            await party.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Party deleted',
-                table_name: 'parties',
-                record_id: id,
-                old_values: party,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'parties',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Party deleted successfully' });
         } catch (error) {
@@ -494,24 +537,37 @@ class PartyController {
                 };
 
                 if (existing) {
+                    const oldSnapshot = existing.toJSON();
                     await Party.update(payload, { where: { party_id: existing.party_id } });
                     result.updated++;
-                    await AuditLog.create({
-                        user_id: userId,
+                    await logAudit({
+                        req,
+                        actorId: userId,
                         action: 'update',
                         description: 'Party updated via bulk upload',
-                        table_name: 'parties',
-                        record_id: existing.party_id,
-                        old_values: existing,
-                        new_values: payload,
-                        ip_address: req && req.ip,
-                        created_at: new Date(),
+                        tableName: 'parties',
+                        recordId: existing.party_id,
+                        oldValues: oldSnapshot,
+                        newValues: { ...oldSnapshot, ...payload },
                     });
                 } else {
+                    if (!row.phone) {
+                        return {
+                            success: false,
+                            message: `Row ${rowNum}: phone is required to create party login`,
+                            data: null,
+                        };
+                    }
+                    const loginUser = await findOrCreateRoleUser({
+                        phone: row.phone,
+                        email: row.email,
+                        fullName: row.contact_person || row.party_name,
+                        roleName: 'party',
+                    });
                     await Party.create({
                         ...payload,
+                        user_id: loginUser.user_id,
                         created_by: userId,
-                        user_id: userId,
                         created_at: new Date(),
                     });
                     result.created++;

@@ -12,7 +12,11 @@ const AuditLog = sequelize.define('AuditLog', {
         allowNull: true
     },
     action: {
-        type: DataTypes.STRING,
+        type: DataTypes.ENUM('create', 'update', 'delete'),
+        allowNull: false
+    },
+    description: {
+        type: DataTypes.STRING(255),
         allowNull: true
     },
     table_name: {
@@ -20,7 +24,7 @@ const AuditLog = sequelize.define('AuditLog', {
         allowNull: true
     },
     record_id: {
-        type: DataTypes.UUID,
+        type: DataTypes.STRING(36),
         allowNull: true
     },
     old_values: {
@@ -44,7 +48,18 @@ const AuditLog = sequelize.define('AuditLog', {
     tableName: 'audit_logs',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: false
+    updatedAt: false,
+    indexes: [
+        { fields: ['user_id'], name: 'idx_audit_logs_user_id' },
+        { fields: ['table_name'], name: 'idx_audit_logs_table_name' },
+        { fields: ['record_id'], name: 'idx_audit_logs_record_id' },
+        { fields: ['action'], name: 'idx_audit_logs_action' },
+        { fields: ['created_at'], name: 'idx_audit_logs_created_at' },
+        { fields: ['table_name', 'record_id'], name: 'idx_audit_logs_table_record' },
+    ],
 });
+
+const User = require('./User');
+AuditLog.belongsTo(User, { foreignKey: 'user_id', constraints: false });
 
 module.exports = AuditLog;

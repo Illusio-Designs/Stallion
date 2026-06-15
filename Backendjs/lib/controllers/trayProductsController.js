@@ -1,7 +1,19 @@
 const TrayProducts = require('../models/TrayProducts');
-const AuditLog = require('../models/AuditLog');
-const Tray = require('../models/Tray');
+const { logAudit } = require('../utils/auditLogger');
 const Product = require('../models/Product');
+const { TrayProductStatus, TrayProductStatusTransitions } = require('../constants/enums');
+
+function isValidTrayProductStatus(status) {
+    return Object.values(TrayProductStatus).includes(status);
+}
+
+function canTransitionTrayStatus(currentStatus, nextStatus) {
+    if (currentStatus === nextStatus) {
+        return true;
+    }
+    const allowed = TrayProductStatusTransitions[currentStatus] || [];
+    return allowed.includes(nextStatus);
+}
 
 class TrayProductsController {
     async getProductsInTray(req, res) {
@@ -26,25 +38,40 @@ class TrayProductsController {
             if (!tray_id || !product_id || !status) {
                 return res.status(400).json({ error: 'All fields are required' });
             }
-            const user = req.user;
-            const alredyInTray = await TrayProducts.findOne({ where: { tray_id, product_id } });
-            if (alredyInTray) {
-                alredyInTray.status = status;
-                alredyInTray.updated_at = new Date();
-                const updatedTrayProduct = await alredyInTray.save();
-                await AuditLog.create({
-                    user_id: user.user_id,
-                    action: 'create',
+            if (!isValidTrayProductStatus(status)) {
+                return res.status(400).json({ error: 'Invalid tray product status' });
+            }
+            if (status !== TrayProductStatus.ALLOTED) {
+                return res.status(400).json({ error: 'New tray products must start as alloted' });
+            }
+
+            const alreadyInTray = await TrayProducts.findOne({ where: { tray_id, product_id } });
+            if (alreadyInTray) {
+                if (!canTransitionTrayStatus(alreadyInTray.status, status)) {
+                    return res.status(400).json({
+                        error: `Cannot update tray product status from '${alreadyInTray.status}' to '${status}'`,
+                    });
+                }
+                const oldSnapshot = alreadyInTray.toJSON();
+                const payload = {
+                    status,
+                    updated_at: new Date(),
+                };
+                alreadyInTray.status = status;
+                alreadyInTray.updated_at = new Date();
+                const updatedTrayProduct = await alreadyInTray.save();
+                await logAudit({
+                    req,
+                    action: 'update',
                     description: 'Tray product status updated',
-                    table_name: 'tray_products',
-                    record_id: alredyInTray.id,
-                    old_values: alredyInTray,
-                    new_values: updatedTrayProduct,
-                    ip_address: req.ip,
-                    created_at: new Date(),
+                    tableName: 'tray_products',
+                    recordId: alreadyInTray.id,
+                    oldValues: oldSnapshot,
+                    newValues: { ...oldSnapshot, ...payload },
                 });
                 return res.status(200).json(updatedTrayProduct);
             }
+
             const product = await Product.findOne({ where: { product_id } });
             if (!product) {
                 return res.status(404).json({ error: 'Product not found' });
@@ -52,6 +79,7 @@ class TrayProductsController {
             if (product.warehouse_qty < 1) {
                 return res.status(400).json({ error: 'Product out of stock' });
             }
+
             const trayProduct = await TrayProducts.create({
                 tray_id,
                 product_id,
@@ -61,21 +89,22 @@ class TrayProductsController {
                 updated_at: new Date(),
                 assigned_at: new Date(),
             });
+
             await Product.update({
                 warehouse_qty: product.warehouse_qty - 1,
                 tray_qty: product.tray_qty + 1,
+                total_qty: product.total_qty,
                 updated_at: new Date(),
             }, { where: { product_id } });
-            await AuditLog.create({
-                user_id: user.user_id,
+
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Tray product created',
-                table_name: 'tray_products',
-                record_id: trayProduct.id,
-                old_values: null,
-                new_values: trayProduct,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'tray_products',
+                recordId: trayProduct.id,
+                oldValues: null,
+                newValues: trayProduct,
             });
             res.status(200).json(trayProduct);
         } catch (error) {
@@ -89,32 +118,35 @@ class TrayProductsController {
             if (!tray_id || !product_id || !status) {
                 return res.status(400).json({ error: 'All fields are required' });
             }
-            const user = req.user;
+            if (!isValidTrayProductStatus(status)) {
+                return res.status(400).json({ error: 'Invalid tray product status' });
+            }
+
             const trayProduct = await TrayProducts.findOne({ where: { tray_id, product_id } });
             if (!trayProduct) {
                 return res.status(404).json({ error: 'Tray product not found' });
             }
-            await trayProduct.update({
-                tray_id: tray_id || trayProduct.tray_id,
-                product_id: product_id || trayProduct.product_id,
-                status: status || trayProduct.status,
+            if (!canTransitionTrayStatus(trayProduct.status, status)) {
+                return res.status(400).json({
+                    error: `Cannot update tray product status from '${trayProduct.status}' to '${status}'`,
+                });
+            }
+
+            const oldSnapshot = trayProduct.toJSON();
+            const payload = {
+                status,
                 updated_at: new Date(),
-            });
-            await AuditLog.create({
-                user_id: user.user_id,
+            };
+            await trayProduct.update(payload);
+
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Tray product updated',
-                table_name: 'tray_products',
-                record_id: trayProduct.id,
-                old_values: trayProduct,
-                new_values: {
-                    tray_id,
-                    product_id,
-                    status,
-                    updated_at: new Date(),
-                },
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'tray_products',
+                recordId: trayProduct.id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Tray product updated successfully' });
         } catch (error) {
@@ -128,7 +160,6 @@ class TrayProductsController {
             if (!tray_id || !product_id) {
                 return res.status(400).json({ error: 'Tray product ID is required' });
             }
-            const user = req.user;
             const product = await Product.findOne({ where: { product_id } });
             if (!product) {
                 return res.status(404).json({ error: 'Product not found' });
@@ -137,22 +168,25 @@ class TrayProductsController {
             if (!trayProduct) {
                 return res.status(404).json({ error: 'Tray product not found' });
             }
-            await TrayProducts.destroy({ where: { tray_id, product_id } });
+
+            const snapshot = trayProduct.toJSON();
+            const qtyToRestore = trayProduct.qty;
+            await trayProduct.destroy();
             await Product.update({
-                warehouse_qty: product.warehouse_qty + 1,
-                tray_qty: product.tray_qty - 1,
+                warehouse_qty: product.warehouse_qty + qtyToRestore,
+                tray_qty: Math.max(0, product.tray_qty - qtyToRestore),
+                total_qty: product.total_qty,
                 updated_at: new Date(),
             }, { where: { product_id } });
-            await AuditLog.create({
-                user_id: user.user_id,
+
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Tray product deleted',
-                table_name: 'tray_products',
-                record_id: trayProduct.id,
-                old_values: trayProduct,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date(),
+                tableName: 'tray_products',
+                recordId: snapshot.id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Tray product deleted successfully' });
         } catch (error) {

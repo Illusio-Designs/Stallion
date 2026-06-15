@@ -39,7 +39,11 @@ const SalesmanTray = sequelize.define('SalesmanTray', {
     tableName: 'salesman_tray',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    indexes: [
+        { fields: ['salesman_id'], name: 'idx_salesman_tray_salesman_id' },
+        { fields: ['tray_id'], name: 'idx_salesman_tray_tray_id' },
+    ],
 });
 
 // Define associations

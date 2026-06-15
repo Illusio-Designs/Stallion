@@ -1,5 +1,5 @@
 const FrameType = require('../models/FrameType');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 class FrameTypeController {
     async getFrameTypes(req, res) {
         try {
@@ -30,7 +30,6 @@ class FrameTypeController {
 
     async createFrameType(req, res) {
         try {
-            const user = req.user;
             const { frame_type } = req.body;
             if (!frame_type) {
                 return res.status(400).json({ error: 'Frame type is required' });
@@ -40,16 +39,14 @@ class FrameTypeController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Frame type created',
-                table_name: 'frame_type',
-                record_id: frameType.frame_type_id,
-                old_values: null,
-                new_values: frameType,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'frame_type',
+                recordId: frameType.frame_type_id,
+                oldValues: null,
+                newValues: frameType,
             });
             res.status(200).json(frameType);
         }
@@ -59,29 +56,29 @@ class FrameTypeController {
     }
     async updateFrameType(req, res) {
         try {
-            const user = req.user;
             const { frame_type } = req.body;
             const { id } = req.params;
             if (!id || !frame_type) {
                 return res.status(400).json({ error: 'Frame type ID and frame type are required' });
             }
-            const frameType = await FrameType.update({
-                frame_type: frame_type,
-                updated_at: new Date(),
-            }, { where: { frame_type_id: id } });
+            const frameType = await FrameType.findOne({ where: { frame_type_id: id } });
             if (!frameType) {
                 return res.status(404).json({ error: 'Frame type not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const oldSnapshot = frameType.toJSON();
+            const payload = {
+                frame_type: frame_type,
+                updated_at: new Date(),
+            };
+            await FrameType.update(payload, { where: { frame_type_id: id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Frame type updated',
-                table_name: 'frame_type',
-                record_id: id,
-                old_values: frameType,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'frame_type',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Frame type updated successfully' });
         }
@@ -91,25 +88,24 @@ class FrameTypeController {
     }
     async deleteFrameType(req, res) {
         try {
-            const user = req.user;
             const { id } = req.params;
             if (!id) {
                 return res.status(400).json({ error: 'Frame type ID is required' });
             }
-            const frameType = await FrameType.destroy({ where: { frame_type_id: id } });
+            const frameType = await FrameType.findOne({ where: { frame_type_id: id } });
             if (!frameType) {
                 return res.status(404).json({ error: 'Frame type not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = frameType.toJSON();
+            await frameType.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Frame type deleted',
-                table_name: 'frame_type',
-                record_id: id,
-                old_values: frameType,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'frame_type',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Frame type deleted successfully' });
         }
@@ -119,4 +115,4 @@ class FrameTypeController {
     }
 }
 
-module.exports = new FrameTypeController();  
+module.exports = new FrameTypeController();

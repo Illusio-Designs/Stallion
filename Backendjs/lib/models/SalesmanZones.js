@@ -24,6 +24,11 @@ const SalesmanZones = sequelize.define('SalesmanZones', {
 }, {
     tableName: 'salesman_zones',
     timestamps: false,
+    indexes: [
+        { fields: ['salesman_id'], name: 'idx_salesman_zones_salesman_id' },
+        { fields: ['zone_id'], name: 'idx_salesman_zones_zone_id' },
+        { fields: ['salesman_id', 'zone_id'], name: 'idx_salesman_zones_salesman_zone_unique', unique: true },
+    ],
 });
 
 SalesmanZones.belongsTo(Salesman, {

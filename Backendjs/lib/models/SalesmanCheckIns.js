@@ -46,7 +46,12 @@ const SalesmanCheckIns = sequelize.define('SalesmanCheckIns', {
     tableName: 'salesman_check_ins',
     timestamps: true,
     createdAt: 'created_at',
-    updatedAt: 'updated_at'
+    updatedAt: 'updated_at',
+    indexes: [
+        { fields: ['salesman_id'], name: 'idx_salesman_check_ins_salesman_id' },
+        { fields: ['party_id'], name: 'idx_salesman_check_ins_party_id' },
+        { fields: ['check_in_date'], name: 'idx_salesman_check_ins_date' },
+    ],
 });
 
 SalesmanCheckIns.belongsTo(Salesman, {

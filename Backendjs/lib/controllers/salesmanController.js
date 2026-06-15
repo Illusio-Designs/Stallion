@@ -1,5 +1,5 @@
 const Salesman = require('../models/Salesman');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const Tray = require('../models/Tray');
 const { TrayStatus } = require('../constants/enums');
 const SalesmanTray = require('../models/SalesmanTray');
@@ -7,6 +7,7 @@ const Party = require('../models/Party');
 const SalesmanZones = require('../models/SalesmanZones');
 const Zone = require('../models/Zone');
 const User = require('../models/User');
+const { findOrCreateRoleUser } = require('../utils/userFactory');
 
 class SalesmanController {
 
@@ -89,9 +90,24 @@ class SalesmanController {
             if (existingSalesman) {
                 return res.status(400).json({ error: 'Salesman with this employee code already exists' });
             }
-            const existingUser = await User.findOne({ where: { user_id: user_id } });
-            if (!existingUser) {
-                return res.status(400).json({ error: 'User not found' });
+
+            let linkedUserId = user_id;
+            if (user_id) {
+                const existingUser = await User.findOne({ where: { user_id } });
+                if (!existingUser) {
+                    return res.status(400).json({ error: 'User not found' });
+                }
+            } else {
+                if (!phone) {
+                    return res.status(400).json({ error: 'Phone is required to create salesman login' });
+                }
+                const loginUser = await findOrCreateRoleUser({
+                    phone,
+                    email,
+                    fullName: full_name,
+                    roleName: 'salesman',
+                });
+                linkedUserId = loginUser.user_id;
             }
 
             const salesman = await Salesman.create({
@@ -111,7 +127,7 @@ class SalesmanController {
                 created_at: new Date(),
                 updated_at: new Date(),
                 is_active: true,
-                user_id: user_id,
+                user_id: linkedUserId,
             });
             console.log("salesman.salesman_id ", salesman.salesman_id);
             for (const zone of zones) {
@@ -136,16 +152,14 @@ class SalesmanController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Salesman created',
-                table_name: 'salesmen',
-                record_id: salesman.salesman_id,
-                old_values: null,
-                new_values: salesman.toJSON(),
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'salesmen',
+                recordId: salesman.salesman_id,
+                oldValues: null,
+                newValues: salesman,
             });
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
             res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones });
@@ -162,7 +176,12 @@ class SalesmanController {
             }
             const { zones, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date, is_active } = req.body;
             const user = req.user;
-            const salesman = await Salesman.update({
+            const salesman = await Salesman.findOne({ where: { salesman_id: id } });
+            if (!salesman) {
+                return res.status(404).json({ error: 'Salesman not found' });
+            }
+            const oldSnapshot = salesman.toJSON();
+            const payload = {
                 employee_code,
                 phone,
                 alternate_phone,
@@ -178,10 +197,8 @@ class SalesmanController {
                 updated_at: new Date(),
                 updated_by: user.user_id,
                 is_active: is_active,
-            }, { where: { salesman_id: id } });
-            if (!salesman) {
-                return res.status(404).json({ error: 'Salesman not found' });
-            }
+            };
+            await Salesman.update(payload, { where: { salesman_id: id } });
             await SalesmanZones.destroy({ where: { salesman_id: id } });
             for (const zone of zones) {
                 const existingZone = await Zone.findOne({ where: { id: zone } });
@@ -193,16 +210,14 @@ class SalesmanController {
                     zone_id: existingZone.id
                 });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Salesman updated',
-                table_name: 'salesmen',
-                record_id: id,
-                old_values: salesman,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'salesmen',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Salesman updated successfully' });
         } catch (error) {
@@ -216,22 +231,21 @@ class SalesmanController {
             if (!id) {
                 return res.status(400).json({ error: 'Salesman ID is required' });
             }
-            const user = req.user;
-            const salesman = await Salesman.destroy({ where: { salesman_id: id } });
+            const salesman = await Salesman.findOne({ where: { salesman_id: id } });
             if (!salesman) {
                 return res.status(404).json({ error: 'Salesman not found' });
             }
+            const snapshot = salesman.toJSON();
             await SalesmanZones.destroy({ where: { salesman_id: id } });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await salesman.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Salesman deleted',
-                table_name: 'salesmen',
-                record_id: id,
-                old_values: salesman,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'salesmen',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Salesman deleted successfully' });
         } catch (error) {

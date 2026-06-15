@@ -22,6 +22,11 @@ const DistributorZones = sequelize.define('DistributorZones', {
 }, {
     tableName: 'distributor_zones',
     timestamps: false,
+    indexes: [
+        { fields: ['distributor_id'], name: 'idx_distributor_zones_distributor_id' },
+        { fields: ['zone_id'], name: 'idx_distributor_zones_zone_id' },
+        { fields: ['distributor_id', 'zone_id'], name: 'idx_distributor_zones_dist_zone_unique', unique: true },
+    ],
 });
 
 module.exports = DistributorZones;

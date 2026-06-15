@@ -11,6 +11,17 @@ const TrayProductStatus = {
     RETURNED: 'returned'
 };
 
+const TrayProductStatusTransitions = {
+    [TrayProductStatus.ALLOTED]: [
+        TrayProductStatus.PARTIALLY_BOOKED,
+        TrayProductStatus.PRIORITY_BOOKED,
+        TrayProductStatus.RETURNED,
+    ],
+    [TrayProductStatus.PARTIALLY_BOOKED]: [TrayProductStatus.RETURNED],
+    [TrayProductStatus.PRIORITY_BOOKED]: [TrayProductStatus.RETURNED],
+    [TrayProductStatus.RETURNED]: [],
+};
+
 const OrderStatus = {
     PENDING: 'pending',
     PROCESSED: 'processed',
@@ -44,4 +55,20 @@ const EventStatus = {
     ONGOING: 'ongoing',
     PAST: 'past',
 };
-module.exports = { TrayStatus, TrayProductStatus, OrderStatus, OrderStatusTransitions, OrderType, EventStatus };
+
+const AuditAction = {
+    CREATE: 'create',
+    UPDATE: 'update',
+    DELETE: 'delete',
+};
+
+module.exports = {
+    TrayStatus,
+    TrayProductStatus,
+    TrayProductStatusTransitions,
+    OrderStatus,
+    OrderStatusTransitions,
+    OrderType,
+    EventStatus,
+    AuditAction,
+};

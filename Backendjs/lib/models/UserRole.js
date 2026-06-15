@@ -45,8 +45,11 @@ const UserRole = sequelize.define('UserRole', {
     indexes: [
         {
             unique: true,
-            fields: ['user_id', 'role_id']
-        }
+            fields: ['user_id', 'role_id'],
+            name: 'idx_user_roles_user_id_role_id_unique',
+        },
+        { fields: ['user_id'], name: 'idx_user_roles_user_id' },
+        { fields: ['role_id'], name: 'idx_user_roles_role_id' },
     ]
 });
 

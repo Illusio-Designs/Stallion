@@ -1,5 +1,5 @@
 const Zone = require('../models/Zone');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 const UserRole = require('../models/UserRole');
 const Role = require('../models/Role');
 const Party = require('../models/Party');
@@ -64,7 +64,7 @@ class ZoneController {
                     return res.status(404).json({ error: 'Party record not found for this user' });
                 }
 
-                zones = Zone.findAll({ where: { is_active: true, id: party.zone_id } });
+                zones = await Zone.findAll({ where: { is_active: true, id: party.zone_id } });
 
             } else if (roleName === 'salesman') {
                 // Get zone_preference from Salesman model (stored as text)
@@ -77,7 +77,7 @@ class ZoneController {
                 }
 
                 const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
-                zones = Zone.findAll({ where: { is_active: true, id: salesmanZones.map(zone => zone.zone_id) } });
+                zones = await Zone.findAll({ where: { is_active: true, id: salesmanZones.map(zone => zone.zone_id) } });
 
             } else if (roleName === 'distributor') {
                 // Get zone_id from Distributor model
@@ -114,7 +114,7 @@ class ZoneController {
                     }
                 }
                 const distributorZones = await DistributorZones.findAll({ where: { distributor_id: distributor.distributor_id } });
-                zones = Zone.findAll({ where: { is_active: true, id: distributorZones.map(zone => zone.zone_id) } });
+                zones = await Zone.findAll({ where: { is_active: true, id: distributorZones.map(zone => zone.zone_id) } });
 
             } else {
                 return res.status(400).json({ error: `Role '${roleName}' is not supported for this operation` });
@@ -161,16 +161,14 @@ class ZoneController {
                 updated_at: new Date(),
                 is_active: true
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Zone created',
-                table_name: 'zones',
-                record_id: zone.id,
-                old_values: null,
-                new_values: zone,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'zones',
+                recordId: zone.id,
+                oldValues: null,
+                newValues: zone,
             });
             res.status(201).json(zone);
         } catch (error) {
@@ -186,7 +184,12 @@ class ZoneController {
             }
             const { name, description, city_id, state_id, country_id, zone_code } = req.body;
             const user = req.user;
-            const zone = await Zone.update({
+            const zone = await Zone.findOne({ where: { id } });
+            if (!zone) {
+                return res.status(404).json({ error: 'Zone not found' });
+            }
+            const oldSnapshot = zone.toJSON();
+            const payload = {
                 name,
                 description,
                 city_id,
@@ -195,20 +198,16 @@ class ZoneController {
                 zone_code,
                 updated_at: new Date(),
                 updated_by: user.user_id
-            }, { where: { id: id } });
-            if (!zone) {
-                return res.status(404).json({ error: 'Zone not found' });
-            }
-            await AuditLog.create({
-                user_id: user.user_id,
+            };
+            await Zone.update(payload, { where: { id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Zone updated',
-                table_name: 'zones',
-                record_id: id,
-                old_values: zone,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'zones',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Zone updated successfully' });
         } catch (error) {
@@ -221,21 +220,20 @@ class ZoneController {
             if (!id) {
                 return res.status(400).json({ error: 'Zone ID is required' });
             }
-            const zone = await Zone.destroy({ where: { id: id } });
+            const zone = await Zone.findOne({ where: { id } });
             if (!zone) {
                 return res.status(404).json({ error: 'Zone not found' });
             }
-            const user = req.user;
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = zone.toJSON();
+            await zone.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Zone deleted',
-                table_name: 'zones',
-                record_id: id,
-                old_values: zone,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'zones',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Zone deleted successfully' });
         } catch (error) {

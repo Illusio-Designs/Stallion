@@ -1,5 +1,5 @@
 const LensColor = require('../models/LensColor');
-const AuditLog = require('../models/AuditLog');
+const { logAudit } = require('../utils/auditLogger');
 class LensColorsController {
     async getLensColors(req, res) {
         try {
@@ -30,7 +30,6 @@ class LensColorsController {
 
     async createLensColor(req, res) {
         try {
-            const user = req.user;
             const { lens_color } = req.body;
             if (!lens_color) {
                 return res.status(400).json({ error: 'Lens color is required' });
@@ -40,16 +39,14 @@ class LensColorsController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
-            await AuditLog.create({
-                user_id: user.user_id,
+            await logAudit({
+                req,
                 action: 'create',
                 description: 'Lens color created',
-                table_name: 'lens_color',
-                record_id: lensColor.lens_color_id,
-                old_values: null,
-                new_values: lensColor,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'lens_color',
+                recordId: lensColor.lens_color_id,
+                oldValues: null,
+                newValues: lensColor,
             });
             res.status(200).json(lensColor);
         }
@@ -60,29 +57,29 @@ class LensColorsController {
 
     async updateLensColor(req, res) {
         try {
-            const user = req.user;
             const { lens_color } = req.body;
             const { id } = req.params;
             if (!id || !lens_color) {
                 return res.status(400).json({ error: 'Lens color ID and lens color are required' });
             }
-            const lensColor = await LensColor.update({
-                lens_color: lens_color,
-                updated_at: new Date(),
-            }, { where: { lens_color_id: id } });
+            const lensColor = await LensColor.findOne({ where: { lens_color_id: id } });
             if (!lensColor) {
                 return res.status(404).json({ error: 'Lens color not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const oldSnapshot = lensColor.toJSON();
+            const payload = {
+                lens_color: lens_color,
+                updated_at: new Date(),
+            };
+            await LensColor.update(payload, { where: { lens_color_id: id } });
+            await logAudit({
+                req,
                 action: 'update',
                 description: 'Lens color updated',
-                table_name: 'lens_color',
-                record_id: id,
-                old_values: lensColor,
-                new_values: req.body,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'lens_color',
+                recordId: id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...payload },
             });
             res.status(200).json({ message: 'Lens color updated successfully' });
         } catch (error) {
@@ -91,25 +88,24 @@ class LensColorsController {
     }
     async deleteLensColor(req, res) {
         try {
-            const user = req.user;
             const { id } = req.params;
             if (!id) {
                 return res.status(400).json({ error: 'Lens color ID is required' });
             }
-            const lensColor = await LensColor.destroy({ where: { lens_color_id: id } });
+            const lensColor = await LensColor.findOne({ where: { lens_color_id: id } });
             if (!lensColor) {
                 return res.status(404).json({ error: 'Lens color not found' });
             }
-            await AuditLog.create({
-                user_id: user.user_id,
+            const snapshot = lensColor.toJSON();
+            await lensColor.destroy();
+            await logAudit({
+                req,
                 action: 'delete',
                 description: 'Lens color deleted',
-                table_name: 'lens_color',
-                record_id: id,
-                old_values: lensColor,
-                new_values: null,
-                ip_address: req.ip,
-                created_at: new Date()
+                tableName: 'lens_color',
+                recordId: id,
+                oldValues: snapshot,
+                newValues: null,
             });
             res.status(200).json({ message: 'Lens color deleted successfully' });
         } catch (error) {
@@ -118,4 +114,4 @@ class LensColorsController {
     }
 }
 
-module.exports = new LensColorsController();  
+module.exports = new LensColorsController();

@@ -177,32 +177,22 @@ const Product = sequelize.define('Product', {
     updatedAt: 'updated_at',
     underscored: true,
     indexes: [
+        { fields: ['collection_id'], name: 'idx_product_collection_id' },
+        { fields: ['brand_id'], name: 'idx_product_brand_id' },
+        { fields: ['color_code_id'], name: 'idx_product_color_code_id' },
+        { fields: ['shape_id'], name: 'idx_product_shape_id' },
+        { fields: ['lens_color_id'], name: 'idx_product_lens_color_id' },
+        { fields: ['frame_color_id'], name: 'idx_product_frame_color_id' },
+        { fields: ['frame_type_id'], name: 'idx_product_frame_type_id' },
+        { fields: ['lens_material_id'], name: 'idx_product_lens_material_id' },
+        { fields: ['frame_material_id'], name: 'idx_product_frame_material_id' },
+        { fields: ['gender_id'], name: 'idx_product_gender_id' },
+        { fields: ['model_no'], name: 'idx_product_model_no' },
+        { fields: ['status'], name: 'idx_product_status' },
         {
-            fields: ['collection_id'],
-        },
-        {
-            fields: ['brand_id'],
-        },
-        {
-            fields: ['color_code_id'],
-        },
-        {
-            fields: ['shape_id'],
-        },
-        {
-            fields: ['lens_color_id'],
-        },
-        {
-            fields: ['frame_color_id'],
-        },
-        {
-            fields: ['frame_type_id'],
-        },
-        {
-            fields: ['lens_material_id'],
-        },
-        {
-            fields: ['frame_material_id'],
+            fields: ['model_no', 'color_code_id'],
+            name: 'idx_product_model_no_color_code_unique',
+            unique: true,
         },
     ]
 });

@@ -145,6 +145,12 @@ const Distributor = sequelize.define('Distributor', {
     timestamps: true,
     createdAt: 'created_at',
     updatedAt: 'updated_at',
+    indexes: [
+        { fields: ['user_id'], name: 'idx_distributors_user_id' },
+        { fields: ['is_active'], name: 'idx_distributors_is_active' },
+        { fields: ['country_id'], name: 'idx_distributors_country_id' },
+        { fields: ['phone'], name: 'idx_distributors_phone' },
+    ],
 });
 
 module.exports = Distributor;
