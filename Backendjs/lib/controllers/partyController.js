@@ -11,6 +11,9 @@ const Cities = require('../models/Cities');
 const Zone = require('../models/Zone');
 const { Op } = require('sequelize');
 const DistributorZones = require('../models/DistributorZones');
+const SalesmanStates = require('../models/SalesmanStates');
+const DistributorStates = require('../models/DistributorStates');
+const { resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const { canManageParties, normalizeRole } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
@@ -267,6 +270,28 @@ class PartyController {
             if (!party_name || !phone) {
                 return res.status(400).json({ error: 'Party name and phone are required' });
             }
+            // State is required — it drives the salesman/distributor assignment.
+            // Accepts a state name or id; city & zone are optional.
+            if (!state_id) {
+                return res.status(400).json({ error: 'State is required' });
+            }
+            const resolvedStateId = await resolveStateId(state_id);
+            if (!resolvedStateId) {
+                return res.status(404).json({ error: `State not found: ${state_id}` });
+            }
+
+            // Auto-assign distributor & salesman from whoever covers this state.
+            // A value explicitly passed in the body always wins (manual override).
+            let finalDistributorId = distributor_id || null;
+            let finalSalesmanId = salesman_id || null;
+            if (!finalDistributorId) {
+                const ds = await DistributorStates.findOne({ where: { state_id: resolvedStateId } });
+                if (ds) finalDistributorId = ds.distributor_id;
+            }
+            if (!finalSalesmanId) {
+                const ss = await SalesmanStates.findOne({ where: { state_id: resolvedStateId } });
+                if (ss) finalSalesmanId = ss.salesman_id;
+            }
 
             const loginUser = await findOrCreateRoleUser({
                 phone,
@@ -276,8 +301,8 @@ class PartyController {
             });
 
             const party = await Party.create({
-                distributor_id,
-                salesman_id,
+                distributor_id: finalDistributorId,
+                salesman_id: finalSalesmanId,
                 user_id: loginUser.user_id,
                 party_name,
                 trade_name,
@@ -286,7 +311,7 @@ class PartyController {
                 phone,
                 address,
                 country_id,
-                state_id,
+                state_id: resolvedStateId,
                 city_id,
                 zone_id,
                 pincode,
@@ -587,6 +612,24 @@ class PartyController {
             message,
             data: result,
         };
+    }
+
+    // Parties in a given state (state passed as name or id).
+    async getPartiesByStateId(req, res) {
+        try {
+            const { state_id } = req.body;
+            if (!state_id) {
+                return res.status(400).json({ error: 'state_id is required' });
+            }
+            const resolved = await resolveStateId(state_id);
+            if (!resolved) {
+                return res.status(404).json({ error: `State not found: ${state_id}` });
+            }
+            const parties = await Party.findAll({ where: { state_id: resolved } });
+            res.status(200).json(parties);
+        } catch (error) {
+            res.status(error.statusCode || 500).json({ error: error.message });
+        }
     }
 }
 

@@ -6,6 +6,7 @@ const { authenticateToken } = require('../middleware/auth');
 
 router.get('/', authenticateToken, distributorController.getDistributor);
 router.get('/parties', authenticateToken, distributorController.getDistributorParties);
+router.get('/by-state/:stateId', authenticateToken, distributorController.getDistributorsByState);
 router.get('/:id', authenticateToken, distributorController.getDistributorById);
 router.post('/', authenticateToken, distributorController.createDistributor);
 router.post('/get', authenticateToken, distributorController.getDistributors);

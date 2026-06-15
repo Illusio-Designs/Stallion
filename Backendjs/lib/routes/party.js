@@ -15,6 +15,7 @@ router.post('/', authenticateToken, isPartyManager, partyController.createParty)
 router.put('/:id', authenticateToken, partyController.updateParty);
 router.delete('/:id', authenticateToken, isPartyManager, partyController.deleteParty);
 router.post('/byZoneId', authenticateToken, partyController.getPartiesByZoneId);
+router.post('/byStateId', authenticateToken, partyController.getPartiesByStateId);
 router.post('/bulk-upload', authenticateToken, isPartyManager, partyFileUpload, parsePartyFile);
 
 module.exports = router;
