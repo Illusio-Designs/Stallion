@@ -14,6 +14,18 @@ export const getAllSalesmanCheckins = async () => {
 };
 
 /**
+ * Get a single salesman by id (returns the salesman with zones/states).
+ * @param {string} salesmanId
+ * @returns {Promise<Object>}
+ */
+export const getSalesmanById = async (salesmanId) => {
+  return apiRequest(`/salesmen/${salesmanId}`, {
+    method: 'GET',
+    includeAuth: true,
+  });
+};
+
+/**
  * Get salesman check-ins by salesman ID
  * @param {string} salesmanId - Salesman ID (UUID)
  * @returns {Promise<Array>} Array of check-in objects

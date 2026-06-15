@@ -8,8 +8,8 @@ import {
   getSalesmanTargets,
   getAllSalesmanCheckins,
   getSalesmanCheckins,
-  getSalesmen,
-  getParties,
+  getSalesmanById,
+  getPartyById,
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
 import { showError } from '../services/notificationService';
@@ -72,11 +72,19 @@ const AnalyticsReports = () => {
         (isSalesman && salesmanId ? getSalesmanTargets(salesmanId) : getAllSalesmanTargets()).catch(emptyOnNotFound),
         (isSalesman && salesmanId ? getSalesmanCheckins(salesmanId) : getAllSalesmanCheckins()).catch(emptyOnNotFound),
       ]);
-      setTargets(asArray(targetsData));
-      setCheckins(asArray(checkinsData));
-      // Names — best effort, never fatal
-      try { setSalesmen(asArray(await getSalesmen())); } catch { /* fall back to id */ }
-      try { setParties(asArray(await getParties())); } catch { /* fall back to id */ }
+      const t = asArray(targetsData);
+      const c = asArray(checkinsData);
+      setTargets(t);
+      setCheckins(c);
+      // Resolve names on-demand by id (best effort, never fatal).
+      const sIds = [...new Set([...t, ...c].map((x) => x.salesman_id).filter(Boolean))];
+      const pIds = [...new Set(c.map((x) => x.party_id).filter(Boolean))];
+      const [sResolved, pResolved] = await Promise.all([
+        Promise.all(sIds.map((id) => getSalesmanById(id).catch(() => null))),
+        Promise.all(pIds.map((id) => getPartyById(id).catch(() => null))),
+      ]);
+      setSalesmen(sResolved.filter(Boolean));
+      setParties(pResolved.filter(Boolean));
     } catch (e) {
       console.error('Reports load failed:', e);
       setLoadError(true);
