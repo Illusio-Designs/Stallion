@@ -782,7 +782,11 @@ const DashboardDistributor = () => {
       setError('Please select a country');
       return;
     }
-    
+    if (!Array.isArray(formData.state_ids) || formData.state_ids.length === 0) {
+      setError('Please select at least one Working State');
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
