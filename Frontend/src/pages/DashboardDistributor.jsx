@@ -220,6 +220,20 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
           </div>
         </div>
       )}
+      {selectedStates.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {selectedStates.map(id => {
+            const s = states.find(st => idOf(st) === id);
+            const label = s ? nameOf(s) : id;
+            return (
+              <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--color-primary-soft)', color: 'var(--color-primary)', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 500 }}>
+                {label}
+                <button type="button" onClick={(e) => { e.stopPropagation(); toggle(id); }} aria-label={`Remove ${label}`} style={{ border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
+              </span>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };
