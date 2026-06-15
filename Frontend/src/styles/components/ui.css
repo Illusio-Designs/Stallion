@@ -801,13 +801,15 @@ textarea.ui-input {
   animation: uiBackdropFade var(--transition) ease-out;
 }
 /* Inner flex wrapper: centers short modals, scrolls the whole overlay for
-   tall ones (the modal grows naturally and the backdrop scrolls). */
+   tall ones. align-items:flex-start + margin:auto on the modal means it is
+   centered when it fits and top-aligned (fully reachable) when it overflows. */
 .ui-modal__scroll {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
   min-height: 100%;
   padding: var(--space-6) var(--space-4);
+  box-sizing: border-box;
 }
 @keyframes uiBackdropFade {
   from { opacity: 0; }
