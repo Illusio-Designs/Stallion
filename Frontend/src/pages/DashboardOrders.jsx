@@ -17,6 +17,7 @@ import {
   getEvents,
   getProducts,
   getProductById,
+  getSalesmanById,
   getCountries
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
@@ -65,6 +66,7 @@ const DashboardOrders = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [partyNamesMap, setPartyNamesMap] = useState({}); // Map of party_id -> party_name
+  const [salesmanNamesMap, setSalesmanNamesMap] = useState({}); // Map of salesman_id -> name
   // Memoize so the reference is stable across renders — getUser()/getUserRole()
   // parse localStorage and return a fresh object each call, which otherwise
   // re-creates every useCallback that depends on `user` and causes an infinite
@@ -196,6 +198,28 @@ const DashboardOrders = () => {
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  // Resolve salesman names for the SALESMAN column (orders only carry salesman_id).
+  useEffect(() => {
+    const ids = [...new Set(
+      orders.map(o => o.salesman_id || o.salesman?.salesman_id || o.salesman?.id).filter(Boolean)
+    )].filter(id => !salesmanNamesMap[id]);
+    if (ids.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const map = {};
+      await Promise.all(ids.map(async (id) => {
+        try {
+          const s = await getSalesmanById(id);
+          const sm = s?.data || s;
+          if (sm) map[id] = sm.full_name || sm.salesman_name || sm.name;
+        } catch { /* leave unresolved */ }
+      }));
+      if (!cancelled && Object.keys(map).length) setSalesmanNamesMap(prev => ({ ...prev, ...map }));
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders]);
 
   // Load create-order form data (countries + products) only when the create
   // modal opens - not on page load, since the listing doesn't need them.
@@ -504,6 +528,10 @@ const DashboardOrders = () => {
         ? new Date(rawDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
         : '—';
 
+      const orderSalesmanId = order.salesman_id || order.salesman?.salesman_id || order.salesman?.id;
+      const salesmanLabel = order.salesman?.salesman_name || order.salesman?.full_name || order.salesman_name ||
+        (orderSalesmanId ? (salesmanNamesMap[orderSalesmanId] || `Salesman ${String(orderSalesmanId).slice(0, 8)}`) : '—');
+
       // Create a single row for the order. The product breakdown lives in the
       // View modal (per-order item table), so it's not a list column.
       tableRows.push({
@@ -511,6 +539,7 @@ const DashboardOrders = () => {
         orderId: orderNumber,
         orderType: orderTypeDisplay,
         client: partyName,
+        salesman: salesmanLabel,
         date: orderDate,
         qty: totalQuantity,
         status: orderStatus,
@@ -520,7 +549,7 @@ const DashboardOrders = () => {
     });
 
     return tableRows;
-  }, [orders, partyNamesMap]);
+  }, [orders, partyNamesMap, salesmanNamesMap]);
 
   // Filter rows by active tab + selected date range
   const filteredRowsByTab = useMemo(() => {
@@ -967,6 +996,7 @@ const DashboardOrders = () => {
     { key: 'orderId', label: 'ORDER ID' },
     { key: 'orderType', label: 'ORDER TYPE' },
     { key: 'client', label: 'PARTY NAME' },
+    { key: 'salesman', label: 'SALESMAN' },
     { key: 'date', label: 'DATE' },
     { key: 'qty', label: 'QTY' },
     { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase().replace(/\s+/g, '-')}>{v}</StatusBadge> },
