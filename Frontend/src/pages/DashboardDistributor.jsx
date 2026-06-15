@@ -147,6 +147,83 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
   );
 };
 
+// Multi-select "Working States" dropdown (mirrors ZonesMultiDropdown).
+// selectedStates is an array of state id strings.
+const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disabled = false }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const dropdownRef = useRef(null);
+  const searchInputRef = useRef(null);
+
+  const nameOf = (s) => s.name || s.state_name || '';
+  const idOf = (s) => s.id || s.state_id;
+  const filtered = searchQuery
+    ? states.filter(s => nameOf(s).toLowerCase().includes(searchQuery.toLowerCase()))
+    : states;
+  const allIds = states.map(idOf);
+  const allSelected = allIds.length > 0 && allIds.every(id => selectedStates.includes(id));
+
+  const displayValue = selectedStates.length === 0
+    ? 'Select Working States'
+    : selectedStates.length === allIds.length
+      ? 'All States'
+      : `${selectedStates.length} state${selectedStates.length > 1 ? 's' : ''} selected`;
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) { setIsOpen(false); setSearchQuery(''); }
+    };
+    if (isOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && searchInputRef.current) setTimeout(() => searchInputRef.current?.focus(), 50);
+  }, [isOpen]);
+
+  const toggle = (id) => {
+    onChange(selectedStates.includes(id) ? selectedStates.filter(x => x !== id) : [...selectedStates, id]);
+  };
+  const toggleAll = (e) => { e.stopPropagation(); onChange(allSelected ? [] : [...allIds]); };
+
+  return (
+    <div ref={dropdownRef} className={`ui-dropdown-custom ui-dropdown-custom--full-width ${isOpen ? 'ui-dropdown-custom--open' : ''} ${disabled ? 'ui-dropdown-custom--disabled' : ''}`}>
+      <div className="ui-dropdown-custom__trigger" onClick={() => !disabled && setIsOpen(o => !o)}>
+        <span className={`ui-dropdown-custom__value ${selectedStates.length === 0 ? 'ui-dropdown-custom__value--placeholder' : ''}`}>{displayValue}</span>
+        <svg className="ui-dropdown-custom__chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </div>
+      {isOpen && !disabled && (
+        <div className="ui-dropdown-custom__menu">
+          <div className="ui-dropdown-custom__search">
+            <input ref={searchInputRef} type="text" className="ui-dropdown-custom__search-input" placeholder="Search states..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onClick={(e) => e.stopPropagation()} />
+          </div>
+          <div className="ui-dropdown-custom__option border-b border-border font-semibold" onClick={toggleAll}>
+            <span className="flex items-center gap-2">
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} onClick={(e) => e.stopPropagation()} style={{ accentColor: '#181265', cursor: 'pointer' }} />
+              {allSelected ? 'Uncheck All' : 'Check All'}
+            </span>
+          </div>
+          <div className="ui-dropdown-custom__options">
+            {filtered.length === 0 ? (
+              <div className="ui-dropdown-custom__no-results">{states.length === 0 ? 'No states available' : 'No results found'}</div>
+            ) : filtered.map(s => {
+              const id = idOf(s); const isChecked = selectedStates.includes(id);
+              return (
+                <div key={id} className={`ui-dropdown-custom__option ${isChecked ? 'ui-dropdown-custom__option--selected' : ''}`} onClick={() => toggle(id)}>
+                  <span className="flex items-center gap-2">
+                    <input type="checkbox" checked={isChecked} onChange={() => toggle(id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: '#181265', cursor: 'pointer' }} />
+                    {nameOf(s)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 const DashboardDistributor = () => {
 
   const [openAdd, setOpenAdd] = useState(false);
@@ -172,6 +249,7 @@ const DashboardDistributor = () => {
     state_id: '',
     city_id: '',
     zones: [],
+    state_ids: [],
     pincode: '',
     gstin: '',
     pan: '',
@@ -465,6 +543,7 @@ const DashboardDistributor = () => {
       state_id: '',
       city_id: '',
       zones: [],
+      state_ids: [],
       pincode: '',
       gstin: '',
       pan: '',
@@ -507,6 +586,7 @@ const DashboardDistributor = () => {
       state_id: row.state_id || '',
       city_id: row.city_id || '',
       zones: Array.isArray(row.zones) ? row.zones : [],
+      state_ids: Array.isArray(row.states) ? row.states.map(s => s.state_id || s.id || s) : [],
       pincode: row.pincode || '',
       gstin: row.gstin || '',
       pan: row.pan || '',
@@ -727,6 +807,7 @@ const DashboardDistributor = () => {
         state_id: formData.state_id || '',
         city_id: formData.city_id || '',
         zones: Array.isArray(formData.zones) ? formData.zones : [],
+        state_ids: Array.isArray(formData.state_ids) ? formData.state_ids : [],
         pincode: formData.pincode ? formData.pincode.trim() : '',
         gstin: formData.gstin ? formData.gstin.trim() : '',
         pan: formData.pan ? formData.pan.trim() : '',
@@ -1326,6 +1407,14 @@ const DashboardDistributor = () => {
             />
           </div>
           <div className="form-group form-group--full">
+            <label className="ui-label">Working States <span style={{ color: '#888', fontWeight: 400 }}>(parties in these states are auto-assigned to this distributor)</span></label>
+            <StatesMultiDropdown
+              states={states}
+              selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
+              onChange={(updated) => handleInputChange('state_ids', updated)}
+            />
+          </div>
+          <div className="form-group form-group--full">
             <label className="ui-label">Address</label>
             <input 
               className="ui-input" 
@@ -1523,6 +1612,14 @@ const DashboardDistributor = () => {
               zones={zones}
               selectedZones={Array.isArray(formData.zones) ? formData.zones : []}
               onChange={(updated) => handleInputChange('zones', updated)}
+            />
+          </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Working States <span style={{ color: '#888', fontWeight: 400 }}>(parties in these states are auto-assigned to this distributor)</span></label>
+            <StatesMultiDropdown
+              states={states}
+              selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
+              onChange={(updated) => handleInputChange('state_ids', updated)}
             />
           </div>
           <div className="form-group form-group--full">

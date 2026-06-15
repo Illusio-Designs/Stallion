@@ -166,6 +166,7 @@ export const getCities = async (stateId) => {
       method: 'POST',
       body: { state_id: stateId },
       includeAuth: true,
+      silent: true, // "Cities not found" is a valid empty case — don't log it
     });
     
     // Ensure we always return an array
