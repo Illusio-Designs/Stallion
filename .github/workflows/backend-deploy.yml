@@ -138,6 +138,54 @@ jobs:
                   bye
                   EOF
 
+            - name: Restart app & fetch stderr log
+              env:
+                  FTP_SERVER: ${{ secrets.FTP_SERVER }}
+                  FTP_USER: ${{ secrets.FTP_USER }}
+                  FTP_PASS: ${{ secrets.FTP_PASS }}
+                  FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+              run: |
+                  set -uo pipefail
+
+                  FTP_SERVER="${FTP_SERVER#ftp://}"
+                  FTP_SERVER="${FTP_SERVER#ftps://}"
+                  FTP_SERVER="${FTP_SERVER%%/*}"
+                  FTP_SERVER="$(echo "$FTP_SERVER" | xargs)"
+                  export LFTP_PASSWORD="$FTP_PASS"
+
+                  # --- Restart the Node app ---
+                  # cPanel / Phusion Passenger restarts the app when tmp/restart.txt
+                  # is (re)created in the app root. Change this if your host differs.
+                  : > restart.txt
+                  lftp -u "$FTP_USER" --env-password "$FTP_SERVER" <<EOF
+                  set ftp:ssl-allow yes
+                  set ssl:verify-certificate no
+                  cd "$FTP_REMOTE_DIR"
+                  mkdir -f tmp
+                  put restart.txt -o tmp/restart.txt
+                  bye
+                  EOF
+                  echo "Restart signalled (tmp/restart.txt re-created)."
+
+                  # Give the app a moment to boot before reading logs.
+                  sleep 12
+
+                  # --- Fetch the stderr log so any boot errors are visible here ---
+                  rm -f stderr.log
+                  lftp -u "$FTP_USER" --env-password "$FTP_SERVER" <<EOF || true
+                  set ftp:ssl-allow yes
+                  set ssl:verify-certificate no
+                  cd "$FTP_REMOTE_DIR"
+                  get stderr.log -o stderr.log
+                  bye
+                  EOF
+                  echo "=================== stderr.log (last 150 lines) ==================="
+                  if [ -s stderr.log ]; then
+                    tail -n 150 stderr.log
+                  else
+                    echo "(no stderr.log at $FTP_REMOTE_DIR/stderr.log — adjust the path if your host logs elsewhere)"
+                  fi
+
             - name: Deployment summary
               run: echo "Backendjs deployed to $FTP_REMOTE_DIR on $FTP_SERVER"
               env:
