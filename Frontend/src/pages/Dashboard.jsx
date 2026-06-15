@@ -29,11 +29,13 @@ const Dashboard = () => {
     const fetchData = async () => {
       try {
         setLoading(true);
-        const [ordersData] = await Promise.all([
+        const [ordersData, productsData] = await Promise.all([
           getOrders(),
           getProducts()
         ]);
-        
+
+        setProducts(Array.isArray(productsData) ? productsData : (productsData?.data || []));
+
         let filteredOrders = Array.isArray(ordersData) ? ordersData : [];
         
         if (isDistributor && user?.distributor_id) {
@@ -156,6 +158,11 @@ const Dashboard = () => {
       return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
     }, 0);
     
+    // Calculate total revenue across ALL orders
+    const totalRevenue = baseOrders.reduce((sum, o) => {
+      return sum + (Number(o.order_total) || 0);
+    }, 0);
+
     // Get unique clients count
     const uniqueClients = new Set();
     baseOrders.forEach(order => {
@@ -171,9 +178,74 @@ const Dashboard = () => {
       bulkOrders,
       completedValue,
       pendingPayments,
+      totalRevenue,
       activeClients: uniqueClients.size
     };
   }, [orders]);
+
+  // Monthly aggregation for the Sales & Revenue chart — real data from orders
+  const chartData = useMemo(() => {
+    if (!orders.length) return [];
+    const currentYear = new Date().getFullYear();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const buckets = months.map(label => ({ label, sales: 0, revenue: 0 }));
+    orders.forEach(o => {
+      const raw = o.order_date || o.created_at;
+      if (!raw) return;
+      const d = new Date(raw);
+      if (isNaN(d.getTime()) || d.getFullYear() !== currentYear) return;
+      const m = d.getMonth();
+      buckets[m].revenue += Number(o.order_total) || 0;
+      buckets[m].sales += 1;
+    });
+    return buckets;
+  }, [orders]);
+
+  // Top selling products — aggregate order_items by product_id across all orders
+  const topProducts = useMemo(() => {
+    if (!orders.length) return [];
+    const qtyByProduct = {};
+    orders.forEach(o => {
+      (o.order_items || []).forEach(it => {
+        const pid = it.product_id;
+        if (pid == null) return;
+        qtyByProduct[pid] = (qtyByProduct[pid] || 0) + (Number(it.quantity) || 0);
+      });
+    });
+    return Object.entries(qtyByProduct)
+      .filter(([, qty]) => qty > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([pid, totalQty]) => {
+        const product = products.find(p => String(p.product_id ?? p.id) === String(pid));
+        return {
+          name: product?.model_no || product?.product_name || `Product ${pid}`,
+          img: product?.image_urls?.[0] || '/images/products/spac1.webp',
+          units: `${totalQty} Units`,
+        };
+      });
+  }, [orders, products]);
+
+  // Inventory alerts — out-of-stock first, then low stock, derived from products
+  const inventoryAlerts = useMemo(() => {
+    if (!products.length) return [];
+    const outOfStock = [];
+    const lowStock = [];
+    products.forEach(p => {
+      const stock = Number(p.total_qty ?? p.warehouse_qty ?? 0);
+      const entry = {
+        name: p.model_no || p.product_name || `Product ${p.product_id ?? p.id}`,
+        img: p.image_urls?.[0] || '/images/products/spac1.webp',
+        left: `${stock} Left`,
+      };
+      if (stock === 0) {
+        outOfStock.push({ ...entry, tag: 'OUT OF STOCKS', type: 'danger' });
+      } else if (stock <= 50) {
+        lowStock.push({ ...entry, tag: 'LOW STOCKS', type: 'warn' });
+      }
+    });
+    return [...outOfStock, ...lowStock].slice(0, 5);
+  }, [products]);
 
   // Get recent orders — first 10, sorted by created_at/order_date
   const recentOrders = useMemo(() => {
@@ -208,11 +280,11 @@ const Dashboard = () => {
             <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">Optical Stores + Enterprises</div>
           </div>
           <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Pending Payments</h4>
+            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Revenue</h4>
             <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
-              {loading ? <Skeleton width={90} height={24} /> : `₹${stats.pendingPayments.toLocaleString('en-IN')}`}
+              {loading ? <Skeleton width={90} height={24} /> : `₹${stats.totalRevenue.toLocaleString('en-IN')}`}
             </div>
-            <div className="metric-sub red text-[var(--text-xs)] font-medium text-error [font-variant-numeric:tabular-nums]">↓ 10% vs last month</div>
+            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">Across {stats.totalOrders} orders</div>
           </div>
         </div>
 
@@ -227,28 +299,14 @@ const Dashboard = () => {
                 <option>Yearly</option>
               </select>
             </div>
-            <SalesRevenueChart data={useMemo(() => ([
-              { label: 'Jan', sales: 24, revenue: 18 },
-              { label: 'Feb', sales: 32, revenue: 22 },
-              { label: 'Mar', sales: 28, revenue: 20 },
-              { label: 'Apr', sales: 36, revenue: 27 },
-              { label: 'May', sales: 40, revenue: 34 },
-              { label: 'Jun', sales: 30, revenue: 25 },
-              { label: 'Jul', sales: 42, revenue: 33 },
-              { label: 'Aug', sales: 26, revenue: 19 },
-              { label: 'Sep', sales: 34, revenue: 29 },
-              { label: 'Oct', sales: 38, revenue: 31 },
-              { label: 'Nov', sales: 29, revenue: 24 },
-              { label: 'Dec', sales: 44, revenue: 36 },
-            ]), [])} height={220} />
+            <SalesRevenueChart data={chartData} height={220} />
           </div>
           <div className="dash-card side equal col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full h-[280px] max-[560px]:h-auto max-[560px]:min-h-[240px] flex flex-col [&>*:last-child]:flex-[1_1_auto] bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700'}}>Quick Actions</h4>
             <div className="btn-col flex flex-col gap-2">
-              <button className="ui-btn ui-btn--primary">Add New Product</button>
-              <button className="ui-btn ui-btn--primary">Create Bulk Order</button>
-              <button className="ui-btn ui-btn--primary">Generate Report</button>
-              <button className="ui-btn ui-btn--primary">Manage Discounts</button>
+              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/products'; }}>Add New Product</button>
+              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/orders'; }}>Create Bulk Order</button>
+              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/analytics'; }}>Generate Report</button>
             </div>
           </div>
         </div>
@@ -259,11 +317,18 @@ const Dashboard = () => {
           <div className="dash-card col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Top Selling Products</h4>
             <div className="mini-list">
-              {[
-                {img:'/images/products/spac1.webp', name:'Anti-Fog Safety Goggles', units:'320 Units'},
-                {img:'/images/products/spac2.webp', name:'Anti-Fog Safety Goggles', units:'275 Units'},
-                {img:'/images/products/spac3.webp', name:'Anti-Fog Safety Goggles', units:'145 Units'},
-              ].map((p,i)=> (
+              {topProducts.length === 0 ? (
+                <div className="ui-state ui-state--empty">
+                  <div className="ui-state__icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M3 3v18h18" />
+                      <path d="m7 14 4-4 3 3 5-5" />
+                    </svg>
+                  </div>
+                  <p className="ui-state__title">Pending from backend</p>
+                  <p className="ui-state__desc">No sales data available yet.</p>
+                </div>
+              ) : topProducts.map((p,i)=> (
                 <div key={i} className="row grid grid-cols-[50px_1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
                   <img src={p.img} alt={p.name} className="prod-icon w-10 h-10 object-contain block rounded-sm" />
                   <div className="name text-text font-medium text-[var(--text-sm)] leading-snug">{p.name}</div>
@@ -275,11 +340,19 @@ const Dashboard = () => {
           <div className="dash-card col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Inventory Alerts</h4>
             <div className="inv-list">
-              {[
-                {tag:'LOW STOCKS', type:'warn', img:'/images/products/spac1.webp', name:'Anti-Fog Safety Goggles', left:'43 Left'},
-                {tag:'OUT OF STOCKS', type:'danger', img:'/images/products/spac2.webp', name:'Anti-Fog Safety Goggles', left:'0 Left'},
-                {tag:'OUT OF STOCKS', type:'danger', img:'/images/products/spac3.webp', name:'Anti-Fog Safety Goggles', left:'0 Left'},
-              ].map((r,i)=> (
+              {inventoryAlerts.length === 0 ? (
+                <div className="ui-state ui-state--empty">
+                  <div className="ui-state__icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+                      <path d="m3.3 7 8.7 5 8.7-5" />
+                      <path d="M12 22V12" />
+                    </svg>
+                  </div>
+                  <p className="ui-state__title">Pending from backend</p>
+                  <p className="ui-state__desc">No sales data available yet.</p>
+                </div>
+              ) : inventoryAlerts.map((r,i)=> (
                 <div key={i} className="row grid grid-cols-[auto_50px_1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
                   <span className={`stock-badge ${r.type} inline-flex items-center px-2 py-1 rounded-pill text-[var(--text-xs)] font-semibold leading-tight [font-variant-numeric:tabular-nums] ${r.type === 'warn' ? 'bg-warning-soft text-warning' : 'bg-error-soft text-error'}`}>{r.tag}</span>
                   <img src={r.img} alt={r.name} className="prod-icon w-10 h-10 object-contain block rounded-sm" />

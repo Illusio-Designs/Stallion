@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import '../styles/pages/dashboard.css';
-import { getOrders } from '../services/apiService';
+import { getOrders, getProducts } from '../services/apiService';
 import { getUser } from '../services/authService';
 import { showError } from '../services/notificationService';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -11,6 +11,7 @@ const DistributorDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [products, setProducts] = useState([]);
   const user = getUser();
   const distributorId = user?.distributor_id || user?.distributorId;
 
@@ -22,7 +23,8 @@ const DistributorDashboard = () => {
     try {
       setLoading(true);
       setError(null);
-      const allOrders = await getOrders();
+      const [allOrders, productsData] = await Promise.all([getOrders(), getProducts()]);
+      setProducts(Array.isArray(productsData) ? productsData : (productsData?.data || []));
       // Filter orders for this distributor
       const distributorOrders = distributorId 
         ? allOrders.filter(order => 
@@ -188,14 +190,17 @@ const DistributorDashboard = () => {
                       const totalQuantity = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
                       const totalValue = parseFloat(order.order_total || Number(order.order_total) || order.total_value || order.total_amount || 0);
                       
-                      // Display product information
+                      // Resolve item name via products list (order_items have only product_id)
+                      const itemName = (it) =>
+                        it.model_no ||
+                        products.find(p => String(p.product_id || p.id) === String(it.product_id))?.model_no ||
+                        products.find(p => String(p.product_id || p.id) === String(it.product_id))?.product_name ||
+                        'Unknown Product';
                       let productDisplay = 'No items';
-                      if (orderItems.length > 0) {
-                        if (orderItems.length === 1) {
-                          productDisplay = orderItems[0].product?.model_no || orderItems[0].product_name || 'Unknown Product';
-                        } else {
-                          productDisplay = `${orderItems.length} items`;
-                        }
+                      if (orderItems.length === 1) {
+                        productDisplay = itemName(orderItems[0]);
+                      } else if (orderItems.length > 1) {
+                        productDisplay = `${itemName(orderItems[0])} +${orderItems.length - 1} more`;
                       }
                       
                       return (

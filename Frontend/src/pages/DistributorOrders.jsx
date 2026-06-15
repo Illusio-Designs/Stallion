@@ -201,14 +201,18 @@ const DistributorOrders = () => {
       const totalQuantity = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
       const totalValue = parseFloat(order.order_total || Number(order.order_total) || order.total_value || order.total_amount || 0);
       
-      // Display product information
+      // order_items store {product_id, quantity, price} (no model_no), so resolve
+      // the product name via the loaded products list.
+      const itemName = (it) =>
+        it.model_no ||
+        products.find(p => String(p.product_id || p.id) === String(it.product_id))?.model_no ||
+        products.find(p => String(p.product_id || p.id) === String(it.product_id))?.product_name ||
+        'Unknown Product';
       let productDisplay = 'No items';
-      if (orderItems.length > 0) {
-        if (orderItems.length === 1) {
-          productDisplay = orderItems[0].product?.model_no || orderItems[0].product_name || 'Unknown Product';
-        } else {
-          productDisplay = `${orderItems.length} items`;
-        }
+      if (orderItems.length === 1) {
+        productDisplay = itemName(orderItems[0]);
+      } else if (orderItems.length > 1) {
+        productDisplay = `${itemName(orderItems[0])} +${orderItems.length - 1} more`;
       }
 
       // Create a single row for the order
@@ -226,7 +230,7 @@ const DistributorOrders = () => {
     });
 
     return tableRows;
-  }, [orders]);
+  }, [orders, products]);
 
   // Filter rows by active tab
   const filteredRowsByTab = useMemo(() => {
