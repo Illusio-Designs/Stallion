@@ -2,11 +2,11 @@ const axios = require('axios');
 
 class Msg91Service {
     constructor() {
-        this.apiKey = process.env.MSG91_API_KEY;
+        this.apiKey = process.env.MSG91_AUTH_KEY || process.env.MSG91_API_KEY;
         this.baseUrl = 'https://control.msg91.com/api/v5';
-        
+
         if (!this.apiKey) {
-            console.warn('MSG91_API_KEY is not set in environment variables');
+            console.warn('MSG91_AUTH_KEY is not set in environment variables');
         }
     }
 
@@ -19,7 +19,7 @@ class Msg91Service {
     async sendOtp(phoneNumber, templateId = null) {
         try {
             if (!this.apiKey) {
-                throw new Error('MSG91_API_KEY is not configured');
+                throw new Error('MSG91_AUTH_KEY is not configured');
             }
 
             if (!phoneNumber) {
@@ -70,7 +70,7 @@ class Msg91Service {
     async verifyOtp(phoneNumber, otp) {
         try {
             if (!this.apiKey) {
-                throw new Error('MSG91_API_KEY is not configured');
+                throw new Error('MSG91_AUTH_KEY is not configured');
             }
 
             if (!phoneNumber) {
