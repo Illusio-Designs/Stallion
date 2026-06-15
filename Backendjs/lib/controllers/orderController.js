@@ -499,7 +499,9 @@ class OrderController {
                     }, { transaction });
                 }
 
-                if (normalizeRole(req.userRoleName) === 'salesman') {
+                // Count the order toward the assigned salesman's target — for any
+                // order that has a salesman_id, regardless of who placed it.
+                if (order.salesman_id) {
                     await salesmanTargetsController.updateTargetFromOrder(order);
                 }
 
