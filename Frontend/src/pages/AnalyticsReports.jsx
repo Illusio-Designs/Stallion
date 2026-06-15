@@ -120,13 +120,13 @@ const AnalyticsReports = () => {
   }, [targets]);
 
   const targetColumns = useMemo(() => ([
-    { key: 'salesman', label: 'SALESMAN' },
-    { key: 'period', label: 'PERIOD' },
-    { key: 'type', label: 'ORDER TYPE' },
-    { key: 'target', label: 'TARGET' },
-    { key: 'achieved', label: 'ACHIEVED' },
-    { key: 'progress', label: 'PROGRESS', render: (v) => <Progress pct={v} /> },
-    { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase()}>{String(v).toUpperCase()}</StatusBadge> },
+    { key: 'salesman', label: 'SALESMAN', width: '150px' },
+    { key: 'period', label: 'PERIOD', width: '200px' },
+    { key: 'type', label: 'ORDER TYPE', width: '120px' },
+    { key: 'target', label: 'TARGET', width: '110px' },
+    { key: 'achieved', label: 'ACHIEVED', width: '110px' },
+    { key: 'progress', label: 'PROGRESS', width: '160px', render: (v) => <Progress pct={v} /> },
+    { key: 'status', label: 'STATUS', width: '110px', render: (v) => <StatusBadge status={String(v).toLowerCase()}>{String(v).toUpperCase()}</StatusBadge> },
   ]), []);
 
   const targetRows = useMemo(() => targets.map((t, i) => {

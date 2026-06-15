@@ -82,7 +82,7 @@ function RangeCalendar({ from, to, onChange }) {
  * Reusable date-range picker (pill trigger + range calendar popover).
  * Controlled via from/to ('YYYY-MM-DD'); onChange receives { from, to }.
  */
-export default function DateRangePicker({ from = null, to = null, onChange, placeholder = 'Select dates' }) {
+export default function DateRangePicker({ from = null, to = null, onChange, placeholder = 'Select dates', fullWidth = false }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
 
@@ -97,8 +97,8 @@ export default function DateRangePicker({ from = null, to = null, onChange, plac
   const label = hasRange ? `${fmt(from) || '…'} – ${fmt(to) || '…'}` : placeholder;
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
-      <button type="button" className="ui-pill" onClick={() => setOpen((v) => !v)} title="Pick a date range" style={{ width: '100%', justifyContent: 'space-between' }}>
+    <div ref={wrapRef} style={{ position: 'relative', display: 'inline-block', width: fullWidth ? '100%' : undefined }}>
+      <button type="button" className="ui-pill" onClick={() => setOpen((v) => !v)} title="Pick a date range" style={fullWidth ? { width: '100%', justifyContent: 'space-between' } : undefined}>
         <span style={{ color: hasRange ? 'var(--color-text)' : 'var(--color-text-subtle)', whiteSpace: 'nowrap' }}>{label}</span>
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: 18, flexShrink: 0 }}>
           <path d="M8 2V5M16 2V5M3 9H21M5 5H19C20.105 5 21 5.895 21 7V19C21 20.105 20.105 21 19 21H5C3.895 21 3 20.105 3 19V7C3 5.895 3.895 5 5 5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />

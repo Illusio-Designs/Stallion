@@ -1921,6 +1921,7 @@ const DashboardSuppliers = () => {
               to={targetForm.end_date || null}
               onChange={({ from, to }) => setTargetForm(prev => ({ ...prev, start_date: from || '', end_date: to || '' }))}
               placeholder="Select start & end date"
+              fullWidth
             />
           </div>
           <div className="form-group form-group--full">
