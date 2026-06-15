@@ -499,6 +499,11 @@ const DashboardOrders = () => {
       const totalQuantity = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
       const totalValue = parseFloat(order.order_total || Number(order.order_total) || order.total_value || order.total_amount || 0);
 
+      const rawDate = order.order_date || order.created_at;
+      const orderDate = rawDate
+        ? new Date(rawDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '—';
+
       // Create a single row for the order. The product breakdown lives in the
       // View modal (per-order item table), so it's not a list column.
       tableRows.push({
@@ -506,6 +511,7 @@ const DashboardOrders = () => {
         orderId: orderNumber,
         orderType: orderTypeDisplay,
         client: partyName,
+        date: orderDate,
         qty: totalQuantity,
         status: orderStatus,
         value: `₹${totalValue.toLocaleString('en-IN')}`,
@@ -961,6 +967,7 @@ const DashboardOrders = () => {
     { key: 'orderId', label: 'ORDER ID' },
     { key: 'orderType', label: 'ORDER TYPE' },
     { key: 'client', label: 'PARTY NAME' },
+    { key: 'date', label: 'DATE' },
     { key: 'qty', label: 'QTY' },
     { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase().replace(/\s+/g, '-')}>{v}</StatusBadge> },
     { key: 'value', label: 'VALUE' },

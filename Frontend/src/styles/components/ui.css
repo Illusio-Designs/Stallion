@@ -805,7 +805,7 @@ textarea.ui-input {
    centered when it fits and top-aligned (fully reachable) when it overflows. */
 .ui-modal__scroll {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   min-height: 100%;
   padding: var(--space-6) var(--space-4);
@@ -818,6 +818,9 @@ textarea.ui-input {
 .ui-modal {
   width: 100%;
   max-width: 640px;
+  /* Cap height so the dialog fits the screen — header/footer stay pinned and
+     only the body scrolls. */
+  max-height: calc(100dvh - 48px);
   margin: auto;
   background: var(--color-surface);
   border-radius: var(--radius-xl);
@@ -850,6 +853,7 @@ textarea.ui-input {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
+  flex-shrink: 0;
 }
 .ui-modal__header h4,
 .ui-modal__title {
@@ -885,8 +889,13 @@ textarea.ui-input {
 }
 .ui-modal__body {
   padding: var(--space-6);
+  overflow-y: auto;
   overflow-x: hidden;
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-grey-300) transparent;
 }
 .ui-modal__body::-webkit-scrollbar { width: 8px; }
 .ui-modal__body::-webkit-scrollbar-track { background: transparent; }
@@ -901,6 +910,7 @@ textarea.ui-input {
   display: flex;
   gap: var(--space-3);
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 
 /* Generic Form Layout (used inside modals) */
