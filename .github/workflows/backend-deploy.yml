@@ -2,15 +2,16 @@ name: Backend CI/CD
 
 on:
     push:
-        branches: [main]
+        branches: [backend]
         paths:
             - "Backendjs/**"
             - ".github/workflows/backend-deploy.yml"
     pull_request:
-        branches: [main]
+        branches: [backend]
         paths:
             - "Backendjs/**"
     workflow_dispatch:
+        branches: [backend]
 
 concurrency:
     group: backend-deploy-${{ github.ref }}
@@ -24,8 +25,11 @@ jobs:
             run:
                 working-directory: Backendjs
         steps:
-            - name: Checkout
+            - name: Checkout Backendjs only
               uses: actions/checkout@v4
+              with:
+                  sparse-checkout: Backendjs
+                  sparse-checkout-cone-mode: true
 
             - name: Setup Node.js
               uses: actions/setup-node@v4
@@ -36,17 +40,20 @@ jobs:
               run: node --check lib/index.js
 
     deploy:
-        name: Deploy to FTP server
+        name: Deploy Backendjs to FTP server
         needs: ci
-        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        if: github.ref == 'refs/heads/backend' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         runs-on: ubuntu-latest
         defaults:
             run:
                 working-directory: Backendjs
         environment: production
         steps:
-            - name: Checkout
+            - name: Checkout Backendjs only
               uses: actions/checkout@v4
+              with:
+                  sparse-checkout: Backendjs
+                  sparse-checkout-cone-mode: true
 
             - name: Install lftp
               run: sudo apt-get update && sudo apt-get install -y lftp
@@ -92,7 +99,7 @@ jobs:
                   "
 
             - name: Deployment summary
-              run: echo "Backend deployed to $FTP_REMOTE_DIR on $FTP_SERVER"
+              run: echo "Backendjs deployed to $FTP_REMOTE_DIR on $FTP_SERVER"
               env:
                   FTP_SERVER: ${{ secrets.FTP_SERVER }}
                   FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
