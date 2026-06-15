@@ -55,6 +55,8 @@ const DashboardOrders = () => {
   const [editRow, setEditRow] = useState(null);
   const [editStatus, setEditStatus] = useState('PENDING');
   const [viewRow, setViewRow] = useState(null);
+  const [viewItems, setViewItems] = useState([]);
+  const [viewItemsLoading, setViewItemsLoading] = useState(false);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
   const [dateRange, setDateRange] = useState('Feb 24, 2023 - Mar 15, 2023');
@@ -188,19 +190,10 @@ const DashboardOrders = () => {
     }
   };
 
-  // Fetch orders + products on mount. Products are required so the PRODUCT
-  // column can resolve names — order_items only carry product_id, not the name.
+  // Fetch orders on mount. Product names are resolved on-demand in the View
+  // modal (per order), so we don't bulk-load the catalog here.
   useEffect(() => {
     fetchOrders();
-    (async () => {
-      try {
-        const data = await getProducts(1, 3000, {});
-        const list = Array.isArray(data) ? data : (data?.data || []);
-        if (list.length > 0) setProducts(list);
-      } catch (err) {
-        console.error('Failed to load products for order name resolution:', err);
-      }
-    })();
   }, []);
 
   // Load create-order form data (countries + products) only when the create
@@ -217,7 +210,7 @@ const DashboardOrders = () => {
     try {
       const [countriesData, productsData] = await Promise.all([
         getCountries(),
-        getProducts(1, 3000, {})
+        getProducts()
       ]);
       setCountries(countriesData || []);
       const productList = Array.isArray(productsData) ? productsData : (productsData?.data || []);
@@ -416,9 +409,62 @@ const DashboardOrders = () => {
     if (typeof orderItems === 'object') {
       return Object.values(orderItems);
     }
-    
+
     return [];
   };
+
+  // Resolve product names for the order shown in the View modal. order_items only
+  // carry product_id, so anything not already embedded is looked up by id. This is
+  // on-demand (only when a modal opens) so the listing keeps its limit of 20.
+  useEffect(() => {
+    if (!viewRow) {
+      setViewItems([]);
+      return;
+    }
+    const items = parseOrderItems(viewRow.originalOrder?.order_items);
+    if (items.length === 0) {
+      setViewItems([]);
+      return;
+    }
+
+    const nameFrom = (it, lookup) =>
+      it.model_no ||
+      it.product?.model_no ||
+      it.product_name ||
+      it.product?.product_name ||
+      lookup[String(it.product_id)] ||
+      products.find(p => String(p.product_id || p.id) === String(it.product_id))?.model_no ||
+      products.find(p => String(p.product_id || p.id) === String(it.product_id))?.product_name ||
+      null;
+
+    let cancelled = false;
+    (async () => {
+      const unresolved = [...new Set(
+        items.filter(it => !nameFrom(it, {})).map(it => String(it.product_id)).filter(Boolean)
+      )];
+
+      const lookup = {};
+      if (unresolved.length > 0) {
+        setViewItemsLoading(true);
+        await Promise.all(unresolved.map(async (pid) => {
+          try {
+            const p = await getProductById(pid);
+            if (p) lookup[pid] = p.model_no || p.product_name || p.name;
+          } catch { /* leave unresolved */ }
+        }));
+      }
+      if (cancelled) return;
+      setViewItems(items.map(it => ({
+        ...it,
+        _name: nameFrom(it, lookup) || it.product_id || 'Unknown Product',
+        _subtotal: (Number(it.quantity) || 0) * (Number(it.price) || 0),
+      })));
+      setViewItemsLoading(false);
+    })();
+
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewRow, products]);
 
   // Transform orders data to table rows
   const rows = useMemo(() => {
@@ -451,30 +497,14 @@ const DashboardOrders = () => {
       // Calculate totals for the order
       const totalQuantity = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
       const totalValue = parseFloat(order.order_total || Number(order.order_total) || order.total_value || order.total_amount || 0);
-      
-      // Display product information. order_items store {product_id, quantity, ...}
-      // and often do NOT carry model_no, so resolve the name via the products list.
-      const itemName = (it) =>
-        it.model_no ||
-        it.product?.model_no ||
-        it.product_name ||
-        products.find(p => String(p.product_id || p.id) === String(it.product_id))?.model_no ||
-        products.find(p => String(p.product_id || p.id) === String(it.product_id))?.product_name ||
-        'Unknown Product';
-      let productDisplay = 'No items';
-      if (orderItems.length === 1) {
-        productDisplay = itemName(orderItems[0]);
-      } else if (orderItems.length > 1) {
-        productDisplay = `${itemName(orderItems[0])} +${orderItems.length - 1} more`;
-      }
 
-      // Create a single row for the order
+      // Create a single row for the order. The product breakdown lives in the
+      // View modal (per-order item table), so it's not a list column.
       tableRows.push({
         id: orderId,
         orderId: orderNumber,
         orderType: orderTypeDisplay,
         client: partyName,
-        product: productDisplay,
         qty: totalQuantity,
         status: orderStatus,
         value: `₹${totalValue.toLocaleString('en-IN')}`,
@@ -483,7 +513,7 @@ const DashboardOrders = () => {
     });
 
     return tableRows;
-  }, [orders, partyNamesMap, products]);
+  }, [orders, partyNamesMap]);
 
   // Filter rows by active tab
   const filteredRowsByTab = useMemo(() => {
@@ -846,7 +876,6 @@ const DashboardOrders = () => {
     { key: 'orderId', label: 'ORDER ID' },
     { key: 'orderType', label: 'ORDER TYPE' },
     { key: 'client', label: 'PARTY NAME' },
-    { key: 'product', label: 'PRODUCT' },
     { key: 'qty', label: 'QTY' },
     { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase().replace(/\s+/g, '-')}>{v}</StatusBadge> },
     { key: 'value', label: 'VALUE' },
@@ -969,7 +998,6 @@ const DashboardOrders = () => {
       )}>
         {viewRow && (() => {
           const order = viewRow.originalOrder;
-          const orderItems = parseOrderItems(order?.order_items);
           return (
             <div className="ui-form">
               <div className="form-group">
@@ -994,15 +1022,43 @@ const DashboardOrders = () => {
               </div>
               <div className="form-group">
                 <label className="ui-label">Order Items</label>
-                <div style={{ border: '1px solid #E0E0E0', borderRadius: '8px', padding: '12px' }}>
-                  {orderItems.length === 0 ? (
-                    <p style={{ color: '#999', margin: 0 }}>No items</p>
-                  ) : orderItems.map((item, i) => (
-                    <div key={i} style={{ padding: '6px 0', borderBottom: i < orderItems.length - 1 ? '1px solid #f0f0f0' : 'none' }}>
-                      <span style={{ fontWeight: 500 }}>{item.product?.model_no || item.product?.product_name || item.product_name || products.find(p => (p.product_id || p.id) === item.product_id)?.model_no || products.find(p => (p.product_id || p.id) === item.product_id)?.product_name || item.product_id || 'Unknown'}</span>
-                      {' — '}Qty: {item.quantity} | Price: ₹{item.price}
-                    </div>
-                  ))}
+                <div className="ui-table__scroll" style={{ border: '1px solid #E0E0E0', borderRadius: '8px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ background: '#f7f7fa' }}>
+                        <th style={{ textAlign: 'left', padding: '10px 12px', color: '#374151', fontWeight: 600, width: 40 }}>#</th>
+                        <th style={{ textAlign: 'left', padding: '10px 12px', color: '#374151', fontWeight: 600 }}>Product</th>
+                        <th style={{ textAlign: 'right', padding: '10px 12px', color: '#374151', fontWeight: 600, width: 60 }}>Qty</th>
+                        <th style={{ textAlign: 'right', padding: '10px 12px', color: '#374151', fontWeight: 600, width: 90 }}>Price</th>
+                        <th style={{ textAlign: 'right', padding: '10px 12px', color: '#374151', fontWeight: 600, width: 100 }}>Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {viewItemsLoading ? (
+                        <tr><td colSpan={5} style={{ padding: '16px 12px', textAlign: 'center', color: '#9ca3af' }}>Loading items…</td></tr>
+                      ) : viewItems.length === 0 ? (
+                        <tr><td colSpan={5} style={{ padding: '16px 12px', textAlign: 'center', color: '#9ca3af' }}>No items</td></tr>
+                      ) : (
+                        viewItems.map((item, i) => (
+                          <tr key={i} style={{ borderTop: '1px solid #f0f0f0' }}>
+                            <td style={{ padding: '10px 12px', color: '#6b7280' }}>{i + 1}</td>
+                            <td style={{ padding: '10px 12px', fontWeight: 500, color: '#1a1b23' }}>{item._name}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'right' }}>{item.quantity}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'right' }}>₹{Number(item.price || 0).toLocaleString('en-IN')}</td>
+                            <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 500 }}>₹{Number(item._subtotal || 0).toLocaleString('en-IN')}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                    {viewItems.length > 0 && (
+                      <tfoot>
+                        <tr style={{ borderTop: '1px solid #E0E0E0', background: '#fafafb' }}>
+                          <td colSpan={4} style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 600, color: '#374151' }}>Total</td>
+                          <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: 700, color: '#1a1b23' }}>{viewRow.value}</td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
                 </div>
               </div>
               {order?.order_notes && (

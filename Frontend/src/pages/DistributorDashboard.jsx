@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import '../styles/pages/dashboard.css';
-import { getOrders, getProducts } from '../services/apiService';
+import { getOrders, getProducts, getProductById } from '../services/apiService';
 import { getUser } from '../services/authService';
 import { showError } from '../services/notificationService';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -12,6 +12,7 @@ const DistributorDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [products, setProducts] = useState([]);
+  const [productNames, setProductNames] = useState({}); // product_id -> resolved name
   const user = getUser();
   const distributorId = user?.distributor_id || user?.distributorId;
 
@@ -19,11 +20,34 @@ const DistributorDashboard = () => {
     fetchOrders();
   }, []);
 
+  // Resolve names for products referenced by the displayed orders but not in the
+  // limit-20 products page. Looked up by id on-demand so the list keeps limit 20.
+  useEffect(() => {
+    const ids = [...new Set(
+      orders.slice(0, 10).flatMap(o => {
+        let items = [];
+        try { items = Array.isArray(o.order_items) ? o.order_items : JSON.parse(o.order_items || '[]'); } catch { items = []; }
+        return (Array.isArray(items) ? items : []).map(it => String(it.product_id)).filter(Boolean);
+      })
+    )].filter(id => !productNames[id] && !products.find(p => String(p.product_id || p.id) === id));
+    if (ids.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      const map = {};
+      await Promise.all(ids.map(async (pid) => {
+        try { const p = await getProductById(pid); if (p) map[pid] = p.model_no || p.product_name || p.name; } catch { /* ignore */ }
+      }));
+      if (!cancelled && Object.keys(map).length) setProductNames(prev => ({ ...prev, ...map }));
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orders, products]);
+
   const fetchOrders = async () => {
     try {
       setLoading(true);
       setError(null);
-      const [allOrders, productsData] = await Promise.all([getOrders(), getProducts(1, 3000, {})]);
+      const [allOrders, productsData] = await Promise.all([getOrders(), getProducts()]);
       setProducts(Array.isArray(productsData) ? productsData : (productsData?.data || []));
       // Filter orders for this distributor
       const distributorOrders = distributorId 
@@ -193,8 +217,11 @@ const DistributorDashboard = () => {
                       // Resolve item name via products list (order_items have only product_id)
                       const itemName = (it) =>
                         it.model_no ||
+                        it.product?.model_no ||
+                        it.product_name ||
                         products.find(p => String(p.product_id || p.id) === String(it.product_id))?.model_no ||
                         products.find(p => String(p.product_id || p.id) === String(it.product_id))?.product_name ||
+                        productNames[String(it.product_id)] ||
                         'Unknown Product';
                       let productDisplay = 'No items';
                       if (orderItems.length === 1) {
