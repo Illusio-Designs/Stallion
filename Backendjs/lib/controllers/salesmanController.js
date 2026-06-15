@@ -6,6 +6,9 @@ const SalesmanTray = require('../models/SalesmanTray');
 const Party = require('../models/Party');
 const SalesmanZones = require('../models/SalesmanZones');
 const Zone = require('../models/Zone');
+const SalesmanStates = require('../models/SalesmanStates');
+const State = require('../models/State');
+const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const User = require('../models/User');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 
@@ -22,7 +25,8 @@ class SalesmanController {
                 return res.status(404).json({ error: 'Salesman not found' });
             }
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
-            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones });
+            const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
+            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
         }
         catch (error) {
             res.status(500).json({ error: error.message });
@@ -85,7 +89,7 @@ class SalesmanController {
     async createSalesman(req, res) {
         try {
             const user = req.user;
-            const { zones, user_id, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date } = req.body;
+            const { zones, state_ids, user_id, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date } = req.body;
             const existingSalesman = await Salesman.findOne({ where: { employee_code: employee_code } });
             if (existingSalesman) {
                 return res.status(400).json({ error: 'Salesman with this employee code already exists' });
@@ -130,7 +134,8 @@ class SalesmanController {
                 user_id: linkedUserId,
             });
             console.log("salesman.salesman_id ", salesman.salesman_id);
-            for (const zone of zones) {
+            // Zones (optional, kept for backward compatibility)
+            for (const zone of (zones || [])) {
                 const existingZone = await Zone.findOne({ where: { id: zone } });
                 if (!existingZone) {
                     return res.status(404).json({ error: 'Zone not found' });
@@ -139,6 +144,10 @@ class SalesmanController {
                     salesman_id: salesman.salesman_id,
                     zone_id: existingZone.id
                 });
+            }
+            // Working states (multi-state coverage) — accepts state names or ids
+            for (const stId of await resolveStateIds(state_ids)) {
+                await SalesmanStates.create({ salesman_id: salesman.salesman_id, state_id: stId });
             }
             const tray = await Tray.create({
                 tray_name: full_name + "'s Tray",
@@ -162,7 +171,8 @@ class SalesmanController {
                 newValues: salesman,
             });
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
-            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones });
+            const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
+            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
         } catch (error) {
             console.error(error);
             res.status(500).json({ error: error.message });
@@ -174,7 +184,7 @@ class SalesmanController {
             if (!id) {
                 return res.status(400).json({ error: 'Salesman ID is required' });
             }
-            const { zones, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date, is_active } = req.body;
+            const { zones, state_ids, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date, is_active } = req.body;
             const user = req.user;
             const salesman = await Salesman.findOne({ where: { salesman_id: id } });
             if (!salesman) {
@@ -199,16 +209,23 @@ class SalesmanController {
                 is_active: is_active,
             };
             await Salesman.update(payload, { where: { salesman_id: id } });
-            await SalesmanZones.destroy({ where: { salesman_id: id } });
-            for (const zone of zones) {
-                const existingZone = await Zone.findOne({ where: { id: zone } });
-                if (!existingZone) {
-                    return res.status(404).json({ error: 'Zone not found' });
+            // Replace zone mappings only when `zones` is provided (kept for back-compat)
+            if (Array.isArray(zones)) {
+                await SalesmanZones.destroy({ where: { salesman_id: id } });
+                for (const zone of zones) {
+                    const existingZone = await Zone.findOne({ where: { id: zone } });
+                    if (!existingZone) {
+                        return res.status(404).json({ error: 'Zone not found' });
+                    }
+                    await SalesmanZones.create({ salesman_id: id, zone_id: existingZone.id });
                 }
-                await SalesmanZones.create({
-                    salesman_id: id,
-                    zone_id: existingZone.id
-                });
+            }
+            // Replace working states only when `state_ids` is provided
+            if (Array.isArray(state_ids)) {
+                await SalesmanStates.destroy({ where: { salesman_id: id } });
+                for (const stId of await resolveStateIds(state_ids)) {
+                    await SalesmanStates.create({ salesman_id: id, state_id: stId });
+                }
             }
             await logAudit({
                 req,
@@ -237,6 +254,7 @@ class SalesmanController {
             }
             const snapshot = salesman.toJSON();
             await SalesmanZones.destroy({ where: { salesman_id: id } });
+            await SalesmanStates.destroy({ where: { salesman_id: id } });
             await salesman.destroy();
             await logAudit({
                 req,
@@ -250,6 +268,22 @@ class SalesmanController {
             res.status(200).json({ message: 'Salesman deleted successfully' });
         } catch (error) {
             res.status(500).json({ error: error.message });
+        }
+    }
+
+    // Salesmen whose working states include the given state (name or id).
+    async getSalesmenByState(req, res) {
+        try {
+            const stateId = await resolveStateId(req.params.stateId);
+            if (!stateId) {
+                return res.status(404).json({ error: 'State not found' });
+            }
+            const links = await SalesmanStates.findAll({ where: { state_id: stateId } });
+            const ids = links.map(l => l.salesman_id);
+            const salesmen = ids.length ? await Salesman.findAll({ where: { salesman_id: ids } }) : [];
+            res.status(200).json(salesmen);
+        } catch (error) {
+            res.status(error.statusCode || 500).json({ error: error.message });
         }
     }
 }
