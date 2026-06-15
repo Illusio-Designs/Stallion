@@ -2,8 +2,13 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [frontend, main]
+    paths:
+      - "Frontend/**"
+      - ".github/workflows/ci.yml"
   pull_request:
+    paths:
+      - "Frontend/**"
 
 jobs:
   build:
