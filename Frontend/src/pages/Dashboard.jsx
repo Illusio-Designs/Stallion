@@ -259,7 +259,7 @@ const Dashboard = () => {
   const topProducts = useMemo(() => topProductRaw.map(({ pid, qty }) => {
     const product = products.find(p => String(p.product_id ?? p.id) === pid);
     return {
-      name: product?.model_no || product?.product_name || extraNames[pid] || `Product ${pid.slice(0, 8)}…`,
+      name: product?.model_no || product?.product_name || extraNames[pid] || 'Unknown Product',
       units: `${qty} Units`,
     };
   }), [topProductRaw, products, extraNames]);

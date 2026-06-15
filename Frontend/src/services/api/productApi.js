@@ -338,7 +338,7 @@ export const getProductById = async (productId) => {
     includeAuth: true,
   });
   const list = Array.isArray(resp) ? resp : (resp?.data || []);
-  return list.find((p) => String(p.product_id) === String(productId)) || null;
+  return list.find((p) => String(p.product_id ?? p.id) === String(productId)) || null;
 };
 
 export const getProductModels = async (modelNo) => {

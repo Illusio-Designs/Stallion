@@ -457,7 +457,7 @@ const DashboardOrders = () => {
       if (cancelled) return;
       setViewItems(items.map(it => ({
         ...it,
-        _name: nameFrom(it, lookup) || it.product_id || 'Unknown Product',
+        _name: nameFrom(it, lookup) || 'Unknown Product',
         _subtotal: (Number(it.quantity) || 0) * (Number(it.price) || 0),
       })));
       setViewItemsLoading(false);
@@ -818,7 +818,7 @@ const DashboardOrders = () => {
     const items = orderItems.map((it) => {
       const qty = Number(it.quantity) || 0;
       const price = Number(it.price) || 0;
-      return { name: String(nameFrom(it, lookup) || it.product_id || 'N/A'), qty, price, subtotal: qty * price };
+      return { name: String(nameFrom(it, lookup) || 'Unknown Product'), qty, price, subtotal: qty * price };
     });
     const grandTotal = items.reduce((s, it) => s + it.subtotal, 0) ||
       parseFloat(String(row.value || '').replace(/[^0-9.]/g, '')) || 0;
