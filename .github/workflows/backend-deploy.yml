@@ -77,6 +77,43 @@ jobs:
                       ./ "$STAGING_DIR/"
                   fi
 
+            - name: Validate FTP configuration
+              env:
+                  FTP_SERVER: ${{ secrets.FTP_SERVER }}
+                  FTP_USER: ${{ secrets.FTP_USER }}
+                  FTP_PASS: ${{ secrets.FTP_PASS }}
+                  FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
+              run: |
+                  set -euo pipefail
+
+                  if [ -z "${FTP_SERVER:-}" ] || [ -z "${FTP_USER:-}" ] || [ -z "${FTP_PASS:-}" ] || [ -z "${FTP_REMOTE_DIR:-}" ]; then
+                    echo "Missing FTP secrets. Configure FTP_SERVER, FTP_USER, FTP_PASS, and FTP_REMOTE_DIR."
+                    echo "This job uses the 'production' environment — set secrets under Settings → Environments → production, or at repo level."
+                    exit 1
+                  fi
+
+                  # Strip protocol, path, and whitespace from host (common secret mistakes)
+                  FTP_SERVER="${FTP_SERVER#ftp://}"
+                  FTP_SERVER="${FTP_SERVER#ftps://}"
+                  FTP_SERVER="${FTP_SERVER%%/*}"
+                  FTP_SERVER="$(echo "$FTP_SERVER" | xargs)"
+
+                  if [ -z "$FTP_SERVER" ]; then
+                    echo "FTP_SERVER is empty after normalization. Use only the hostname, e.g. ftp.nishree.com"
+                    exit 1
+                  fi
+
+                  echo "FTP host (normalized): $FTP_SERVER"
+                  echo "FTP user: $FTP_USER"
+                  echo "FTP remote dir: $FTP_REMOTE_DIR"
+
+                  if ! getent hosts "$FTP_SERVER" > /dev/null; then
+                    echo "DNS lookup failed for '$FTP_SERVER'. Check the FTP_SERVER secret — no ftp:// prefix, no trailing slash."
+                    exit 1
+                  fi
+
+                  echo "DNS lookup OK"
+
             - name: Upload to FTP
               env:
                   FTP_SERVER: ${{ secrets.FTP_SERVER }}
@@ -84,19 +121,21 @@ jobs:
                   FTP_PASS: ${{ secrets.FTP_PASS }}
                   FTP_REMOTE_DIR: ${{ secrets.FTP_REMOTE_DIR }}
               run: |
-                  if [ -z "$FTP_SERVER" ] || [ -z "$FTP_USER" ] || [ -z "$FTP_PASS" ] || [ -z "$FTP_REMOTE_DIR" ]; then
-                    echo "Missing FTP secrets. Configure FTP_SERVER, FTP_USER, FTP_PASS, and FTP_REMOTE_DIR in repository secrets."
-                    exit 1
-                  fi
+                  set -euo pipefail
 
-                  lftp -c "
-                  set ftp:ssl-allow yes;
-                  set ssl:verify-certificate no;
-                  open -u '$FTP_USER','$FTP_PASS' '$FTP_SERVER';
-                  echo 'Connected. Starting sync...';
-                  mirror --reverse --delete --verbose --parallel=10 'build' '$FTP_REMOTE_DIR';
-                  bye;
-                  "
+                  FTP_SERVER="${FTP_SERVER#ftp://}"
+                  FTP_SERVER="${FTP_SERVER#ftps://}"
+                  FTP_SERVER="${FTP_SERVER%%/*}"
+                  FTP_SERVER="$(echo "$FTP_SERVER" | xargs)"
+
+                  export LFTP_PASSWORD="$FTP_PASS"
+
+                  lftp -u "$FTP_USER" "$FTP_SERVER" <<EOF
+                  set ftp:ssl-allow yes
+                  set ssl:verify-certificate no
+                  mirror --reverse --delete --verbose --parallel=10 build $FTP_REMOTE_DIR
+                  bye
+                  EOF
 
             - name: Deployment summary
               run: echo "Backendjs deployed to $FTP_REMOTE_DIR on $FTP_SERVER"
