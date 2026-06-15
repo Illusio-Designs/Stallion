@@ -204,9 +204,17 @@ const Dashboard = () => {
   // Top selling products — aggregate order_items by product_id across all orders
   const topProducts = useMemo(() => {
     if (!orders.length) return [];
+    // order_items can come back as a JSON string OR an array — normalize first.
+    const asItems = (raw) => {
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === 'string') {
+        try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { return []; }
+      }
+      return [];
+    };
     const qtyByProduct = {};
     orders.forEach(o => {
-      (o.order_items || []).forEach(it => {
+      asItems(o.order_items).forEach(it => {
         const pid = it.product_id;
         if (pid == null) return;
         qtyByProduct[pid] = (qtyByProduct[pid] || 0) + (Number(it.quantity) || 0);
