@@ -3,6 +3,8 @@ import TableWithControls from '../components/ui/TableWithControls';
 import Modal from '../components/ui/Modal';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
+import DatePicker from '../components/ui/DatePicker';
+import DateRangePicker from '../components/ui/DateRangePicker';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import {
@@ -1643,11 +1645,10 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">Joining Date</label>
-            <input 
-              className="ui-input" 
-              type="date"
+            <DatePicker
               value={formData.joining_date}
-              onChange={(e) => handleInputChange('joining_date', e.target.value)}
+              onChange={(v) => handleInputChange('joining_date', v)}
+              placeholder="Joining date"
             />
           </div>
           <div className="form-group form-group--full">
@@ -1824,11 +1825,10 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">Joining Date</label>
-            <input 
-              className="ui-input" 
-              type="date"
+            <DatePicker
               value={formData.joining_date}
-              onChange={(e) => handleInputChange('joining_date', e.target.value)}
+              onChange={(v) => handleInputChange('joining_date', v)}
+              placeholder="Joining date"
             />
           </div>
           <div className="form-group form-group--full">
@@ -1914,13 +1914,14 @@ const DashboardSuppliers = () => {
             <label className="ui-label">Target Amount (₹)</label>
             <input className="ui-input" type="number" placeholder="e.g. 10000" value={targetForm.target_amount} onChange={(e) => setTargetForm(prev => ({ ...prev, target_amount: e.target.value }))} required />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Start Date</label>
-            <input className="ui-input" type="date" value={targetForm.start_date} onChange={(e) => setTargetForm(prev => ({ ...prev, start_date: e.target.value }))} required />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">End Date</label>
-            <input className="ui-input" type="date" value={targetForm.end_date} onChange={(e) => setTargetForm(prev => ({ ...prev, end_date: e.target.value }))} required />
+          <div className="form-group form-group--full">
+            <label className="ui-label">Target Period (Start – End)</label>
+            <DateRangePicker
+              from={targetForm.start_date || null}
+              to={targetForm.end_date || null}
+              onChange={({ from, to }) => setTargetForm(prev => ({ ...prev, start_date: from || '', end_date: to || '' }))}
+              placeholder="Select start & end date"
+            />
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Order Type</label>
