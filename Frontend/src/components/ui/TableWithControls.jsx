@@ -429,20 +429,100 @@ function DateRangePicker({ from, to, onChange }) {
         </svg>
       </button>
       {open && (
-        <div
-          onMouseDown={(e) => e.stopPropagation()}
-          style={{ position: 'absolute', right: 0, top: 'calc(100% + 6px)', background: '#fff', border: '1px solid #E0E0E0', borderRadius: 10, boxShadow: '0 4px 16px rgba(24,18,101,.10)', padding: 14, zIndex: 60, minWidth: 240 }}
-        >
-          <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>From</label>
-          <input type="date" className="ui-input" value={from || ''} max={to || undefined} onChange={(e) => onChange({ from: e.target.value || null, to })} style={{ width: '100%', marginBottom: 12 }} />
-          <label style={{ display: 'block', fontSize: 12, color: '#6b7280', marginBottom: 4 }}>To</label>
-          <input type="date" className="ui-input" value={to || ''} min={from || undefined} onChange={(e) => onChange({ from, to: e.target.value || null })} style={{ width: '100%', marginBottom: 12 }} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+        <div className="cal-popover" onMouseDown={(e) => e.stopPropagation()}>
+          <RangeCalendar from={from} to={to} onChange={onChange} />
+          <div className="cal__footer">
             <button type="button" className="ui-btn ui-btn--secondary ui-btn--sm" onClick={() => onChange({ from: null, to: null })}>Clear</button>
             <button type="button" className="ui-btn ui-btn--primary ui-btn--sm" onClick={() => setOpen(false)}>Done</button>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+const CAL_WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+const CAL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const calKey = (y, m, d) => `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+const calParse = (k) => {
+  if (!k) return null;
+  const [y, m, d] = k.split('-').map(Number);
+  return { y, m: m - 1, d };
+};
+
+// Custom range calendar: click start, then click end. The span highlights, and
+// hovering previews the range before the end is committed. Emits 'YYYY-MM-DD'.
+function RangeCalendar({ from, to, onChange }) {
+  const start = calParse(from);
+  const today = new Date();
+  const [view, setView] = useState(() => {
+    const base = start || { y: today.getFullYear(), m: today.getMonth() };
+    return { y: base.y, m: base.m };
+  });
+  const [hover, setHover] = useState(null);
+
+  const firstWeekday = new Date(view.y, view.m, 1).getDay();
+  const daysInMonth = new Date(view.y, view.m + 1, 0).getDate();
+  const todayKey = calKey(today.getFullYear(), today.getMonth(), today.getDate());
+
+  const goPrev = () => setView((v) => (v.m === 0 ? { y: v.y - 1, m: 11 } : { y: v.y, m: v.m - 1 }));
+  const goNext = () => setView((v) => (v.m === 11 ? { y: v.y + 1, m: 0 } : { y: v.y, m: v.m + 1 }));
+
+  const handleClick = (key) => {
+    if (!from || (from && to)) {
+      onChange({ from: key, to: null });
+    } else if (key < from) {
+      onChange({ from: key, to: from });
+    } else {
+      onChange({ from, to: key });
+    }
+  };
+
+  // End of the visible range: committed end, or hovered day while picking.
+  const previewEnd = to || (from && !to ? hover : null);
+  const [lo, hi] = from && previewEnd ? (from <= previewEnd ? [from, previewEnd] : [previewEnd, from]) : [from, to];
+
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(<div key={`b${i}`} className="cal__day cal__day--blank" />);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = calKey(view.y, view.m, d);
+    const isStart = lo && key === lo;
+    const isEnd = hi && key === hi;
+    const isInRange = lo && hi && key > lo && key < hi;
+    const cls = ['cal__day'];
+    if (isInRange) cls.push('cal__day--in-range');
+    if (isStart) cls.push('cal__day--start');
+    if (isEnd) cls.push('cal__day--end');
+    if (key === todayKey) cls.push('cal__day--today');
+    cells.push(
+      <button
+        type="button"
+        key={key}
+        className={cls.join(' ')}
+        onClick={() => handleClick(key)}
+        onMouseEnter={() => setHover(key)}
+      >
+        <span>{d}</span>
+      </button>
+    );
+  }
+
+  return (
+    <div className="cal" onMouseLeave={() => setHover(null)}>
+      <div className="cal__head">
+        <button type="button" className="cal__nav" onClick={goPrev} aria-label="Previous month">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+        </button>
+        <div className="cal__title">{CAL_MONTHS[view.m]} {view.y}</div>
+        <button type="button" className="cal__nav" onClick={goNext} aria-label="Next month">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6" /></svg>
+        </button>
+      </div>
+      <div className="cal__grid cal__grid--wd">
+        {CAL_WEEKDAYS.map((w) => <div key={w} className="cal__wd">{w}</div>)}
+      </div>
+      <div className="cal__grid">{cells}</div>
     </div>
   );
 }
