@@ -70,14 +70,14 @@
 .mini-list .row,
 .inv-list .row {
   display: grid;
-  grid-template-columns: 50px 1fr auto;
+  grid-template-columns: 1fr auto;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-3) 0;
   border-bottom: 1px solid var(--color-border);
 }
 .inv-list .row {
-  grid-template-columns: auto 50px 1fr auto;
+  grid-template-columns: auto 1fr auto;
 }
 .mini-list .row:last-child,
 .inv-list .row:last-child {
@@ -96,12 +96,15 @@
   font-weight: var(--font-weight-medium);
   font-size: var(--text-sm);
   line-height: var(--leading-snug);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .mini-list .units,
 .inv-list .units {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .stock-badge {
   display: inline-flex;
