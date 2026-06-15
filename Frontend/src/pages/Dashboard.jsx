@@ -195,8 +195,13 @@ const Dashboard = () => {
       const d = new Date(raw);
       if (isNaN(d.getTime()) || d.getFullYear() !== currentYear) return;
       const m = d.getMonth();
-      buckets[m].revenue += Number(o.order_total) || 0;
-      buckets[m].sales += 1;
+      const amount = Number(o.order_total) || 0;
+      // Both series in ₹ so they share the axis sensibly:
+      // Sales = gross order value (all orders); Revenue = realized (completed).
+      buckets[m].sales += amount;
+      if ((o.order_status || '').toLowerCase() === 'completed') {
+        buckets[m].revenue += amount;
+      }
     });
     return buckets;
   }, [orders]);

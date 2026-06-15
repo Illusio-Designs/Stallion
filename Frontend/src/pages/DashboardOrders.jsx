@@ -188,9 +188,19 @@ const DashboardOrders = () => {
     }
   };
 
-  // Fetch orders on mount
+  // Fetch orders + products on mount. Products are required so the PRODUCT
+  // column can resolve names — order_items only carry product_id, not the name.
   useEffect(() => {
     fetchOrders();
+    (async () => {
+      try {
+        const data = await getProducts(1, 3000, {});
+        const list = Array.isArray(data) ? data : (data?.data || []);
+        if (list.length > 0) setProducts(list);
+      } catch (err) {
+        console.error('Failed to load products for order name resolution:', err);
+      }
+    })();
   }, []);
 
   // Load create-order form data (countries + products) only when the create
@@ -207,10 +217,11 @@ const DashboardOrders = () => {
     try {
       const [countriesData, productsData] = await Promise.all([
         getCountries(),
-        getProducts()
+        getProducts(1, 3000, {})
       ]);
       setCountries(countriesData || []);
-      setProducts(productsData || []);
+      const productList = Array.isArray(productsData) ? productsData : (productsData?.data || []);
+      if (productList.length > 0) setProducts(productList);
     } catch (err) {
       console.error('Failed to fetch initial data:', err);
     }

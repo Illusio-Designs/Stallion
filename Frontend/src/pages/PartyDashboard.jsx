@@ -23,7 +23,7 @@ const PartyDashboard = () => {
     try {
       setLoading(true);
       setError(null);
-      const [allOrders, productsData] = await Promise.all([getOrders(), getProducts()]);
+      const [allOrders, productsData] = await Promise.all([getOrders(), getProducts(1, 3000, {})]);
       setProducts(Array.isArray(productsData) ? productsData : (productsData?.data || []));
       // Filter orders for this party
       const currentPartyId = partyId;
