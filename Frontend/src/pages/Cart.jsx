@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from "react";
-import "../styles/pages/Cart.css";
 import {
   getCartItems,
   removeFromCart,
@@ -959,7 +958,7 @@ const Cart = ({ onPageChange = null }) => {
                 </p>
                 <button
                   type="button"
-                  className="checkout-btn empty-cart__action mt-3 w-full min-h-12 bg-primary text-text-on-primary border border-primary px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
+                  className="checkout-btn empty-cart__action mt-3 w-full min-h-12 bg-primary text-white border border-primary px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
                   onClick={() => handlePageChange('products')}
                 >
                   Browse Products
@@ -1001,7 +1000,7 @@ const Cart = ({ onPageChange = null }) => {
                       <div className="quantity-selector-cart inline-flex items-center gap-1 bg-surface border border-border-strong rounded-md p-1 w-fit transition duration-[120ms] focus-within:border-primary focus-within:shadow-[var(--focus-ring)]">
                         <button
                           type="button"
-                          className="qty-btn-cart minus bg-primary rounded-sm border border-primary cursor-pointer text-[length:var(--text-md)] leading-none text-text-on-primary w-8 h-8 flex items-center justify-center transition duration-[120ms] p-0 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.96] disabled:opacity-45 disabled:cursor-not-allowed"
+                          className="qty-btn-cart minus bg-primary rounded-sm border border-primary cursor-pointer text-[length:var(--text-md)] leading-none text-white w-8 h-8 flex items-center justify-center transition duration-[120ms] p-0 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.96] disabled:opacity-45 disabled:cursor-not-allowed"
                           onClick={() => handleQuantityDecrease(item.id)}
                           disabled={item.quantity <= 1}
                           aria-label="Decrease quantity"
@@ -1034,7 +1033,7 @@ const Cart = ({ onPageChange = null }) => {
                         />
                         <button
                           type="button"
-                          className="qty-btn-cart plus bg-primary rounded-sm border border-primary cursor-pointer text-[length:var(--text-md)] leading-none text-text-on-primary w-8 h-8 flex items-center justify-center transition duration-[120ms] p-0 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.96] disabled:opacity-45 disabled:cursor-not-allowed"
+                          className="qty-btn-cart plus bg-primary rounded-sm border border-primary cursor-pointer text-[length:var(--text-md)] leading-none text-white w-8 h-8 flex items-center justify-center transition duration-[120ms] p-0 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.96] disabled:opacity-45 disabled:cursor-not-allowed"
                           onClick={() => handleQuantityIncrease(item.id)}
                           aria-label="Increase quantity"
                         >
@@ -1179,7 +1178,7 @@ const Cart = ({ onPageChange = null }) => {
 
             <button
               type="button"
-              className="checkout-btn w-full min-h-12 bg-primary text-text-on-primary border border-primary px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
+              className="checkout-btn w-full min-h-12 bg-primary text-white border border-primary px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
               onClick={handleCheckout}
               disabled={loading}
               aria-busy={loading}
