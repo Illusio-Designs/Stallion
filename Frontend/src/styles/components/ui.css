@@ -1423,6 +1423,59 @@ textarea.ui-input {
   color: var(--color-text-muted);
 }
 
+/* ============================================================
+   Responsive — shared table + controls (covers every list page
+   that renders TableWithControls). Below the md breakpoint the
+   table scrolls sideways instead of squishing, and the footer
+   stacks instead of overlapping.
+   ============================================================ */
+@media (max-width: 768px) {
+  .ui-table__header {
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
+  .ui-table__title {
+    font-size: var(--text-md);
+  }
+  /* Action buttons span the row and share width evenly. */
+  .ui-table__actions {
+    width: 100%;
+  }
+  .ui-table__actions > * {
+    flex: 1 1 auto;
+  }
+  .ui-table__controls {
+    padding: var(--space-2) var(--space-3);
+  }
+  .ui-table__right {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  /* Keep columns readable and let the row scroll horizontally
+     rather than collapsing into an unreadable grid. */
+  .ui-table__scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+  .ui-table table {
+    min-width: 680px;
+  }
+  /* Footer: stack count / pager / go-to; drop the absolute centering. */
+  .ui-table__footer {
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+  }
+  .ui-table__pager {
+    position: static;
+    left: auto;
+    transform: none;
+  }
+  .ui-page-goto {
+    margin-left: 0;
+  }
+}
+
 /* Pagination */
 .ui-pagination {
   display: flex;
