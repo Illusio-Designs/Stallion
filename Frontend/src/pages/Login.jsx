@@ -234,10 +234,11 @@ const Login = ({ onPageChange }) => {
 
       // Verify OTP via MSG91
       const verifyResponse = await verifyOTP(otpValue);
-      
+
       if (verifyResponse.success) {
-        // OTP verified, now login user
-        const loginResponse = await login(formattedPhone);
+        // OTP verified by the widget — pass its access-token to login so the
+        // backend verifies it server-side and issues the JWT in one call.
+        const loginResponse = await login(formattedPhone, verifyResponse.accessToken);
         
         console.log('Login response:', loginResponse);
         

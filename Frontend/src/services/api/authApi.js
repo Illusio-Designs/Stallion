@@ -61,10 +61,12 @@ export const checkUser = async (phoneNumber, options = {}) => {
  * @param {string} phoneNumber - Phone number in E.164 format (e.g., +917600032917)
  * @returns {Promise<Object>} Response with token, role, and message
  */
-export const login = async (phoneNumber) => {
+export const login = async (phoneNumber, accessToken = null) => {
   return apiRequest('/auth/login', {
     method: 'POST',
-    body: { phoneNumber },
+    // accessToken = the JWT from the MSG91 widget; the backend verifies it
+    // server-side and issues the login token in the same call.
+    body: { phoneNumber, accessToken },
     includeAuth: false,
   });
 };
