@@ -3,10 +3,14 @@ const axios = require('axios');
 class Msg91Service {
     constructor() {
         this.apiKey = process.env.MSG91_AUTH_KEY || process.env.MSG91_API_KEY;
+        this.templateId = process.env.MSG91_TEMPLATE_ID || null;
         this.baseUrl = 'https://control.msg91.com/api/v5';
 
         if (!this.apiKey) {
             console.warn('MSG91_AUTH_KEY is not set in environment variables');
+        }
+        if (!this.templateId) {
+            console.warn('MSG91_TEMPLATE_ID is not set — MSG91 OTP send requires a template id');
         }
     }
 
@@ -30,19 +34,17 @@ class Msg91Service {
             const cleanedPhoneNumber = phoneNumber.replace(/[\s\-\(\)]/g, '');
             
             const url = `${this.baseUrl}/otp`;
-            const payload = {
-                authkey: this.apiKey,
-                mobile: cleanedPhoneNumber,
-            };
-
-            // Add template ID if provided
-            if (templateId) {
-                payload.template_id = templateId;
+            const tid = templateId || this.templateId;
+            const payload = { mobile: cleanedPhoneNumber };
+            // MSG91 requires the OTP template id (DLT-approved) to send.
+            if (tid) {
+                payload.template_id = tid;
             }
 
             const response = await axios.post(url, payload, {
                 headers: {
                     'Content-Type': 'application/json',
+                    authkey: this.apiKey, // MSG91 expects the auth key in the header
                 },
             });
 
@@ -85,13 +87,10 @@ class Msg91Service {
             const cleanedPhoneNumber = phoneNumber.replace(/[\s\-\(\)]/g, '');
 
             const url = `${this.baseUrl}/otp/verify`;
-            const params = {
-                authkey: this.apiKey,
-                mobile: cleanedPhoneNumber,
-                otp: otp,
-            };
-
-            const response = await axios.get(url, { params });
+            const response = await axios.get(url, {
+                params: { mobile: cleanedPhoneNumber, otp },
+                headers: { authkey: this.apiKey },
+            });
 
             // MSG91 returns type "success" when OTP is verified
             const isVerified = response.data.type === 'success';
