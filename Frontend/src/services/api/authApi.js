@@ -27,7 +27,10 @@ export const checkUser = async (phoneNumber, options = {}) => {
     // If checkUser returns 200 and autoSendOTP is enabled, send OTP via MSG91
     if (autoSendOTP && response) {
       try {
-        await sendOTP(phoneNumber);
+        const otpResp = await sendOTP(phoneNumber);
+        // Surface MSG91's raw reply (the `data` field) so delivery issues are
+        // visible right in the console.
+        console.log('[checkUser] send-otp response (MSG91 reply in .data):', otpResp);
         return {
           ...response,
           otpSent: true,
