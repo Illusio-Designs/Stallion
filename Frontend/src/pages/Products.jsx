@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import '../styles/pages/Products.css';
 import '../styles/components/filter-chips.css';
 import { productPath } from '../utils/dashboardRoutes';
@@ -803,8 +804,9 @@ const Products = ({ onPageChange }) => {
           Filters
         </button>
 
-        {/* Mobile centered modal for filter (closes when clicking backdrop) */}
-        {mobileFilterOpen && (
+        {/* Mobile filter modal — portaled to <body> so position:fixed centers on
+            the viewport (not a transformed ancestor) regardless of page scroll. */}
+        {mobileFilterOpen && typeof document !== 'undefined' && createPortal(
           <div className="mobile-filter-modal open fixed inset-0 bg-[rgba(26,27,35,0.55)] backdrop-blur-[2px] z-[1500] flex items-center justify-center p-4" onClick={() => setMobileFilterOpen(false)} role="dialog" aria-modal="true" aria-label="Product filters">
             <div className="mobile-filter-modal__panel w-[min(520px,100%)]" onClick={(e) => e.stopPropagation()}>
               <aside className="filter-sidebar block w-full max-h-[calc(100vh-64px)] relative top-auto left-auto bg-surface rounded-xl p-6 shadow-xl overflow-y-auto border border-border [scrollbar-width:thin]">
@@ -816,7 +818,8 @@ const Products = ({ onPageChange }) => {
                 <FilterContent />
               </aside>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Products Grid */}
