@@ -1451,13 +1451,21 @@ textarea.ui-input {
     width: 100%;
     flex-wrap: wrap;
   }
-  /* Keep columns readable and let the row scroll horizontally
-     rather than collapsing into an unreadable grid. */
+  /* Keep columns readable and let the row scroll horizontally rather than
+     collapsing into an unreadable grid. table-layout:auto sizes each column to
+     its content so badges/values don't overflow into the next column. */
   .ui-table__scroll {
     -webkit-overflow-scrolling: touch;
   }
   .ui-table table {
+    table-layout: auto;
     min-width: 680px;
+    width: max-content;
+  }
+  /* Don't let cell content wrap awkwardly or bleed across columns. */
+  .ui-table thead th,
+  .ui-table tbody td {
+    white-space: nowrap;
   }
   /* Footer: stack count / pager / go-to; drop the absolute centering. */
   .ui-table__footer {
