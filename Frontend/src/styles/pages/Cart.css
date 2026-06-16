@@ -299,25 +299,11 @@
 }
 
 /* Summary Breakdown */
-.summary-breakdown {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding-top: var(--space-6);
-  margin-bottom: var(--space-6);
-}
-
-.summary-form + .summary-breakdown {
-  margin-top: var(--space-6);
-  border-top: 1px solid var(--color-border);
-}
-
-.breakdown-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: var(--space-4);
-}
+/* Summary breakdown layout (spacing, the divider above it when role dropdowns
+   are present, and the Total row's top border) is owned by the Tailwind classes
+   in Cart.jsx. The old rules here used a higher-specificity adjacent-sibling
+   selector that forced the divider/gap even for regular customers, so they were
+   removed. */
 
 .breakdown-label {
   font-size: var(--text-base);
@@ -332,22 +318,8 @@
   font-variant-numeric: tabular-nums;
 }
 
-.breakdown-item.total {
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--color-border);
-}
-
-.breakdown-item.total .breakdown-label {
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--text-md);
-  color: var(--color-text);
-}
-
-.breakdown-item.total .breakdown-value {
-  font-weight: var(--font-weight-bold);
-  font-size: var(--text-lg);
-  color: var(--color-text);
-}
+/* .breakdown-item.total styling (top divider + bold Total) is set via Tailwind
+   in Cart.jsx; the duplicate rules were removed. */
 
 .checkout-btn {
   width: 100%;
