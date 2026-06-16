@@ -30,9 +30,10 @@ class Msg91Service {
                 throw new Error('Phone number is required');
             }
 
-            // Remove any spaces, dashes, or special characters except +
-            const cleanedPhoneNumber = phoneNumber.replace(/[\s\-\(\)]/g, '');
-            
+            // MSG91 wants digits only with country code (e.g. 919876543210) — a
+            // leading + makes it return {type:'error'} with HTTP 200 (silent fail).
+            const cleanedPhoneNumber = String(phoneNumber).replace(/\D/g, '');
+
             const url = `${this.baseUrl}/otp`;
             const tid = templateId || this.templateId;
             const payload = { mobile: cleanedPhoneNumber };
@@ -47,6 +48,16 @@ class Msg91Service {
                     authkey: this.apiKey, // MSG91 expects the auth key in the header
                 },
             });
+
+            // MSG91 signals failures with type:'error' even on HTTP 200, so don't
+            // blindly report success — surface the real reason instead.
+            if (response.data && response.data.type && response.data.type !== 'success') {
+                return {
+                    success: false,
+                    error: response.data,
+                    message: response.data.message || 'Failed to send OTP',
+                };
+            }
 
             return {
                 success: true,
@@ -83,8 +94,8 @@ class Msg91Service {
                 throw new Error('OTP is required');
             }
 
-            // Remove any spaces, dashes, or special characters except +
-            const cleanedPhoneNumber = phoneNumber.replace(/[\s\-\(\)]/g, '');
+            // Match the digits-only form used when sending (MSG91 keys the OTP on it).
+            const cleanedPhoneNumber = String(phoneNumber).replace(/\D/g, '');
 
             const url = `${this.baseUrl}/otp/verify`;
             const response = await axios.get(url, {
