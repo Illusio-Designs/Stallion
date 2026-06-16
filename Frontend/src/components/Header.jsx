@@ -287,7 +287,7 @@ const Header = ({ onPageChange, currentPage }) => {
           </div>
           <div className="action-icons flex items-center gap-2">
             <button type="button" className="icon-btn cart-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text-on-primary transition-[background,transform] duration-200 ease-[ease] hover:bg-white/12 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.5)] active:scale-[0.94]" onClick={() => onPageChange('cart')} aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}>
-              <FiShoppingCart size={28} style={{ width: 28, height: 28 }} aria-hidden="true" />
+              <FiShoppingCart size={28} aria-hidden="true" />
               {cartCount > 0 && (
                 <span className="cart-badge absolute right-0.5 top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill border-2 border-primary bg-accent px-[5px] text-[length:var(--text-xs)] font-bold leading-none text-text-on-accent" aria-hidden="true">{cartCount > 99 ? '99+' : cartCount}</span>
               )}
@@ -301,7 +301,7 @@ const Header = ({ onPageChange, currentPage }) => {
                 aria-haspopup={loggedIn ? 'menu' : undefined}
                 aria-expanded={loggedIn ? isUserDropdownOpen : undefined}
               >
-                <FiUser size={28} style={{ width: 28, height: 28 }} aria-hidden="true" />
+                <FiUser size={28} aria-hidden="true" />
               </button>
               {loggedIn && isUserDropdownOpen && (
                 <div className="user-dropdown absolute right-0 top-[calc(100%+0.5rem)] z-[1001] min-w-[184px] max-[768px]:min-w-[168px] overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg" role="menu">
@@ -326,7 +326,7 @@ const Header = ({ onPageChange, currentPage }) => {
             </div>
             {!isMenuOpen && (
               <button type="button" ref={menuBtnRef} className="icon-btn menu-btn z-[1004] inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text-on-primary transition-[background,transform] duration-200 ease-[ease] hover:bg-white/12 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.5)] active:scale-[0.94] md:hidden" aria-label="Open menu" aria-expanded={isMenuOpen} aria-haspopup="dialog" onClick={() => setIsMenuOpen(true)}>
-                <FiMenu size={28} style={{ width: 28, height: 28 }} aria-hidden="true" />
+                <FiMenu size={28} aria-hidden="true" />
               </button>
             )}
           </div>
