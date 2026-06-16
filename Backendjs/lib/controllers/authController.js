@@ -69,7 +69,7 @@ class AuthController {
 
     async login(req, res) {
         try {
-            const { phoneNumber } = req.body;
+            const { phoneNumber, accessToken } = req.body;
             if (!phoneNumber) {
                 return res.status(400).json({ error: 'Phone number is required' });
             }
@@ -77,8 +77,18 @@ class AuthController {
             const normalizedPhone = normalizePhone(phoneNumber);
             const isBypassNumber = allowedNumbers.some((n) => normalizePhone(n) === normalizedPhone);
 
-            if (!isBypassNumber && !consumePhoneVerification(phoneNumber)) {
-                return res.status(401).json({ error: 'OTP verification required before login' });
+            // Single-call OTP login: verify the MSG91 widget's access-token right
+            // here. Falls back to the prior markPhoneVerified/consume flow if a
+            // caller still verifies in a separate step.
+            if (!isBypassNumber) {
+                if (accessToken) {
+                    const otp = await msg91Service.verifyAccessToken(accessToken);
+                    if (!otp.success) {
+                        return res.status(401).json({ error: otp.message || 'OTP verification failed' });
+                    }
+                } else if (!consumePhoneVerification(phoneNumber)) {
+                    return res.status(401).json({ error: 'OTP verification required before login' });
+                }
             }
 
             const user = await User.findOne({
