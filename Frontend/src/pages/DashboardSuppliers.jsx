@@ -436,6 +436,7 @@ const DashboardSuppliers = () => {
   };
 
   const fetchZones = async () => {
+    if (zones.length > 0) return; // already loaded this session (getAllZones is cached too)
     try {
       const zonesData = await getAllZones();
       setZones(zonesData || []);
@@ -548,7 +549,8 @@ const DashboardSuppliers = () => {
     if (selectedCountryFilter) {
       console.log('[Filter] Country changed, fetching salesmen for:', selectedCountryFilter);
       fetchSalesmenForCountry(selectedCountryFilter);
-      fetchZones();
+      // Zones are only needed inside the Add/Edit form, and loading them walks
+      // states -> cities -> zones (100+ requests). Defer to when the form opens.
     } else {
       // If no country selected (All Countries), clear salesmen
       console.log('[Filter] No country selected (All Countries), clearing salesmen');
@@ -689,6 +691,7 @@ const DashboardSuppliers = () => {
 
   const handleAdd = () => {
     resetForm();
+    fetchZones(); // lazy-load zones for the form (cached after first open)
     setOpenAdd(true);
   };
 
@@ -723,7 +726,8 @@ const DashboardSuppliers = () => {
       joining_date: row.joining_date ? row.joining_date.split('T')[0] : '',
     });
     setEditRow(row);
-    
+    fetchZones(); // lazy-load zones for the form (cached after first open)
+
     // Load dependent data for editing
     if (row.country_id) {
       await fetchStates(row.country_id);
