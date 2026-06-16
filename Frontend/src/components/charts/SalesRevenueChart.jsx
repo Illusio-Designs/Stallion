@@ -1,5 +1,5 @@
 'use client';
-import React, { useMemo } from 'react';
+import React, { useMemo, useRef, useState, useEffect } from 'react';
 import '../../styles/pages/dashboard-analytics.css';
 
 // Lightweight SVG dual-bar chart (Sales = indigo, Revenue = amber) with grid,
@@ -10,9 +10,24 @@ export default function SalesRevenueChart({
   height = 260,
   loading = false,
 }) {
+  // Measure the actual rendered width so the SVG viewBox matches it 1:1. Without
+  // this the fixed 820-wide viewBox gets scaled DOWN to fit a narrow phone,
+  // shrinking the bars to half height and leaving big empty gaps.
+  const wrapRef = useRef(null);
+  const [measuredW, setMeasuredW] = useState(820);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !wrapRef.current) return;
+    const el = wrapRef.current;
+    const update = () => setMeasuredW(Math.max(280, Math.round(el.clientWidth) || 820));
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [loading, data.length]);
+
   const cfg = useMemo(() => {
     const margin = { top: 16, right: 0, bottom: 28, left: 0 };
-    const width = 820; // scales via viewBox
+    const width = measuredW; // match the rendered width so the viewBox isn't shrunk to fit
     const innerW = width - margin.left - margin.right;
     const innerH = height - margin.top - margin.bottom;
 
@@ -52,7 +67,7 @@ export default function SalesRevenueChart({
     };
 
     return { margin, width, height, innerW, innerH, visualMax, band, barW, xOf, y, yTicksVals, formatK, series };
-  }, [data, height]);
+  }, [data, height, measuredW]);
 
   const legend = (
     <div className="srchart__legend z-[1] mb-2 flex justify-end gap-4" aria-hidden="true">
@@ -101,13 +116,14 @@ export default function SalesRevenueChart({
   }
 
   return (
-    <div className="srchart relative w-full">
+    <div className="srchart relative w-full" ref={wrapRef}>
       {legend}
       <svg
         className="srchart__svg block w-full overflow-visible"
         viewBox={`0 0 ${cfg.width} ${height}`}
         width="100%"
         height={height}
+        preserveAspectRatio="none"
         role="img"
         aria-label="Sales and revenue by period"
       >
