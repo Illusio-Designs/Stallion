@@ -9,6 +9,9 @@ const SIDEBAR_COLLAPSED_KEY = 'dashboardSidebarCollapsed';
 
 const DashboardLayout = ({ children, currentPage, onPageChange }) => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  // Off-canvas drawer (mobile only) — separate from the desktop collapse state.
+  const [isMobile, setIsMobile] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   // Monitor token presence - automatically log out if token is removed
   useTokenMonitor(true);
@@ -20,6 +23,32 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
     if (saved !== null) setIsSidebarCollapsed(saved === 'true');
   }, []);
 
+  // Track viewport so the sidebar renders as a drawer (expanded labels) on mobile.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(max-width: 768px)');
+    const update = () => {
+      setIsMobile(mq.matches);
+      if (!mq.matches) setIsMobileSidebarOpen(false); // leaving mobile: ensure drawer closed
+    };
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+
+  // Close the drawer whenever the page changes (a nav item was picked).
+  useEffect(() => {
+    setIsMobileSidebarOpen(false);
+  }, [currentPage]);
+
+  // Lock body scroll while the mobile drawer is open.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const locked = isMobile && isMobileSidebarOpen;
+    document.body.style.overflow = locked ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [isMobile, isMobileSidebarOpen]);
+
   const toggleSidebar = () => {
     setIsSidebarCollapsed((v) => {
       const next = !v;
@@ -30,6 +59,12 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
     });
   };
 
+  const closeMobileSidebar = () => setIsMobileSidebarOpen(false);
+  const openMobileSidebar = () => setIsMobileSidebarOpen(true);
+
+  // On mobile the drawer always shows full labels (never the collapsed rail).
+  const effectiveCollapsed = isMobile ? false : isSidebarCollapsed;
+
   const layoutClassName = useMemo(() => {
     return isSidebarCollapsed ? 'collapsed' : 'expanded';
   }, [isSidebarCollapsed]);
@@ -39,8 +74,19 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
       <DashboardSidebar
         currentPage={currentPage}
         onPageChange={onPageChange}
-        isCollapsed={isSidebarCollapsed}
+        isCollapsed={effectiveCollapsed}
         onToggleCollapse={toggleSidebar}
+        isMobileOpen={isMobileSidebarOpen}
+        onMobileClose={closeMobileSidebar}
+      />
+
+      {/* Backdrop — only on mobile while the drawer is open */}
+      <div
+        className={`dashboard-sidebar-backdrop fixed inset-0 z-[999] bg-black/45 transition-opacity duration-200 md:hidden ${
+          isMobileSidebarOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+        }`}
+        onClick={closeMobileSidebar}
+        aria-hidden="true"
       />
 
       <div
@@ -52,6 +98,7 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
           currentPage={currentPage}
           onPageChange={onPageChange}
           isCollapsed={isSidebarCollapsed}
+          onMobileMenuToggle={openMobileSidebar}
         />
 
         <main

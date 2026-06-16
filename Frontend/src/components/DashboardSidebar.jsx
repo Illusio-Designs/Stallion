@@ -3,12 +3,12 @@ import '../styles/components/DashboardSidebar.css';
 import {
   FiGrid, FiPackage, FiShoppingCart, FiDollarSign, FiInbox, FiCalendar,
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
-  FiHelpCircle, FiSettings, FiChevronsLeft,
+  FiHelpCircle, FiSettings, FiChevronsLeft, FiX,
 } from 'react-icons/fi';
 import { getUserRole } from '../services/authService';
 import { filterMenuItemsByRole } from '../utils/rolePermissions';
 
-const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleCollapse }) => {
+const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleCollapse, isMobileOpen = false, onMobileClose }) => {
   const [tooltipState, setTooltipState] = useState({ show: false, text: '', top: 0 });
   // Single crisp icon system (react-icons) — inherits currentColor (white on
   // the indigo sidebar), no webp + filter:brightness() hack.
@@ -58,7 +58,9 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
 
   return (
     <aside
-      className={`dashboard-sidebar ${isCollapsed ? 'collapsed' : 'expanded'} fixed left-0 top-0 z-[1000] flex h-screen flex-col overflow-visible bg-primary text-text-on-primary ${
+      className={`dashboard-sidebar ${isCollapsed ? 'collapsed' : 'expanded'} ${
+        isMobileOpen ? 'mobile-open max-md:translate-x-0' : 'max-md:-translate-x-full'
+      } fixed left-0 top-0 z-[1000] flex h-screen flex-col overflow-visible bg-primary text-text-on-primary transition-transform duration-200 ease-[ease] motion-reduce:transition-none md:translate-x-0 ${
         isCollapsed ? 'w-16 md:w-16' : 'w-60'
       }`}
     >
@@ -82,6 +84,15 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
             />
           )}
         </div>
+        {/* Close (mobile drawer only) */}
+        <button
+          type="button"
+          className="sidebar-mobile-close ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/[0.08] hover:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_rgba(255,255,255,0.7)] md:hidden"
+          onClick={onMobileClose}
+          aria-label="Close menu"
+        >
+          <FiX size={20} aria-hidden="true" />
+        </button>
       </div>
 
       <nav
@@ -108,6 +119,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
                 onClick={(e) => {
                   e.preventDefault();
                   onPageChange(item.id);
+                  onMobileClose?.();
                 }}
                 onMouseEnter={(e) => {
                   if (isCollapsed) {
@@ -148,7 +160,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
         </ul>
       </nav>
       <div
-        className={`dashboard-sidebar-footer border-t border-white/10 ${
+        className={`dashboard-sidebar-footer border-t border-white/10 max-md:hidden ${
           isCollapsed ? 'px-2 py-3 text-center' : 'p-3'
         }`}
       >

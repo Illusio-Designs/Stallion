@@ -315,11 +315,16 @@
   display: none;
 }
 
-/* Mobile: sidebar becomes an off-canvas drawer */
+/* Mobile: sidebar becomes an off-canvas drawer (slide handled via Tailwind
+   translate classes; it always renders expanded/full-width on mobile). */
 @media (max-width: 768px) {
   .dashboard-sidebar.expanded,
   .dashboard-sidebar.collapsed {
-    width: 240px;
+    width: 264px;
+  }
+  /* Elevate the drawer above the backdrop when open. */
+  .dashboard-sidebar.mobile-open {
+    box-shadow: var(--shadow-lg);
   }
 }
 
