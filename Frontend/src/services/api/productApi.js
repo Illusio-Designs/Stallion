@@ -345,8 +345,10 @@ export const getProductModels = async (modelNo) => {
   try {
     const response = await apiRequest('/products/product-models', {
       method: 'POST',
+      // Backend expects `model_no` (exact match); sending `search` left it
+      // undefined -> 400 "Model number is required".
       body: {
-        search: modelNo,
+        model_no: modelNo,
       },
       includeAuth: true,
     });
