@@ -1,6 +1,26 @@
 const SalesmanTargets = require('../models/SalesmanTargets');
+const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const { Op } = require('sequelize');
+
+// Compute a target's achieved amount LIVE from the orders, so existing and new
+// orders always count (the report never depends on the stored running total).
+const computeCompleted = async (target) => {
+    const where = {
+        salesman_id: target.salesman_id,
+        order_date: { [Op.between]: [target.start_date, target.end_date] },
+    };
+    if (target.order_type) where.order_type = target.order_type; // null = "overall" = any type
+    const orders = await Order.findAll({ where, attributes: ['order_total'] });
+    return orders.reduce((sum, o) => sum + (Number(o.order_total) || 0), 0);
+};
+
+const enrichTarget = async (t) => {
+    const completed = await computeCompleted(t);
+    const targetAmount = Number(t.target_amount) || 0;
+    const target_status = (targetAmount > 0 && completed >= targetAmount) ? 'completed' : (t.target_status || 'pending');
+    return { ...t.toJSON(), completed_amount: completed, target_status };
+};
 
 class SalesmanTargetsController {
 
@@ -48,7 +68,8 @@ class SalesmanTargetsController {
     async getSalesmanTargets(req, res) {
         try {
             const salesmanTargets = await SalesmanTargets.findAll();
-            res.status(200).json(salesmanTargets);
+            const enriched = await Promise.all(salesmanTargets.map(enrichTarget));
+            res.status(200).json(enriched);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -64,7 +85,8 @@ class SalesmanTargetsController {
             if (!salesmanTargets || salesmanTargets.length === 0) {
                 return res.status(404).json({ error: 'Salesman targets not found' });
             }
-            res.status(200).json(salesmanTargets);
+            const enriched = await Promise.all(salesmanTargets.map(enrichTarget));
+            res.status(200).json(enriched);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
