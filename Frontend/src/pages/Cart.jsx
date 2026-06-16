@@ -1162,7 +1162,7 @@ const Cart = ({ onPageChange = null }) => {
               )}
             </div>
 
-            <div className={`summary-breakdown flex flex-col gap-3 pt-6 mb-6 border-t border-border ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'mt-6' : 'mt-0'}`}>
+            <div className={`summary-breakdown flex flex-col gap-3 mb-6 ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'pt-6 mt-6 border-t border-border' : 'pt-0 mt-0'}`}>
               <div className="breakdown-item flex justify-between items-baseline gap-4">
                 <span className="breakdown-label text-[length:var(--text-base)] text-text-muted font-normal">Subtotal:</span>
                 <span className="breakdown-value text-[length:var(--text-base)] text-text font-semibold [font-variant-numeric:tabular-nums]">

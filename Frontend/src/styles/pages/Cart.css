@@ -88,69 +88,10 @@
   flex-direction: column;
 }
 
-.cart-items-header {
-  display: grid;
-  grid-template-columns: 4fr 1fr 1fr auto;
-  gap: var(--space-4);
-  padding-bottom: var(--space-3);
-  border-bottom: 1px solid var(--color-border);
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--text-xs);
-  color: var(--color-text-subtle);
-  text-transform: uppercase;
-  letter-spacing: var(--tracking-label);
-}
-
-.header-item {
-  grid-column: 1;
-}
-
-.header-qty {
-  grid-column: 2;
-  text-align: center;
-}
-
-.header-subtotal {
-  grid-column: 3;
-  text-align: right;
-}
-
-.header-remove {
-  grid-column: 4;
-  width: 32px;
-}
-
-.cart-item {
-  display: grid;
-  grid-template-columns: 4fr 1fr 1fr auto;
-  gap: var(--space-4);
-  border-bottom: 1px solid var(--color-border);
-  align-items: center;
-  padding: var(--space-4) 0;
-}
-
-.cart-item:last-child {
-  border-bottom: none;
-}
-
-.item-info {
-  display: flex;
-  gap: var(--space-4);
-  align-items: center;
-  min-width: 0;
-}
-
-.item-image {
-  width: 72px;
-  height: 72px;
-  flex-shrink: 0;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-surface-muted);
-  border-radius: var(--radius-md);
-}
+/* Layout for the header row, item row, info, image and qty is owned entirely by
+   the Tailwind classes in Cart.jsx (which are responsive — stacked on mobile,
+   4 columns on desktop). The old fixed-grid rules here fought that and forced
+   the desktop layout onto phones, so they've been removed. */
 
 .item-image img {
   max-width: 100%;
@@ -169,11 +110,6 @@
   font-weight: var(--font-weight-medium);
   color: var(--color-text);
   margin: 0;
-}
-
-.item-qty {
-  display: flex;
-  justify-content: center;
 }
 
 .quantity-selector-cart {
@@ -494,49 +430,9 @@
   }
 }
 
-@media (max-width: 480px) {
-  .cart-items-header {
-    grid-template-columns: 1fr auto auto;
-  }
-
-  .cart-items-header .header-subtotal {
-    display: none;
-  }
-
-  .cart-item {
-    grid-template-columns: 1fr auto;
-    grid-template-areas:
-      "info remove"
-      "qty subtotal";
-    gap: var(--space-3) var(--space-3);
-    row-gap: var(--space-3);
-  }
-
-  .item-info {
-    grid-area: info;
-  }
-
-  .item-qty {
-    grid-area: qty;
-    justify-content: flex-start;
-  }
-
-  .item-subtotal {
-    grid-area: subtotal;
-    align-self: center;
-  }
-
-  .item-remove {
-    grid-area: remove;
-    align-self: start;
-    justify-content: flex-end;
-  }
-
-  .item-image {
-    width: 56px;
-    height: 56px;
-  }
-}
+/* Mobile cart layout (stacked rows) is handled by the responsive Tailwind
+   classes in Cart.jsx, so the old 480px grid overrides were removed to avoid
+   two competing sources of truth. */
 
 @media (prefers-reduced-motion: reduce) {
   .checkout-btn__spinner {
