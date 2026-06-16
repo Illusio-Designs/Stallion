@@ -823,7 +823,7 @@ const Products = ({ onPageChange }) => {
         )}
 
         {/* Products Grid */}
-        <main className="products-main flex-1 min-w-0 bg-transparent p-0 min-h-[calc(100vh-var(--header-height))]">
+        <main className="products-main flex-1 min-w-0 bg-transparent px-0 pt-0 pb-28 md:pb-0 min-h-[calc(100vh-var(--header-height))]">
           <div className="products-header flex justify-between items-center gap-4 mb-6 flex-wrap">
             <h2 className="text-[length:var(--text-lg)] sm:text-[length:var(--text-xl)] font-semibold tracking-[-0.01em] leading-[1.2] text-text m-0">
               {loading ? '' : searchQuery ?
