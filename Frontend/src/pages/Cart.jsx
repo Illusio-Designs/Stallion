@@ -977,7 +977,7 @@ const Cart = ({ onPageChange = null }) => {
                 {cartItems.map((item) => (
                   <div key={item.id} className="cart-item grid grid-cols-[1fr_auto] [grid-template-areas:'info_remove''qty_subtotal'] sm:grid-cols-[4fr_1fr_1fr_auto] sm:[grid-template-areas:none] gap-3 sm:gap-4 border-b border-border last:border-b-0 items-center py-4">
                   <div className="item-info [grid-area:info] sm:[grid-area:auto] flex gap-4 items-center min-w-0">
-                    <div className="item-image w-14 h-14 sm:w-[72px] sm:h-[72px] flex-shrink-0 overflow-hidden flex items-center justify-center bg-surface-muted rounded-md">
+                    <div className="item-image w-14 h-14 sm:w-[72px] sm:h-[72px] flex-shrink-0 overflow-hidden flex items-center justify-center bg-surface-muted rounded-md border border-border p-1">
                       <img
                         className="max-w-full max-h-full object-contain"
                         src={item.image || '/images/products/spac1.webp'}
@@ -991,7 +991,10 @@ const Cart = ({ onPageChange = null }) => {
                       />
                     </div>
                     <div className="item-details flex-1 min-w-0">
-                      <h3 className="item-name text-[length:var(--text-md)] leading-[var(--leading-snug)] font-medium text-text m-0">{getDisplayName(item)}</h3>
+                      <h3 className="item-name text-[length:var(--text-md)] leading-[var(--leading-snug)] font-medium text-text m-0 truncate">{getDisplayName(item)}</h3>
+                      <p className="item-unit-price text-[length:var(--text-sm)] text-text-muted mt-1 m-0 [font-variant-numeric:tabular-nums]">
+                        {formatPrice(parseFloat(String(item.whp || item.mrp || 0).replace(/[₹,]/g, '')))} each
+                      </p>
                     </div>
                   </div>
                     <div className="item-qty [grid-area:qty] sm:[grid-area:auto] flex justify-start sm:justify-center">
@@ -1159,7 +1162,7 @@ const Cart = ({ onPageChange = null }) => {
               )}
             </div>
 
-            <div className="summary-breakdown flex flex-col gap-3 pt-6 mb-6 mt-6 border-t border-border">
+            <div className={`summary-breakdown flex flex-col gap-3 pt-6 mb-6 border-t border-border ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'mt-6' : 'mt-0'}`}>
               <div className="breakdown-item flex justify-between items-baseline gap-4">
                 <span className="breakdown-label text-[length:var(--text-base)] text-text-muted font-normal">Subtotal:</span>
                 <span className="breakdown-value text-[length:var(--text-base)] text-text font-semibold [font-variant-numeric:tabular-nums]">
