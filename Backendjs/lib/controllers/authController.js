@@ -234,6 +234,41 @@ class AuthController {
         }
     }
 
+    // Verify the JWT access-token from the MSG91 OTP widget (server side).
+    async verifyAccessToken(req, res) {
+        try {
+            const { accessToken, phoneNumber } = req.body;
+
+            // Whitelisted numbers skip MSG91 entirely.
+            if (phoneNumber && allowedNumbers.includes(phoneNumber)) {
+                markPhoneVerified(phoneNumber);
+                return res.status(200).json({ message: 'OTP verified successfully' });
+            }
+
+            if (!accessToken) {
+                return res.status(400).json({ error: 'Access token is required' });
+            }
+
+            const result = await msg91Service.verifyAccessToken(accessToken);
+            if (!result.success) {
+                return res.status(400).json({
+                    error: result.message || 'Invalid access token',
+                    details: result.error,
+                });
+            }
+
+            if (phoneNumber) markPhoneVerified(phoneNumber);
+
+            res.status(200).json({
+                message: 'OTP verified successfully',
+                data: result.data,
+            });
+        } catch (error) {
+            console.error('Verify Access Token Error:', error);
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async checkToken(req, res) {
         try {
             res.status(200).json({ message: 'Token is valid' });

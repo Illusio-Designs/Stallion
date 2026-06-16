@@ -116,6 +116,46 @@ class Msg91Service {
             };
         }
     }
+
+    /**
+     * Verify the JWT access-token returned by the MSG91 OTP Widget (server side).
+     * The widget verifies the OTP in the browser and returns an access-token;
+     * the backend confirms it with the secret authkey so the OTP can't be faked.
+     * @param {string} accessToken - JWT access-token from the widget
+     * @returns {Promise<Object>}
+     */
+    async verifyAccessToken(accessToken) {
+        try {
+            if (!this.apiKey) {
+                throw new Error('MSG91_AUTH_KEY is not configured');
+            }
+            if (!accessToken) {
+                throw new Error('Access token is required');
+            }
+
+            const url = `${this.baseUrl}/widget/verifyAccessToken`;
+            const response = await axios.post(url, {
+                authkey: this.apiKey,
+                'access-token': accessToken,
+            }, {
+                headers: { 'Content-Type': 'application/json' },
+            });
+
+            const ok = response.data && response.data.type === 'success';
+            return {
+                success: ok,
+                data: response.data,
+                message: ok ? 'Access token verified' : 'Invalid access token',
+            };
+        } catch (error) {
+            console.error('MSG91 Verify Access Token Error:', error.response?.data || error.message);
+            return {
+                success: false,
+                error: error.response?.data || error.message,
+                message: 'Failed to verify access token',
+            };
+        }
+    }
 }
 
 module.exports = new Msg91Service();

@@ -5,6 +5,7 @@ const { authenticateToken } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/roleAuth');
 
 router.post('/verify-otp', authController.verifyOtp);
+router.post('/verify-token', authController.verifyAccessToken);
 router.post('/send-otp', authController.sendOtp);
 router.post('/logout', authController.logout);
 router.post('/refresh-token', authController.refreshToken);
