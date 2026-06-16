@@ -1,22 +1,26 @@
 /**
- * OTP via the backend MSG91 OTP API (the flow that works with MSG91's default
- * OTP template — no DLT registration, no widget, no WhatsApp setup needed).
+ * MSG91 OTP Widget integration (official otp-provider.js script + exposeMethods).
  *
- *   sendOTP   -> POST /auth/send-otp   (backend calls MSG91 /otp with the authkey)
- *   verifyOTP -> POST /auth/verify-otp (backend verifies + marks the phone verified)
- *   login     -> POST /auth/login      (backend consumes that verification)
+ * The widget sends/verifies the OTP in the browser (channel — SMS/WhatsApp/Email
+ * — is configured in the MSG91 dashboard, so it works without managing DLT here)
+ * and returns a JWT access-token on verify. That token is then verified
+ * SERVER-SIDE via the backend (POST /auth/login or /auth/verify-token with the
+ * secret authkey) so the OTP can't be spoofed and the authkey never ships to the
+ * browser.
  *
- * The phone is passed through in the SAME E.164 form (+91…) used for check-user
- * and login, because the backend's verified-phone session is keyed on that exact
- * string (it only strips spaces/dashes, not the leading +).
+ * Required env: NEXT_PUBLIC_MSG91_WIDGET_ID, NEXT_PUBLIC_MSG91_TOKEN_AUTH
  */
 
-import { apiRequest } from './api/client';
+const WIDGET_ID = process.env.NEXT_PUBLIC_MSG91_WIDGET_ID || '';
+const TOKEN_AUTH = process.env.NEXT_PUBLIC_MSG91_TOKEN_AUTH || '';
+const WIDGET_SCRIPT = 'https://verify.msg91.com/otp-provider.js';
 
-// The phone for the current OTP attempt (set on send / initialize, reused on verify/resend).
+let widgetReady = false;
+let widgetLoading = null;
+let currentAccessToken = null;
 let currentPhoneNumber = null;
 
-/** Digits-only with country code, no + (e.g. 919999999999). Kept for callers that need it. */
+/** Format to MSG91 form: digits only, with country code, no + (e.g. 919999999999). */
 export const formatPhoneNumberForMSG91 = (phoneNumber) => {
   if (!phoneNumber) return '';
   const digits = String(phoneNumber).replace(/\D/g, '');
@@ -25,52 +29,159 @@ export const formatPhoneNumberForMSG91 = (phoneNumber) => {
   return digits;
 };
 
-/** Send the OTP. Resolves with the backend response, throws on failure. */
-export const sendOTP = async (phoneNumber) => {
-  currentPhoneNumber = phoneNumber;
-  return apiRequest('/auth/send-otp', {
-    method: 'POST',
-    body: { phoneNumber },
-    includeAuth: false,
+/** Load otp-provider.js once and run initSendOTP with exposeMethods enabled. */
+const ensureWidget = () => {
+  if (typeof window === 'undefined') return Promise.reject(new Error('Window not available'));
+  if (widgetReady && typeof window.sendOtp === 'function') return Promise.resolve();
+  if (widgetLoading) return widgetLoading;
+  if (!WIDGET_ID) return Promise.reject(new Error('NEXT_PUBLIC_MSG91_WIDGET_ID is not set'));
+  if (!TOKEN_AUTH) return Promise.reject(new Error('NEXT_PUBLIC_MSG91_TOKEN_AUTH is not set'));
+
+  widgetLoading = new Promise((resolve, reject) => {
+    const init = () => {
+      try {
+        if (typeof window.initSendOTP !== 'function') {
+          reject(new Error('MSG91 widget loaded but initSendOTP is unavailable'));
+          return;
+        }
+        window.initSendOTP({
+          widgetId: WIDGET_ID,
+          tokenAuth: TOKEN_AUTH,
+          exposeMethods: true, // expose window.sendOtp/verifyOtp/retryOtp, no popup
+          success: () => {},
+          failure: () => {},
+        });
+        // exposeMethods attaches window.sendOtp/verifyOtp/retryOtp ASYNCHRONOUSLY,
+        // so wait until they actually exist before resolving.
+        const startedAt = Date.now();
+        const waitForMethods = () => {
+          if (typeof window.sendOtp === 'function' && typeof window.verifyOtp === 'function') {
+            widgetReady = true;
+            resolve();
+          } else if (Date.now() - startedAt > 10000) {
+            reject(new Error('MSG91 widget methods not exposed — check NEXT_PUBLIC_MSG91_WIDGET_ID / NEXT_PUBLIC_MSG91_TOKEN_AUTH'));
+          } else {
+            setTimeout(waitForMethods, 100);
+          }
+        };
+        waitForMethods();
+      } catch (e) {
+        reject(e);
+      }
+    };
+
+    if (typeof window.initSendOTP === 'function') { init(); return; }
+
+    const existing = document.querySelector(`script[src="${WIDGET_SCRIPT}"]`);
+    if (existing) {
+      existing.addEventListener('load', init, { once: true });
+      existing.addEventListener('error', () => reject(new Error('Failed to load MSG91 widget')), { once: true });
+      return;
+    }
+    const s = document.createElement('script');
+    s.src = WIDGET_SCRIPT;
+    s.async = true;
+    s.onload = init;
+    s.onerror = () => reject(new Error('Failed to load MSG91 widget script'));
+    document.body.appendChild(s);
+  }).catch((e) => {
+    // Reset so a later attempt can retry instead of reusing a rejected promise.
+    widgetLoading = null;
+    throw e;
   });
+  return widgetLoading;
 };
 
-/** No widget to load anymore — just remember the phone for verify/resend. */
+const extractToken = (data) =>
+  (data && (data.message || data['access-token'] || data.accessToken || data.token)) || null;
+
+/** Load + init the widget (call once before send). */
 export const initializeOTPWidget = async (phoneNumber) => {
-  currentPhoneNumber = phoneNumber;
-  return { initialized: true, phoneNumber };
+  await ensureWidget();
+  currentPhoneNumber = formatPhoneNumberForMSG91(phoneNumber);
+  return { initialized: true, phoneNumber: currentPhoneNumber };
 };
 
-/**
- * Verify the entered OTP. Throws (via apiRequest) on an invalid code.
- * accessToken is null in this flow — the backend marks the phone verified and
- * login() consumes that, so login is called without a token.
- */
-export const verifyOTP = async (otp, phoneNumber = currentPhoneNumber) => {
-  const res = await apiRequest('/auth/verify-otp', {
-    method: 'POST',
-    body: { phoneNumber, otp },
-    includeAuth: false,
+const describeError = (error, fallback) => {
+  if (!error) return fallback;
+  if (typeof error === 'string') return error;
+  return error.message || error.type || error.errorMessage ||
+    (Object.keys(error).length ? JSON.stringify(error) : fallback);
+};
+
+/** Send OTP to a phone number (identifier may also be an email). */
+export const sendOTP = async (phoneNumber) => {
+  await ensureWidget();
+  const phone = formatPhoneNumberForMSG91(phoneNumber);
+  currentPhoneNumber = phone;
+  return new Promise((resolve, reject) => {
+    window.sendOtp(
+      phone,
+      (data) => resolve({ success: true, message: 'OTP sent successfully', data }),
+      (error) => {
+        console.warn('[MSG91] sendOtp failed:', error);
+        reject({ success: false, message: describeError(error, 'Failed to send OTP'), error });
+      }
+    );
   });
-  return { success: true, message: res?.message || 'OTP verified successfully', data: res, accessToken: null };
 };
 
-/** Resend = send the OTP again to the same number. */
-export const resendOTP = async (phoneNumber = currentPhoneNumber) => {
-  const res = await apiRequest('/auth/send-otp', {
-    method: 'POST',
-    body: { phoneNumber },
-    includeAuth: false,
+/** Verify the OTP the user entered; resolves with the JWT access-token. */
+export const verifyOTP = async (otp) => {
+  await ensureWidget();
+  return new Promise((resolve, reject) => {
+    window.verifyOtp(
+      otp,
+      (data) => {
+        const token = extractToken(data);
+        currentAccessToken = token;
+        resolve({ success: true, message: 'OTP verified successfully', data, accessToken: token });
+      },
+      (error) => {
+        console.warn('[MSG91] verifyOtp failed:', error);
+        reject({ success: false, message: describeError(error, 'Invalid OTP'), error });
+      }
+    );
   });
-  return { success: true, message: res?.message || 'OTP resent successfully', data: res };
 };
 
+/** Resend OTP. channel: null = widget default; '11' SMS, '4' Voice, '3' Email, '12' WhatsApp. */
+export const resendOTP = async (channel = null) => {
+  await ensureWidget();
+  return new Promise((resolve, reject) => {
+    window.retryOtp(
+      channel,
+      (data) => resolve({ success: true, message: 'OTP resent successfully', data }),
+      (error) => {
+        console.warn('[MSG91] retryOtp failed:', error);
+        reject({ success: false, message: describeError(error, 'Failed to resend OTP'), error });
+      }
+    );
+  });
+};
+
+export const getAccessToken = () => currentAccessToken;
 export const getCurrentPhone = () => currentPhoneNumber;
 
 export const destroyOTPWidget = () => {
+  currentAccessToken = null;
   currentPhoneNumber = null;
 };
 
-// Legacy aliases (kept so older imports don't break).
+/**
+ * Kept for backward compatibility. Real verification is SERVER-SIDE now
+ * (the backend calls MSG91 /widget/verifyAccessToken with the secret authkey).
+ */
+export const verifyAccessToken = async (accessToken = null) => ({
+  success: true,
+  accessToken: accessToken || currentAccessToken,
+});
+
+// Legacy aliases
+export const getJWTToken = getAccessToken;
 export const verifyOTPWithWidget = verifyOTP;
 export const resendOTPWithWidget = resendOTP;
+export const getWidgetMethods = () =>
+  (typeof window !== 'undefined'
+    ? { sendOtp: window.sendOtp, verifyOtp: window.verifyOtp, retryOtp: window.retryOtp }
+    : null);
