@@ -23,6 +23,9 @@
   box-shadow: var(--shadow-sm);
   padding: var(--space-5);
   grid-column: span 6;
+  /* Allow the card to shrink inside the grid so a wide table scrolls within
+     its own .ui-table__scroll instead of overflowing the page (grid blowout). */
+  min-width: 0;
 }
 .dash-card.metric {
   grid-column: span 3;
