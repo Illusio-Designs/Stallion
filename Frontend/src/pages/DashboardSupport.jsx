@@ -46,12 +46,12 @@ const DashboardSupport = () => {
                 <label className="ui-label block mb-2" htmlFor="support-email">Email</label>
                 <input id="support-email" className="ui-input w-full" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
               </div>
-              <div className="form-group flex flex-col gap-2 col-[1/-1]" style={{gridColumn:'1 / -1'}}>
+              <div className="form-group flex flex-col gap-2 col-[1/-1]">
                 <label className="ui-label block mb-2" htmlFor="support-query">Query</label>
                 <textarea id="support-query" className="ui-input w-full min-h-[140px] resize-y" rows={6} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Write your question here..." required />
               </div>
 
-              <div className="support-form-actions flex flex-wrap justify-end gap-3 col-[1/-1]" style={{gridColumn:'1 / -1'}}>
+              <div className="support-form-actions flex flex-wrap justify-end gap-3 col-[1/-1]">
                 <Button type="submit">Send</Button>
               </div>
             </form>

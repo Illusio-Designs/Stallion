@@ -97,10 +97,10 @@ export default function DateRangePicker({ from = null, to = null, onChange, plac
   const label = hasRange ? `${fmt(from) || '…'} – ${fmt(to) || '…'}` : placeholder;
 
   return (
-    <div ref={wrapRef} style={{ position: 'relative', display: 'inline-block', width: fullWidth ? '100%' : undefined }}>
+    <div ref={wrapRef} className="relative inline-block" style={{ width: fullWidth ? '100%' : undefined }}>
       <button type="button" className="ui-pill" onClick={() => setOpen((v) => !v)} title="Pick a date range" style={fullWidth ? { width: '100%', justifyContent: 'space-between' } : undefined}>
-        <span style={{ color: hasRange ? 'var(--color-text)' : 'var(--color-text-subtle)', whiteSpace: 'nowrap' }}>{label}</span>
-        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: 18, height: 18, flexShrink: 0 }}>
+        <span className="whitespace-nowrap" style={{ color: hasRange ? 'var(--color-text)' : 'var(--color-text-subtle)' }}>{label}</span>
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-[18px] h-[18px] shrink-0">
           <path d="M8 2V5M16 2V5M3 9H21M5 5H19C20.105 5 21 5.895 21 7V19C21 20.105 20.105 21 19 21H5C3.895 21 3 20.105 3 19V7C3 5.895 3.895 5 5 5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </button>

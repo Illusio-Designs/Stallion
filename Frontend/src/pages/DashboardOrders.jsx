@@ -1142,11 +1142,11 @@ const DashboardOrders = () => {
                   <table className="ord-items">
                     <thead>
                       <tr>
-                        <th style={{ width: 40 }}>#</th>
+                        <th className="w-[40px]">#</th>
                         <th>Product</th>
-                        <th className="ta-r" style={{ width: 60 }}>Qty</th>
-                        <th className="ta-r" style={{ width: 90 }}>Price</th>
-                        <th className="ta-r" style={{ width: 104 }}>Subtotal</th>
+                        <th className="ta-r w-[60px]">Qty</th>
+                        <th className="ta-r w-[90px]">Price</th>
+                        <th className="ta-r w-[104px]">Subtotal</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1158,10 +1158,10 @@ const DashboardOrders = () => {
                         viewItems.map((item, i) => (
                           <tr key={i}>
                             <td style={{ color: '#6b7280' }}>{i + 1}</td>
-                            <td style={{ fontWeight: 500 }}>{item._name}</td>
+                            <td className="font-medium">{item._name}</td>
                             <td className="ta-r">{item.quantity}</td>
                             <td className="ta-r">₹{Number(item.price || 0).toLocaleString('en-IN')}</td>
-                            <td className="ta-r" style={{ fontWeight: 500 }}>₹{Number(item._subtotal || 0).toLocaleString('en-IN')}</td>
+                            <td className="ta-r font-medium">₹{Number(item._subtotal || 0).toLocaleString('en-IN')}</td>
                           </tr>
                         ))
                       )}
@@ -1284,8 +1284,8 @@ const DashboardOrders = () => {
             <div className="form-group">
               <label className="ui-label">
                 Order Type 
-                {!isDistributor && <span style={{ color: 'red' }}>*</span>}
-                {isDistributor && <span style={{ color: '#666', fontSize: '12px' }}> (Default: Distributor Order)</span>}
+                {!isDistributor && <span className="text-[red]">*</span>}
+                {isDistributor && <span className="text-[12px] text-[#666]"> (Default: Distributor Order)</span>}
               </label>
               <DropdownSelector
                 options={[
@@ -1349,7 +1349,7 @@ const DashboardOrders = () => {
           {(isFieldRequired('party_id') || createFormData.party_id) && (
             <div className="form-group">
               <label className="ui-label">
-                Party {isFieldRequired('party_id') && <span style={{ color: 'red' }}>*</span>}
+                Party {isFieldRequired('party_id') && <span className="text-[red]">*</span>}
               </label>
               <DropdownSelector
                 options={[
@@ -1366,19 +1366,19 @@ const DashboardOrders = () => {
                 className="ui-dropdown-custom--full-width"
               />
               {!selectedCountry && (
-                <small style={{ color: '#666', fontSize: '12px' }}>Please select a country first</small>
+                <small className="text-[12px] text-[#666]">Please select a country first</small>
               )}
               {selectedCountry && parties.length === 0 && allParties.length > 0 && isSalesman && (createFormData.order_type === 'visit_order' || createFormData.order_type === 'whatsapp_order') && (
-                <small style={{ color: '#666', fontSize: '12px' }}>No parties found in your zone for this order type</small>
+                <small className="text-[12px] text-[#666]">No parties found in your zone for this order type</small>
               )}
               {selectedCountry && parties.length === 0 && allParties.length === 0 && (
-                <small style={{ color: '#666', fontSize: '12px' }}>No parties available for this country</small>
+                <small className="text-[12px] text-[#666]">No parties available for this country</small>
               )}
               {selectedCountry && parties.length > 0 && isSalesman && (createFormData.order_type === 'visit_order' || createFormData.order_type === 'whatsapp_order') && (
-                <small style={{ color: '#666', fontSize: '12px' }}>Showing parties from your zone only</small>
+                <small className="text-[12px] text-[#666]">Showing parties from your zone only</small>
               )}
               {selectedCountry && parties.length > 0 && isSalesman && createFormData.order_type === 'event_order' && (
-                <small style={{ color: '#666', fontSize: '12px' }}>Showing all parties for event orders</small>
+                <small className="text-[12px] text-[#666]">Showing all parties for event orders</small>
               )}
             </div>
           )}
@@ -1387,7 +1387,7 @@ const DashboardOrders = () => {
           {(isFieldRequired('distributor_id') || createFormData.distributor_id) && (
             <div className="form-group">
               <label className="ui-label">
-                Distributor {isFieldRequired('distributor_id') && <span style={{ color: 'red' }}>*</span>}
+                Distributor {isFieldRequired('distributor_id') && <span className="text-[red]">*</span>}
               </label>
               <DropdownSelector
                 options={[
@@ -1404,10 +1404,10 @@ const DashboardOrders = () => {
                 className="ui-dropdown-custom--full-width"
               />
               {!selectedCountry && (
-                <small style={{ color: '#666', fontSize: '12px' }}>Please select a country first</small>
+                <small className="text-[12px] text-[#666]">Please select a country first</small>
               )}
               {selectedCountry && distributors.length === 0 && (
-                <small style={{ color: '#666', fontSize: '12px' }}>No distributors available for this country</small>
+                <small className="text-[12px] text-[#666]">No distributors available for this country</small>
               )}
             </div>
           )}
@@ -1416,7 +1416,7 @@ const DashboardOrders = () => {
           {!isSalesman && (isFieldRequired('salesman_id') || createFormData.salesman_id) && (
             <div className="form-group">
               <label className="ui-label">
-                Salesman {isFieldRequired('salesman_id') && <span style={{ color: 'red' }}>*</span>}
+                Salesman {isFieldRequired('salesman_id') && <span className="text-[red]">*</span>}
               </label>
               <DropdownSelector
                 options={[
@@ -1433,10 +1433,10 @@ const DashboardOrders = () => {
                 className="ui-dropdown-custom--full-width"
               />
               {!selectedCountry && (
-                <small style={{ color: '#666', fontSize: '12px' }}>Please select a country first</small>
+                <small className="text-[12px] text-[#666]">Please select a country first</small>
               )}
               {selectedCountry && salesmen.length === 0 && (
-                <small style={{ color: '#666', fontSize: '12px' }}>No salesmen available for this country</small>
+                <small className="text-[12px] text-[#666]">No salesmen available for this country</small>
               )}
             </div>
           )}
@@ -1445,7 +1445,7 @@ const DashboardOrders = () => {
           {createFormData.order_type === 'event_order' && (
             <div className="form-group">
               <label className="ui-label">
-                Event <span style={{ color: 'red' }}>*</span>
+                Event <span className="text-[red]">*</span>
               </label>
               <DropdownSelector
                 options={[
@@ -1466,16 +1466,16 @@ const DashboardOrders = () => {
           {/* Order Items */}
           <div className="form-group">
             <label className="ui-label">
-              Order Items <span style={{ color: 'red' }}>*</span>
+              Order Items <span className="text-[red]">*</span>
             </label>
-            <div style={{ border: '1px solid #E0E0E0', borderRadius: '8px', padding: '16px' }}>
+            <div className="rounded-lg border border-[#E0E0E0] p-4">
               {createFormData.order_items.map((item, index) => (
                 <div key={index} style={{ 
                   marginBottom: index < createFormData.order_items.length - 1 ? '16px' : 0,
                   paddingBottom: index < createFormData.order_items.length - 1 ? '16px' : 0,
                   borderBottom: index < createFormData.order_items.length - 1 ? '1px solid #E0E0E0' : 'none'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div className="mb-2 flex items-center justify-between">
                     <strong>Item {index + 1}</strong>
                     {createFormData.order_items.length > 1 && (
                       <Button 
@@ -1487,9 +1487,9 @@ const DashboardOrders = () => {
                       </Button>
                     )}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'block' }}>Product</label>
+                      <label className="mb-1 block text-[12px] text-[#666]">Product</label>
                       <DropdownSelector
                         options={[
                           { value: '', label: 'Select Product' },
@@ -1505,7 +1505,7 @@ const DashboardOrders = () => {
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'block' }}>Quantity</label>
+                      <label className="mb-1 block text-[12px] text-[#666]">Quantity</label>
                       <input 
                         type="number"
                         className="ui-input"
@@ -1516,7 +1516,7 @@ const DashboardOrders = () => {
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'block' }}>Price</label>
+                      <label className="mb-1 block text-[12px] text-[#666]">Price</label>
                       <input 
                         type="number"
                         className="ui-input"

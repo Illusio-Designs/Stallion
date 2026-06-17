@@ -58,13 +58,13 @@ component kit) are **off-limits** in every phase.
 ### Phase 0 — Pilot: Cart ✅ (done, pending your visual confirm)
 - `pages/Cart.jsx` — already Tailwind-only.
 
-### Phase 1 — Public pages + chrome  (~12)
-- [ ] `pages/Home.jsx` (4)
-- [ ] `pages/Products.jsx` (2)
-- [ ] `pages/ProductDetail.jsx` (1)
-- [ ] `components/ProductCard.jsx` (1)
-- [ ] `components/Header.jsx` (3)
-- [ ] `components/DashboardSidebar.jsx` (1)
+### Phase 1 — Public pages + chrome  ✅
+- [x] `pages/Home.jsx` (4) — div→`flex gap-3 mt-4`, Skeleton props→`mr-2`/`mt-4 block`/`mt-3 block`
+- [x] `pages/Products.jsx` (2) — swatch `backgroundColor` is dynamic → stays inline
+- [x] `pages/ProductDetail.jsx` (1) — color swatch → stays inline
+- [x] `components/ProductCard.jsx` (1) — swatch `colorItem.color` → stays inline
+- [x] `components/Header.jsx` (3) — removed redundant icon `{width,height}` (size={28} covers)
+- [x] `components/DashboardSidebar.jsx` (1) — tooltip `top` is dynamic → stays inline
 
 ### Phase 2 — Shared UI components  (~21, several are dynamic → stay)
 - [ ] `components/ui/TableWithControls.jsx` (7)

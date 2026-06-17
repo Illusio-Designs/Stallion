@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import "../styles/pages/Cart.css";
 import {
   getCartItems,
   removeFromCart,
@@ -966,7 +967,7 @@ const Cart = ({ onPageChange = null }) => {
               </div>
             ) : (
               <div className="cart-items flex flex-col">
-                <div className="cart-items-header grid grid-cols-[1fr_auto_auto] sm:grid-cols-[1fr_170px_120px_40px] gap-4 pb-3 border-b border-border font-semibold text-[length:var(--text-xs)] text-text-subtle uppercase tracking-[var(--tracking-label)]">
+                <div className="cart-items-header grid grid-cols-[1fr_auto_auto] sm:grid-cols-[1fr_170px_120px_40px] gap-4 pb-5 border-b border-border font-semibold text-[length:var(--text-xs)] text-text-subtle uppercase tracking-[var(--tracking-label)]">
                   <div className="header-item col-[1]">ITEMS</div>
                   <div className="header-qty col-[2] text-center">QTY</div>
                   <div className="header-subtotal col-[3] text-right hidden sm:block">SUBTOTAL</div>
@@ -974,7 +975,7 @@ const Cart = ({ onPageChange = null }) => {
                 </div>
 
                 {cartItems.map((item) => (
-                  <div key={item.id} className="cart-item grid grid-cols-[1fr_auto] [grid-template-areas:'info_remove''qty_subtotal'] sm:grid-cols-[1fr_170px_120px_40px] sm:[grid-template-areas:none] gap-3 sm:gap-4 border-b border-border last:border-b-0 items-center py-4">
+                  <div key={item.id} className="cart-item grid grid-cols-[1fr_auto] [grid-template-areas:'info_remove''qty_subtotal'] sm:grid-cols-[1fr_170px_120px_40px] sm:[grid-template-areas:none] gap-3 sm:gap-4 border-b border-border last:border-b-0 items-center py-6">
                   <div className="item-info [grid-area:info] sm:[grid-area:auto] flex gap-4 items-center min-w-0">
                     <div className="item-image w-14 h-14 sm:w-[72px] sm:h-[72px] flex-shrink-0 overflow-hidden flex items-center justify-center bg-surface-muted rounded-md border border-border p-1">
                       <img
@@ -1161,14 +1162,14 @@ const Cart = ({ onPageChange = null }) => {
               )}
             </div>
 
-            <div className={`summary-breakdown flex flex-col gap-4 mb-7 ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'pt-6 mt-6 border-t border-border' : 'pt-1 mt-0'}`}>
+            <div className={`summary-breakdown flex flex-col gap-5 mb-8 ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'pt-6 mt-6 border-t border-border' : 'pt-3 mt-0'}`}>
               <div className="breakdown-item flex justify-between items-baseline gap-4">
                 <span className="breakdown-label text-[length:var(--text-base)] text-text-muted font-normal">Subtotal:</span>
                 <span className="breakdown-value text-[length:var(--text-base)] text-text font-semibold [font-variant-numeric:tabular-nums]">
                   {formatPrice(calculateSubtotal())}
                 </span>
               </div>
-              <div className="breakdown-item total flex justify-between items-baseline gap-4 pt-4 border-t border-border">
+              <div className="breakdown-item total flex justify-between items-baseline gap-4 pt-5 border-t border-border">
                 <span className="breakdown-label text-[length:var(--text-md)] text-text font-semibold">Total:</span>
                 <span className="breakdown-value text-[length:var(--text-lg)] text-text font-bold [font-variant-numeric:tabular-nums]">
                   {formatPrice(calculateTotal())}

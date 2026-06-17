@@ -462,13 +462,13 @@ const DashboardTray = () => {
         {activeTab === 'assign-products' && (
           <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
             <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
-              <div style={{ padding: '20px' }}>
-                <h2 style={{ marginTop: 0, marginBottom: '20px' }}>Assign Products to Tray</h2>
-                
-                {error && <div style={{ padding: 12, color: 'red', marginBottom: 12, backgroundColor: '#fee', border: '1px solid #fcc', borderRadius: '8px' }}>{error}</div>}
-                
+              <div className="p-5">
+                <h2 className="mt-0 mb-5">Assign Products to Tray</h2>
+
+                {error && <div className="mb-3 rounded-lg border border-[#fcc] bg-[#fee] p-3 text-[red]">{error}</div>}
+
                 {/* Single Section: Tray Selection, Add Product, and Products Table */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                <div className="flex flex-col gap-6">
                   {/* Tray Selection */}
                   <div className="form-group">
                     <label className="ui-label" style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 700 }}>Select Tray</label>
@@ -485,29 +485,14 @@ const DashboardTray = () => {
 
                   {/* Add Product Section - Only show when tray is selected */}
                   {selectedTray && (
-                    <div style={{ 
-                      padding: '24px', 
-                      backgroundColor: '#f9fafb', 
-                      borderRadius: '12px',
-                      border: '1px solid #e5e7eb'
-                    }}>
-                      <h3 style={{ 
-                        marginTop: 0, 
-                        marginBottom: '20px',
-                        fontSize: '18px',
-                        fontWeight: 700,
-                        color: '#000000'
-                      }}>
+                    <div className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-6">
+                      <h3 className="mb-5 mt-0 text-[18px] font-bold text-[#000000]">
                         Add Products to Tray
                       </h3>
-                      <div style={{ 
-                        display: 'flex', 
-                        flexDirection: 'column',
-                        gap: '16px'
-                      }}>
+                      <div className="flex flex-col gap-4">
                         <div className="form-group" style={{ position: 'relative' }}>
                           <label className="ui-label" style={{ marginBottom: '8px' }}>Select Products</label>
-                          <div style={{ position: 'relative' }}>
+                          <div className="relative">
                             {/* Trigger button */}
                             <button
                               type="button"
@@ -532,7 +517,7 @@ const DashboardTray = () => {
                                   ? 'Select products to add'
                                   : `${selectedProducts.length} product(s) selected`}
                               </span>
-                              <span style={{ fontSize: '12px', color: '#666' }}>
+                              <span className="text-[12px] text-[#666]">
                                 {productDropdownOpen ? '▲' : '▼'}
                               </span>
                             </button>
@@ -541,24 +526,10 @@ const DashboardTray = () => {
                               <>
                                 {/* Dropdown panel */}
                                 <div
-                                  style={{
-                                    position: 'absolute',
-                                    top: '100%',
-                                    left: 0,
-                                    right: 0,
-                                    marginTop: '4px',
-                                    border: '1px solid #e5e7eb',
-                                    borderRadius: '10px',
-                                    backgroundColor: '#fff',
-                                    zIndex: 1001,
-                                    boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    height: '270px'
-                                  }}
+                                  className="absolute left-0 right-0 top-full z-[1001] mt-1 flex h-[270px] flex-col rounded-[10px] border border-[#e5e7eb] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
                                 >
                                   {/* Search bar — sticky top */}
-                                  <div style={{ padding: '10px', borderBottom: '1px solid #f0f0f0', flexShrink: 0 }}>
+                                  <div className="shrink-0 border-b border-[#f0f0f0] p-[10px]">
                                     <input
                                       type="text"
                                       placeholder="🔍  Search by model, brand or collection..."
@@ -566,23 +537,14 @@ const DashboardTray = () => {
                                       onChange={(e) => setProductSearch(e.target.value)}
                                       onClick={(e) => e.stopPropagation()}
                                       autoFocus
-                                      style={{
-                                        width: '100%',
-                                        padding: '8px 10px',
-                                        border: '1px solid #e5e7eb',
-                                        borderRadius: '6px',
-                                        fontSize: '13px',
-                                        outline: 'none',
-                                        boxSizing: 'border-box',
-                                        backgroundColor: '#f9fafb'
-                                      }}
+                                      className="box-border w-full rounded-md border border-[#e5e7eb] bg-[#f9fafb] p-[8px_10px] text-[13px] outline-none"
                                     />
                                   </div>
 
                                   {/* Product list — scrollable */}
-                                  <div style={{ overflowY: 'auto', flex: 1, padding: '6px' }}>
+                                  <div className="flex-1 overflow-y-auto p-[6px]">
                                     {allProducts.length === 0 ? (
-                                      <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>
+                                      <div className="p-5 text-center text-[13px] text-[#999]">
                                         No products available
                                       </div>
                                     ) : (() => {
@@ -596,7 +558,7 @@ const DashboardTray = () => {
                                         );
                                       });
                                       if (filtered.length === 0) return (
-                                        <div style={{ padding: '20px', textAlign: 'center', color: '#999', fontSize: '13px' }}>
+                                        <div className="p-5 text-center text-[13px] text-[#999]">
                                           No products match "{productSearch}"
                                         </div>
                                       );
@@ -631,12 +593,12 @@ const DashboardTray = () => {
                                                   setSelectedProducts(prev => prev.filter(id => id !== productIdStr));
                                                 }
                                               }}
-                                              style={{ marginRight: '10px', width: '16px', height: '16px', cursor: 'pointer', accentColor: '#3b82f6', flexShrink: 0 }}
+                                              className="mr-[10px] h-4 w-4 shrink-0 cursor-pointer accent-[#3b82f6]"
                                             />
-                                            <span style={{ fontSize: '13px', color: '#333', lineHeight: 1.4 }}>
-                                              <strong style={{ color: '#111' }}>{p.model_no || 'N/A'}</strong>
+                                            <span className="text-[13px] leading-[1.4] text-[#333]">
+                                              <strong className="text-[#111]">{p.model_no || 'N/A'}</strong>
                                               {(p.brand_name || p.collection_name) && (
-                                                <span style={{ color: '#888', marginLeft: '6px' }}>
+                                                <span className="ml-[6px] text-[#888]">
                                                   {[p.brand_name, p.collection_name].filter(Boolean).join(' · ')}
                                                 </span>
                                               )}
@@ -648,20 +610,11 @@ const DashboardTray = () => {
                                   </div>
 
                                   {/* Footer with actions — sticky bottom */}
-                                  <div style={{
-                                    padding: '10px 12px',
-                                    borderTop: '1px solid #f0f0f0',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'space-between',
-                                    flexShrink: 0,
-                                    backgroundColor: '#fafafa',
-                                    borderRadius: '0 0 10px 10px'
-                                  }}>
-                                    <span style={{ fontSize: '12px', color: '#888' }}>
+                                  <div className="flex shrink-0 items-center justify-between rounded-b-[10px] border-t border-[#f0f0f0] bg-[#fafafa] p-[10px_12px]">
+                                    <span className="text-[12px] text-[#888]">
                                       {selectedProducts.length > 0 ? `${selectedProducts.length} selected` : 'None selected'}
                                     </span>
-                                    <div style={{ display: 'flex', gap: '8px' }}>
+                                    <div className="flex gap-2">
                                       {selectedProducts.length > 0 && (
                                         <button
                                           type="button"
@@ -686,7 +639,7 @@ const DashboardTray = () => {
                                 </div>
                                 {/* Backdrop — rendered after panel so panel stays on top */}
                                 <div
-                                  style={{ position: 'fixed', inset: 0, zIndex: 999 }}
+                                  className="fixed inset-0 z-[999]"
                                   onClick={() => { setProductDropdownOpen(false); setProductSearch(''); }}
                                 />
                               </>
@@ -699,29 +652,29 @@ const DashboardTray = () => {
 
                   {/* Products List - Always visible */}
                   <div>
-                    <h3 style={{ marginTop: 0, marginBottom: 15 }}>
+                    <h3 className="mb-[15px] mt-0">
                       Products in Tray ({trayProducts.length})
                     </h3>
-                    <div style={{ maxHeight: '500px', overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-                      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <div className="max-h-[500px] overflow-y-auto rounded-lg border border-[#e5e7eb]">
+                      <table className="w-full border-collapse">
                         <thead>
-                          <tr style={{ backgroundColor: '#f0f0f0', position: 'sticky', top: 0 }}>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>MODEL NO</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>BRAND</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>COLLECTION</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>MRP</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>WHP</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>QUANTITY</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>STATUS</th>
-                            <th style={{ padding: '12px', textAlign: 'left', borderBottom: '2px solid #ddd' }}>ACTIONS</th>
+                          <tr className="sticky top-0 bg-[#f0f0f0]">
+                            <th className="border-b-2 border-[#ddd] p-3 text-left">MODEL NO</th>
+                            <th className="border-b-2 border-[#ddd] p-3 text-left">BRAND</th>
+                            <th className="border-b-2 border-[#ddd] p-3 text-left">COLLECTION</th>
+                            <th className="border-b-2 border-[#ddd] p-3 text-left">MRP</th>
+                            <th className="border-b-2 border-[#ddd] p-3 text-left">WHP</th>
+                            <th className="border-b-2 border-[#ddd] p-3 text-left">QUANTITY</th>
+                            <th className="border-b-2 border-[#ddd] p-3 text-left">STATUS</th>
+                            <th className="border-b-2 border-[#ddd] p-3 text-left">ACTIONS</th>
                           </tr>
                         </thead>
                         <tbody>
                           {loadingProducts ? (
                             Array.from({ length: 4 }).map((_, i) => (
-                              <tr key={`sk-${i}`} style={{ borderBottom: '1px solid #eee' }}>
+                              <tr key={`sk-${i}`} className="border-b border-[#eee]">
                                 {Array.from({ length: 8 }).map((__, c) => (
-                                  <td key={c} style={{ padding: '12px' }}>
+                                  <td key={c} className="p-3">
                                     <span className="ui-skeleton" style={{ display: 'block', height: '14px', width: c === 7 ? '60px' : '100%', borderRadius: '6px' }} />
                                   </td>
                                 ))}
@@ -729,7 +682,7 @@ const DashboardTray = () => {
                             ))
                           ) : error && selectedTray ? (
                             <tr>
-                              <td colSpan="8" style={{ padding: 0 }}>
+                              <td colSpan="8" className="p-0">
                                 <div className="ui-state ui-state--error">
                                   <div className="ui-state__icon">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -746,7 +699,7 @@ const DashboardTray = () => {
                             </tr>
                           ) : trayProducts.length === 0 ? (
                             <tr>
-                              <td colSpan="8" style={{ padding: 0 }}>
+                              <td colSpan="8" className="p-0">
                                 <div className="ui-state ui-state--empty">
                                   <div className="ui-state__icon">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -789,31 +742,31 @@ const DashboardTray = () => {
                               }) : null;
                               
                               return (
-                                <tr key={tp.id} style={{ borderBottom: '1px solid #eee' }}>
-                                  <td style={{ padding: '12px' }}>
+                                <tr key={tp.id} className="border-b border-[#eee]">
+                                  <td className="p-3">
                                     {productData?.model_no || 'N/A'}
                                     {!product && productId && (
-                                      <span style={{ fontSize: '10px', color: '#999', display: 'block' }}>
+                                      <span className="block text-[10px] text-[#999]">
                                         (ID: {productId.substring(0, 8)}...)
                                       </span>
                                     )}
                                   </td>
-                                  <td style={{ padding: '12px' }}>
+                                  <td className="p-3">
                                     {brand?.brand_name || productData?.brand_name || 'N/A'}
                                   </td>
-                                  <td style={{ padding: '12px' }}>
+                                  <td className="p-3">
                                     {collection?.collection_name || productData?.collection_name || 'N/A'}
                                   </td>
-                                  <td style={{ padding: '12px' }}>
+                                  <td className="p-3">
                                     {productData?.mrp ? `₹${parseFloat(productData.mrp || 0).toLocaleString('en-IN')}` : 'N/A'}
                                   </td>
-                                  <td style={{ padding: '12px' }}>
+                                  <td className="p-3">
                                     {productData?.whp ? `₹${parseFloat(productData.whp || 0).toLocaleString('en-IN')}` : 'N/A'}
                                   </td>
-                                  <td style={{ padding: '12px' }}>
+                                  <td className="p-3">
                                     1
                                   </td>
-                                  <td style={{ padding: '12px' }}>
+                                  <td className="p-3">
                                     <span style={{ 
                                       padding: '4px 8px', 
                                       borderRadius: '4px', 
@@ -824,7 +777,7 @@ const DashboardTray = () => {
                                       {getStatusLabel(tp.status || TrayProductStatus.ALLOTED)}
                                     </span>
                                   </td>
-                                  <td style={{ padding: '12px' }}>
+                                  <td className="p-3">
                                     <RowActions
                                       onEdit={() => startEditProduct(tp)}
                                       onDelete={() => handleRemoveProduct(tp)}

@@ -129,11 +129,11 @@ const DistributorDashboard = () => {
           <div className="dash-card bg-surface border border-border rounded-lg shadow-sm p-5" style={{gridColumn:'span 12'}}>
             <h4 className="text-black text-base font-bold" style={{color: '#000000', fontSize: '16px', fontWeight: '700'}}>My Orders</h4>
             <div className="ui-table__scroll">
-              <table className="w-full border-separate border-spacing-0" style={{width:'100%', borderCollapse:'separate', borderSpacing:0}}>
+              <table className="w-full border-separate border-spacing-0">
                 <thead>
                   <tr>
                     {['ORDER ID','ORDER TYPE','PARTY NAME','PRODUCT','QTY','STATUS','VALUE','ACTION'].map((h)=> (
-                      <th key={h} className="text-left py-[14px] text-xs text-black border-b border-b-[#E0E0E0]" style={{textAlign:'left', padding:'14px 0', fontSize:12, color:'#000', borderBottom:'1px solid #E0E0E0'}}>{h}</th>
+                      <th key={h} className="text-left py-[14px] text-xs text-black border-b border-b-[#E0E0E0]">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -142,7 +142,7 @@ const DistributorDashboard = () => {
                     Array.from({ length: 6 }).map((_, i) => (
                       <tr key={`sk-${i}`}>
                         {Array.from({ length: 8 }).map((__, j) => (
-                          <td key={j} className="py-[14px]" style={{padding:'14px 0'}}>
+                          <td key={j} className="py-[14px]">
                             <Skeleton height={16} width={j === 3 ? '60%' : '80%'} />
                           </td>
                         ))}
@@ -150,7 +150,7 @@ const DistributorDashboard = () => {
                     ))
                   ) : error ? (
                     <tr>
-                      <td colSpan="8" style={{padding:0}}>
+                      <td colSpan="8" className="p-0">
                         <div className="ui-state ui-state--error">
                           <div className="ui-state__icon">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -163,7 +163,7 @@ const DistributorDashboard = () => {
                     </tr>
                   ) : orders.length === 0 ? (
                     <tr>
-                      <td colSpan="8" style={{padding:0}}>
+                      <td colSpan="8" className="p-0">
                         <div className="ui-state ui-state--empty">
                           <div className="ui-state__icon">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2h9l5 5v15H6z"/><path d="M14 2v6h6"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
@@ -232,14 +232,14 @@ const DistributorDashboard = () => {
                       
                       return (
                         <tr key={orderId || index}>
-                          <td className="py-[14px]" style={{padding:'14px 0'}}>{orderNumber}</td>
-                          <td className="py-[14px]" style={{padding:'14px 0'}}>{orderTypeDisplay}</td>
-                          <td className="py-[14px]" style={{padding:'14px 0'}}>{partyName}</td>
-                          <td className="py-[14px] text-[#6b7280]" style={{padding:'14px 0', color:'#6b7280'}}>{productDisplay}</td>
-                          <td className="py-[14px]" style={{padding:'14px 0'}}>{totalQuantity}</td>
-                          <td className="py-[14px]" style={{padding:'14px 0'}}><StatusBadge status={orderStatus.toLowerCase().replace(/\s+/g, '-')}>{orderStatus}</StatusBadge></td>
-                          <td className="py-[14px]" style={{padding:'14px 0'}}>₹{totalValue.toLocaleString('en-IN')}</td>
-                          <td className="py-[14px]" style={{padding:'14px 0'}}>
+                          <td className="py-[14px]">{orderNumber}</td>
+                          <td className="py-[14px]">{orderTypeDisplay}</td>
+                          <td className="py-[14px]">{partyName}</td>
+                          <td className="py-[14px] text-[#6b7280]">{productDisplay}</td>
+                          <td className="py-[14px]">{totalQuantity}</td>
+                          <td className="py-[14px]"><StatusBadge status={orderStatus.toLowerCase().replace(/\s+/g, '-')}>{orderStatus}</StatusBadge></td>
+                          <td className="py-[14px]">₹{totalValue.toLocaleString('en-IN')}</td>
+                          <td className="py-[14px]">
                             <RowActions onView={()=>console.log('view', order)} />
                           </td>
                         </tr>

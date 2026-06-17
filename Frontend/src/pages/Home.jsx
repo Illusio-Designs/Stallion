@@ -177,7 +177,7 @@ const Home = ({ onPageChange }) => {
         <div className="collection-filters mx-auto mb-12 flex max-w-[1400px] flex-wrap justify-start gap-x-8 gap-y-2 overflow-x-auto overflow-y-hidden pb-3 max-[384px]:gap-x-5">
           {loadingCollections ? (
             Array.from({ length: 5 }).map((_, i) => (
-              <Skeleton key={`filter-skeleton-${i}`} width={96} height={36} radius={18} style={{ marginRight: 8 }} />
+              <Skeleton key={`filter-skeleton-${i}`} width={96} height={36} radius={18} className="mr-2" />
             ))
           ) : (
             filters.map((filter) => (
@@ -202,9 +202,9 @@ const Home = ({ onPageChange }) => {
                 className="box-border h-full rounded-lg border border-border bg-surface p-4 shadow-sm"
               >
                 <Skeleton width="100%" height={260} radius={8} />
-                <Skeleton width="70%" height={16} style={{ marginTop: 16, display: 'block' }} />
-                <Skeleton width="40%" height={16} style={{ marginTop: 12, display: 'block' }} />
-                <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
+                <Skeleton width="70%" height={16} className="mt-4 block" />
+                <Skeleton width="40%" height={16} className="mt-3 block" />
+                <div className="flex gap-3 mt-4">
                   <Skeleton width={22} height={22} radius={999} />
                   <Skeleton width={22} height={22} radius={999} />
                   <Skeleton width={22} height={22} radius={999} />

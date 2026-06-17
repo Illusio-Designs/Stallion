@@ -2331,7 +2331,7 @@ const DashboardProducts = () => {
               }}>
                 <strong>{uploadProgress.success ? 'Success:' : 'Error:'}</strong> {uploadProgress.message}
                 {uploadProgress.details && (
-                  <div style={{ marginTop: '6px', fontSize: '14px' }}>
+                  <div className="mt-1.5 text-sm">
                     {uploadProgress.details}
                   </div>
                 )}
@@ -2416,8 +2416,7 @@ const DashboardProducts = () => {
                       
                       {/* Delete Button */}
                       <button
-                        className="absolute top-3 right-3 text-white border-none rounded-full w-9 h-9 cursor-pointer flex items-center justify-center z-[2] text-lg font-bold transition-[background] duration-200 shadow-sm"
-                        style={{ background: '#f44336' }}
+                        className="absolute top-3 right-3 text-white border-none rounded-full w-9 h-9 cursor-pointer flex items-center justify-center z-[2] text-lg font-bold transition-[background] duration-200 shadow-sm bg-[#f44336]"
                         onClick={async (e) => {
                           e.stopPropagation();
 
@@ -3067,8 +3066,7 @@ const DashboardProducts = () => {
                             title="Unassign image"
                             onClick={() => handleUnassignImage(editRow.data, url)}
                             disabled={loading || productModelLoading}
-                            className="absolute top-[3px] right-[3px] text-white border-none rounded-full w-5 h-5 cursor-pointer text-[11px] font-bold flex items-center justify-center leading-none p-0"
-                            style={{ background: '#f44336' }}
+                            className="absolute top-[3px] right-[3px] text-white border-none rounded-full w-5 h-5 cursor-pointer text-[11px] font-bold flex items-center justify-center leading-none p-0 bg-[#f44336]"
                           >
                             ✕
                           </button>
@@ -3144,7 +3142,7 @@ const DashboardProducts = () => {
             }}>
               <strong>{uploadProgress.success ? 'Success!' : 'Error:'}</strong> {uploadProgress.message}
               {uploadProgress.details && (
-                <div style={{ marginTop: '8px', fontSize: '14px' }}>
+                <div className="mt-2 text-sm">
                   {uploadProgress.details}
                 </div>
               )}
@@ -3264,7 +3262,7 @@ const DashboardProducts = () => {
                       cursor: 'pointer'
                     }}>
                       {isSelected && (
-                        <span style={{ color: '#fff', fontSize: '14px', fontWeight: 'bold' }}>✓</span>
+                        <span className="text-white text-sm font-bold">✓</span>
                       )}
                     </div>
                     <div className="w-full aspect-[4/3] bg-surface-muted relative">
@@ -3341,7 +3339,7 @@ const DashboardProducts = () => {
         accept="image/*"
         multiple
         onChange={handleImageUpload}
-        style={{ display: 'none' }}
+        className="hidden"
         disabled={uploadingImage}
       />
 

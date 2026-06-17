@@ -365,7 +365,7 @@ const DashboardExpenses = () => {
         key: 'action', 
         label: 'ACTION', 
         render: (_v, row) => (
-          <div style={{ display: 'flex', gap: 8, position: 'relative', zIndex: 1 }}>
+          <div className="flex gap-2 relative z-[1]">
             <button 
               className="ui-btn ui-btn--ghost ui-btn--sm has-tt" 
               onClick={() => {

@@ -1,4 +1,5 @@
 import React from 'react';
+import { FiInstagram, FiFacebook, FiLinkedin } from 'react-icons/fi';
 import '../styles/components/Footer.css';
 
 const Footer = ({ onPageChange }) => {
@@ -26,12 +27,17 @@ const Footer = ({ onPageChange }) => {
         </div>
         <div className="footer-section flex flex-col gap-3">
           <h4 className="footer-heading m-0 mb-2 text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-white/60">Contact and Support</h4>
-          <p className="footer-text m-0 text-white/80 text-[length:var(--text-base)] leading-[var(--leading-normal)]">+1 (800) 123-4567</p>
-          <p className="footer-text m-0 text-white/80 text-[length:var(--text-base)] leading-[var(--leading-normal)]"><a href="mailto:support@stallion.com" className="footer-link footer-link--inline inline-flex items-center text-white/80 text-[length:var(--text-base)] leading-[var(--leading-normal)] rounded-sm transition-colors duration-[120ms] motion-reduce:transition-none underline underline-offset-2 decoration-white/40 hover:text-text-on-primary hover:decoration-white active:text-white/70 focus-visible:outline-none focus-visible:text-text-on-primary focus-visible:decoration-white focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.35)]">support@stallion.com</a></p>
+          <p className="footer-text m-0 text-white/80 text-[length:var(--text-base)] leading-[var(--leading-normal)]"><a href="tel:+919324337504" className="footer-link footer-link--inline inline-flex items-center text-white/80 text-[length:var(--text-base)] leading-[var(--leading-normal)] rounded-sm transition-colors duration-[120ms] motion-reduce:transition-none no-underline hover:text-text-on-primary active:text-white/70 focus-visible:outline-none focus-visible:text-text-on-primary focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.35)]">+91 93243 37504</a></p>
+          <p className="footer-text m-0 text-white/80 text-[length:var(--text-base)] leading-[var(--leading-normal)]"><a href="mailto:info@stallioneyewear.in" className="footer-link footer-link--inline inline-flex items-center text-white/80 text-[length:var(--text-base)] leading-[var(--leading-normal)] rounded-sm transition-colors duration-[120ms] motion-reduce:transition-none underline underline-offset-2 decoration-white/40 hover:text-text-on-primary hover:decoration-white active:text-white/70 focus-visible:outline-none focus-visible:text-text-on-primary focus-visible:decoration-white focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.35)]">info@stallioneyewear.in</a></p>
         </div>
       </div>
-      <div className="footer-bottom relative z-[3] mx-auto mt-8 max-w-[1280px] border-t border-white/12 px-6 pt-5 min-[385px]:px-[5%]">
-        <p className="footer-copyright m-0 text-center text-[length:var(--text-xs)] text-white/55">© {new Date().getFullYear()} Stallion Eyewear LLP. All rights reserved.</p>
+      <div className="footer-bottom relative z-[3] mx-auto mt-12 w-full max-w-[1280px] border-t border-white/15 px-6 pt-6 min-[385px]:px-[5%] flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
+        <p className="footer-copyright m-0 text-[length:var(--text-xs)] text-white/65 text-center sm:text-left">© {new Date().getFullYear()} Stallion Eyewear LLP. All rights reserved.</p>
+        <div className="footer-social flex items-center gap-1">
+          <a href="#" aria-label="Instagram" className="inline-flex h-9 w-9 items-center justify-center rounded-pill text-white/70 transition-colors duration-[120ms] hover:bg-white/10 hover:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.35)]"><FiInstagram size={18} aria-hidden="true" /></a>
+          <a href="#" aria-label="Facebook" className="inline-flex h-9 w-9 items-center justify-center rounded-pill text-white/70 transition-colors duration-[120ms] hover:bg-white/10 hover:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.35)]"><FiFacebook size={18} aria-hidden="true" /></a>
+          <a href="#" aria-label="LinkedIn" className="inline-flex h-9 w-9 items-center justify-center rounded-pill text-white/70 transition-colors duration-[120ms] hover:bg-white/10 hover:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.35)]"><FiLinkedin size={18} aria-hidden="true" /></a>
+        </div>
       </div>
     </footer>
   );

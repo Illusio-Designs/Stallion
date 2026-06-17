@@ -347,7 +347,7 @@ const Dashboard = () => {
         {!isSalesman && (
         <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
           <div className="dash-card tall equal col-span-9 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
-            <div className="chart-header" style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10}}>
+            <div className="chart-header flex items-center justify-between mb-[10px]">
               <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700', margin: 0}}>Sales &amp; Revenue</h4>
               <DropdownSelector
                 options={[
@@ -432,15 +432,15 @@ const Dashboard = () => {
 
       {/* Salesman Targets - before Order Overview */}
       {isSalesman && (
-        <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3" style={{marginTop:'16px'}}>
+        <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3 mt-4">
           <div className="dash-card col-span-12 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5" style={{gridColumn:'span 12'}}>
             <h4 style={{color:'#000000', fontSize:'14px', fontWeight:'700', marginBottom:'14px'}}>My Targets</h4>
             <div className="ui-table__scroll">
-              <table style={{width:'100%', borderCollapse:'separate', borderSpacing:0}}>
+              <table className="w-full border-separate border-spacing-0">
                 <thead>
                   <tr>
                     {['TARGET AMOUNT','START DATE','END DATE','ORDER TYPE','STATUS','DESCRIPTION','REMARKS'].map(h => (
-                      <th key={h} style={{textAlign:'left', padding:'10px 0', fontSize:11, color:'#000', borderBottom:'1px solid #E0E0E0', fontWeight:'600'}}>{h}</th>
+                      <th key={h} className="text-left py-[10px] px-0 text-[11px] text-black border-b border-[#E0E0E0] font-semibold">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -449,7 +449,7 @@ const Dashboard = () => {
                     Array.from({ length: 4 }).map((_, i) => (
                       <tr key={`target-skel-${i}`}>
                         {Array.from({ length: 7 }).map((__, c) => (
-                          <td key={c} style={{padding:'10px 0'}}>
+                          <td key={c} className="py-[10px] px-0">
                             <Skeleton width={c === 5 || c === 6 ? 120 : 80} height={14} />
                           </td>
                         ))}
@@ -457,7 +457,7 @@ const Dashboard = () => {
                     ))
                   ) : targets.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={{padding:0}}>
+                      <td colSpan="7" className="p-0">
                         <div className="ui-state ui-state--empty">
                           <div className="ui-state__icon">
                             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -473,19 +473,18 @@ const Dashboard = () => {
                     </tr>
                   ) : targets.map((t, i) => (
                     <tr key={i}>
-                      <td style={{padding:'10px 0', fontSize:'13px', fontWeight:'600'}}>₹{parseFloat(t.target_amount || 0).toLocaleString('en-IN')}</td>
-                      <td style={{padding:'10px 0', fontSize:'13px'}}>{t.start_date ? new Date(t.start_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'}) : '-'}</td>
-                      <td style={{padding:'10px 0', fontSize:'13px'}}>{t.end_date ? new Date(t.end_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'}) : '-'}</td>
-                      <td style={{padding:'10px 0', fontSize:'13px'}}>{t.order_type || 'Overall'}</td>
-                      <td style={{padding:'10px 0'}}>
-                        <span style={{
-                          padding:'2px 10px', borderRadius:'12px', fontSize:'12px', fontWeight:600,
+                      <td className="py-[10px] px-0 text-[13px] font-semibold">₹{parseFloat(t.target_amount || 0).toLocaleString('en-IN')}</td>
+                      <td className="py-[10px] px-0 text-[13px]">{t.start_date ? new Date(t.start_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'}) : '-'}</td>
+                      <td className="py-[10px] px-0 text-[13px]">{t.end_date ? new Date(t.end_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'}) : '-'}</td>
+                      <td className="py-[10px] px-0 text-[13px]">{t.order_type || 'Overall'}</td>
+                      <td className="py-[10px] px-0">
+                        <span className="px-[10px] py-[2px] rounded-[12px] text-[12px] font-semibold" style={{
                           background: t.target_status === 'pending' ? '#fff3cd' : '#d4edda',
                           color: t.target_status === 'pending' ? '#856404' : '#155724',
                         }}>{t.target_status || 'pending'}</span>
                       </td>
-                      <td style={{padding:'10px 0', fontSize:'13px', color:'#6b7280'}}>{t.target_description || '-'}</td>
-                      <td style={{padding:'10px 0', fontSize:'13px', color:'#6b7280'}}>{t.target_remarks || '-'}</td>
+                      <td className="py-[10px] px-0 text-[13px] text-[#6b7280]">{t.target_description || '-'}</td>
+                      <td className="py-[10px] px-0 text-[13px] text-[#6b7280]">{t.target_remarks || '-'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -496,15 +495,15 @@ const Dashboard = () => {
       )}
 
       {/* Order Overview */}
-      <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3" style={{marginTop:'16px'}}>
+      <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3 mt-4">
         <div className="dash-card col-span-12 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5" style={{gridColumn:'span 12'}}>
           <h4 style={{color:'#000000', fontSize:'14px', fontWeight:'700', marginBottom:'10px'}}>Order Overview</h4>
           <div className="ui-table__scroll">
-            <table style={{width:'100%', borderCollapse:'separate', borderSpacing:0}}>
+            <table className="w-full border-separate border-spacing-0">
               <thead>
                 <tr>
                   {['ORDER ID','ORDER TYPE','PARTY','STATUS','VALUE','DATE'].map(h => (
-                    <th key={h} style={{textAlign:'left', padding:'10px 8px', fontSize:11, color:'#000', borderBottom:'1px solid #E0E0E0', fontWeight:'600'}}>{h}</th>
+                    <th key={h} className="text-left py-[10px] px-2 text-[11px] text-black border-b border-[#E0E0E0] font-semibold">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -513,7 +512,7 @@ const Dashboard = () => {
                   Array.from({ length: 6 }).map((_, i) => (
                     <tr key={`order-skel-${i}`}>
                       {Array.from({ length: 6 }).map((__, c) => (
-                        <td key={c} style={{padding:'10px 8px'}}>
+                        <td key={c} className="py-[10px] px-2">
                           <Skeleton width={c === 0 ? 70 : c === 3 ? 64 : 90} height={14} />
                         </td>
                       ))}
@@ -521,7 +520,7 @@ const Dashboard = () => {
                   ))
                 ) : recentOrders.length === 0 ? (
                   <tr>
-                    <td colSpan="6" style={{padding:0}}>
+                    <td colSpan="6" className="p-0">
                       <div className="ui-state ui-state--empty">
                         <div className="ui-state__icon">
                           <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -545,15 +544,15 @@ const Dashboard = () => {
                   const date = order.created_at || order.order_date;
                   const statusColor = status === 'COMPLETED' ? {bg:'#d4edda', color:'#155724'} : status === 'CANCELLED' ? {bg:'#f8d7da', color:'#721c24'} : {bg:'#fff3cd', color:'#856404'};
                   return (
-                    <tr key={i} style={{borderBottom:'1px solid #f3f4f6'}}>
-                      <td style={{padding:'10px 8px', fontSize:'13px', fontWeight:'500'}}>{orderNum}</td>
-                      <td style={{padding:'10px 8px', fontSize:'13px'}}>{orderType}</td>
-                      <td style={{padding:'10px 8px', fontSize:'13px'}}>{party}</td>
-                      <td style={{padding:'10px 8px'}}>
-                        <span style={{padding:'2px 10px', borderRadius:'12px', fontSize:'12px', fontWeight:600, background:statusColor.bg, color:statusColor.color}}>{status}</span>
+                    <tr key={i} className="border-b border-[#f3f4f6]">
+                      <td className="py-[10px] px-2 text-[13px] font-medium">{orderNum}</td>
+                      <td className="py-[10px] px-2 text-[13px]">{orderType}</td>
+                      <td className="py-[10px] px-2 text-[13px]">{party}</td>
+                      <td className="py-[10px] px-2">
+                        <span className="px-[10px] py-[2px] rounded-[12px] text-[12px] font-semibold" style={{background:statusColor.bg, color:statusColor.color}}>{status}</span>
                       </td>
-                      <td style={{padding:'10px 8px', fontSize:'13px', fontWeight:'600'}}>₹{value.toLocaleString('en-IN')}</td>
-                      <td style={{padding:'10px 8px', fontSize:'13px', color:'#6b7280'}}>{date ? new Date(date).toLocaleDateString('en-GB') : '-'}</td>
+                      <td className="py-[10px] px-2 text-[13px] font-semibold">₹{value.toLocaleString('en-IN')}</td>
+                      <td className="py-[10px] px-2 text-[13px] text-[#6b7280]">{date ? new Date(date).toLocaleDateString('en-GB') : '-'}</td>
                     </tr>
                   );
                 })}

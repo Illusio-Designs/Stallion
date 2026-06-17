@@ -335,7 +335,7 @@ const DashboardEvents = () => {
       >
         <div className="ui-form grid grid-cols-1 gap-4 min-[560px]:grid-cols-2">
           <div className="form-group flex flex-col gap-2">
-            <label className="ui-label text-sm font-medium text-text">Event Name <span style={{ color: 'red' }}>*</span></label>
+            <label className="ui-label text-sm font-medium text-text">Event Name <span className="text-[red]">*</span></label>
             <input
               className="ui-input w-full"
               placeholder="Enter event name"
@@ -344,7 +344,7 @@ const DashboardEvents = () => {
             />
           </div>
           <div className="form-group flex flex-col gap-2">
-            <label className="ui-label text-sm font-medium text-text">Start Date <span style={{ color: 'red' }}>*</span></label>
+            <label className="ui-label text-sm font-medium text-text">Start Date <span className="text-[red]">*</span></label>
             <input
               type="date"
               className="ui-input w-full"
@@ -353,7 +353,7 @@ const DashboardEvents = () => {
             />
           </div>
           <div className="form-group flex flex-col gap-2">
-            <label className="ui-label text-sm font-medium text-text">End Date <span style={{ color: 'red' }}>*</span></label>
+            <label className="ui-label text-sm font-medium text-text">End Date <span className="text-[red]">*</span></label>
             <input
               type="date"
               className="ui-input w-full"
@@ -362,7 +362,7 @@ const DashboardEvents = () => {
             />
           </div>
           <div className="form-group flex flex-col gap-2">
-            <label className="ui-label text-sm font-medium text-text">Event Location <span style={{ color: 'red' }}>*</span></label>
+            <label className="ui-label text-sm font-medium text-text">Event Location <span className="text-[red]">*</span></label>
             <input
               className="ui-input w-full"
               placeholder="Enter event location"
@@ -391,7 +391,7 @@ const DashboardEvents = () => {
       >
         <div className="ui-form grid grid-cols-1 gap-4 min-[560px]:grid-cols-2">
           <div className="form-group flex flex-col gap-2">
-            <label className="ui-label text-sm font-medium text-text">Event Name <span style={{ color: 'red' }}>*</span></label>
+            <label className="ui-label text-sm font-medium text-text">Event Name <span className="text-[red]">*</span></label>
             <input
               className="ui-input w-full"
               value={form.event_name}
@@ -399,7 +399,7 @@ const DashboardEvents = () => {
             />
           </div>
           <div className="form-group flex flex-col gap-2">
-            <label className="ui-label text-sm font-medium text-text">Start Date <span style={{ color: 'red' }}>*</span></label>
+            <label className="ui-label text-sm font-medium text-text">Start Date <span className="text-[red]">*</span></label>
             <input
               type="date"
               className="ui-input w-full"
@@ -408,7 +408,7 @@ const DashboardEvents = () => {
             />
           </div>
           <div className="form-group flex flex-col gap-2">
-            <label className="ui-label text-sm font-medium text-text">End Date <span style={{ color: 'red' }}>*</span></label>
+            <label className="ui-label text-sm font-medium text-text">End Date <span className="text-[red]">*</span></label>
             <input
               type="date"
               className="ui-input w-full"
@@ -417,7 +417,7 @@ const DashboardEvents = () => {
             />
           </div>
           <div className="form-group flex flex-col gap-2">
-            <label className="ui-label text-sm font-medium text-text">Event Location <span style={{ color: 'red' }}>*</span></label>
+            <label className="ui-label text-sm font-medium text-text">Event Location <span className="text-[red]">*</span></label>
             <input
               className="ui-input w-full"
               placeholder="Enter event location"

@@ -155,11 +155,11 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
             setTimeout(() => {
               handlePageChange(page);
             }, 100);
-            return <div style={{ padding: '20px', textAlign: 'center' }}>Redirecting...</div>;
+            return <div className="p-5 text-center">Redirecting...</div>;
           }
         }
         // If no accessible page found, show error
-        return <div style={{ padding: '20px', textAlign: 'center' }}>You don't have access to this page.</div>;
+        return <div className="p-5 text-center">You don't have access to this page.</div>;
       }
     }
     

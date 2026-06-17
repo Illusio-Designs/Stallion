@@ -200,7 +200,7 @@ export default function TableWithControls({
 
             {/* Filter Dropdown - appear below filter icon if open */}
             {showFilter && (
-              <div style={{position:'relative', display:'inline-block'}}>
+              <div className="relative inline-block">
                 <button
                   className="ui-pill"
                   ref={filterBtnRef}

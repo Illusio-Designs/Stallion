@@ -67,9 +67,11 @@
   max-width: 1280px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 3fr 1fr 1fr;
-  gap: var(--space-12);
-  padding: var(--space-5) 5%;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: var(--space-10);
+  /* Horizontal inset only — the <footer> already supplies the top/bottom
+     padding, so no redundant vertical padding here. */
+  padding: 0 5%;
   position: relative;
   z-index: 3;
 }
@@ -202,7 +204,7 @@
 
 @media (max-width: 384px) {
   .footer-content {
-    padding: var(--space-5) var(--space-6);
+    padding: 0 var(--space-6);
   }
   /* Keep decorative glasses from forcing horizontal scroll at 375px */
   .footer-side-image {

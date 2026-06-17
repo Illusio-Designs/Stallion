@@ -134,11 +134,11 @@ const PartyDashboard = () => {
           <div className="dash-card col-span-1 sm:col-span-12 bg-surface border border-border rounded-lg shadow-sm p-5" style={{gridColumn:'span 12'}}>
             <h4 className="text-base font-bold text-black">My Orders</h4>
             <div className="ui-table__scroll">
-              <table style={{width:'100%', borderCollapse:'separate', borderSpacing:0}}>
+              <table className="w-full border-separate border-spacing-0">
                 <thead>
                   <tr>
                     {['ORDER ID','ORDER TYPE','PARTY NAME','PRODUCT','QTY','STATUS','VALUE','ACTION'].map((h)=> (
-                      <th key={h} style={{textAlign:'left', padding:'14px 0', fontSize:12, color:'#000', borderBottom:'1px solid #E0E0E0'}}>{h}</th>
+                      <th key={h} className="text-left py-[14px] text-xs text-black border-b border-[#E0E0E0]">{h}</th>
                     ))}
                   </tr>
                 </thead>
@@ -147,7 +147,7 @@ const PartyDashboard = () => {
                     Array.from({ length: 6 }).map((_, i) => (
                       <tr key={`sk-${i}`}>
                         {Array.from({ length: 8 }).map((__, c) => (
-                          <td key={c} style={{padding:'14px 0'}}>
+                          <td key={c} className="py-[14px]">
                             <Skeleton height={16} width={c === 5 ? 90 : '70%'} />
                           </td>
                         ))}
@@ -155,7 +155,7 @@ const PartyDashboard = () => {
                     ))
                   ) : error ? (
                     <tr>
-                      <td colSpan="8" style={{padding:0, borderBottom:'none'}}>
+                      <td colSpan="8" className="p-0 border-b-0">
                         <div className="ui-state ui-state--error">
                           <div className="ui-state__icon" aria-hidden="true">
                             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -172,7 +172,7 @@ const PartyDashboard = () => {
                     </tr>
                   ) : orders.length === 0 ? (
                     <tr>
-                      <td colSpan="8" style={{padding:0, borderBottom:'none'}}>
+                      <td colSpan="8" className="p-0 border-b-0">
                         <div className="ui-state ui-state--empty">
                           <div className="ui-state__icon" aria-hidden="true">
                             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -246,14 +246,14 @@ const PartyDashboard = () => {
                       
                       return (
                         <tr key={orderId || index}>
-                          <td style={{padding:'14px 0'}}>{orderNumber}</td>
-                          <td style={{padding:'14px 0'}}>{orderTypeDisplay}</td>
-                          <td style={{padding:'14px 0'}}>{partyName}</td>
-                          <td style={{padding:'14px 0', color:'#6b7280'}}>{productDisplay}</td>
-                          <td style={{padding:'14px 0'}}>{totalQuantity}</td>
-                          <td style={{padding:'14px 0'}}><StatusBadge status={orderStatus.toLowerCase().replace(/\s+/g, '-')}>{orderStatus}</StatusBadge></td>
-                          <td style={{padding:'14px 0'}}>₹{totalValue.toLocaleString('en-IN')}</td>
-                          <td style={{padding:'14px 0'}}>
+                          <td className="py-[14px]">{orderNumber}</td>
+                          <td className="py-[14px]">{orderTypeDisplay}</td>
+                          <td className="py-[14px]">{partyName}</td>
+                          <td className="py-[14px] text-[#6b7280]">{productDisplay}</td>
+                          <td className="py-[14px]">{totalQuantity}</td>
+                          <td className="py-[14px]"><StatusBadge status={orderStatus.toLowerCase().replace(/\s+/g, '-')}>{orderStatus}</StatusBadge></td>
+                          <td className="py-[14px]">₹{totalValue.toLocaleString('en-IN')}</td>
+                          <td className="py-[14px]">
                             <RowActions onView={()=>console.log('view', order)} />
                           </td>
                         </tr>

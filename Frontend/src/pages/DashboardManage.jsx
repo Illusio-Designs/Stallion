@@ -1631,8 +1631,8 @@ const DashboardManage = () => {
               showFilter={['State', 'City', 'Zone'].includes(activeTab)}
               filterContent={
                 activeTab === 'State' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <label style={{ fontWeight: 500, fontSize: '14px', marginBottom: '4px' }}>
+                  <div className="flex flex-col gap-3">
+                    <label className="font-medium text-[14px] mb-1">
                       Filter by Country:
                     </label>
                     <DropdownSelector
@@ -1644,24 +1644,15 @@ const DashboardManage = () => {
                     {stateCountryFilter && (
                       <button
                         onClick={() => setStateCountryFilter('')}
-                        style={{
-                          padding: '8px 16px',
-                          background: '#f5f5f5',
-                          border: '1px solid #E0E0E0',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          marginTop: '8px'
-                        }}
+                        className="px-4 py-2 bg-[#f5f5f5] border border-[#E0E0E0] rounded-lg cursor-pointer text-[14px] font-medium mt-2"
                       >
                         Clear Filter
                       </button>
                     )}
                   </div>
                 ) : activeTab === 'City' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <label style={{ fontWeight: 500, fontSize: '14px', marginBottom: '4px' }}>
+                  <div className="flex flex-col gap-3">
+                    <label className="font-medium text-[14px] mb-1">
                       Filter by State:
                     </label>
                     <DropdownSelector
@@ -1673,28 +1664,19 @@ const DashboardManage = () => {
                     {cityStateFilter && (
                       <button
                         onClick={() => setCityStateFilter('')}
-                        style={{
-                          padding: '8px 16px',
-                          background: '#f5f5f5',
-                          border: '1px solid #E0E0E0',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          marginTop: '8px'
-                        }}
+                        className="px-4 py-2 bg-[#f5f5f5] border border-[#E0E0E0] rounded-lg cursor-pointer text-[14px] font-medium mt-2"
                       >
                         Clear Filter
                       </button>
                     )}
                   </div>
                 ) : activeTab === 'Zone' ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    <label style={{ fontWeight: 500, fontSize: '14px', marginBottom: '4px' }}>
+                  <div className="flex flex-col gap-3">
+                    <label className="font-medium text-[14px] mb-1">
                       Filter by City:
                     </label>
                     {zoneCitiesLoading ? (
-                      <div style={{ padding: '10px', textAlign: 'center', color: '#666', fontSize: '14px' }}>
+                      <div className="p-[10px] text-center text-[#666] text-[14px]">
                         Loading cities...
                       </div>
                     ) : (
@@ -1709,16 +1691,7 @@ const DashboardManage = () => {
                     {zoneCityFilter && (
                       <button
                         onClick={() => setZoneCityFilter('')}
-                        style={{
-                          padding: '8px 16px',
-                          background: '#f5f5f5',
-                          border: '1px solid #E0E0E0',
-                          borderRadius: '8px',
-                          cursor: 'pointer',
-                          fontSize: '14px',
-                          fontWeight: 500,
-                          marginTop: '8px'
-                        }}
+                        className="px-4 py-2 bg-[#f5f5f5] border border-[#E0E0E0] rounded-lg cursor-pointer text-[14px] font-medium mt-2"
                       >
                         Clear Filter
                       </button>

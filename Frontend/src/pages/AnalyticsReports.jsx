@@ -30,11 +30,11 @@ const Progress = ({ pct }) => {
   const v = Math.max(0, Math.min(100, Math.round(pct)));
   const color = v >= 100 ? 'var(--color-success)' : v >= 50 ? 'var(--color-primary)' : 'var(--color-warning)';
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 120 }}>
-      <div style={{ flex: 1, height: 6, borderRadius: 999, background: 'var(--color-grey-200)', overflow: 'hidden' }}>
+    <div className="flex items-center gap-2 min-w-[120px]">
+      <div className="flex-1 h-[6px] rounded-[999px] bg-[var(--color-grey-200)] overflow-hidden">
         <div style={{ width: `${v}%`, height: '100%', background: color, borderRadius: 999 }} />
       </div>
-      <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text)', minWidth: 34, textAlign: 'right' }}>{v}%</span>
+      <span className="text-xs font-semibold text-text min-w-[34px] text-right">{v}%</span>
     </div>
   );
 };
@@ -150,8 +150,8 @@ const AnalyticsReports = () => {
     { key: 'party', label: 'PARTY' },
     { key: 'date', label: 'DATE' },
     { key: 'location', label: 'LOCATION', render: (v) => (v && v.lat && v.lng)
-      ? <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--color-primary)', fontWeight: 500 }}>View on map</a>
-      : <span style={{ color: 'var(--color-text-subtle)' }}>—</span> },
+      ? <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
+      : <span className="text-text-subtle">—</span> },
     { key: 'remarks', label: 'REMARKS' },
   ]), []);
 

@@ -548,17 +548,10 @@ const DashboardSettings = () => {
                         });
                         setAvatarError(false);
                       }}
-                      style={{ 
-                        display: 'block', 
-                        width: '100%', 
-                        height: '100%', 
-                        objectFit: 'cover',
-                        visibility: 'visible',
-                        opacity: 1
-                      }}
+                      className="block w-full h-full object-cover visible opacity-100"
                     />
                   ) : avatarError ? (
-                    <span style={{ color: '#ef4444', fontSize: '12px' }}>Failed to load image</span>
+                    <span className="text-[#ef4444] text-[12px]">Failed to load image</span>
                   ) : (
                     <span>No Image</span>
                   )}

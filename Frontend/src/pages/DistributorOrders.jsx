@@ -519,7 +519,7 @@ const DistributorOrders = () => {
           </>
         )}
       >
-        <div className="ui-form" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+        <div className="ui-form max-h-[70vh] overflow-y-auto">
           {/* Order Type - Hidden, auto-set to distributor_order */}
           <div className="form-group" style={{ display: 'none' }}>
             <label className="ui-label">Order Type</label>
@@ -533,16 +533,16 @@ const DistributorOrders = () => {
           {/* Order Items */}
           <div className="form-group">
             <label className="ui-label">
-              Order Items <span style={{ color: 'red' }}>*</span>
+              Order Items <span className="text-[red]">*</span>
             </label>
-            <div style={{ border: '1px solid #E0E0E0', borderRadius: '8px', padding: '16px' }}>
+            <div className="border border-[#E0E0E0] rounded-lg p-4">
               {createFormData.order_items.map((item, index) => (
                 <div key={index} style={{ 
                   marginBottom: index < createFormData.order_items.length - 1 ? '16px' : 0,
                   paddingBottom: index < createFormData.order_items.length - 1 ? '16px' : 0,
                   borderBottom: index < createFormData.order_items.length - 1 ? '1px solid #E0E0E0' : 'none'
                 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div className="flex justify-between items-center mb-2">
                     <strong>Item {index + 1}</strong>
                     {createFormData.order_items.length > 1 && (
                       <Button 
@@ -554,9 +554,9 @@ const DistributorOrders = () => {
                       </Button>
                     )}
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                  <div className="grid grid-cols-3 gap-3">
                     <div>
-                      <label style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'block' }}>Product</label>
+                      <label className="text-xs text-[#666] mb-1 block">Product</label>
                       <DropdownSelector
                         options={[
                           { value: '', label: 'Select Product' },
@@ -572,7 +572,7 @@ const DistributorOrders = () => {
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'block' }}>Quantity</label>
+                      <label className="text-xs text-[#666] mb-1 block">Quantity</label>
                       <input 
                         type="number"
                         className="ui-input"
@@ -583,7 +583,7 @@ const DistributorOrders = () => {
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: '12px', color: '#666', marginBottom: '4px', display: 'block' }}>Price</label>
+                      <label className="text-xs text-[#666] mb-1 block">Price</label>
                       <input 
                         type="number"
                         className="ui-input"

@@ -107,7 +107,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
                 checked={allSelected}
                 onChange={toggleAll}
                 onClick={(e) => e.stopPropagation()}
-                style={{ accentColor: '#181265', cursor: 'pointer' }}
+                className="accent-[#181265] cursor-pointer"
               />
               {allSelected ? 'Uncheck All' : 'Check All'}
             </span>
@@ -133,7 +133,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
                       checked={isChecked}
                       onChange={() => toggleZone(zoneId)}
                       onClick={(e) => e.stopPropagation()}
-                      style={{ accentColor: '#181265', cursor: 'pointer' }}
+                      className="accent-[#181265] cursor-pointer"
                     />
                     {zoneName}
                   </span>
@@ -199,7 +199,7 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
           </div>
           <div className="ui-dropdown-custom__option border-b border-border font-semibold" onClick={toggleAll}>
             <span className="flex items-center gap-2">
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} onClick={(e) => e.stopPropagation()} style={{ accentColor: '#181265', cursor: 'pointer' }} />
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} onClick={(e) => e.stopPropagation()} className="accent-[#181265] cursor-pointer" />
               {allSelected ? 'Uncheck All' : 'Check All'}
             </span>
           </div>
@@ -211,7 +211,7 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
               return (
                 <div key={id} className={`ui-dropdown-custom__option ${isChecked ? 'ui-dropdown-custom__option--selected' : ''}`} onClick={() => toggle(id)}>
                   <span className="flex items-center gap-2">
-                    <input type="checkbox" checked={isChecked} onChange={() => toggle(id)} onClick={(e) => e.stopPropagation()} style={{ accentColor: '#181265', cursor: 'pointer' }} />
+                    <input type="checkbox" checked={isChecked} onChange={() => toggle(id)} onClick={(e) => e.stopPropagation()} className="accent-[#181265] cursor-pointer" />
                     {nameOf(s)}
                   </span>
                 </div>
@@ -221,14 +221,14 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
         </div>
       )}
       {selectedStates.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+        <div className="flex flex-wrap gap-1.5 mt-2">
           {selectedStates.map(id => {
             const s = states.find(st => idOf(st) === id);
             const label = s ? nameOf(s) : id;
             return (
-              <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: 'var(--color-primary-soft)', color: 'var(--color-primary)', borderRadius: 999, padding: '3px 10px', fontSize: 12, fontWeight: 500 }}>
+              <span key={id} className="inline-flex items-center gap-1.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] rounded-full py-[3px] px-[10px] text-xs font-medium">
                 {label}
-                <button type="button" onClick={(e) => { e.stopPropagation(); toggle(id); }} aria-label={`Remove ${label}`} style={{ border: 'none', background: 'transparent', color: 'inherit', cursor: 'pointer', fontSize: 14, lineHeight: 1, padding: 0 }}>×</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); toggle(id); }} aria-label={`Remove ${label}`} className="border-none bg-transparent text-inherit cursor-pointer text-sm leading-none p-0">×</button>
               </span>
             );
           })}
@@ -1429,7 +1429,7 @@ const DashboardDistributor = () => {
             />
           </div>
           <div className="form-group form-group--full">
-            <label className="ui-label">Working States <span style={{ color: '#888', fontWeight: 400 }}>(parties in these states are auto-assigned to this distributor)</span></label>
+            <label className="ui-label">Working States <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this distributor)</span></label>
             <StatesMultiDropdown
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
@@ -1637,7 +1637,7 @@ const DashboardDistributor = () => {
             />
           </div>
           <div className="form-group form-group--full">
-            <label className="ui-label">Working States <span style={{ color: '#888', fontWeight: 400 }}>(parties in these states are auto-assigned to this distributor)</span></label>
+            <label className="ui-label">Working States <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this distributor)</span></label>
             <StatesMultiDropdown
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
