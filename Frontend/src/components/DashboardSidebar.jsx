@@ -44,7 +44,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     { id: 'dashboard-products', text: 'Products' },
     { id: 'orders', text: 'Orders' },
     { id: 'expenses', text: 'Expenses' },
-    { id: 'tray', text: 'Tray' },
+    { id: 'tray', text: 'Sample' },
     { id: 'events', text: 'Events' },
     { id: 'party', text: 'Party' },
     { id: 'salesmen', text: 'Salesmen' },
