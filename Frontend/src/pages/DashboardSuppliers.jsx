@@ -36,7 +36,7 @@ import { showSuccess, showError } from '../services/notificationService';
 import { getUser, getUserRole } from '../services/authService';
 
 // Multi-select zones dropdown (same design as distributor page)
-const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled = false }) => {
+const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled = false, onOpen }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef(null);
@@ -89,7 +89,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
       ref={dropdownRef}
       className={`ui-dropdown-custom ui-dropdown-custom--full-width ${isOpen ? 'ui-dropdown-custom--open' : ''} ${disabled ? 'ui-dropdown-custom--disabled' : ''}`}
     >
-      <div className="ui-dropdown-custom__trigger" onClick={() => !disabled && setIsOpen(o => !o)}>
+      <div className="ui-dropdown-custom__trigger" onClick={() => { if (disabled) return; setIsOpen(o => { const next = !o; if (next) onOpen?.(); return next; }); }}>
         <span className={`ui-dropdown-custom__value ${selectedZones.length === 0 ? 'ui-dropdown-custom__value--placeholder' : ''}`}>
           {displayValue}
         </span>
@@ -693,7 +693,7 @@ const DashboardSuppliers = () => {
 
   const handleAdd = () => {
     resetForm();
-    fetchZones(); // lazy-load zones for the form (cached after first open)
+    // Zones are optional — loaded only when the user opens the Zones dropdown.
     setOpenAdd(true);
   };
 
@@ -728,7 +728,7 @@ const DashboardSuppliers = () => {
       joining_date: row.joining_date ? row.joining_date.split('T')[0] : '',
     });
     setEditRow(row);
-    fetchZones(); // lazy-load zones for the form (cached after first open)
+    // Zones are optional — loaded only when the user opens the Zones dropdown.
 
     // Load dependent data for editing
     if (row.country_id) {
@@ -1618,6 +1618,7 @@ const DashboardSuppliers = () => {
               zones={zones}
               selectedZones={formData.zones}
               onChange={(selected) => handleInputChange('zones', selected)}
+              onOpen={fetchZones}
             />
           </div>
           <div className="form-group form-group--full">
@@ -1798,6 +1799,7 @@ const DashboardSuppliers = () => {
               zones={zones}
               selectedZones={formData.zones}
               onChange={(selected) => handleInputChange('zones', selected)}
+              onOpen={fetchZones}
             />
           </div>
           <div className="form-group form-group--full">
