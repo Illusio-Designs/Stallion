@@ -1,4 +1,4 @@
-import { apiRequest, fetchAllPages, getBaseURL, getAuthToken, handleResponse } from './client';
+import { apiRequest, fetchAllPages, fetchPage, getBaseURL, getAuthToken, handleResponse } from './client';
 
 // ==================== DISTRIBUTOR ENDPOINTS ====================
 
@@ -420,8 +420,10 @@ const scopedList = async (endpoint) => {
   }
 };
 
-// GET /salesmen/parties — parties assigned to the authenticated salesman.
-export const getSalesmanParties = async () => scopedList('/salesmen/parties');
+// GET /parties/my — parties assigned to the authenticated salesman. (There is no
+// /salesmen/parties route; the backend scopes /parties/my by role from the JWT,
+// returning the salesman's assigned-state parties.)
+export const getSalesmanParties = async () => scopedList('/parties/my');
 // GET /distributors/parties — parties under the authenticated distributor.
 export const getDistributorParties = async () => scopedList('/distributors/parties');
 // GET /parties/my — parties for the current user's role.
@@ -441,6 +443,22 @@ export const getPartiesForRole = async (role, countryId) => {
     default: return getParties(countryId);
   }
 };
+
+// ---- Server-paginated (20/page) variants for list TABLES (Products-style) ----
+/** One page of parties (admin list) -> { data, pagination }. */
+export const getPartiesPage = (countryId, page = 1, limit = 20, search = '') =>
+  fetchPage('/parties/get', { page, limit, search }, {
+    method: 'POST',
+    body: countryId ? { country_id: String(countryId).trim() } : {},
+    includeAuth: true,
+  });
+/** One page of distributors -> { data, pagination }. */
+export const getDistributorsPage = (countryId, page = 1, limit = 20, search = '') =>
+  fetchPage('/distributors/get', { page, limit, search }, {
+    method: 'POST',
+    body: countryId ? { country_id: String(countryId).trim() } : {},
+    includeAuth: true,
+  });
 
 export const getParties = async (countryId) => {
   // If no countryId provided, use POST /parties/get with empty body to get all parties

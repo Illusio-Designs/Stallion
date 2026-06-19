@@ -6,7 +6,7 @@ import Footer from '../components/Footer';
 import '../styles/pages/Login.css';
 import { showLoginSuccess, showError, showSuccess } from '../services/notificationService';
 import { setAuth, isLoggedIn, getUserRole, getUser } from '../services/authService';
-import { checkUser, login, getUsers, getRoles } from '../services/apiService';
+import { checkUser, login, getMe, getMyRole } from '../services/apiService';
 import { getAccessiblePages, hasPageAccess } from '../utils/rolePermissions';
 import { pageKeyToPath } from '../utils/dashboardRoutes';
 import { verifyOTP, resendOTP, initializeOTPWidget, destroyOTPWidget } from '../services/msg91Service';
@@ -324,79 +324,52 @@ const Login = ({ onPageChange }) => {
             const refreshUserData = async () => {
               try {
                 const currentUser = getUser();
-                if (!currentUser || !currentUser.id) return;
-                
-                // Fetch all users to get the latest user data
-                const usersResponse = await getUsers();
-                let usersArray = [];
-                if (Array.isArray(usersResponse)) {
-                  usersArray = usersResponse;
-                } else if (usersResponse && Array.isArray(usersResponse.data)) {
-                  usersArray = usersResponse.data;
-                } else if (usersResponse && Array.isArray(usersResponse.users)) {
-                  usersArray = usersResponse.users;
-                }
-                
-                // Find current user in the list
-                const updatedUserData = usersArray.find(u => 
-                  (u.user_id || u.id) === currentUser.id
-                );
-                
-                if (updatedUserData) {
-                  // Fetch roles to map role_id to role_name
-                  let rolesArray = [];
-                  try {
-                    const rolesResponse = await getRoles();
-                    if (Array.isArray(rolesResponse)) {
-                      rolesArray = rolesResponse;
-                    } else if (rolesResponse && Array.isArray(rolesResponse.data)) {
-                      rolesArray = rolesResponse.data;
-                    } else if (rolesResponse && Array.isArray(rolesResponse.roles)) {
-                      rolesArray = rolesResponse.roles;
-                    }
-                  } catch (rolesError) {
-                    console.error('Error fetching roles for user refresh:', rolesError);
-                  }
-                  
-                  // Find role name from role_id
-                  const userRole = rolesArray.find(r => {
-                    const roleId = r.role_id || r.id || r.roleId || r._id || r.uuid || r.ID;
-                    return roleId === (updatedUserData.role_id || updatedUserData.roleId);
-                  });
-                  
-                  const roleName = userRole 
-                    ? (userRole.role_name || userRole.name || userRole.roleName || userRole.title || userRole.role || userRole.Name || userRole.RoleName)
-                    : null;
-                  
-                  // Update user object with latest data, especially role
-                  const updatedUser = {
-                    ...currentUser,
-                    ...updatedUserData,
-                    id: updatedUserData.user_id || updatedUserData.id || currentUser.id,
-                    full_name: updatedUserData.full_name || updatedUserData.fullName || updatedUserData.name || currentUser.full_name,
-                    fullName: updatedUserData.full_name || updatedUserData.fullName || updatedUserData.name || currentUser.fullName,
-                    name: updatedUserData.full_name || updatedUserData.fullName || updatedUserData.name || currentUser.name,
-                    email: updatedUserData.email || currentUser.email,
-                    phone: updatedUserData.phone || updatedUserData.phoneNumber || currentUser.phone,
-                    profile_image: updatedUserData.profile_image || updatedUserData.image_url || currentUser.profile_image,
-                    image_url: updatedUserData.image_url || updatedUserData.profile_image || currentUser.image_url,
-                    role_id: updatedUserData.role_id || updatedUserData.roleId || currentUser.role_id,
-                    roleId: updatedUserData.role_id || updatedUserData.roleId || currentUser.roleId,
-                    // Update role name if we found it
-                    role: roleName || updatedUserData.role || currentUser.role,
-                    role_name: roleName || updatedUserData.role_name || updatedUserData.roleName || currentUser.role_name,
-                    roleName: roleName || updatedUserData.roleName || updatedUserData.role_name || currentUser.roleName,
-                  };
-                  
-                  // Update stored user data with latest information
-                  setAuth(updatedUser, loginResponse.token);
-                  
-                  console.log('User data refreshed with latest role:', {
-                    role_id: updatedUser.role_id,
-                    role: updatedUser.role,
-                    role_name: updatedUser.role_name,
-                  });
-                }
+                if (!currentUser) return;
+
+                // Use the role-agnostic self endpoints. GET /users (admin-only)
+                // 403s for party/distributor/salesman; /users/me + /users/role
+                // work for every role and return the latest profile + role.
+                const [me, myRoles] = await Promise.all([
+                  getMe().catch(() => null),
+                  getMyRole().catch(() => []),
+                ]);
+
+                // /users/role returns [{ role_id, role_name, ... }] for the user.
+                const roleList = Array.isArray(myRoles)
+                  ? myRoles
+                  : (myRoles?.data || myRoles?.roles || []);
+                const roleName = roleList.length
+                  ? (roleList[0].role_name || roleList[0].roleName || roleList[0].role || roleList[0].name)
+                  : null;
+
+                if (!me && !roleName) return;
+
+                const updatedUser = {
+                  ...currentUser,
+                  ...(me || {}),
+                  id: (me && (me.user_id || me.id)) || currentUser.id,
+                  full_name: (me && (me.full_name || me.fullName || me.name)) || currentUser.full_name,
+                  fullName: (me && (me.full_name || me.fullName || me.name)) || currentUser.fullName,
+                  name: (me && (me.full_name || me.fullName || me.name)) || currentUser.name,
+                  email: (me && me.email) || currentUser.email,
+                  phone: (me && (me.phone || me.phoneNumber)) || currentUser.phone,
+                  profile_image: (me && (me.profile_image || me.image_url)) || currentUser.profile_image,
+                  image_url: (me && (me.image_url || me.profile_image)) || currentUser.image_url,
+                  role_id: (me && (me.role_id || me.roleId)) || (roleList[0]?.role_id) || currentUser.role_id,
+                  roleId: (me && (me.role_id || me.roleId)) || (roleList[0]?.role_id) || currentUser.roleId,
+                  // Latest role name from /users/role wins; fall back to existing.
+                  role: roleName || currentUser.role,
+                  role_name: roleName || currentUser.role_name,
+                  roleName: roleName || currentUser.roleName,
+                };
+
+                setAuth(updatedUser, loginResponse.token);
+
+                console.log('User data refreshed with latest role:', {
+                  role_id: updatedUser.role_id,
+                  role: updatedUser.role,
+                  role_name: updatedUser.role_name,
+                });
               } catch (refreshError) {
                 console.error('Error refreshing user data after login:', refreshError);
                 // Don't block login if refresh fails - user can still proceed

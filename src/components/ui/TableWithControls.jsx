@@ -21,7 +21,7 @@ export default function TableWithControls({
   dateFrom = null,
   dateTo = null,
   onDateRangeChange,
-  rowSizeOptions = [8, 16, 24],
+  rowSizeOptions = [20, 40, 60],
   selectable = true,
   addNewText = "Add New",
   exportText = "Export All Data",
