@@ -1,5 +1,6 @@
 const SalesmanCheckIns = require('../models/SalesmanCheckIns');
 const { logAudit } = require('../utils/auditLogger');
+const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 class SalesmanCheckInsController {
 
@@ -40,11 +41,15 @@ class SalesmanCheckInsController {
 
     async getSalesmanCheckIns(req, res) {
         try {
-            const checkIns = await SalesmanCheckIns.findAll();
-            if (!checkIns || checkIns.length === 0) {
-                return res.status(404).json({ error: 'Salesman check-ins not found' });
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
             }
-            res.status(200).json(checkIns);
+            const { count, rows: checkIns } = await SalesmanCheckIns.findAndCountAll({
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            res.status(200).json(buildPaginatedResponse(checkIns, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

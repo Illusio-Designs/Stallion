@@ -2,6 +2,7 @@ const SalesmanTargets = require('../models/SalesmanTargets');
 const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const { Op } = require('sequelize');
+const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 // Compute a target's achieved amount LIVE from the orders, so existing and new
 // orders always count (the report never depends on the stored running total).
@@ -67,9 +68,16 @@ class SalesmanTargetsController {
 
     async getSalesmanTargets(req, res) {
         try {
-            const salesmanTargets = await SalesmanTargets.findAll();
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
+            }
+            const { count, rows: salesmanTargets } = await SalesmanTargets.findAndCountAll({
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
             const enriched = await Promise.all(salesmanTargets.map(enrichTarget));
-            res.status(200).json(enriched);
+            res.status(200).json(buildPaginatedResponse(enriched, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

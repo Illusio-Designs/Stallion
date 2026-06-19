@@ -45,8 +45,40 @@ function mergeWhere(baseWhere, searchFilter) {
     return { [Op.and]: [baseWhere, searchFilter] };
 }
 
+/** Required `page` and `limit` from query string. */
+function parsePaginationParams(req) {
+    const { page, limit } = req.query;
+    if (!page || !limit) {
+        return { error: 'Page and limit are required', status: 400 };
+    }
+    if (isNaN(page) || isNaN(limit)) {
+        return { error: 'Page and limit must be numbers', status: 400 };
+    }
+    const pageNum = parseInt(page, 10);
+    const limitNum = parseInt(limit, 10);
+    return {
+        page: pageNum,
+        limit: limitNum,
+        offset: (pageNum - 1) * limitNum,
+    };
+}
+
+function buildPaginatedResponse(data, { page, limit }, count) {
+    return {
+        data,
+        pagination: {
+            page,
+            limit,
+            total: count,
+            totalPages: Math.ceil(count / limit) || 0,
+        },
+    };
+}
+
 module.exports = {
     getListSearchParams,
     buildNamePhoneFilter,
     mergeWhere,
+    parsePaginationParams,
+    buildPaginatedResponse,
 };

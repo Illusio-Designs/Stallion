@@ -17,7 +17,7 @@ const { resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const { canManageParties, normalizeRole } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
-const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 class PartyController {
     async getPartie(req, res) {
@@ -40,6 +40,10 @@ class PartyController {
             if (!canManageParties(req.userRoleName)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
+            }
             const { name, phone } = getListSearchParams(req);
             const searchFilter = buildNamePhoneFilter({
                 name,
@@ -48,11 +52,12 @@ class PartyController {
                 phoneFields: ['phone'],
             });
             const where = mergeWhere({ is_active: true }, searchFilter);
-            const parties = await Party.findAll({ where });
-            if (!parties || parties.length === 0) {
-                return res.status(404).json({ error: 'Parties not found' });
-            }
-            res.status(200).json(parties);
+            const { count, rows: parties } = await Party.findAndCountAll({
+                where,
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            res.status(200).json(buildPaginatedResponse(parties, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

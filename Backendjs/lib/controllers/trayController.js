@@ -1,14 +1,19 @@
 const Tray = require('../models/Tray');
 const { logAudit } = require('../utils/auditLogger');
+const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 class TrayController {
     async getTrays(req, res) {
         try {
-            const trays = await Tray.findAll();
-            if (!trays || trays.length === 0) {
-                return res.status(404).json({ error: 'Trays not found' });
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
             }
-            res.status(200).json(trays);
+            const { count, rows: trays } = await Tray.findAndCountAll({
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            res.status(200).json(buildPaginatedResponse(trays, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

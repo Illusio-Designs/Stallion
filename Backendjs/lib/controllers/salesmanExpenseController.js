@@ -2,6 +2,7 @@ const SalesmanExpense = require('../models/SalesmanExpense');
 const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const { normalizeRole, isOfficeRole } = require('../utils/roleHelpers');
+const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 async function resolveSalesmanIdForUser(userId, roleName) {
     if (normalizeRole(roleName) === 'salesman') {
@@ -33,15 +34,20 @@ class SalesmanExpenseController {
             if (!isOfficeRole(req.userRoleName)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
+            }
             const { salesman_id } = req.params;
             if (!salesman_id) {
                 return res.status(400).json({ error: 'Salesman ID is required' });
             }
-            const salesmanExpenses = await SalesmanExpense.findAll({ where: { salesman_id: salesman_id } });
-            if (!salesmanExpenses || salesmanExpenses.length === 0) {
-                return res.status(404).json({ error: 'Salesman expenses not found' });
-            }
-            res.status(200).json(salesmanExpenses);
+            const { count, rows: salesmanExpenses } = await SalesmanExpense.findAndCountAll({
+                where: { salesman_id },
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            res.status(200).json(buildPaginatedResponse(salesmanExpenses, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -52,7 +58,11 @@ class SalesmanExpenseController {
             if (!isOfficeRole(req.userRoleName)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
-            const salesmanExpenses = await SalesmanExpense.findAll({
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
+            }
+            const { count, rows: salesmanExpenses } = await SalesmanExpense.findAndCountAll({
                 include: [
                     {
                         model: Salesman,
@@ -60,10 +70,10 @@ class SalesmanExpenseController {
                         attributes: ['full_name'],
                     },
                 ],
+                limit: pagination.limit,
+                offset: pagination.offset,
+                distinct: true,
             });
-            if (!salesmanExpenses || salesmanExpenses.length === 0) {
-                return res.status(404).json({ error: 'Salesman expenses not found' });
-            }
 
             const response = salesmanExpenses.map((expense) => {
                 const plain = expense.get({ plain: true });
@@ -74,7 +84,7 @@ class SalesmanExpenseController {
                 };
             });
 
-            res.status(200).json(response);
+            res.status(200).json(buildPaginatedResponse(response, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
