@@ -21,7 +21,7 @@ import {
 import { showSuccess, showError } from '../services/notificationService';
 
 // Multi-select zones dropdown matching the existing DropdownSelector design
-const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled = false }) => {
+const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled = false, onOpen }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef(null);
@@ -74,7 +74,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
       ref={dropdownRef}
       className={`ui-dropdown-custom ui-dropdown-custom--full-width ${isOpen ? 'ui-dropdown-custom--open' : ''} ${disabled ? 'ui-dropdown-custom--disabled' : ''}`}
     >
-      <div className="ui-dropdown-custom__trigger" onClick={() => !disabled && setIsOpen(o => !o)}>
+      <div className="ui-dropdown-custom__trigger" onClick={() => { if (disabled) return; if (!isOpen) onOpen?.(); setIsOpen(o => !o); }}>
         <span className={`ui-dropdown-custom__value ${selectedZones.length === 0 ? 'ui-dropdown-custom__value--placeholder' : ''}`}>
           {displayValue}
         </span>
@@ -579,7 +579,7 @@ const DashboardDistributor = () => {
 
   const handleAdd = () => {
     resetForm();
-    fetchAllZones(selectedCountryFilter); // lazy-load zones for the form (cached after first open)
+    // Zones load only when the user opens the Zones dropdown (onOpen).
     setOpenAdd(true);
   };
 
@@ -617,7 +617,7 @@ const DashboardDistributor = () => {
       commission_rate: row.commission_rate || '',
     });
     setEditRow(row);
-    fetchAllZones(row.country_id || selectedCountryFilter); // lazy-load zones for the form (cached after first open)
+    // Zones load only when the user opens the Zones dropdown (onOpen).
 
     // Load dependent data for editing (countries too, so the Country field
     // shows its label even if the dropdown was never opened).
@@ -1436,6 +1436,7 @@ const DashboardDistributor = () => {
               zones={zones}
               selectedZones={Array.isArray(formData.zones) ? formData.zones : []}
               onChange={(updated) => handleInputChange('zones', updated)}
+              onOpen={() => fetchAllZones(formData.country_id || selectedCountryFilter)}
             />
           </div>
           <div className="form-group form-group--full">
@@ -1645,6 +1646,7 @@ const DashboardDistributor = () => {
               zones={zones}
               selectedZones={Array.isArray(formData.zones) ? formData.zones : []}
               onChange={(updated) => handleInputChange('zones', updated)}
+              onOpen={() => fetchAllZones(formData.country_id || selectedCountryFilter)}
             />
           </div>
           <div className="form-group form-group--full">

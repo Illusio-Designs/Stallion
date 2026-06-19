@@ -341,17 +341,17 @@ export const getOrdersForRole = async (role) => {
 };
 
 // ---- Server-paginated (20/page) variants for list TABLES (Products-style) ----
-/** One page of orders (admin/full list) -> { data, pagination }. */
-export const getOrdersPage = (page = 1, limit = 20, search = '') =>
-  fetchPage('/orders', { page, limit, search }, { method: 'GET', includeAuth: true });
+/** One page of orders (admin/full list) -> { data, pagination }. status filters by order_status. */
+export const getOrdersPage = (page = 1, limit = 20, search = '', status = '') =>
+  fetchPage('/orders', { page, limit, search, params: { status } }, { method: 'GET', includeAuth: true });
 /** One page of the current user's own orders -> { data, pagination }. */
-export const getMyOrdersPage = (page = 1, limit = 20, search = '') =>
-  fetchPage('/orders/my', { page, limit, search }, { method: 'GET', includeAuth: true });
+export const getMyOrdersPage = (page = 1, limit = 20, search = '', status = '') =>
+  fetchPage('/orders/my', { page, limit, search, params: { status } }, { method: 'GET', includeAuth: true });
 /** Role-aware single page of orders -> { data, pagination }. */
-export const getOrdersPageForRole = (role, page = 1, limit = 20, search = '') =>
+export const getOrdersPageForRole = (role, page = 1, limit = 20, search = '', status = '') =>
   SELF_SCOPED_ORDER_ROLES.has((role || '').toLowerCase().trim())
-    ? getMyOrdersPage(page, limit, search)
-    : getOrdersPage(page, limit, search);
+    ? getMyOrdersPage(page, limit, search, status)
+    : getOrdersPage(page, limit, search, status);
 /** One page of trays -> { data, pagination }. */
 export const getTraysPage = (page = 1, limit = 20, search = '') =>
   fetchPage('/trays', { page, limit, search }, { method: 'GET', includeAuth: true });
