@@ -5,10 +5,12 @@ import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import { register, getRoles, getUsers, updateUser, deleteUser } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 
 const DashboardOfficeTeam = () => {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('All');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -337,7 +339,7 @@ const DashboardOfficeTeam = () => {
 
   const handleDelete = async (row) => {
     // Confirm deletion
-    const confirmed = window.confirm(`Are you sure you want to delete user "${row.fullName}"?`);
+    const confirmed = await confirm(`Are you sure you want to delete user "${row.fullName}"?`);
     if (!confirmed) return;
     
     setLoading(true);

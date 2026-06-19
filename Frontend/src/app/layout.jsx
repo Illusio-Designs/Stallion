@@ -3,6 +3,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import LoaderProvider from "../components/LoaderProvider";
 import ToastContainerProvider from "../components/ToastContainerProvider";
 import ErrorBoundary from "../components/ErrorBoundary";
+import { ConfirmProvider } from "../components/ui/ConfirmProvider";
 
 export const metadata = {
   title: "Stallion Eyewear",
@@ -38,7 +39,9 @@ export default function RootLayout({ children }) {
         <ErrorBoundary>
           <LoaderProvider>
             <ToastContainerProvider>
-              {children}
+              <ConfirmProvider>
+                {children}
+              </ConfirmProvider>
             </ToastContainerProvider>
           </LoaderProvider>
         </ErrorBoundary>

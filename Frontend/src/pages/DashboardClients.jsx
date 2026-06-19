@@ -5,6 +5,7 @@ import AsidePanel from '../components/ui/AsidePanel';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import RowActions from '../components/ui/RowActions';
 import TableWithControls from '../components/ui/TableWithControls';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   bulkUploadParties,
   createParty,
@@ -22,6 +23,7 @@ import { getUser, getUserRole } from '../services/authService';
 import { showError, showSuccess } from '../services/notificationService';
 
 const DashboardClients = () => {
+  const confirm = useConfirm();
   // Memoize user and role to prevent infinite loops
   const userRole = useMemo(() => getUserRole(), []);
   const user = useMemo(() => getUser(), []);
@@ -62,11 +64,15 @@ const DashboardClients = () => {
     prefered_courier: '',
   });
 
+  // Countries load on mount because the listing's default-country filter
+  // (India) depends on them. The load-once guard makes the onOpen fallback on
+  // the form's Country dropdowns a no-op once they're already loaded.
   useEffect(() => {
     fetchCountries();
   }, []);
 
   const fetchCountries = async () => {
+    if (countries.length > 0) return;
     try {
       const countriesData = await getCountries();
       setCountries(countriesData || []);
@@ -481,7 +487,9 @@ const DashboardClients = () => {
     setOpenAdd(false);
 
     try {
-      // Load states, cities, and zones FIRST before setting formData
+      // Load the cascade lists FIRST so the selected values show their labels.
+      // Countries included so the Country field isn't blank in edit mode.
+      await fetchCountries();
       if (row.country_id) {
         await fetchStates(row.country_id);
         if (row.state_id) {
@@ -527,7 +535,7 @@ const DashboardClients = () => {
   };
 
   const handleDelete = async (row) => {
-    if (!window.confirm(`Are you sure you want to delete this party? This will also delete the associated user account.`)) {
+    if (!(await confirm(`Are you sure you want to delete this party? This will also delete the associated user account.`))) {
       return;
     }
 
@@ -1167,6 +1175,7 @@ const DashboardClients = () => {
           ]}
           value={formData.country_id || ''}
           onChange={(value) => handleInputChange('country_id', value || '')}
+          onOpen={fetchCountries}
           placeholder="Select Country"
           className="ui-dropdown-custom--full-width"
         />
@@ -1400,6 +1409,7 @@ const DashboardClients = () => {
                         setLoading(false);
                       }
                     }}
+                    onOpen={fetchCountries}
                     placeholder="All Countries"
                     className="ui-dropdown-custom--full-width"
                   />

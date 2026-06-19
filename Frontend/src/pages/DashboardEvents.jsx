@@ -3,6 +3,7 @@ import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import StatusBadge from '../components/ui/StatusBadge';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getEvents,
   createEvent,
@@ -34,6 +35,7 @@ const getStatusLabel = (status) => {
 };
 
 const DashboardEvents = () => {
+  const confirm = useConfirm();
   const [dateRange, setDateRange] = useState('Feb 25, 2025 - Mar 25, 2025');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -246,7 +248,7 @@ const DashboardEvents = () => {
   const handleDelete = async (row) => {
     const eventId = row?.event_id || row?.id;
     if (!eventId) return;
-    const confirmed = window.confirm(`Delete event "${row.event_name}"?`);
+    const confirmed = await confirm(`Delete event "${row.event_name}"?`);
     if (!confirmed) return;
     setSaving(true);
     setError(null);

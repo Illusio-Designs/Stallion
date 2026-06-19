@@ -4,6 +4,7 @@ import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import { Skeleton } from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   bulkUploadProducts,
   createProduct,
@@ -128,6 +129,7 @@ const hasValidImageUrls = (product) => {
 };
 
 const DashboardProducts = () => {
+  const confirm = useConfirm();
   const PRODUCTS_PER_PAGE = 20;
   const [activeTab, setActiveTab] = useState('Products');
   const [products, setProducts] = useState([]);
@@ -1786,7 +1788,7 @@ const DashboardProducts = () => {
       return;
     }
 
-    if (!window.confirm(`Are you sure you want to delete product ${row.model_no}? This will also remove it from all trays.`)) {
+    if (!(await confirm(`Are you sure you want to delete product ${row.model_no}? This will also remove it from all trays.`))) {
       return;
     }
 
@@ -1872,7 +1874,7 @@ const DashboardProducts = () => {
   };
 
   const handleUnassignImage = async (product, imageUrl) => {
-    if (!window.confirm('Unassign this image from the product?')) return;
+    if (!(await confirm('Unassign this image from the product?'))) return;
     try {
       setProductModelLoading(true);
       const currentUrls = parseImageUrls(product);
@@ -2430,7 +2432,7 @@ const DashboardProducts = () => {
                               return;
                             }
 
-                            if (!window.confirm('Are you sure you want to delete this image? This cannot be undone.')) {
+                            if (!(await confirm('Are you sure you want to delete this image? This cannot be undone.'))) {
                               return;
                             }
 

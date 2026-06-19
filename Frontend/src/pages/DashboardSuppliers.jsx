@@ -5,6 +5,7 @@ import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import DatePicker from '../components/ui/DatePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import {
@@ -239,6 +240,7 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
 };
 
 const DashboardSuppliers = () => {
+  const confirm = useConfirm();
   const isSalesman = getUserRole() === 'salesman';
   const [activeTab, setActiveTab] = useState('All');
   const [mainTab, setMainTab] = useState(isSalesman ? 'Check-ins' : 'Salesmen');
@@ -743,7 +745,7 @@ const DashboardSuppliers = () => {
   };
 
   const handleDelete = async (row) => {
-    if (!window.confirm(`Are you sure you want to delete this salesman? This will also delete the associated user account.`)) {
+    if (!(await confirm(`Are you sure you want to delete this salesman? This will also delete the associated user account.`))) {
       return;
     }
 
@@ -1188,7 +1190,7 @@ const DashboardSuppliers = () => {
   };
 
   const handleCheckinDelete = async (row) => {
-    if (!window.confirm('Delete this check-in?')) return;
+    if (!(await confirm('Delete this check-in?'))) return;
     try {
       await deleteSalesmanCheckin(row.id);
       showSuccess('Check-in deleted successfully');
@@ -1250,7 +1252,7 @@ const DashboardSuppliers = () => {
   };
 
   const handleTargetDelete = async (row) => {
-    if (!window.confirm('Delete this target?')) return;
+    if (!(await confirm('Delete this target?'))) return;
     try {
       await deleteSalesmanTarget(row.id);
       showSuccess('Target deleted successfully');

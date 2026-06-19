@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getSalesmanExpenses,
   getAllAdminExpenses,
@@ -19,6 +20,7 @@ import { getUserRole, getUser } from '../services/authService';
 import '../styles/pages/dashboard-expenses.css';
 
 const DashboardExpenses = () => {
+  const confirm = useConfirm();
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -299,7 +301,7 @@ const DashboardExpenses = () => {
 
   // Handle delete expense
   const handleDelete = async (row) => {
-    if (!window.confirm('Are you sure you want to delete this expense?')) return;
+    if (!(await confirm('Are you sure you want to delete this expense?'))) return;
 
     try {
       setLoading(true);
