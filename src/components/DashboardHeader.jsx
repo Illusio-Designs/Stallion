@@ -4,7 +4,7 @@ import { FiMaximize, FiMinimize, FiBell, FiMenu } from 'react-icons/fi';
 import Tooltip from './ui/Tooltip';
 import { logout as authLogout, getUser } from '../services/authService';
 import { showLogoutSuccess } from '../services/notificationService';
-import { getUsers } from '../services/apiService';
+import { getMe } from '../services/apiService';
 
 const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuToggle }) => {
   const [userName, setUserName] = useState('');
@@ -52,19 +52,9 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
       // Priority 3: Try to fetch from API if we have user ID but no name/avatar
       if (user && user.id && (!name || !avatar)) {
         try {
-          const usersResponse = await getUsers();
-          let usersArray = [];
-          if (Array.isArray(usersResponse)) {
-            usersArray = usersResponse;
-          } else if (usersResponse && Array.isArray(usersResponse.data)) {
-            usersArray = usersResponse.data;
-          } else if (usersResponse && Array.isArray(usersResponse.users)) {
-            usersArray = usersResponse.users;
-          }
-
-          const userData = usersArray.find(u => 
-            (u.user_id || u.id) === user.id
-          );
+          // GET /users/me — current user (works for every role). Previously this
+          // fetched the whole /users list (admin-only -> 403 for field roles).
+          const userData = await getMe();
 
           if (userData) {
             if (!name) {
