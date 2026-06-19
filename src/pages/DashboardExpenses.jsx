@@ -3,7 +3,7 @@ import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
+import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import {
@@ -542,7 +542,7 @@ const DashboardExpenses = () => {
       </div>
 
       {/* Create Expense Modal */}
-      <Modal
+      <AsidePanel
         open={createModalOpen}
         onClose={() => {
           setCreateModalOpen(false);
@@ -667,10 +667,10 @@ const DashboardExpenses = () => {
             </Button>
           </div>
         </div>
-      </Modal>
+      </AsidePanel>
 
       {/* View Expense Modal */}
-      <Modal
+      <AsidePanel
         open={editModalOpen}
         onClose={() => {
           setEditModalOpen(false);
@@ -755,7 +755,7 @@ const DashboardExpenses = () => {
             </div>
           </div>
         )}
-      </Modal>
+      </AsidePanel>
     </div>
   );
 };

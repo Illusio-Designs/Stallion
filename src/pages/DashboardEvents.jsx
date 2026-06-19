@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import TableWithControls from '../components/ui/TableWithControls';
-import Modal from '../components/ui/Modal';
+import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import StatusBadge from '../components/ui/StatusBadge';
 import {
@@ -318,7 +318,7 @@ const DashboardEvents = () => {
       </div>
       
       {/* Add Event Modal */}
-      <Modal
+      <AsidePanel
         open={openAdd}
         onClose={() => {
           setOpenAdd(false);
@@ -371,10 +371,10 @@ const DashboardEvents = () => {
             />
           </div>
         </div>
-      </Modal>
+      </AsidePanel>
 
       {/* Edit Event Modal */}
-      <Modal
+      <AsidePanel
         open={!!editRow}
         onClose={() => {
           setEditRow(null);
@@ -426,7 +426,7 @@ const DashboardEvents = () => {
             />
           </div>
         </div>
-      </Modal>
+      </AsidePanel>
     </div>
   );
 };

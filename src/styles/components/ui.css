@@ -1053,7 +1053,13 @@ textarea.ui-input {
   background: rgba(26, 27, 35, 0.25);
   z-index: 50;
   backdrop-filter: blur(2px);
-  animation: uiBackdropFade var(--transition) ease-out;
+  /* Fade the scrim in/out; .is-open is toggled by the component. */
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+
+.ui-aside-panel__backdrop.is-open {
+  opacity: 1;
 }
 
 .ui-aside-panel {
@@ -1068,29 +1074,29 @@ textarea.ui-input {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* Off-screen by default; slides in when .is-open is added, and back out
+     before unmount. Easing is the "drawer" curve (decelerate to rest). */
+  transform: translateX(100%);
+  transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+  will-change: transform;
+}
+
+.ui-aside-panel.is-open {
+  transform: translateX(0);
+}
+
+.ui-aside-panel--sm {
+  max-width: 420px;
 }
 
 .ui-aside-panel--lg {
   max-width: 640px;
 }
 
-.ui-aside-panel--enter {
-  animation: uiAsideEnter 220ms ease-out;
-}
-
-@keyframes uiAsideEnter {
-  from {
-    transform: translateX(100%);
-  }
-
-  to {
-    transform: translateX(0);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .ui-aside-panel--enter {
-    animation: none;
+  .ui-aside-panel__backdrop,
+  .ui-aside-panel {
+    transition: none;
   }
 }
 

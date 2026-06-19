@@ -3,7 +3,7 @@ import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
+import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import {
@@ -1096,7 +1096,7 @@ const DashboardOrders = () => {
       </div>
 
       {/* View Order Modal */}
-      <Modal open={!!viewRow} onClose={() => setViewRow(null)} title="Order Details" footer={(
+      <AsidePanel open={!!viewRow} onClose={() => setViewRow(null)} title="Order Details" footer={(
         <Button onClick={() => setViewRow(null)}>Close</Button>
       )}>
         {viewRow && (() => {
@@ -1187,10 +1187,10 @@ const DashboardOrders = () => {
             </div>
           );
         })()}
-      </Modal>
+      </AsidePanel>
 
       {/* Edit Order Status Modal */}
-      <Modal open={!!editRow} onClose={() => {
+      <AsidePanel open={!!editRow} onClose={() => {
         setEditRow(null);
         setEditStatus('PENDING');
       }} title="Edit Order Status" footer={(
@@ -1246,10 +1246,10 @@ const DashboardOrders = () => {
             />
           </div>
         </div>
-      </Modal>
+      </AsidePanel>
 
       {/* Create Order Modal */}
-      <Modal 
+      <AsidePanel 
         open={createModalOpen} 
         onClose={() => {
           setCreateModalOpen(false);
@@ -1552,7 +1552,7 @@ const DashboardOrders = () => {
             />
           </div>
         </div>
-      </Modal>
+      </AsidePanel>
     </div>
   );
 };

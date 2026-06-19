@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import TableWithControls from '../components/ui/TableWithControls';
-import Modal from '../components/ui/Modal';
+import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import { register, getRoles, getUsers, updateUser, deleteUser } from '../services/apiService';
@@ -536,7 +536,7 @@ const DashboardOfficeTeam = () => {
           </div>
         </div>
       </div>
-      <Modal
+      <AsidePanel
         open={openAdd}
         onClose={() => {
           setOpenAdd(false);
@@ -607,8 +607,8 @@ const DashboardOfficeTeam = () => {
             />
           </div>
         </form>
-      </Modal>
-      <Modal
+      </AsidePanel>
+      <AsidePanel
         open={!!editRow}
         onClose={() => {
           setEditRow(null);
@@ -694,7 +694,7 @@ const DashboardOfficeTeam = () => {
             </div>
           </div>
         </form>
-      </Modal>
+      </AsidePanel>
     </div>
   );
 };

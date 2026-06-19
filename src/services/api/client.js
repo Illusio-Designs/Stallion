@@ -360,6 +360,36 @@ const apiRequest = async (endpoint, options = {}) => {
 };
 
 
+// ---- List pagination compatibility ----
+// Several backend list endpoints now REQUIRE page & limit (they 400 without
+// them) and respond { data, pagination }. Dashboards/dropdowns/client-side
+// tables need the FULL list, so these getters make a SINGLE request with a large
+// limit and return the unwrapped array (no per-page looping). Tables that want
+// true 20/page server pagination pass their own page/limit and read .pagination.
+const PAGE_SIZE = 20;        // strict server page size for true server-paginated tables
+const LIST_LIMIT = 1000;     // single-call "load all" size for client-side lists/dropdowns
+
+/** Normalize an array | { data, pagination } response to its array. */
+const unwrapList = (res) =>
+  Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+
+/** Append page/limit query params (the backend now requires them). */
+const withListPaging = (endpoint, { page = 1, limit = LIST_LIMIT } = {}) => {
+  const sep = endpoint.includes('?') ? '&' : '?';
+  return `${endpoint}${sep}page=${page}&limit=${limit}`;
+};
+
+/**
+ * Single request that loads a full list (page 1, large limit) and returns the
+ * unwrapped array — one network call, no looping.
+ * @param {string} endpoint
+ * @param {Object} [opts] - apiRequest options (method/body/includeAuth/silent)
+ */
+const fetchAllPages = async (endpoint, opts = {}) => {
+  const res = await apiRequest(withListPaging(endpoint), opts);
+  return unwrapList(res);
+};
+
 export {
   getBaseURL,
   getAuthToken,
@@ -370,4 +400,9 @@ export {
   TTL_LOOKUP,
   TTL_PRODUCTS,
   TTL_TRANSACTIONAL,
+  PAGE_SIZE,
+  LIST_LIMIT,
+  unwrapList,
+  withListPaging,
+  fetchAllPages,
 };

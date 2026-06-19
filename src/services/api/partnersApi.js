@@ -1,4 +1,4 @@
-import { apiRequest, getBaseURL, getAuthToken, handleResponse } from './client';
+import { apiRequest, fetchAllPages, getBaseURL, getAuthToken, handleResponse } from './client';
 
 // ==================== DISTRIBUTOR ENDPOINTS ====================
 
@@ -27,7 +27,7 @@ export const getDistributors = async (countryId) => {
     console.log('[getDistributors] Request body:', JSON.stringify({ country_id: cleanCountryId }));
     
     // Use POST to /distributors/get with country_id in body (following pattern from getStates/getCities)
-    const response = await apiRequest('/distributors/get', {
+    const response = await fetchAllPages('/distributors/get', {
       method: 'POST',
       body: { country_id: cleanCountryId },
       includeAuth: true,
@@ -411,7 +411,7 @@ export const deleteDistributor = async (distributorId) => {
 
 const scopedList = async (endpoint) => {
   try {
-    const response = await apiRequest(endpoint, { method: 'GET', includeAuth: true });
+    const response = await fetchAllPages(endpoint, { method: 'GET', includeAuth: true });
     return Array.isArray(response) ? response : (response?.data || []);
   } catch (error) {
     const msg = `${error.message || ''} ${error.errorData?.error || error.errorData?.message || ''}`.toLowerCase();
@@ -447,7 +447,7 @@ export const getParties = async (countryId) => {
   if (!countryId) {
     try {
       console.log('[getParties] Fetching all parties (no country filter)');
-      const response = await apiRequest('/parties/get', {
+      const response = await fetchAllPages('/parties/get', {
         method: 'POST',
         body: {}, // Empty body to get all parties
         includeAuth: true,
@@ -501,7 +501,7 @@ export const getParties = async (countryId) => {
     console.log('[getParties] Request body:', JSON.stringify({ country_id: cleanCountryId }));
     
     // Use POST to /parties/get with country_id in body (following pattern from getDistributors/getSalesmen)
-    const response = await apiRequest('/parties/get', {
+    const response = await fetchAllPages('/parties/get', {
       method: 'POST',
       body: { country_id: cleanCountryId },
       includeAuth: true,
@@ -609,7 +609,7 @@ export const getPartyById = async (partyId) => {
   try {
     // Use POST to /parties/get with party_id in body (matching pattern from getParties)
     console.log('[getPartyById] Fetching party with ID:', cleanPartyId);
-    const response = await apiRequest('/parties/get', {
+    const response = await fetchAllPages('/parties/get', {
       method: 'POST',
       body: { party_id: cleanPartyId },
       includeAuth: true,

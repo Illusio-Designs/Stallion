@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import TableWithControls from '../components/ui/TableWithControls';
-import Modal from '../components/ui/Modal';
+import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import DatePicker from '../components/ui/DatePicker';
@@ -1486,7 +1486,7 @@ const DashboardSuppliers = () => {
         </div>
         )}
       </div>
-      <Modal
+      <AsidePanel
         open={openAdd}
         onClose={() => {
           setOpenAdd(false);
@@ -1665,8 +1665,8 @@ const DashboardSuppliers = () => {
             />
           </div>
         </form>
-      </Modal>
-      <Modal
+      </AsidePanel>
+      <AsidePanel
         open={!!editRow}
         onClose={() => {
           setEditRow(null);
@@ -1845,11 +1845,11 @@ const DashboardSuppliers = () => {
             />
           </div>
         </form>
-      </Modal>
+      </AsidePanel>
 
       {/* Check-in Modal - salesman only */}
       {isSalesman && (
-      <Modal
+      <AsidePanel
         open={openCheckinModal}
         onClose={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}
         title={editCheckin ? 'Edit Check-in' : 'Add Check-in'}
@@ -1881,11 +1881,11 @@ const DashboardSuppliers = () => {
             <input className="ui-input" placeholder="Check-in remarks" value={checkinForm.check_in_remarks} onChange={(e) => setCheckinForm(prev => ({ ...prev, check_in_remarks: e.target.value }))} />
           </div>
         </form>
-      </Modal>
+      </AsidePanel>
       )}
 
       {/* Target Modal */}
-      <Modal
+      <AsidePanel
         open={openTargetModal}
         onClose={() => { setOpenTargetModal(false); setEditTarget(null); resetTargetForm(); }}
         title={editTarget ? 'Edit Target' : 'Set Target'}
@@ -1950,7 +1950,7 @@ const DashboardSuppliers = () => {
             <input className="ui-input" placeholder="Target remarks" value={targetForm.target_remarks} onChange={(e) => setTargetForm(prev => ({ ...prev, target_remarks: e.target.value }))} />
           </div>
         </form>
-      </Modal>
+      </AsidePanel>
     </div>
   );
 };

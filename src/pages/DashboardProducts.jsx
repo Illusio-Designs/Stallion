@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import Modal from '../components/ui/Modal';
+import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import { Skeleton } from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
@@ -2578,7 +2578,7 @@ const DashboardProducts = () => {
           </div>
         </div>
       </div>
-      <Modal
+      <AsidePanel
         open={openAdd}
         onClose={() => {
           setOpenAdd(false);
@@ -2807,8 +2807,8 @@ const DashboardProducts = () => {
             />
           </div>
         </form>
-      </Modal>
-      <Modal
+      </AsidePanel>
+      <AsidePanel
         open={!!editRow}
         onClose={() => {
           setEditRow(null);
@@ -3085,8 +3085,8 @@ const DashboardProducts = () => {
             );
           })()}
         </form>
-      </Modal>
-      <Modal
+      </AsidePanel>
+      <AsidePanel
         open={openBulkUpload}
         onClose={() => {
           setOpenBulkUpload(false);
@@ -3153,8 +3153,8 @@ const DashboardProducts = () => {
             </div>
           )}
         </div>
-      </Modal>
-      <Modal
+      </AsidePanel>
+      <AsidePanel
         open={openImageSelectModal}
         onClose={() => {
           setOpenImageSelectModal(false);
@@ -3335,7 +3335,7 @@ const DashboardProducts = () => {
             </>
           )}
         </div>
-      </Modal>
+      </AsidePanel>
       <input
         ref={imageInputRef}
         id="product-image-upload"
