@@ -200,12 +200,24 @@ class SalesmanController {
                 is_active: is_active,
             };
             await Salesman.update(payload, { where: { salesman_id: id } });
-            // Keep the linked login account (users table) in sync. Login (OTP) is
-            // matched against users.phone, so a salesman phone/email/name change
-            // must propagate here or the salesman can no longer log in.
+            // Keep the linked login account (users table) in sync. Login (OTP)
+            // matches users.phone EXACTLY against the E.164 form (+91XXXXXXXXXX),
+            // but the salesman form stores the phone without the leading '+'. So
+            // normalize to E.164 before saving, otherwise the salesman can no
+            // longer log in after an edit.
             if (salesman.user_id) {
+                const toE164 = (p) => {
+                    let s = String(p).trim().replace(/[\s\-()]/g, '');
+                    if (!s) return s;
+                    if (!s.startsWith('+')) {
+                        s = s.replace(/^0+/, '');
+                        if (!s.startsWith('91')) s = `91${s}`;
+                        s = `+${s}`;
+                    }
+                    return s;
+                };
                 const userUpdate = { updated_at: new Date() };
-                if (phone !== undefined && phone !== null && String(phone).trim() !== '') userUpdate.phone = phone;
+                if (phone !== undefined && phone !== null && String(phone).trim() !== '') userUpdate.phone = toE164(phone);
                 if (email !== undefined && email !== null && String(email).trim() !== '') userUpdate.email = email;
                 if (full_name !== undefined && full_name !== null && String(full_name).trim() !== '') userUpdate.full_name = full_name;
                 if (Object.keys(userUpdate).length > 1) {
