@@ -60,6 +60,9 @@ const Cart = ({ onPageChange = null }) => {
   // user to re-enable it in site settings AND reload (Chrome applies the change
   // only after a reload), so we surface a Reload action instead of "Try again".
   const [locationBlocked, setLocationBlocked] = useState(false);
+  // True when coordinates came from the IP-based fallback (approximate) rather
+  // than precise GPS — used to label the captured location honestly.
+  const [locationApprox, setLocationApprox] = useState(false);
   
   // Dropdown data
   const [countries, setCountries] = useState([]);
@@ -218,31 +221,52 @@ const Cart = ({ onPageChange = null }) => {
     });
   };
 
-  // Explicit location request for visit orders. We ALWAYS call getCurrentPosition
-  // (don't pre-bail on navigator.permissions, whose 'denied' state can be stale
-  // until reload). getCurrentPosition shows the native prompt when undecided, or
-  // errors with code 1 (PERMISSION_DENIED) when blocked — which we treat as a
-  // "re-enable in settings + reload" case.
+  // Approximate location from the user's IP — used as a fallback when precise
+  // GPS isn't available (e.g. desktops with no location hardware/provider).
+  const getIpLocation = async () => {
+    const res = await fetch('https://ipwho.is/', { cache: 'no-store' });
+    const data = await res.json();
+    if (data && data.success !== false && Number.isFinite(data.latitude) && Number.isFinite(data.longitude)) {
+      return { latitude: Number(data.latitude), longitude: Number(data.longitude) };
+    }
+    throw new Error('IP location unavailable');
+  };
+
+  // Explicit location request for visit orders. Try precise GPS first; if that
+  // fails (denied / unavailable / no hardware), fall back to approximate IP-based
+  // location so a visit order is never fully blocked. Phones with GPS still get
+  // exact coordinates.
   const requestLocation = async () => {
     setLocationLoading(true);
     setLocationError(null);
     setLocationBlocked(false);
+    setLocationApprox(false);
     try {
-      await getCurrentLocation(); // native prompt, or rejects if blocked
+      await getCurrentLocation(); // precise GPS (native prompt) — exact coords
     } catch (err) {
-      if (err?.insecure) {
-        // getCurrentLocation already set the HTTPS message; nothing to retry here.
-      } else if (err && err.code === 1 /* PERMISSION_DENIED */) {
-        // Site permission may already be on — a code-1 with the site allowed is
-        // usually the device's location service being off (Chrome surfaces OS
-        // denial as code 1). Cover both, and offer a reload (Chrome applies a
-        // permission change only after reload).
-        setLocationBlocked(true);
-        setLocationError('Location is blocked. Make sure location is allowed for this site AND your device’s location service is turned on, then reload the page.');
-      } else if (err && err.code === 2 /* POSITION_UNAVAILABLE */) {
-        setLocationError('Your location is currently unavailable. Turn on your device’s location service and try again.');
-      } else if (err && err.code === 3 /* TIMEOUT */) {
-        setLocationError('Getting your location timed out. Please try again.');
+      // Precise attempt failed — try the IP-based fallback before giving up.
+      try {
+        const ip = await getIpLocation();
+        setLatitude(ip.latitude);
+        setLongitude(ip.longitude);
+        locationRef.current = { latitude: ip.latitude, longitude: ip.longitude };
+        setLocationApprox(true);
+        setLocationBlocked(false);
+        setLocationError(null);
+      } catch {
+        // Both precise and IP failed — show the most useful guidance.
+        if (err?.insecure) {
+          // HTTPS message already set by getCurrentLocation.
+        } else if (err && err.code === 1 /* PERMISSION_DENIED */) {
+          setLocationBlocked(true);
+          setLocationError('Couldn’t get your location. Allow location for this site and turn on your device’s location service, then reload — or try again.');
+        } else if (err && err.code === 2 /* POSITION_UNAVAILABLE */) {
+          setLocationError('Your location is currently unavailable. Turn on your device’s location service and try again.');
+        } else if (err && err.code === 3 /* TIMEOUT */) {
+          setLocationError('Getting your location timed out. Please try again.');
+        } else {
+          setLocationError('Could not determine your location. Please try again.');
+        }
       }
     } finally {
       setLocationLoading(false);
@@ -1155,7 +1179,7 @@ const Cart = ({ onPageChange = null }) => {
                   <label className="form-label text-[length:var(--text-sm)] font-medium text-text">Location</label>
                   {latitude !== null && longitude !== null ? (
                     <div className="flex items-center gap-2 text-[length:var(--text-sm)]">
-                      <span className="font-medium text-[color:var(--color-success,#16a34a)]">✓ Location captured</span>
+                      <span className="font-medium text-[color:var(--color-success,#16a34a)]">{locationApprox ? '✓ Approximate location (IP-based)' : '✓ Location captured'}</span>
                       <span className="text-text-muted [font-variant-numeric:tabular-nums]">({Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)})</span>
                       <button
                         type="button"
