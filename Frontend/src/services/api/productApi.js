@@ -1,7 +1,24 @@
-import { apiRequest, getBaseURL, getAuthToken, handleResponse, TTL_PRODUCTS } from './client';
 import { getCached, invalidateCache } from '../cacheService';
+import { TTL_PRODUCTS, apiRequest, getAuthToken, getBaseURL, handleResponse } from './client';
 
 // ==================== PRODUCTS ENDPOINTS ====================
+
+/**
+ * Normalize a products API response into { data, pagination }.
+ * Supports legacy plain-array responses and paginated { data, pagination } payloads.
+ */
+export const parseProductsResponse = (response) => {
+  if (Array.isArray(response)) {
+    return { data: response, pagination: null };
+  }
+  if (response && Array.isArray(response.data)) {
+    return {
+      data: response.data,
+      pagination: response.pagination ?? null,
+    };
+  }
+  return { data: [], pagination: null };
+};
 
 /**
  * Get all products
@@ -28,9 +45,9 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
     const queryParams = new URLSearchParams();
     queryParams.append('page', page.toString());
     queryParams.append('limit', limit.toString());
-    
+
     const endpoint = `/products/?${queryParams.toString()}`; // Note: trailing slash as in Postman
-    
+
     // If filters is explicitly null, send all filter fields as null (matching Postman collection)
     // Postman uses GET with body, but browsers can't send body with GET, so apiRequest will convert to POST
     if (filters === null) {
@@ -46,75 +63,69 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
         status: null, // Include null status to get all products including drafts
         price: null
       };
-      
+
       const response = await apiRequest(endpoint, {
         method: 'POST',
         body: filterBody,
         includeAuth: true,
       });
-      
-      if (Array.isArray(response)) {
-        return response;
-      }
-      if (response && Array.isArray(response.data)) {
-        return response.data;
-      }
-      return [];
+
+      return parseProductsResponse(response);
     }
-    
+
     // Build filter body exactly as shown in Postman collection, but only when filters exist
     const filterBody = {};
-    
+
     // gender_id
     if (filters.gender_id !== undefined && filters.gender_id !== null) {
       filterBody.gender_id = filters.gender_id;
     }
-    
+
     // color_code_id
     if (filters.color_code_id !== undefined && filters.color_code_id !== null) {
       filterBody.color_code_id = filters.color_code_id;
     }
-    
+
     // shape_id
     if (filters.shape_id !== undefined && filters.shape_id !== null) {
       filterBody.shape_id = filters.shape_id;
     }
-    
+
     // lens_color_id
     if (filters.lens_color_id !== undefined && filters.lens_color_id !== null) {
       filterBody.lens_color_id = filters.lens_color_id;
     }
-    
+
     // frame_color_id
     if (filters.frame_color_id !== undefined && filters.frame_color_id !== null) {
       filterBody.frame_color_id = filters.frame_color_id;
     }
-    
+
     // frame_type_id
     if (filters.frame_type_id !== undefined && filters.frame_type_id !== null) {
       filterBody.frame_type_id = filters.frame_type_id;
     }
-    
+
     // lens_material_id
     if (filters.lens_material_id !== undefined && filters.lens_material_id !== null) {
       filterBody.lens_material_id = filters.lens_material_id;
     }
-    
+
     // frame_material_id
     if (filters.frame_material_id !== undefined && filters.frame_material_id !== null) {
       filterBody.frame_material_id = filters.frame_material_id;
     }
-    
+
     // brand_id (optional, but include if provided)
     if (filters.brand_id !== undefined && filters.brand_id !== null) {
       filterBody.brand_id = filters.brand_id;
     }
-    
+
     // status (optional, include if provided to filter by status, or null to get all including drafts)
     if (filters.status !== undefined) {
       filterBody.status = filters.status;
     }
-    
+
     // Always include price filter (backend requires it)
     // If price is not provided, use full range (0-10000) to show all products
     if (filters.price !== undefined && filters.price !== null) {
@@ -123,31 +134,25 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
       // Default to full range when no price filter is specified
       filterBody.price = { min: 0, max: 10000 };
     }
-    
+
     // Always use POST with body since backend requires price field
     const response = await apiRequest(endpoint, {
       method: 'POST',
       body: filterBody,
       includeAuth: true,
     });
-    
-    if (Array.isArray(response)) {
-      return response;
-    }
-    if (response && Array.isArray(response.data)) {
-      return response.data;
-    }
-    return [];
+
+    return parseProductsResponse(response);
   } catch (error) {
     const errorMessage = (error.message || '').toLowerCase();
     const errorText = (error.errorData?.error || error.errorData?.message || '').toLowerCase();
-    
+
     if (errorMessage.includes('products not found') ||
-        errorMessage.includes('not found') ||
-        errorText.includes('products not found') ||
-        errorText.includes('not found') ||
-        error.statusCode === 404) {
-      return [];
+      errorMessage.includes('not found') ||
+      errorText.includes('products not found') ||
+      errorText.includes('not found') ||
+      error.statusCode === 404) {
+      return { data: [], pagination: null };
     }
     throw error;
   }
@@ -166,7 +171,7 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
  * @param {number} [page=1] - Page number
  * @param {number} [limit=20] - Items per page
  * @param {Object|null} [filters={}] - Filter object (null = all products)
- * @returns {Promise<Array>}
+ * @returns {Promise<{ data: Array, pagination: Object|null }>}
  */
 export const getProducts = async (page = 1, limit = 20, filters = {}) => {
   const key = `products:${page}:${limit}:${JSON.stringify(filters ?? null)}`;
@@ -286,7 +291,7 @@ export const updateProduct = async (productId, productData) => {
     status,
     image_urls, // Array of image paths
   } = productData;
-  
+
   const body = {
     model_no,
     gender_id,
@@ -307,12 +312,12 @@ export const updateProduct = async (productId, productData) => {
     total_qty,
     status,
   };
-  
+
   // Include image_urls if provided (array of image paths)
   if (image_urls !== undefined) {
     body.image_urls = image_urls;
   }
-  
+
   const result = await apiRequest(`/products/${productId}`, {
     method: 'PUT',
     body,
@@ -352,7 +357,7 @@ export const getProductModels = async (modelNo) => {
       },
       includeAuth: true,
     });
-    
+
     if (Array.isArray(response)) {
       return response;
     }
@@ -363,10 +368,10 @@ export const getProductModels = async (modelNo) => {
   } catch (error) {
     const errorMessage = (error.message || '').toLowerCase();
     const errorText = (error.errorData?.error || error.errorData?.message || '').toLowerCase();
-    
+
     if (errorMessage.includes('not found') ||
-        errorText.includes('not found') ||
-        error.statusCode === 404) {
+      errorText.includes('not found') ||
+      error.statusCode === 404) {
       return [];
     }
     throw error;
@@ -397,20 +402,20 @@ export const deleteProduct = async (productId) => {
 export const uploadProductImage = async (productImages, productId) => {
   const baseUrl = getBaseURL();
   const fullUrl = `${baseUrl}/products/image-upload`;
-  
+
   const token = getAuthToken();
   const headers = { Accept: 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   // Create FormData
   const formData = new FormData();
   // Attach product reference when provided so backend can link the file
   if (productId) {
     formData.append('product_id', productId);
   }
-  
+
   // Handle both single file and multiple files
   if (Array.isArray(productImages)) {
     // Multiple files - append each one
@@ -421,7 +426,7 @@ export const uploadProductImage = async (productImages, productId) => {
     // Single file
     formData.append('file', productImages);
   }
-  
+
   // Make the request
   const response = await fetch(fullUrl, {
     method: 'POST',
@@ -429,7 +434,7 @@ export const uploadProductImage = async (productImages, productId) => {
     credentials: 'omit',
     body: formData,
   });
-  
+
   // Use handleResponse which will throw appropriate errors for status codes
   return await handleResponse(response);
 };
@@ -442,16 +447,16 @@ export const uploadProductImage = async (productImages, productId) => {
 export const bulkUploadProducts = async (file) => {
   const baseUrl = getBaseURL();
   const fullUrl = `${baseUrl}/products/bulk-upload`;
-  
+
   const formData = new FormData();
   formData.append('file', file);
-  
+
   const token = getAuthToken();
   const headers = { Accept: 'application/json' };
   if (token) {
     headers['Authorization'] = `Bearer ${token}`;
   }
-  
+
   // For FormData, don't set Content-Type header (browser will set it with boundary)
   const response = await fetch(fullUrl, {
     method: 'POST',
@@ -459,7 +464,7 @@ export const bulkUploadProducts = async (file) => {
     credentials: 'omit',
     body: formData,
   });
-  
+
   return await handleResponse(response);
 };
 
@@ -473,16 +478,16 @@ export const getAllUploads = async () => {
     const endpoints = [
       '/products/images/all'
     ];
-    
+
     let lastError = null;
-    
+
     for (const endpoint of endpoints) {
       try {
         const response = await apiRequest(endpoint, {
           method: 'GET',
           includeAuth: true,
         });
-        
+
         // Handle different response formats
         let images = [];
         if (Array.isArray(response)) {
@@ -499,50 +504,50 @@ export const getAllUploads = async () => {
           // If we got a response but it's not in expected format, return empty array
           return [];
         }
-        
+
         // Fix image URLs to use the correct base URL
         const fixedImages = images.map(image => {
           const fixedImage = { ...image };
-          
+
           // Fix the main image URL
           if (fixedImage.url && fixedImage.url.startsWith('/uploads/products/')) {
             fixedImage.url = `https://api.stallioneyewear.in${fixedImage.url}`;
           }
-          
+
           // Fix image_url if it exists
           if (fixedImage.image_url && fixedImage.image_url.startsWith('/uploads/products/')) {
             fixedImage.image_url = `https://api.stallioneyewear.in${fixedImage.image_url}`;
           }
-          
+
           // Fix path if it exists and is relative
           if (fixedImage.path && fixedImage.path.startsWith('/uploads/products/')) {
             fixedImage.path = `https://api.stallioneyewear.in${fixedImage.path}`;
           }
-          
+
           return fixedImage;
         });
-        
+
         return fixedImages;
       } catch (error) {
         lastError = error;
         // If it's a 404, try next endpoint
-        if (error.statusCode === 404 || 
-            error.message?.toLowerCase().includes('not found')) {
+        if (error.statusCode === 404 ||
+          error.message?.toLowerCase().includes('not found')) {
           continue;
         }
         // For other errors, throw immediately
         throw error;
       }
     }
-    
+
     // If all endpoints failed with 404, return empty array (no uploads endpoint exists)
     console.warn('Uploads endpoint not found. Tried:', endpoints);
     return [];
   } catch (error) {
     // If it's a 404 or "not found" error, return empty array
     const errorMessage = (error.message || '').toLowerCase();
-    if (error.statusCode === 404 || 
-        errorMessage.includes('not found')) {
+    if (error.statusCode === 404 ||
+      errorMessage.includes('not found')) {
       return [];
     }
     throw error;

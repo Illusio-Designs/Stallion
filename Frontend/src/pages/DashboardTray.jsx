@@ -1,23 +1,23 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import TableWithControls from '../components/ui/TableWithControls';
+import { useEffect, useMemo, useState } from 'react';
+import DropdownSelector from '../components/ui/DropdownSelector';
 import Modal from '../components/ui/Modal';
 import RowActions from '../components/ui/RowActions';
-import DropdownSelector from '../components/ui/DropdownSelector';
+import TableWithControls from '../components/ui/TableWithControls';
 import {
-  getProducts,
+  addProductToTray,
+  deleteProductFromTray,
+  deleteTray,
   getBrands,
   getCollections,
-  getTrays,
-  updateTray,
-  deleteTray,
+  getProducts,
   getProductsInTray,
-  addProductToTray,
+  getTrays,
   updateProductInTray,
-  deleteProductFromTray,
+  updateTray,
 } from '../services/apiService';
-import { showSuccess, showError } from '../services/notificationService';
-import '../styles/pages/dashboard.css';
+import { showError, showSuccess } from '../services/notificationService';
 import '../styles/pages/dashboard-orders.css';
+import '../styles/pages/dashboard.css';
 
 const TrayStatus = {
   AVAILABLE: 'available',
@@ -74,7 +74,7 @@ const DashboardTray = () => {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ tray_name: '', tray_status: TrayStatus.AVAILABLE });
   const [error, setError] = useState(null);
-  
+
   // Product assignment tab state
   const [selectedTray, setSelectedTray] = useState('');
   const [trayProducts, setTrayProducts] = useState([]);
@@ -91,8 +91,8 @@ const DashboardTray = () => {
 
   const columns = useMemo(() => ([
     { key: 'tray_name', label: 'TRAY NAME' },
-    { 
-      key: 'tray_status', 
+    {
+      key: 'tray_status',
       label: 'STATUS',
       render: (_v, row) => {
         const status = row.tray_status || '';
@@ -131,8 +131,8 @@ const DashboardTray = () => {
 
   const fetchAllProducts = async () => {
     try {
-      const data = await getProducts();
-      setAllProducts(data || []);
+      const result = await getProducts();
+      setAllProducts(result.data || []);
     } catch (err) {
       console.error('Failed to load products:', err);
       setAllProducts([]);
@@ -291,7 +291,7 @@ const DashboardTray = () => {
           status: TrayProductStatus.ALLOTED,
         })
       );
-      
+
       await Promise.all(addPromises);
       showSuccess(`${selectedProducts.length} product(s) added to tray successfully`);
       const items = await getProductsInTray(selectedTray);
@@ -473,8 +473,8 @@ const DashboardTray = () => {
                   <div className="form-group">
                     <label className="ui-label" style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 700 }}>Select Tray</label>
                     <DropdownSelector
-                      options={trays.map(t => ({ 
-                        value: t.tray_id || t.id, 
+                      options={trays.map(t => ({
+                        value: t.tray_id || t.id,
                         label: t.tray_name || 'N/A'
                       }))}
                       value={selectedTray}
@@ -725,22 +725,22 @@ const DashboardTray = () => {
                                 const pId = p.product_id || p.id;
                                 return pId && productId && String(pId).toLowerCase() === String(productId).toLowerCase();
                               });
-                              
+
                               // If product not found, try to get brand and collection from nested product object
                               const productData = product || tp.product;
                               const brandId = productData?.brand_id;
                               const collectionId = productData?.collection_id;
-                              
+
                               const brand = brandId ? brands.find(b => {
                                 const bId = b.brand_id || b.id;
                                 return bId && String(bId).toLowerCase() === String(brandId).toLowerCase();
                               }) : null;
-                              
+
                               const collection = collectionId ? collections.find(c => {
                                 const cId = c.collection_id || c.id;
                                 return cId && String(cId).toLowerCase() === String(collectionId).toLowerCase();
                               }) : null;
-                              
+
                               return (
                                 <tr key={tp.id} className="border-b border-[#eee]">
                                   <td className="p-3">
@@ -767,9 +767,9 @@ const DashboardTray = () => {
                                     1
                                   </td>
                                   <td className="p-3">
-                                    <span style={{ 
-                                      padding: '4px 8px', 
-                                      borderRadius: '4px', 
+                                    <span style={{
+                                      padding: '4px 8px',
+                                      borderRadius: '4px',
                                       fontSize: '12px',
                                       backgroundColor: getStatusColor(tp.status || TrayProductStatus.ALLOTED).bg,
                                       color: getStatusColor(tp.status || TrayProductStatus.ALLOTED).text
@@ -877,9 +877,9 @@ const DashboardTray = () => {
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={cancelEditProduct}>Cancel</button>
-            <button 
-              className="ui-btn ui-btn--primary" 
-              disabled={saving} 
+            <button
+              className="ui-btn ui-btn--primary"
+              disabled={saving}
               onClick={() => editingProduct && handleUpdateProductStatus(editingProduct)}
             >
               Update

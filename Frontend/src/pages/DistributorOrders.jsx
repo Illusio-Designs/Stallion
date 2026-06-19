@@ -1,21 +1,20 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
-import Skeleton from '../components/ui/Skeleton';
-import TableWithControls from '../components/ui/TableWithControls';
-import StatusBadge from '../components/ui/StatusBadge';
+import { useEffect, useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
+import DropdownSelector from '../components/ui/DropdownSelector';
 import Modal from '../components/ui/Modal';
 import RowActions from '../components/ui/RowActions';
-import DropdownSelector from '../components/ui/DropdownSelector';
-import { 
-  getOrders, 
-  createOrder, 
-  updateOrderStatus, 
+import Skeleton from '../components/ui/Skeleton';
+import StatusBadge from '../components/ui/StatusBadge';
+import TableWithControls from '../components/ui/TableWithControls';
+import {
+  createOrder,
   deleteOrder,
-  getProducts,
-  getCountries
+  getCountries,
+  getOrders,
+  getProducts
 } from '../services/apiService';
-import { showSuccess, showError } from '../services/notificationService';
 import { getUser } from '../services/authService';
+import { showError, showSuccess } from '../services/notificationService';
 import '../styles/pages/dashboard-orders.css';
 
 // Map API status to UI status
@@ -54,14 +53,14 @@ const DistributorOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  
+
   const user = getUser();
   const distributorId = user?.distributor_id || user?.distributorId;
-  
+
   // Dropdown data
   const [countries, setCountries] = useState([]);
   const [products, setProducts] = useState([]);
-  
+
   // Create order form data - order_type is auto-set to distributor_order
   const [createFormData, setCreateFormData] = useState({
     order_type: 'distributor_order', // Auto-set for distributor
@@ -77,22 +76,22 @@ const DistributorOrders = () => {
       setError(null);
       const response = await getOrders();
       // Filter orders for this distributor
-      const distributorOrders = distributorId 
-        ? response.filter(order => 
-            (order.distributor_id || order.distributor?.id || order.distributor?.distributor_id) === distributorId ||
-            order.order_type === 'distributor_order'
-          )
+      const distributorOrders = distributorId
+        ? response.filter(order =>
+          (order.distributor_id || order.distributor?.id || order.distributor?.distributor_id) === distributorId ||
+          order.order_type === 'distributor_order'
+        )
         : response.filter(order => order.order_type === 'distributor_order');
       setOrders(Array.isArray(distributorOrders) ? distributorOrders : []);
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Failed to fetch orders';
       const errorMessage = (message || '').toLowerCase();
-      
+
       const isNotFoundError = errorMessage.includes('orders not found') ||
-                             errorMessage.includes('no orders found') ||
-                             errorMessage.includes('order not found') ||
-                             err.statusCode === 404;
-      
+        errorMessage.includes('no orders found') ||
+        errorMessage.includes('order not found') ||
+        err.statusCode === 404;
+
       if (isNotFoundError) {
         setOrders([]);
         setError(null);
@@ -136,7 +135,7 @@ const DistributorOrders = () => {
         getProducts()
       ]);
       setCountries(countriesData || []);
-      setProducts(productsData || []);
+      setProducts(productsData?.data || []);
     } catch (err) {
       console.error('Failed to fetch initial data:', err);
     }
@@ -145,12 +144,12 @@ const DistributorOrders = () => {
   // Helper function to parse order_items (can be JSON string or array)
   const parseOrderItems = (orderItems) => {
     if (!orderItems) return [];
-    
+
     // If it's already an array, return it
     if (Array.isArray(orderItems)) {
       return orderItems;
     }
-    
+
     // If it's a JSON string, parse it
     if (typeof orderItems === 'string') {
       try {
@@ -161,12 +160,12 @@ const DistributorOrders = () => {
         return [];
       }
     }
-    
+
     // If it's an object, try to get values
     if (typeof orderItems === 'object') {
       return Object.values(orderItems);
     }
-    
+
     return [];
   };
 
@@ -179,12 +178,12 @@ const DistributorOrders = () => {
       const orderId = order.order_id || order.id;
       const orderNumber = order.order_number || `#${orderId?.toString().slice(-6) || 'N/A'}`;
       // Get party name from order object, try multiple possible field names
-      const partyName = order.party?.party_name || 
-                       order.party_name || 
-                       order.party?.name ||
-                       (order.party_id ? `Party ${order.party_id.slice(0, 8)}...` : 'N/A');
+      const partyName = order.party?.party_name ||
+        order.party_name ||
+        order.party?.name ||
+        (order.party_id ? `Party ${order.party_id.slice(0, 8)}...` : 'N/A');
       const orderStatus = mapApiStatusToUI(order.order_status);
-      
+
       // Parse order_items (can be JSON string or array)
       const orderItems = parseOrderItems(order.order_items);
 
@@ -201,7 +200,7 @@ const DistributorOrders = () => {
       // Calculate totals for the order
       const totalQuantity = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
       const totalValue = parseFloat(order.order_total || Number(order.order_total) || order.total_value || order.total_amount || 0);
-      
+
       // order_items store {product_id, quantity, price} (no model_no), so resolve
       // the product name via the loaded products list.
       const itemName = (it) =>
@@ -238,7 +237,7 @@ const DistributorOrders = () => {
     if (activeTab === 'All') return rows;
     const apiStatus = mapUITabToApiStatus(activeTab);
     if (!apiStatus) return rows;
-    
+
     return rows.filter(row => {
       const rowStatus = row.originalOrder?.order_status?.toLowerCase();
       return rowStatus === apiStatus;
@@ -296,14 +295,14 @@ const DistributorOrders = () => {
         showError('Distributor ID not found. Please contact support.');
         return;
       }
-      if (createFormData.order_items.length === 0 || 
-          createFormData.order_items.some(item => !item.product_id || !item.quantity || !item.price)) {
+      if (createFormData.order_items.length === 0 ||
+        createFormData.order_items.some(item => !item.product_id || !item.quantity || !item.price)) {
         showError('Please add at least one valid order item');
         return;
       }
 
       setLoading(true);
-      
+
       // Prepare order data - order_type is always distributor_order, order_date is automatically set to current date/time
       const orderData = {
         order_date: new Date().toISOString(),
@@ -361,7 +360,7 @@ const DistributorOrders = () => {
   const updateOrderItem = (index, field, value) => {
     setCreateFormData(prev => ({
       ...prev,
-      order_items: prev.order_items.map((item, i) => 
+      order_items: prev.order_items.map((item, i) =>
         i === index ? { ...item, [field]: value } : item
       )
     }));
@@ -387,12 +386,14 @@ const DistributorOrders = () => {
     { key: 'qty', label: 'QTY' },
     { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase().replace(/\s+/g, '-')}>{v}</StatusBadge> },
     { key: 'value', label: 'VALUE' },
-    { key: 'action', label: 'ACTION', render: (_v, row) => (
-      <RowActions 
-        onView={() => console.log('view', row)} 
-        onDelete={() => handleDelete(row)} 
-      />
-    ) },
+    {
+      key: 'action', label: 'ACTION', render: (_v, row) => (
+        <RowActions
+          onView={() => console.log('view', row)}
+          onDelete={() => handleDelete(row)}
+        />
+      )
+    },
   ]), []);
 
   return (
@@ -424,11 +425,10 @@ const DistributorOrders = () => {
             {['All', 'Pending', 'Processing', 'Hold by Trey', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].map(tab => (
               <button
                 key={tab}
-                className={`order-tab inline-flex items-center min-h-10 px-4 py-2 rounded-md font-semibold text-[var(--text-base)] leading-snug cursor-pointer whitespace-nowrap shrink-0 transition-[background,color,box-shadow] duration-[0.12s] ease-[ease] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] ${
-                  activeTab === tab
+                className={`order-tab inline-flex items-center min-h-10 px-4 py-2 rounded-md font-semibold text-[var(--text-base)] leading-snug cursor-pointer whitespace-nowrap shrink-0 transition-[background,color,box-shadow] duration-[0.12s] ease-[ease] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] ${activeTab === tab
                     ? 'active bg-primary text-text-on-primary'
                     : 'text-text-muted hover:bg-primary-soft hover:text-primary'
-                }`}
+                  }`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}
@@ -491,27 +491,27 @@ const DistributorOrders = () => {
       </div>
 
       {/* Create Order Modal */}
-      <Modal 
-        open={createModalOpen} 
+      <Modal
+        open={createModalOpen}
         onClose={() => {
           setCreateModalOpen(false);
           resetCreateForm();
-        }} 
+        }}
         title="Create New Order"
         footer={(
           <>
-            <Button 
-              variant="secondary" 
+            <Button
+              variant="secondary"
               onClick={() => {
                 setCreateModalOpen(false);
                 resetCreateForm();
-              }} 
+              }}
               disabled={loading}
             >
               Cancel
             </Button>
-            <Button 
-              onClick={handleCreateOrder} 
+            <Button
+              onClick={handleCreateOrder}
               disabled={loading}
             >
               {loading ? 'Creating...' : 'Create Order'}
@@ -523,8 +523,8 @@ const DistributorOrders = () => {
           {/* Order Type - Hidden, auto-set to distributor_order */}
           <div className="form-group" style={{ display: 'none' }}>
             <label className="ui-label">Order Type</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               value="Distributor Order"
               disabled
             />
@@ -537,7 +537,7 @@ const DistributorOrders = () => {
             </label>
             <div className="border border-[#E0E0E0] rounded-lg p-4">
               {createFormData.order_items.map((item, index) => (
-                <div key={index} style={{ 
+                <div key={index} style={{
                   marginBottom: index < createFormData.order_items.length - 1 ? '16px' : 0,
                   paddingBottom: index < createFormData.order_items.length - 1 ? '16px' : 0,
                   borderBottom: index < createFormData.order_items.length - 1 ? '1px solid #E0E0E0' : 'none'
@@ -545,8 +545,8 @@ const DistributorOrders = () => {
                   <div className="flex justify-between items-center mb-2">
                     <strong>Item {index + 1}</strong>
                     {createFormData.order_items.length > 1 && (
-                      <Button 
-                        variant="secondary" 
+                      <Button
+                        variant="secondary"
                         onClick={() => removeOrderItem(index)}
                         style={{ padding: '4px 8px', fontSize: '12px' }}
                       >
@@ -573,7 +573,7 @@ const DistributorOrders = () => {
                     </div>
                     <div>
                       <label className="text-xs text-[#666] mb-1 block">Quantity</label>
-                      <input 
+                      <input
                         type="number"
                         className="ui-input"
                         value={item.quantity}
@@ -584,7 +584,7 @@ const DistributorOrders = () => {
                     </div>
                     <div>
                       <label className="text-xs text-[#666] mb-1 block">Price</label>
-                      <input 
+                      <input
                         type="number"
                         className="ui-input"
                         value={item.price}
@@ -597,8 +597,8 @@ const DistributorOrders = () => {
                   </div>
                 </div>
               ))}
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 onClick={addOrderItem}
                 style={{ marginTop: '12px', width: '100%' }}
               >
@@ -610,7 +610,7 @@ const DistributorOrders = () => {
           {/* Order Notes */}
           <div className="form-group">
             <label className="ui-label">Order Notes</label>
-            <textarea 
+            <textarea
               className="ui-input"
               value={createFormData.order_notes}
               onChange={(e) => setCreateFormData(prev => ({ ...prev, order_notes: e.target.value }))}

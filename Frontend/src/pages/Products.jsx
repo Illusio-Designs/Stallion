@@ -1,23 +1,22 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import '../styles/pages/Products.css';
-import '../styles/components/filter-chips.css';
-import { productPath } from '../utils/dashboardRoutes';
 import ProductCard from '../components/ProductCard';
 import Skeleton from '../components/ui/Skeleton';
-import { isLoggedIn } from '../services/authService';
 import {
-  getProducts,
-  getFeaturedProducts,
-  getGenders,
-  getShapes,
-  getFrameTypes,
-  getLensMaterials,
-  getFrameMaterials,
-  getLensColors,
+  getBrands,
   getFrameColors,
-  getBrands
+  getFrameMaterials,
+  getFrameTypes,
+  getGenders,
+  getLensColors,
+  getLensMaterials,
+  getProducts,
+  getShapes
 } from '../services/apiService';
+import { isLoggedIn } from '../services/authService';
+import '../styles/components/filter-chips.css';
+import '../styles/pages/Products.css';
+import { productPath } from '../utils/dashboardRoutes';
 
 const Products = ({ onPageChange }) => {
   // Check authentication on mount
@@ -34,7 +33,7 @@ const Products = ({ onPageChange }) => {
 
   // Get search query from URL and listen for real-time changes
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   useEffect(() => {
     // Get initial search from URL
     if (typeof window !== 'undefined') {
@@ -51,7 +50,7 @@ const Products = ({ onPageChange }) => {
       console.log('Search change event received:', newSearch);
       setSearchQuery(newSearch);
       setPage(1); // Reset to first page when search changes
-      
+
       // Update URL
       const url = new URL(window.location);
       if (newSearch.trim()) {
@@ -64,7 +63,7 @@ const Products = ({ onPageChange }) => {
 
     // Listen for custom search change events
     window.addEventListener('searchChange', handleSearchChange);
-    
+
     // Listen for URL changes (back/forward buttons)
     const handlePopState = () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -72,7 +71,7 @@ const Products = ({ onPageChange }) => {
       setSearchQuery(search);
       setPage(1);
     };
-    
+
     window.addEventListener('popstate', handlePopState);
 
     return () => {
@@ -90,7 +89,7 @@ const Products = ({ onPageChange }) => {
   const [selectedLensMaterial, setSelectedLensMaterial] = useState([]); // Array of lens_material_id
   const [selectedFrameColor, setSelectedFrameColor] = useState(null); // Single frame_color_id
   const [selectedColorCode, setSelectedColorCode] = useState(null); // Single color_code_id
-  
+
   // Products display
   const [products, setProducts] = useState([]);
   const [totalResults, setTotalResults] = useState(0);
@@ -99,7 +98,7 @@ const Products = ({ onPageChange }) => {
   const [error, setError] = useState(null);
   const [page, setPage] = useState(1);
   const limit = 20; // Products per page (server-side pagination)
-  
+
   // Filter options from API
   const [brandsData, setBrandsData] = useState([]);
   const [gendersData, setGendersData] = useState([]);
@@ -109,7 +108,7 @@ const Products = ({ onPageChange }) => {
   const [lensMaterialsData, setLensMaterialsData] = useState([]);
   const [frameMaterialsData, setFrameMaterialsData] = useState([]);
   const [frameTypesData, setFrameTypesData] = useState([]);
-  
+
   // Dropdown states for collapsible sections
   const [expandedSections, setExpandedSections] = useState({
     brands: true,
@@ -124,7 +123,7 @@ const Products = ({ onPageChange }) => {
 
   // Static data for filters
   const types = ['Full Frame', 'Half Frame', 'Rimless'];
-  
+
   // Color mapping helper
   const getColorHex = (colorName) => {
     const colorMap = {
@@ -179,62 +178,62 @@ const Products = ({ onPageChange }) => {
   // Build filter object for API - Only include fields with actual values
   const buildFilters = useCallback(() => {
     const filters = {};
-    
+
     // Only include filter fields that have values (don't include null/empty fields)
     // gender_id
     if (selectedGender.length > 0) {
       filters.gender_id = selectedGender.length === 1 ? selectedGender[0] : selectedGender;
     }
-    
+
     // color_code_id
     if (selectedColorCode !== null && selectedColorCode !== undefined) {
       filters.color_code_id = selectedColorCode;
     }
-    
+
     // shape_id
     if (selectedShapes.length > 0) {
       filters.shape_id = selectedShapes.length === 1 ? selectedShapes[0] : selectedShapes;
     }
-    
+
     // lens_color_id
     if (selectedLensColor !== null && selectedLensColor !== undefined) {
       filters.lens_color_id = selectedLensColor;
     }
-    
+
     // frame_color_id
     if (selectedFrameColor !== null && selectedFrameColor !== undefined) {
       filters.frame_color_id = selectedFrameColor;
     }
-    
+
     // frame_type_id
     if (selectedType !== null && selectedType !== undefined) {
       filters.frame_type_id = selectedType;
     }
-    
+
     // lens_material_id
     if (selectedLensMaterial.length > 0) {
       filters.lens_material_id = selectedLensMaterial.length === 1 ? selectedLensMaterial[0] : selectedLensMaterial;
     }
-    
+
     // frame_material_id
     if (selectedFrameMaterials.length > 0) {
       filters.frame_material_id = selectedFrameMaterials.length === 1 ? selectedFrameMaterials[0] : selectedFrameMaterials;
     }
-    
+
     // brand_id (optional, but include if selected)
     if (selectedBrands.length > 0) {
       filters.brand_id = selectedBrands.length === 1 ? selectedBrands[0] : selectedBrands;
     }
-    
+
     // Always filter to show only active products in public page (hide draft products)
     filters.status = 'active';
-    
+
     // Always include price filter with full range (backend requires it)
     filters.price = {
       min: 0,
       max: 10000
     };
-    
+
     return filters;
   }, [
     selectedGender,
@@ -316,8 +315,8 @@ const Products = ({ onPageChange }) => {
           let p = 1;
           let more = true;
           while (more && p <= 50) {
-            const data = await getProducts(p, 100, filters);
-            const arr = Array.isArray(data) ? data : (data?.data || []);
+            const result = await getProducts(p, 100, filters);
+            const arr = result.data || [];
             collected = collected.concat(
               arr.filter((pr) => isActive(pr) && (pr.model_no || '').toLowerCase().includes(q))
             );
@@ -331,15 +330,19 @@ const Products = ({ onPageChange }) => {
           setTotalPages(Math.max(1, Math.ceil(collected.length / limit)));
         } else {
           // Normal browse / attribute filtering: true server-side pagination.
-          const data = await getProducts(page, limit, filters);
-          const arr = Array.isArray(data) ? data : (data?.data || []);
+          const result = await getProducts(page, limit, filters);
+          const arr = result.data || [];
           if (cancelled) return;
           const activeArr = arr.filter(isActive);
           setProducts(activeArr);
-          // The API returns a plain array with no total count, so treat a full
-          // page as a signal that at least one more page may exist.
-          setTotalPages(arr.length === limit ? page + 1 : page);
-          setTotalResults(activeArr.length);
+          if (result.pagination?.totalPages != null) {
+            setTotalPages(Math.max(1, result.pagination.totalPages));
+            setTotalResults(result.pagination.total ?? activeArr.length);
+          } else {
+            // Fallback when API omits pagination metadata.
+            setTotalPages(arr.length === limit ? page + 1 : page);
+            setTotalResults(activeArr.length);
+          }
         }
       } catch (err) {
         if (cancelled) return;
@@ -423,48 +426,48 @@ const Products = ({ onPageChange }) => {
   // Helper function to get product image
   const getProductImage = (product) => {
     if (!product) return '/images/products/spac1.webp';
-    
+
     // Extract filename from path and construct URL
     const extractFilename = (imagePath) => {
       if (!imagePath || typeof imagePath !== 'string') return null;
-      
+
       // Remove any query parameters or fragments
       let cleanPath = imagePath.split('?')[0].split('#')[0];
-      
+
       // Remove any trailing JSON syntax characters (like \]", ]", \", etc.)
       // Remove backslashes, closing brackets, and quotes at the end
       cleanPath = cleanPath.replace(/([\]"\\])+$/, '');
-      
+
       // Extract filename from path (handles "/uploads/products/filename.webp" or full paths)
       const parts = cleanPath.split('/');
       let filename = parts[parts.length - 1];
-      
+
       // Clean filename: remove any remaining JSON syntax characters
       filename = filename.replace(/([\]"\\])+$/, '');
-      
+
       // Make sure we got a valid filename (not empty, has extension)
       if (filename && filename.includes('.')) {
         return filename;
       }
-      
+
       return null;
     };
-    
+
     // Parse image_urls - handle JSON string format like "[\"/uploads/products/spac2-1766058948930.webp\"]"
     const parseImageUrls = (imageUrls) => {
       if (!imageUrls) return null;
-      
+
       // If it's already an array, return it
       if (Array.isArray(imageUrls)) {
         return imageUrls;
       }
-      
+
       // If it's a string, try to parse it as JSON
       if (typeof imageUrls === 'string') {
         try {
           // Try parsing once
           let parsed = JSON.parse(imageUrls);
-          
+
           // Handle double-encoded strings (some APIs return double-encoded JSON)
           if (typeof parsed === 'string') {
             try {
@@ -473,12 +476,12 @@ const Products = ({ onPageChange }) => {
               // If second parse fails, use the first parsed value
             }
           }
-          
+
           // If parsed result is an array, return it
           if (Array.isArray(parsed)) {
             return parsed;
           }
-          
+
           // If parsed result is a string, wrap it in an array
           if (typeof parsed === 'string') {
             return [parsed];
@@ -490,10 +493,10 @@ const Products = ({ onPageChange }) => {
           }
         }
       }
-      
+
       return null;
     };
-    
+
     // Handle image_urls (can be array or JSON string)
     const imageUrls = parseImageUrls(product.image_urls);
     if (imageUrls && imageUrls.length > 0) {
@@ -505,7 +508,7 @@ const Products = ({ onPageChange }) => {
         }
       }
     }
-    
+
     // Handle single image_url string
     if (product.image_url) {
       const filename = extractFilename(product.image_url);
@@ -513,7 +516,7 @@ const Products = ({ onPageChange }) => {
         return `https://stallion.nishree.com/uploads/products/${filename}`;
       }
     }
-    
+
     // Default fallback
     return '/images/products/spac1.webp';
   };
@@ -537,7 +540,7 @@ const Products = ({ onPageChange }) => {
           <h3 className={sectionTitleClass}>Brands</h3>
           <span className={`${chevronBaseClass} ${expandedSections.brands ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
         </div>
@@ -548,8 +551,8 @@ const Products = ({ onPageChange }) => {
               const brandName = brand.brand_name || brand.name || '';
               return (
                 <label key={brandId} className={checkboxLabelClass}>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={selectedBrands.includes(brandId)}
                     onChange={() => toggleSelection(brandId, selectedBrands, setSelectedBrands)}
                   />
@@ -567,7 +570,7 @@ const Products = ({ onPageChange }) => {
           <h3 className={sectionTitleClass}>Frame Material</h3>
           <span className={`${chevronBaseClass} ${expandedSections.frameMaterial ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
         </div>
@@ -578,7 +581,7 @@ const Products = ({ onPageChange }) => {
               const materialName = material.frame_material || material.frame_material_name || material.name || '';
               return (
                 <label key={materialId} className={checkboxLabelClass}>
-                  <input 
+                  <input
                     type="checkbox"
                     checked={selectedFrameMaterials.includes(materialId)}
                     onChange={() => toggleSelection(materialId, selectedFrameMaterials, setSelectedFrameMaterials)}
@@ -597,7 +600,7 @@ const Products = ({ onPageChange }) => {
           <h3 className={sectionTitleClass}>Shape</h3>
           <span className={`${chevronBaseClass} ${expandedSections.shape ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
         </div>
@@ -608,7 +611,7 @@ const Products = ({ onPageChange }) => {
               const shapeName = shape.shape_name || shape.name || '';
               return (
                 <label key={shapeId} className={checkboxLabelClass}>
-                  <input 
+                  <input
                     type="checkbox"
                     checked={selectedShapes.includes(shapeId)}
                     onChange={() => toggleSelection(shapeId, selectedShapes, setSelectedShapes)}
@@ -627,7 +630,7 @@ const Products = ({ onPageChange }) => {
           <h3 className={sectionTitleClass}>Frame Type</h3>
           <span className={`${chevronBaseClass} ${expandedSections.type ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
         </div>
@@ -638,8 +641,8 @@ const Products = ({ onPageChange }) => {
               const typeName = frameType.frame_type || frameType.frame_type_name || frameType.name || '';
               return (
                 <label key={typeId} className={radioLabelClass}>
-                  <input 
-                    type="radio" 
+                  <input
+                    type="radio"
                     name="type"
                     checked={selectedType === typeId}
                     onChange={() => setSelectedType(selectedType === typeId ? null : typeId)}
@@ -658,7 +661,7 @@ const Products = ({ onPageChange }) => {
           <h3 className={sectionTitleClass}>Gender</h3>
           <span className={`${chevronBaseClass} ${expandedSections.gender ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
         </div>
@@ -669,7 +672,7 @@ const Products = ({ onPageChange }) => {
               const genderName = gender.gender_name || gender.name || '';
               return (
                 <label key={genderId} className={checkboxLabelClass}>
-                  <input 
+                  <input
                     type="checkbox"
                     checked={selectedGender.includes(genderId)}
                     onChange={() => toggleSelection(genderId, selectedGender, setSelectedGender)}
@@ -688,7 +691,7 @@ const Products = ({ onPageChange }) => {
           <h3 className={sectionTitleClass}>Lens Colour</h3>
           <span className={`${chevronBaseClass} ${expandedSections.lensColor ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
         </div>
@@ -725,7 +728,7 @@ const Products = ({ onPageChange }) => {
           <h3 className={sectionTitleClass}>Lens Material</h3>
           <span className={`${chevronBaseClass} ${expandedSections.lensMaterial ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
         </div>
@@ -736,7 +739,7 @@ const Products = ({ onPageChange }) => {
               const materialName = material.lens_material || material.lens_material_name || material.name || '';
               return (
                 <label key={materialId} className={checkboxLabelClass}>
-                  <input 
+                  <input
                     type="checkbox"
                     checked={selectedLensMaterial.includes(materialId)}
                     onChange={() => toggleSelection(materialId, selectedLensMaterial, setSelectedLensMaterial)}
@@ -755,7 +758,7 @@ const Products = ({ onPageChange }) => {
           <h3 className={sectionTitleClass}>Frame Colour</h3>
           <span className={`${chevronBaseClass} ${expandedSections.frameColor ? 'expanded rotate-180 !text-primary' : ''}`}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
         </div>
@@ -936,7 +939,7 @@ const Products = ({ onPageChange }) => {
               )}
             </div>
           )}
-          
+
           {/* Pagination Controls */}
           {!loading && products.length > 0 && totalPages > 1 && (
             <nav className="products-pagination flex justify-center items-center gap-4 mt-10 py-5" aria-label="Products pagination">

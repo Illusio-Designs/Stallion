@@ -1,45 +1,43 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
-import '../styles/pages/dashboard-products.css';
-import '../styles/pages/dashboard-orders.css';
-import TableWithControls from '../components/ui/TableWithControls';
-import Modal from '../components/ui/Modal';
-import Button from '../components/ui/Button';
-import RowActions from '../components/ui/RowActions';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import LoadingSpinner from '../components/ui/LoadingSpinner';
+import Modal from '../components/ui/Modal';
+import RowActions from '../components/ui/RowActions';
 import { Skeleton } from '../components/ui/Skeleton';
+import TableWithControls from '../components/ui/TableWithControls';
 import {
-  getProducts,
+  bulkUploadProducts,
   createProduct,
-  updateProduct,
   deleteProduct,
+  deleteProductFromTray,
+  deleteProductImage,
+  getAllUploads,
   getBrands,
   getCollections,
-  getGenders,
   getColorCodes,
-  getShapes,
-  getLensColors,
   getFrameColors,
-  getFrameTypes,
-  getLensMaterials,
   getFrameMaterials,
-  uploadProductImage,
-  bulkUploadProducts,
-  getAllUploads,
-  deleteProductImage,
-  getTrays,
+  getFrameTypes,
+  getGenders,
+  getLensColors,
+  getLensMaterials,
+  getProducts,
   getProductsInTray,
-  deleteProductFromTray,
+  getShapes,
+  getTrays,
+  updateProduct,
+  uploadProductImage,
 } from '../services/apiService';
-import { showSuccess, showError } from '../services/notificationService';
+import { showError, showSuccess } from '../services/notificationService';
+import '../styles/pages/dashboard-orders.css';
+import '../styles/pages/dashboard-products.css';
 
 // Helper function to parse image_urls from various formats
 // Handles: arrays, JSON strings like "[\"/uploads/products/image.webp\"]", plain strings
 const parseImageUrls = (product) => {
   if (!product) return [];
-  
+
   let imageUrls = [];
-  
+
   // Check image_urls array
   if (Array.isArray(product.image_urls)) {
     imageUrls = product.image_urls.filter(url => {
@@ -47,7 +45,7 @@ const parseImageUrls = (product) => {
       const trimmed = url.trim();
       return trimmed.length > 0 && trimmed !== '[]';
     });
-  } 
+  }
   // Check if image_urls is a JSON string (like "[\"/uploads/products/image.webp\"]")
   // Also handles double-encoded JSON strings
   else if (product.image_urls && typeof product.image_urls === 'string') {
@@ -58,7 +56,7 @@ const parseImageUrls = (product) => {
       let parseAttempts = 0;
       const maxAttempts = 3;
       let currentString = trimmed;
-      
+
       while (parseAttempts < maxAttempts && (currentString.startsWith('[') || currentString.startsWith('"'))) {
         try {
           parsed = JSON.parse(currentString);
@@ -103,7 +101,7 @@ const parseImageUrls = (product) => {
           }
         }
       }
-      
+
       // If we didn't successfully parse, treat as single URL string
       if (imageUrls.length === 0 && trimmed.length > 0) {
         imageUrls = [trimmed];
@@ -117,7 +115,7 @@ const parseImageUrls = (product) => {
       imageUrls = [trimmed];
     }
   }
-  
+
   return imageUrls;
 };
 
@@ -154,7 +152,7 @@ const DashboardProducts = () => {
   const [allUploads, setAllUploads] = useState([]); // All uploaded images from API
   const [productModelLoading, setProductModelLoading] = useState(false);
   const imageInputRef = useRef(null);
-  
+
   // Related data for dropdowns
   const [brands, setBrands] = useState([]);
   const [collections, setCollections] = useState([]);
@@ -166,7 +164,7 @@ const DashboardProducts = () => {
   const [frameTypes, setFrameTypes] = useState([]);
   const [lensMaterials, setLensMaterials] = useState([]);
   const [frameMaterials, setFrameMaterials] = useState([]);
-  
+
   // Form data
   const [formData, setFormData] = useState({
     model_no: '',
@@ -194,7 +192,7 @@ const DashboardProducts = () => {
       if (saved) {
         const parsed = JSON.parse(saved);
         // Filter out temporary blob URLs that won't work after refresh
-        const validImages = parsed.filter(img => 
+        const validImages = parsed.filter(img =>
           img.url && !img.url.startsWith('blob:') && !img.isTemporary
         );
         if (validImages.length > 0) {
@@ -226,15 +224,15 @@ const DashboardProducts = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Use the API service function which will try /products/images/all endpoint
       const data = await getAllUploads();
-      
+
       // Helper function to construct full URL using configured IMAGE_BASE_URL
       const imageBaseUrl = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/$/, '');
       const constructFullUrl = (imagePath) => {
         if (!imagePath) return null;
-        
+
         // If already a full URL with /uploads/products/, extract path and rebuild with configured base
         if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
           const uploadsIdx = imagePath.indexOf('/uploads/products/');
@@ -245,57 +243,57 @@ const DashboardProducts = () => {
           const filename = imagePath.split('/').pop()?.split('?')[0];
           return filename ? `${imageBaseUrl}/uploads/products/${filename}` : imagePath;
         }
-        
+
         // Relative path starting with /uploads/products/
         if (imagePath.startsWith('/uploads/products/')) {
           return `${imageBaseUrl}${imagePath.split('?')[0]}`;
         }
-        
+
         // Just a filename or relative path — extract filename and construct
         const filename = imagePath.split('/').pop()?.split('?')[0];
         return filename ? `${imageBaseUrl}/uploads/products/${filename}` : null;
       };
-      
+
       // Handle different response formats from the API
       let imageFiles = [];
-      
+
       if (Array.isArray(data)) {
         imageFiles = data.map((item, idx) => {
           // The API returns: { filename, path, url, size, uploadedAt, modifiedAt }
           // Prefer 'url' field as it contains the relative path like "/uploads/products/filename.webp"
           // Fallback to 'path' or 'filename' if 'url' is not available
-          let imageUrl = item.url || item.path || item.image_url || item.imageUrl || 
-                        item.file || item.filename || item.image || item.src;
-          
+          let imageUrl = item.url || item.path || item.image_url || item.imageUrl ||
+            item.file || item.filename || item.image || item.src;
+
           // Extract filename - prefer the filename field from API response
           let filename = item.filename || item.name || item.file;
-          
+
           // If we have imageUrl, use it; otherwise try to construct from filename
           if (!imageUrl && filename) {
             imageUrl = filename;
           }
-          
+
           // If filename is a full path, extract just the filename
           if (filename && filename.includes('/')) {
             filename = filename.split('/').pop()?.split('?')[0];
           }
-          
+
           // Extract filename from URL if not provided
           if (!filename && imageUrl) {
             // Extract just the filename from the path/URL
             const urlParts = imageUrl.split('/');
             filename = urlParts[urlParts.length - 1]?.split('?')[0];
           }
-          
+
           // Construct full URL in the required format: https://stallion.nishree.com/uploads/products/filename.webp
           // The constructFullUrl function will handle relative paths like "/uploads/products/filename.webp"
           const fullUrl = constructFullUrl(imageUrl);
-          
+
           if (!fullUrl) {
             console.warn('Could not construct URL for item:', item);
             return null;
           }
-          
+
           return {
             id: item.id || `upload-${idx}-${Date.now()}`,
             filename: filename || fullUrl.split('/').pop()?.split('?')[0] || 'unknown',
@@ -307,20 +305,20 @@ const DashboardProducts = () => {
             modifiedAt: item.modifiedAt, // Include modifiedAt if available
           };
         }).filter(item => item !== null); // Remove any items that couldn't be processed
-        }
-        
+      }
+
       // Remove duplicates based on URL
-        const uniqueImages = [];
-        const seenUrls = new Set();
-        imageFiles.forEach(img => {
+      const uniqueImages = [];
+      const seenUrls = new Set();
+      imageFiles.forEach(img => {
         const url = img.url || img.image_url;
         if (url && !seenUrls.has(url)) {
           seenUrls.add(url);
-            uniqueImages.push(img);
-          }
-        });
-        
-        setAllUploads(uniqueImages);
+          uniqueImages.push(img);
+        }
+      });
+
+      setAllUploads(uniqueImages);
     } catch (error) {
       console.error('Error fetching uploads:', error);
       setError(`Failed to load images: ${error.message}`);
@@ -362,17 +360,19 @@ const DashboardProducts = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await getProducts(targetPage, PRODUCTS_PER_PAGE, null);
-      const list = Array.isArray(data) ? data : [];
+      const result = await getProducts(targetPage, PRODUCTS_PER_PAGE, null);
+      const list = result.data || [];
       setProducts(list);
       setProductPage(targetPage);
-      // The products API returns a plain array (no total count). Treat a full
-      // page as a signal that at least one more page may exist.
-      setProductPageCount(list.length === PRODUCTS_PER_PAGE ? targetPage + 1 : targetPage);
+      if (result.pagination?.totalPages != null) {
+        setProductPageCount(Math.max(1, result.pagination.totalPages));
+      } else {
+        setProductPageCount(list.length === PRODUCTS_PER_PAGE ? targetPage + 1 : targetPage);
+      }
     } catch (error) {
       console.error('Error fetching products page:', error);
       if (!error.message?.toLowerCase().includes('token expired') &&
-          !error.message?.toLowerCase().includes('unauthorized')) {
+        !error.message?.toLowerCase().includes('unauthorized')) {
         setError(`Failed to load products: ${error.message}`);
       }
       setProducts([]);
@@ -393,8 +393,8 @@ const DashboardProducts = () => {
       ]);
     } catch (error) {
       console.error('Error fetching all data:', error);
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         setError(`Failed to load data: ${error.message}`);
       }
     } finally {
@@ -407,14 +407,15 @@ const DashboardProducts = () => {
     try {
       setError(null);
       // Send null filters to get all products
-      const data = await getProducts(1, 3000, null); // Increased limit to show all products
-      setProducts(data || []);
-      
+      const result = await getProducts(1, 3000, null); // Increased limit to show all products
+      const data = result.data || [];
+      setProducts(data);
+
       // Get all product image URLs to identify which orphaned images are now assigned
       const productImageUrls = new Set(); // Store original URLs
       const productNormalizedUrls = new Set(); // Store normalized URLs for comparison
       const productImageFilenames = new Set();
-      
+
       if (data && data.length > 0) {
         data.forEach(product => {
           // Handle image_urls array (API returns array)
@@ -462,7 +463,7 @@ const DashboardProducts = () => {
           });
         });
       }
-      
+
       // If database has no images at all, clear all orphaned images
       // This ensures we don't show stale orphaned images when database is empty
       if (productImageFilenames.size === 0 && productImageUrls.size === 0) {
@@ -474,40 +475,40 @@ const DashboardProducts = () => {
           console.error('Error clearing orphaned images from localStorage:', e);
         }
       } else {
-      // Remove orphaned images that are now assigned to products
-      setOrphanedImages(prev => {
-        return prev.filter(img => {
-          const imageUrl = img.url || img.image_url;
-          if (!imageUrl) return false;
-          
+        // Remove orphaned images that are now assigned to products
+        setOrphanedImages(prev => {
+          return prev.filter(img => {
+            const imageUrl = img.url || img.image_url;
+            if (!imageUrl) return false;
+
             // Check if this image URL (original) is assigned to any product
-          if (productImageUrls.has(imageUrl)) {
-            return false; // Remove - it's assigned
-          }
-            
+            if (productImageUrls.has(imageUrl)) {
+              return false; // Remove - it's assigned
+            }
+
             // Check if normalized URL matches any assigned image
             const normalizedUrl = normalizeImageUrl(imageUrl);
             if (normalizedUrl && productNormalizedUrls.has(normalizedUrl)) {
-            return false; // Remove - it's assigned
-          }
-          
-          // Check by filename
-          const urlParts = imageUrl.split('/');
+              return false; // Remove - it's assigned
+            }
+
+            // Check by filename
+            const urlParts = imageUrl.split('/');
             const filename = urlParts[urlParts.length - 1]?.split('?')[0]?.split('#')[0];
-          if (filename && productImageFilenames.has(filename)) {
-            return false; // Remove - it's assigned
-          }
-          
-          // Check if filename matches
-          if (img.fileName && productImageFilenames.has(img.fileName)) {
-            return false; // Remove - it's assigned
-          }
-          
-          return true; // Keep - still unassigned
+            if (filename && productImageFilenames.has(filename)) {
+              return false; // Remove - it's assigned
+            }
+
+            // Check if filename matches
+            if (img.fileName && productImageFilenames.has(img.fileName)) {
+              return false; // Remove - it's assigned
+            }
+
+            return true; // Keep - still unassigned
+          });
         });
-      });
       }
-      
+
       // After fetching products, try to verify orphaned images
       // by checking if any match the pattern of existing product images
       if (orphanedImages.length > 0 && data && data.length > 0) {
@@ -518,7 +519,7 @@ const DashboardProducts = () => {
           const imageUrl = productWithImage.image_url;
           const urlParts = imageUrl.split('/');
           const basePath = urlParts.slice(0, -1).join('/'); // Everything except filename
-          
+
           // Update orphaned images with potential URLs based on product image pattern
           setOrphanedImages(prev => prev.map(img => {
             if (img.isTemporary && img.fileName && !img.verified) {
@@ -531,7 +532,7 @@ const DashboardProducts = () => {
             }
             return img;
           }));
-          
+
           // Verify the constructed URLs asynchronously
           setTimeout(async () => {
             setOrphanedImages(currentImages => {
@@ -561,7 +562,7 @@ const DashboardProducts = () => {
               ).then(verifiedImages => {
                 setOrphanedImages(verifiedImages);
               });
-              
+
               return currentImages; // Return current state while verifying
             });
           }, 500);
@@ -569,8 +570,8 @@ const DashboardProducts = () => {
       }
     } catch (error) {
       console.error('Error fetching products:', error);
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         setError(`Failed to load products: ${error.message}`);
       }
       throw error; // Re-throw to be caught by fetchAllData
@@ -609,14 +610,15 @@ const DashboardProducts = () => {
       setLoading(true);
       setError(null);
       // Send null filters to get all products
-      const data = await getProducts(1, 3000, null); // Increased limit to show all products
-      setProducts(data || []);
-      
+      const result = await getProducts(1, 3000, null); // Increased limit to show all products
+      const data = result.data || [];
+      setProducts(data);
+
       // Get all product image URLs to identify which orphaned images are now assigned
       const productImageUrls = new Set(); // Store original URLs
       const productNormalizedUrls = new Set(); // Store normalized URLs for comparison
       const productImageFilenames = new Set();
-      
+
       if (data && data.length > 0) {
         data.forEach(product => {
           // Handle image_urls array (API returns array)
@@ -664,7 +666,7 @@ const DashboardProducts = () => {
           });
         });
       }
-      
+
       // If database has no images at all, clear all orphaned images
       // This ensures we don't show stale orphaned images when database is empty
       if (productImageFilenames.size === 0 && productImageUrls.size === 0) {
@@ -676,40 +678,40 @@ const DashboardProducts = () => {
           console.error('Error clearing orphaned images from localStorage:', e);
         }
       } else {
-      // Remove orphaned images that are now assigned to products
-      setOrphanedImages(prev => {
-        return prev.filter(img => {
-          const imageUrl = img.url || img.image_url;
-          if (!imageUrl) return false;
-          
+        // Remove orphaned images that are now assigned to products
+        setOrphanedImages(prev => {
+          return prev.filter(img => {
+            const imageUrl = img.url || img.image_url;
+            if (!imageUrl) return false;
+
             // Check if this image URL (original) is assigned to any product
-          if (productImageUrls.has(imageUrl)) {
-            return false; // Remove - it's assigned
-          }
-            
+            if (productImageUrls.has(imageUrl)) {
+              return false; // Remove - it's assigned
+            }
+
             // Check if normalized URL matches any assigned image
             const normalizedUrl = normalizeImageUrl(imageUrl);
             if (normalizedUrl && productNormalizedUrls.has(normalizedUrl)) {
-            return false; // Remove - it's assigned
-          }
-          
-          // Check by filename
-          const urlParts = imageUrl.split('/');
+              return false; // Remove - it's assigned
+            }
+
+            // Check by filename
+            const urlParts = imageUrl.split('/');
             const filename = urlParts[urlParts.length - 1]?.split('?')[0]?.split('#')[0];
-          if (filename && productImageFilenames.has(filename)) {
-            return false; // Remove - it's assigned
-          }
-          
-          // Check if filename matches
-          if (img.fileName && productImageFilenames.has(img.fileName)) {
-            return false; // Remove - it's assigned
-          }
-          
-          return true; // Keep - still unassigned
+            if (filename && productImageFilenames.has(filename)) {
+              return false; // Remove - it's assigned
+            }
+
+            // Check if filename matches
+            if (img.fileName && productImageFilenames.has(img.fileName)) {
+              return false; // Remove - it's assigned
+            }
+
+            return true; // Keep - still unassigned
+          });
         });
-      });
       }
-      
+
       // After fetching products, try to verify orphaned images
       // by checking if any match the pattern of existing product images
       if (orphanedImages.length > 0 && data && data.length > 0) {
@@ -720,7 +722,7 @@ const DashboardProducts = () => {
           const imageUrl = productWithImage.image_url;
           const urlParts = imageUrl.split('/');
           const basePath = urlParts.slice(0, -1).join('/'); // Everything except filename
-          
+
           // Update orphaned images with potential URLs based on product image pattern
           setOrphanedImages(prev => prev.map(img => {
             if (img.isTemporary && img.fileName && !img.verified) {
@@ -733,7 +735,7 @@ const DashboardProducts = () => {
             }
             return img;
           }));
-          
+
           // Verify the constructed URLs asynchronously
           setTimeout(async () => {
             setOrphanedImages(currentImages => {
@@ -763,7 +765,7 @@ const DashboardProducts = () => {
               ).then(verifiedImages => {
                 setOrphanedImages(verifiedImages);
               });
-              
+
               return currentImages; // Return current state while verifying
             });
           }, 500);
@@ -771,8 +773,8 @@ const DashboardProducts = () => {
       }
     } catch (error) {
       console.error('Error fetching products:', error);
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         setError(`Failed to load products: ${error.message}`);
       }
     } finally {
@@ -805,7 +807,7 @@ const DashboardProducts = () => {
         getLensMaterials().catch(() => []),
         getFrameMaterials().catch(() => []),
       ]);
-      
+
       setBrands(brandsData || []);
       setCollections(collectionsData || []);
       setGenders(gendersData || []);
@@ -850,7 +852,7 @@ const DashboardProducts = () => {
       // Get the image URL - use relative path format like "/uploads/products/filename.webp"
       const imageUrl = imageItem.image_url;
       let imagePath = null;
-      
+
       // Extract relative path for the backend
       if (imageUrl.includes('/uploads/products/')) {
         // Extract path after /uploads/products/
@@ -894,10 +896,10 @@ const DashboardProducts = () => {
         showError('Image is already attached to this product');
         return;
       }
-      
+
       // Add the new image URL to the array
       const updatedImageUrls = [...currentImageUrls, imagePath];
-      
+
       // Prepare update data with all product fields
       const updateData = {
         model_no: product.model_no || '',
@@ -923,7 +925,7 @@ const DashboardProducts = () => {
 
       // Update product using PUT API
       await updateProduct(productId, updateData);
-      
+
       // Refresh products to get updated values
       await fetchProductsWithoutLoading();
       await fetchAllUploads(); // Refresh the images list in the modal
@@ -963,7 +965,7 @@ const DashboardProducts = () => {
 
     // Get selected images from availableImagesForModal (images from API)
     const imagesToAttach = availableImagesForModal.filter(img => selectedImageIds.has(img.id));
-    
+
     if (imagesToAttach.length === 0) {
       setError('No valid images selected');
       return;
@@ -972,16 +974,16 @@ const DashboardProducts = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Extract image paths for all selected images
       const newImagePaths = [];
 
       for (const imageItem of imagesToAttach) {
-          const imageUrl = imageItem.image_url;
+        const imageUrl = imageItem.image_url;
         let imagePath = null;
-          
+
         // Extract relative path for the backend
-          if (imageUrl.includes('/uploads/products/')) {
+        if (imageUrl.includes('/uploads/products/')) {
           const filename = imageUrl.split('/uploads/products/')[1]?.split('?')[0];
           imagePath = `/uploads/products/${filename}`;
         } else if (imageUrl.startsWith('/uploads/products/')) {
@@ -1022,16 +1024,16 @@ const DashboardProducts = () => {
       // Filter out duplicates - only add images that aren't already attached
       const uniqueNewPaths = newImagePaths.filter(newPath => {
         const filename = newPath.split('/').pop();
-        return !currentImageUrls.some(existingUrl => 
+        return !currentImageUrls.some(existingUrl =>
           existingUrl === newPath || existingUrl.includes(filename)
         );
       });
 
       if (uniqueNewPaths.length === 0) {
         showError('All selected images are already attached to this product');
-                    return;
-                  }
-                  
+        return;
+      }
+
       // Combine current and new image URLs
       const updatedImageUrls = [...currentImageUrls, ...uniqueNewPaths];
 
@@ -1060,7 +1062,7 @@ const DashboardProducts = () => {
 
       // Update product using PUT API
       await updateProduct(productId, updateData);
-      
+
       // Refresh products to get updated values
       await fetchProductsWithoutLoading();
       await fetchAllUploads(); // Refresh the images list in the modal
@@ -1069,7 +1071,7 @@ const DashboardProducts = () => {
       const successMessage = skippedCount > 0
         ? `${uniqueNewPaths.length} image(s) attached successfully! ${skippedCount} were already attached.`
         : `${uniqueNewPaths.length} image(s) attached successfully!`;
-      
+
       showSuccess(successMessage);
       setOpenImageSelectModal(false);
       setImageTargetProduct(null);
@@ -1101,11 +1103,11 @@ const DashboardProducts = () => {
       const frameType = frameTypes.find(ft => (ft.frame_type_id || ft.id) === product.frame_type_id);
       const lensMaterial = lensMaterials.find(lm => (lm.lens_material_id || lm.id) === product.lens_material_id);
       const frameMaterial = frameMaterials.find(fm => (fm.frame_material_id || fm.id) === product.frame_material_id);
-      
+
       // Check if product has valid images using helper function
       // This properly handles empty arrays [], arrays with empty strings, and the string "[]"
       const hasUploadedMedia = hasValidImageUrls(product);
-      
+
       return {
         id: product.product_id || product.id,
         product_id: product.product_id || product.id,
@@ -1154,25 +1156,25 @@ const DashboardProducts = () => {
   // Always returns path in format: /uploads/products/filename.jpg
   const extractRelativePath = (path) => {
     if (!path) return null;
-    
+
     // Ensure path is a string
     if (typeof path !== 'string') return null;
-    
+
     // Extract filename from any path format
     let filename = path;
-    
+
     // If path contains slashes, extract the filename
     if (path.includes('/')) {
       filename = path.split('/').pop();
     }
-    
+
     // Remove any query parameters or fragments from filename
     filename = filename.split('?')[0].split('#')[0];
-    
+
     // Trim whitespace and validate filename is not empty
     filename = filename.trim();
     if (!filename || filename.length === 0) return null;
-    
+
     // Always return in the format: /uploads/products/filename
     return `/uploads/products/${filename}`;
   };
@@ -1228,105 +1230,105 @@ const DashboardProducts = () => {
     const productImageUrls = new Set();
     const productImageFilenames = new Set();
     const productImagePaths = new Set(); // Store paths in various formats for comparison
-    
+
     products.forEach(product => {
       // Use helper function to parse image_urls from various formats (array, JSON string, plain string)
       const imageUrls = parseImageUrls(product);
-      
+
       imageUrls.forEach(imageUrl => {
         if (imageUrl && typeof imageUrl === 'string') {
           const trimmed = imageUrl.trim();
           // Double-check it's not empty or "[]"
           if (trimmed.length > 0 && trimmed !== '[]') {
-          // Add the URL as-is
-          productImageUrls.add(imageUrl);
-          
-          // Normalize and add
-          const normalizedUrl = normalizeImageUrl(imageUrl);
-          if (normalizedUrl) {
-            productImageUrls.add(normalizedUrl);
-          }
-          
-          // Extract filename
-          const urlParts = imageUrl.split('/');
-          const filename = urlParts[urlParts.length - 1]?.split('?')[0];
-          if (filename) {
-            productImageFilenames.add(filename);
-          }
-          
-          // Add various path formats for comparison
-          // Full path, relative path, and filename
-          if (imageUrl.includes('/uploads/products/')) {
-            const path = imageUrl.split('/uploads/products/')[1]?.split('?')[0];
-            if (path) {
-              productImagePaths.add(`/uploads/products/${path}`);
-              productImagePaths.add(path);
+            // Add the URL as-is
+            productImageUrls.add(imageUrl);
+
+            // Normalize and add
+            const normalizedUrl = normalizeImageUrl(imageUrl);
+            if (normalizedUrl) {
+              productImageUrls.add(normalizedUrl);
             }
-          } else if (imageUrl.startsWith('/uploads/products/')) {
-            productImagePaths.add(imageUrl.split('?')[0]);
-            const path = imageUrl.replace('/uploads/products/', '').split('?')[0];
-            if (path) {
-              productImagePaths.add(path);
+
+            // Extract filename
+            const urlParts = imageUrl.split('/');
+            const filename = urlParts[urlParts.length - 1]?.split('?')[0];
+            if (filename) {
+              productImageFilenames.add(filename);
             }
-          }
+
+            // Add various path formats for comparison
+            // Full path, relative path, and filename
+            if (imageUrl.includes('/uploads/products/')) {
+              const path = imageUrl.split('/uploads/products/')[1]?.split('?')[0];
+              if (path) {
+                productImagePaths.add(`/uploads/products/${path}`);
+                productImagePaths.add(path);
+              }
+            } else if (imageUrl.startsWith('/uploads/products/')) {
+              productImagePaths.add(imageUrl.split('?')[0]);
+              const path = imageUrl.replace('/uploads/products/', '').split('?')[0];
+              if (path) {
+                productImagePaths.add(path);
+              }
+            }
           }
         }
       });
     });
-    
+
     // Only include images from allUploads (from uploads/products folder)
     const mediaImages = [];
     const seenUrls = new Set();
-    
+
     if (allUploads && Array.isArray(allUploads) && allUploads.length > 0) {
       allUploads.forEach((upload, idx) => {
         // Handle different possible response formats
         let imageUrl = upload.path || upload.url || upload.image_url || upload.file || upload.filename;
         let fileName = upload.filename || upload.name || upload.file;
-        
+
         // If fileName is a full path, extract just the filename
         if (fileName && fileName.includes('/')) {
           fileName = fileName.split('/').pop()?.split('?')[0];
         }
-        
+
         // If imageUrl is just a filename, construct full path
         if (imageUrl && !imageUrl.includes('/') && !imageUrl.startsWith('http')) {
           imageUrl = `/uploads/products/${imageUrl}`;
         }
-        
+
         // Skip if no valid URL
         if (!imageUrl) return;
-        
+
         // Ensure URL is normalized and from products folder
         const normalizedUrl = normalizeImageUrl(imageUrl);
         if (!normalizedUrl) return;
-        
+
         // Only include images from uploads/products folder
         if (!normalizedUrl.includes('/uploads/products/')) {
           return; // Skip - not from products folder
         }
-        
+
         // Skip duplicates
         if (seenUrls.has(normalizedUrl)) return;
         seenUrls.add(normalizedUrl);
-        
+
         // Extract filename if not provided
         if (!fileName) {
           const urlParts = normalizedUrl.split('/');
           fileName = urlParts[urlParts.length - 1]?.split('?')[0];
         }
-        
+
         // Check if this image is assigned to any product
         let isAssigned = false;
         let assignedProduct = null;
-        
+
         // Helper function to extract filename from URL
         const getFilenameFromUrl = (url) => {
           if (!url) return null;
           const parts = url.split('/');
           return parts[parts.length - 1]?.split('?')[0] || null;
         };
-        
+
         // Helper function to extract path after /uploads/products/
         const getPathAfterProducts = (url) => {
           if (!url) return null;
@@ -1335,13 +1337,13 @@ const DashboardProducts = () => {
           }
           return null;
         };
-        
+
         // Get all variations of the current image URL for comparison
         const normalizedUrlNoQuery = normalizedUrl.split('?')[0];
         const imageUrlNoQuery = imageUrl.split('?')[0];
         const currentFileName = fileName || getFilenameFromUrl(normalizedUrl) || getFilenameFromUrl(imageUrl);
         const currentPath = getPathAfterProducts(normalizedUrl) || getPathAfterProducts(imageUrl);
-        
+
         // Check by full URL (normalized and original) - check all variations
         const urlVariations = [
           normalizedUrl,
@@ -1353,14 +1355,14 @@ const DashboardProducts = () => {
           `https://stallion.nishree.com${normalizedUrlNoQuery}`,
           `https://stallion.nishree.com${imageUrlNoQuery}`
         ];
-        
+
         for (const urlVar of urlVariations) {
           if (productImageUrls.has(urlVar)) {
             isAssigned = true;
             break;
           }
         }
-        
+
         // Check by filename - also check normalized filename
         if (!isAssigned && currentFileName) {
           if (productImageFilenames.has(currentFileName)) {
@@ -1375,7 +1377,7 @@ const DashboardProducts = () => {
             }
           }
         }
-        
+
         // Check by path formats - check all variations
         if (!isAssigned && currentPath) {
           const pathVariations = [
@@ -1387,7 +1389,7 @@ const DashboardProducts = () => {
             `https://stallion.nishree.com${normalizedUrlNoQuery}`,
             `https://stallion.nishree.com${imageUrlNoQuery}`
           ];
-          
+
           for (const pathVar of pathVariations) {
             if (productImagePaths.has(pathVar)) {
               isAssigned = true;
@@ -1395,7 +1397,7 @@ const DashboardProducts = () => {
             }
           }
         }
-        
+
         // Additional check: directly compare against all product images
         if (!isAssigned) {
           for (const product of products) {
@@ -1404,28 +1406,28 @@ const DashboardProducts = () => {
               const normalizedProductUrl = normalizeImageUrl(productImageUrl);
               const productFileName = getFilenameFromUrl(normalizedProductUrl) || getFilenameFromUrl(productImageUrl);
               const productPath = getPathAfterProducts(normalizedProductUrl) || getPathAfterProducts(productImageUrl);
-              
+
               // Compare URLs
-              if (normalizedProductUrl === normalizedUrl || 
-                  normalizedProductUrl === imageUrl ||
-                  productImageUrl === normalizedUrl ||
-                  productImageUrl === imageUrl ||
-                  normalizedProductUrl?.split('?')[0] === normalizedUrlNoQuery ||
-                  productImageUrl?.split('?')[0] === imageUrlNoQuery) {
+              if (normalizedProductUrl === normalizedUrl ||
+                normalizedProductUrl === imageUrl ||
+                productImageUrl === normalizedUrl ||
+                productImageUrl === imageUrl ||
+                normalizedProductUrl?.split('?')[0] === normalizedUrlNoQuery ||
+                productImageUrl?.split('?')[0] === imageUrlNoQuery) {
                 isAssigned = true;
                 assignedProduct = product;
                 break;
               }
-              
+
               // Compare filenames
-              if (currentFileName && productFileName && 
-                  (currentFileName === productFileName || 
-                   currentFileName.toLowerCase() === productFileName.toLowerCase())) {
+              if (currentFileName && productFileName &&
+                (currentFileName === productFileName ||
+                  currentFileName.toLowerCase() === productFileName.toLowerCase())) {
                 isAssigned = true;
                 assignedProduct = product;
                 break;
               }
-              
+
               // Compare paths
               if (currentPath && productPath && currentPath === productPath) {
                 isAssigned = true;
@@ -1436,46 +1438,46 @@ const DashboardProducts = () => {
             if (isAssigned) break;
           }
         }
-        
+
         // If assigned, find the product
         if (isAssigned && !assignedProduct) {
           assignedProduct = products.find(p => {
             // Use helper function to parse image_urls
             const productImageUrls = parseImageUrls(p);
-            
+
             return productImageUrls.some(url => {
               const normalizedProductUrl = normalizeImageUrl(url);
               const productUrlNoQuery = url.split('?')[0];
               const normalizedProductUrlNoQuery = normalizedProductUrl ? normalizedProductUrl.split('?')[0] : null;
-              
+
               // Check by full URL
-              if (normalizedProductUrl === normalizedUrl || 
-                  url === imageUrl || 
-                  normalizedProductUrl === imageUrl || 
-                  url === normalizedUrl ||
-                  normalizedProductUrlNoQuery === normalizedUrlNoQuery ||
-                  productUrlNoQuery === imageUrlNoQuery) {
+              if (normalizedProductUrl === normalizedUrl ||
+                url === imageUrl ||
+                normalizedProductUrl === imageUrl ||
+                url === normalizedUrl ||
+                normalizedProductUrlNoQuery === normalizedUrlNoQuery ||
+                productUrlNoQuery === imageUrlNoQuery) {
                 return true;
               }
-              
+
               // Check by filename
               const productFileName = getFilenameFromUrl(url) || getFilenameFromUrl(normalizedProductUrl);
               if (productFileName && productFileName === fileName) {
                 return true;
               }
-              
+
               // Check by path
               const productPath = getPathAfterProducts(normalizedProductUrl || url);
               const imagePath = getPathAfterProducts(normalizedUrl);
               if (productPath && imagePath && productPath === imagePath) {
                 return true;
               }
-              
+
               return false;
             });
           });
         }
-        
+
         mediaImages.push({
           id: `media-${idx}-${upload.id || Date.now()}`,
           image_url: normalizedUrl,
@@ -1494,7 +1496,7 @@ const DashboardProducts = () => {
         });
       });
     }
-    
+
     return mediaImages;
   }, [allUploads, products]);
 
@@ -1504,7 +1506,7 @@ const DashboardProducts = () => {
     // Get all product image URLs and filenames to exclude assigned images
     const productImageUrls = new Set();
     const productImageFilenames = new Set();
-    
+
     products.forEach(product => {
       // Handle image_urls array (API returns array)
       // Filter out invalid values: empty strings, whitespace-only, and the string "[]"
@@ -1546,48 +1548,48 @@ const DashboardProducts = () => {
         }
       });
     });
-    
+
     // Filter allMediaImages to show only unassigned images
     return allMediaImages
       .filter((img) => {
         const imageUrl = img.image_url;
         if (!imageUrl) return false;
-        
+
         // Exclude blob URLs (temporary)
         if (imageUrl.startsWith('blob:')) return false;
-        
+
         // Exclude images that failed to load
         if (invalidImageUrls.has(imageUrl)) {
           return false;
         }
-        
+
         // Exclude if image type is 'assigned' (most reliable check)
         if (img.type === 'assigned') {
           return false; // This image is assigned
         }
-        
+
         // Exclude if image has an assignedProduct
         if (img.assignedProduct || img.productId || img.productData) {
           return false; // This image is assigned to a product
         }
-        
+
         // Exclude if this image is assigned to any product
         if (productImageUrls.has(imageUrl)) {
           return false; // This image is assigned
         }
-        
+
         // Check by filename
         const urlParts = imageUrl.split('/');
         const filename = urlParts[urlParts.length - 1]?.split('?')[0];
         if (filename && productImageFilenames.has(filename)) {
           return false; // This image is assigned
         }
-        
+
         // Check by fileName property
         if (img.fileName && productImageFilenames.has(img.fileName)) {
           return false; // This image is assigned
         }
-        
+
         return true; // Image is available for assignment
       })
       .map((img, idx) => {
@@ -1599,8 +1601,8 @@ const DashboardProducts = () => {
           collection_name: img.collection_name || 'N/A',
           type: 'unassigned',
           isTemporary: false,
-          fileName: img.fileName || (img.image_url.includes('/uploads/products/') 
-            ? img.image_url.split('/uploads/products/')[1]?.split('?')[0] 
+          fileName: img.fileName || (img.image_url.includes('/uploads/products/')
+            ? img.image_url.split('/uploads/products/')[1]?.split('?')[0]
             : null),
           originalData: img // Keep reference
         };
@@ -1613,7 +1615,7 @@ const DashboardProducts = () => {
     // Get all product image URLs and filenames to exclude assigned images
     const productImageUrls = new Set();
     const productImageFilenames = new Set();
-    
+
     products.forEach(product => {
       // Handle image_urls array (API returns array)
       // Ensure imageUrls is always an array
@@ -1637,50 +1639,50 @@ const DashboardProducts = () => {
         }
       });
     });
-    
+
     return orphanedImages
       .filter((img) => {
         const imageUrl = img.url || img.image_url || (typeof img === 'string' ? img : null);
         if (!imageUrl) return false;
-        
+
         // Exclude blob URLs (temporary)
         if (imageUrl.startsWith('blob:')) return false;
-        
+
         // Exclude images that failed to load
         const normalizedUrl = normalizeImageUrl(imageUrl);
         if (invalidImageUrls.has(normalizedUrl) || invalidImageUrls.has(imageUrl)) {
           return false;
         }
-        
+
         // Exclude if this image is assigned to any product
         if (productImageUrls.has(imageUrl) || productImageUrls.has(normalizedUrl)) {
           return false; // This image is assigned
         }
-        
+
         // Check by filename
         const urlParts = normalizedUrl.split('/');
         const filename = urlParts[urlParts.length - 1]?.split('?')[0];
         if (filename && productImageFilenames.has(filename)) {
           return false; // This image is assigned
         }
-        
+
         // Check by fileName property
         if (img.fileName && productImageFilenames.has(img.fileName)) {
           return false; // This image is assigned
         }
-        
+
         // Check if the image is in uploads/products directory
         // Accept if URL contains /uploads/products/ or has a valid filename
-        const hasUploadsProducts = normalizedUrl.includes('/uploads') || 
-                                   imageUrl.includes('/uploads') ||
-                                   (img.fileName && img.fileName.length > 0);
-        
+        const hasUploadsProducts = normalizedUrl.includes('/uploads') ||
+          imageUrl.includes('/uploads') ||
+          (img.fileName && img.fileName.length > 0);
+
         return hasUploadsProducts;
       })
       .map((img, idx) => {
         const imageUrl = img.url || img.image_url || (typeof img === 'string' ? img : null);
         const normalizedUrl = normalizeImageUrl(imageUrl);
-        
+
         return {
           id: `orphaned-${idx}-${img.uploadedAt || Date.now()}`,
           image_url: normalizedUrl,
@@ -1689,8 +1691,8 @@ const DashboardProducts = () => {
           collection_name: img.collection_name || 'N/A',
           type: 'orphaned',
           isTemporary: img.isTemporary,
-          fileName: img.fileName || (normalizedUrl.includes('/uploads/products/') 
-            ? normalizedUrl.split('/uploads/products/')[1]?.split('?')[0] 
+          fileName: img.fileName || (normalizedUrl.includes('/uploads/products/')
+            ? normalizedUrl.split('/uploads/products/')[1]?.split('?')[0]
             : null),
           originalData: img // Keep reference for removal
         };
@@ -1700,7 +1702,7 @@ const DashboardProducts = () => {
   const unuploadedRows = useMemo(
     () => rows.filter(r => {
       const product = r.data;
-      
+
       // Check if product has valid images using helper function
       // Products with empty array [], arrays with empty strings, or the string "[]" should appear in unuploaded gallery
       // Return products that have NO valid images
@@ -1804,13 +1806,13 @@ const DashboardProducts = () => {
           try {
             // Get products in this tray
             const trayProducts = await getProductsInTray(trayId);
-            
+
             // Check if this product exists in the tray
-            const productInTray = Array.isArray(trayProducts) 
+            const productInTray = Array.isArray(trayProducts)
               ? trayProducts.find(tp => {
-                  const tpProductId = tp.product_id || tp.product?.product_id || tp.product?.id;
-                  return tpProductId && String(tpProductId).toLowerCase() === String(productId).toLowerCase();
-                })
+                const tpProductId = tp.product_id || tp.product?.product_id || tp.product?.id;
+                return tpProductId && String(tpProductId).toLowerCase() === String(productId).toLowerCase();
+              })
               : null;
 
             // If product exists in tray, remove it
@@ -1848,10 +1850,10 @@ const DashboardProducts = () => {
       setError(null);
       showSuccess('Product deleted successfully');
     } catch (error) {
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         console.error('Error deleting product:', error);
-        
+
         // Check if it's a foreign key constraint error
         const errorMessage = error.message || JSON.stringify(error);
         if (errorMessage.includes('foreign key constraint') || errorMessage.includes('tray_product')) {
@@ -1940,15 +1942,17 @@ const DashboardProducts = () => {
     { key: 'status', label: 'STATUS', width: '100px' },
     { key: 'brand', label: 'BRAND', width: '120px' },
     { key: 'collection', label: 'COLLECTION', width: '130px' },
-    { key: 'action', label: 'ACTION', width: '120px', render: (_v, row) => (
-      <RowActions 
-        onEdit={() => handleEdit(row)} 
-        onDelete={() => handleDelete(row)} 
-        onUpload={(!row.data?.image_url && activeTab === 'Unuploaded Media Gallery') 
-          ? () => handleAttachImage(row) 
-          : undefined}
-      />
-    ) },
+    {
+      key: 'action', label: 'ACTION', width: '120px', render: (_v, row) => (
+        <RowActions
+          onEdit={() => handleEdit(row)}
+          onDelete={() => handleDelete(row)}
+          onUpload={(!row.data?.image_url && activeTab === 'Unuploaded Media Gallery')
+            ? () => handleAttachImage(row)
+            : undefined}
+        />
+      )
+    },
   ]), [handleEdit, handleDelete, handleAttachImage, activeTab]);
 
   const handleOpenMediaUpload = () => {
@@ -1960,7 +1964,7 @@ const DashboardProducts = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     try {
       setLoading(true);
       const dataToSend = {
@@ -1981,7 +1985,7 @@ const DashboardProducts = () => {
         warehouse_qty: parseInt(formData.warehouse_qty) || 0,
         status: formData.status,
       };
-      
+
       // Include tray_qty and total_qty only when updating (edit mode)
       if (editRow) {
         dataToSend.tray_qty = parseInt(formData.tray_qty) || 0;
@@ -2000,8 +2004,8 @@ const DashboardProducts = () => {
       setEditRow(null);
       resetForm();
     } catch (error) {
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         console.error('Error saving product:', error);
         const message = `Failed to save product: ${error.message}`;
         setError(message);
@@ -2017,12 +2021,12 @@ const DashboardProducts = () => {
     if (files.length === 0) return;
 
     const targetProduct = imageTargetProduct;
-    const targetProductId = targetProduct?.id 
-      || targetProduct?.product_id 
-      || targetProduct?.data?.product_id 
+    const targetProductId = targetProduct?.id
+      || targetProduct?.product_id
+      || targetProduct?.data?.product_id
       || targetProduct?.data?.id;
-    const targetLabel = targetProduct?.model_no 
-      || targetProduct?.data?.model_no 
+    const targetLabel = targetProduct?.model_no
+      || targetProduct?.data?.model_no
       || (activeTab === 'Media Gallery' ? 'media' : 'product');
 
     const isMediaUpload = activeTab === 'Media Gallery';
@@ -2053,19 +2057,19 @@ const DashboardProducts = () => {
       setUploadingImage(true);
       setError(null);
       setSelectedImages(files);
-      
+
       const response = await uploadProductImage(files, targetProductId);
-      
+
       // Log full response for debugging
       console.log('Image upload response:', response);
-      
+
       // If upload successful and uploaded to a specific product, update status to active and refresh
       if (targetProductId) {
         // Find the product to update its status
-        const productToUpdate = products.find(p => 
+        const productToUpdate = products.find(p =>
           (p.id || p.product_id) == targetProductId
         ) || targetProduct?.data || targetProduct;
-        
+
         if (productToUpdate) {
           // Update product status to active when image is uploaded
           const updateData = {
@@ -2089,21 +2093,21 @@ const DashboardProducts = () => {
             status: 'active', // Update status to active when image is uploaded
             image_urls: productToUpdate.image_urls || [] // Keep existing image_urls
           };
-          
+
           await updateProduct(targetProductId, updateData);
         }
-        
+
         await fetchProductsWithoutLoading();
       }
-      
+
       // Handle orphaned images (uploaded without product_id)
       if (isMediaUpload && !targetProductId) {
         // Refresh the media gallery to show the newly uploaded image immediately
         await fetchAllUploads();
-        
+
         // Extract image paths from response - API returns { data: [{ path, filename, ... }] }
         let imageFiles = [];
-        
+
         if (response?.data) {
           if (Array.isArray(response.data)) {
             // Response has data array with file info
@@ -2111,7 +2115,7 @@ const DashboardProducts = () => {
               // Extract relative path from absolute server path
               const relativePath = extractRelativePath(item.path);
               return {
-              filename: item.filename || item.originalName || item.name,
+                filename: item.filename || item.originalName || item.name,
                 path: relativePath, // Convert absolute path to relative path
                 url: relativePath || item.image_url || item.url || null
               };
@@ -2126,7 +2130,7 @@ const DashboardProducts = () => {
             }];
           }
         }
-        
+
         // If no files extracted from response, use uploaded file names
         if (imageFiles.length === 0 && files.length > 0) {
           // Get backend base URL for constructing image URLs
@@ -2142,7 +2146,7 @@ const DashboardProducts = () => {
             }
             return 'https://stallion.nishree.com';
           };
-          
+
           const backendBaseUrl = getBackendBaseUrl();
           imageFiles = files.map(file => ({
             filename: file.name,
@@ -2150,7 +2154,7 @@ const DashboardProducts = () => {
             url: `${backendBaseUrl}/uploads/products/${file.name}`
           }));
         }
-        
+
         // Add to orphaned images using path from API response
         if (imageFiles.length > 0) {
           const newOrphanedImages = imageFiles
@@ -2158,7 +2162,7 @@ const DashboardProducts = () => {
             .map(file => {
               // Use path from API response (already converted to relative), or construct URL from filename
               const imageUrl = file.path || file.url || (file.filename ? `/uploads/products/${file.filename}` : null);
-              
+
               return {
                 url: imageUrl,
                 image_url: imageUrl,
@@ -2168,26 +2172,26 @@ const DashboardProducts = () => {
                 verified: !!file.path // Verified if we got path from API
               };
             });
-          
+
           setOrphanedImages(prev => [...prev, ...newOrphanedImages]);
         }
       }
-      
+
       const fileCount = files.length;
       setUploadProgress({
         success: true,
-        message: fileCount === 1 
-          ? (isMediaUpload ? 'Image uploaded successfully!' : `Image attached to ${targetLabel} successfully!`) 
+        message: fileCount === 1
+          ? (isMediaUpload ? 'Image uploaded successfully!' : `Image attached to ${targetLabel} successfully!`)
           : (isMediaUpload ? `${fileCount} images uploaded successfully!` : `${fileCount} images attached to ${targetLabel} successfully!`),
       });
       showSuccess(isMediaUpload ? 'Images uploaded successfully' : 'Images attached to product successfully');
-      
+
       // Close the modal if it was open
       if (openImageSelectModal) {
         setOpenImageSelectModal(false);
       }
       setImageTargetProduct(null);
-      
+
       // Clear selection after 3 seconds
       setTimeout(() => {
         setSelectedImages([]);
@@ -2199,8 +2203,8 @@ const DashboardProducts = () => {
       }, 3000);
     } catch (error) {
       console.error('Error uploading images:', error);
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         const message = `Failed to upload images: ${error.message}`;
         setError(message);
         showError(message);
@@ -2225,7 +2229,7 @@ const DashboardProducts = () => {
     const validExtensions = ['.xlsx', '.xls'];
     const fileName = selectedBulkFile.name.toLowerCase();
     const isValidFile = validExtensions.some(ext => fileName.endsWith(ext));
-    
+
     if (!isValidFile) {
       setError('Please select a valid Excel file (.xlsx or .xls)');
       return;
@@ -2234,24 +2238,24 @@ const DashboardProducts = () => {
     try {
       setUploadingBulk(true);
       setError(null);
-      
+
       const response = await bulkUploadProducts(selectedBulkFile);
-      
+
       // Show success message with details
       const successMessage = response.message || 'Bulk upload completed successfully!';
-      const details = response.data ? 
+      const details = response.data ?
         `Created: ${response.data.successCount || 0}, Errors: ${response.data.errorCount || 0}` : '';
-      
+
       setUploadProgress({
         success: true,
         message: successMessage,
         details: details,
       });
       showSuccess(successMessage);
-      
+
       // Refresh products list
       await fetchProductsWithoutLoading();
-      
+
       // Clear selection and close modal after 3 seconds
       setTimeout(() => {
         setSelectedBulkFile(null);
@@ -2260,8 +2264,8 @@ const DashboardProducts = () => {
       }, 3000);
     } catch (error) {
       console.error('Error uploading bulk file:', error);
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         const message = `Failed to upload file: ${error.message}`;
         setError(message);
         showError(message);
@@ -2322,7 +2326,7 @@ const DashboardProducts = () => {
         {uploadProgress && (
           <div className="dash-row">
             <div className="dash-card full">
-              <div style={{ 
+              <div style={{
                 padding: '12px',
                 backgroundColor: uploadProgress.success ? '#d4edda' : '#f8d7da',
                 border: `1px solid ${uploadProgress.success ? '#c3e6cb' : '#f5c6cb'}`,
@@ -2394,182 +2398,182 @@ const DashboardProducts = () => {
                 ) : (
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-5 p-5">
                     {allMediaImages.map(item => (
-                    <div
-                      key={item.id}
-                      className="border border-border rounded-xl overflow-hidden bg-surface flex flex-col shadow-md relative transition-[transform,box-shadow] duration-200 cursor-pointer"
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.transform = 'translateY(0)';
-                        e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                      }}
-                    >
-                      {/* Status Tag - Always show assigned/unassigned status */}
                       <div
-                        className="absolute top-3 left-3 text-white px-3 py-1.5 rounded-md text-xs font-semibold z-[2] uppercase tracking-[0.5px] shadow-sm"
-                        style={{ background: (item.type === 'assigned') ? 'var(--color-success)' : 'var(--color-warning)' }}
-                      >
-                        {item.type === 'assigned' ? 'Assigned' : 'Unassigned'}
-                      </div>
-                      
-                      {/* Delete Button */}
-                      <button
-                        className="absolute top-3 right-3 text-white border-none rounded-full w-9 h-9 cursor-pointer flex items-center justify-center z-[2] text-lg font-bold transition-[background] duration-200 shadow-sm bg-[#f44336]"
-                        onClick={async (e) => {
-                          e.stopPropagation();
-
-                          // If image is assigned, block deletion and show notification
-                          if (item.type === 'assigned') {
-                            showError('This image is assigned to a product. Please unassign it first before deleting.');
-                            return;
-                          }
-
-                          if (!window.confirm('Are you sure you want to delete this image? This cannot be undone.')) {
-                            return;
-                          }
-
-                          try {
-                            setLoading(true);
-                            // Extract filename from URL
-                            const imageUrl = item.image_url || item.url;
-                            const fileName = imageUrl ? imageUrl.split('/').pop().split('?')[0] : null;
-                            if (!fileName) {
-                              showError('Could not determine image filename.');
-                              return;
-                            }
-                            await deleteProductImage(fileName);
-                            showSuccess('Image deleted successfully');
-                            await fetchAllUploads();
-                          } catch (error) {
-                            console.error('Error deleting image:', error);
-                            showError(`Failed to delete image: ${error.message}`);
-                          } finally {
-                            setLoading(false);
-                          }
-                        }}
+                        key={item.id}
+                        className="border border-border rounded-xl overflow-hidden bg-surface flex flex-col shadow-md relative transition-[transform,box-shadow] duration-200 cursor-pointer"
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.background = '#d32f2f';
+                          e.currentTarget.style.transform = 'translateY(-4px)';
+                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
                         }}
                         onMouseLeave={(e) => {
-                          e.currentTarget.style.background = '#f44336';
+                          e.currentTarget.style.transform = 'translateY(0)';
+                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
                         }}
-                        disabled={loading}
-                        aria-label="Delete image"
-                        title="Delete image"
                       >
-                        ✕
-                      </button>
-                      
-                      {/* Image Container */}
-                      <div className="w-full aspect-[4/3] bg-surface-muted relative min-h-[250px] overflow-hidden flex items-center justify-center">
-                        {item.image_url ? (
-                          <img
-                            src={item.image_url}
-                            alt={item.model_no || 'Product image'}
-                            className="w-full h-full object-contain block max-w-full max-h-full"
-                            onError={(e) => {
-                              const img = e.target;
-                              const normalizedUrl = item.image_url;
-                              const originalUrl = item.originalImageUrl;
-                              
-                              console.error('Image failed to load:', normalizedUrl);
-                              
-                              // If we have an original URL that's different, try it as fallback
-                              if (originalUrl && originalUrl !== normalizedUrl && !img.dataset.fallbackTried) {
-                                console.log('Trying original URL as fallback:', originalUrl);
-                                img.dataset.fallbackTried = 'true';
-                                // Construct full URL from original if needed
-                                let fallbackUrl = originalUrl;
-                                if (!originalUrl.startsWith('http://') && !originalUrl.startsWith('https://') && !originalUrl.startsWith('blob:')) {
-                                  const getImageBase = () => {
-                                    if (typeof window === 'undefined') return '';
-                                    const imgEnv = process.env.NEXT_PUBLIC_IMAGE_BASE_URL || '';
-                                    if (imgEnv) return imgEnv.replace(/\/$/, '');
-                                    const apiEnv = process.env.NEXT_PUBLIC_API_URL || '';
-                                    if (apiEnv) return apiEnv.replace(/\/api\/?$/, '').replace(/\/$/, '');
-                                    return 'https://api.stallioneyewear.in';
-                                  };
-                                  const base = getImageBase();
-                                  fallbackUrl = originalUrl.startsWith('/') ? `${base}${originalUrl}` : `${base}/uploads/products/${originalUrl}`;
-                                }
-                                img.src = fallbackUrl;
-                                return; // Don't mark as invalid yet, wait for fallback to fail
-                              }
-                              
-                              // Both normalized and original URLs failed, mark as invalid
-                              setInvalidImageUrls(prev => new Set([...prev, normalizedUrl]));
-                              if (originalUrl && originalUrl !== normalizedUrl) {
-                                setInvalidImageUrls(prev => new Set([...prev, originalUrl]));
-                              }
-                              
-                              // Don't hide the image, just show error message
-                              const errorDiv = img.nextElementSibling;
-                              if (errorDiv) {
-                                errorDiv.style.display = 'flex';
-                                errorDiv.textContent = item.isTemporary 
-                                  ? 'Image uploading...' 
-                                  : 'Image not found';
-                              }
-                              // Remove from orphaned images if it's unassigned and failed to load
-                              if (item.type === 'unassigned') {
-                                setOrphanedImages(prev => prev.filter(img => {
-                                  const imgUrl = img.url || img.image_url;
-                                  return imgUrl !== normalizedUrl && imgUrl !== originalUrl;
-                                }));
-                              }
-                            }}
-                            onLoad={() => {
-                              const errorDiv = document.querySelector(`[data-image-error="${item.id}"]`);
-                              if (errorDiv) {
-                                errorDiv.style.display = 'none';
-                              }
-                            }}
-                          />
-                        ) : null}
-                        <div 
-                          data-image-error={item.id}
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            display: item.image_url ? 'none' : 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            color: '#999',
-                            fontSize: '14px',
-                            position: 'absolute',
-                            top: 0,
-                            left: 0
-                          }}
+                        {/* Status Tag - Always show assigned/unassigned status */}
+                        <div
+                          className="absolute top-3 left-3 text-white px-3 py-1.5 rounded-md text-xs font-semibold z-[2] uppercase tracking-[0.5px] shadow-sm"
+                          style={{ background: (item.type === 'assigned') ? 'var(--color-success)' : 'var(--color-warning)' }}
                         >
-                          {item.isTemporary ? 'Loading...' : 'No Image'}
+                          {item.type === 'assigned' ? 'Assigned' : 'Unassigned'}
                         </div>
+
+                        {/* Delete Button */}
+                        <button
+                          className="absolute top-3 right-3 text-white border-none rounded-full w-9 h-9 cursor-pointer flex items-center justify-center z-[2] text-lg font-bold transition-[background] duration-200 shadow-sm bg-[#f44336]"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+
+                            // If image is assigned, block deletion and show notification
+                            if (item.type === 'assigned') {
+                              showError('This image is assigned to a product. Please unassign it first before deleting.');
+                              return;
+                            }
+
+                            if (!window.confirm('Are you sure you want to delete this image? This cannot be undone.')) {
+                              return;
+                            }
+
+                            try {
+                              setLoading(true);
+                              // Extract filename from URL
+                              const imageUrl = item.image_url || item.url;
+                              const fileName = imageUrl ? imageUrl.split('/').pop().split('?')[0] : null;
+                              if (!fileName) {
+                                showError('Could not determine image filename.');
+                                return;
+                              }
+                              await deleteProductImage(fileName);
+                              showSuccess('Image deleted successfully');
+                              await fetchAllUploads();
+                            } catch (error) {
+                              console.error('Error deleting image:', error);
+                              showError(`Failed to delete image: ${error.message}`);
+                            } finally {
+                              setLoading(false);
+                            }
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.background = '#d32f2f';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.background = '#f44336';
+                          }}
+                          disabled={loading}
+                          aria-label="Delete image"
+                          title="Delete image"
+                        >
+                          ✕
+                        </button>
+
+                        {/* Image Container */}
+                        <div className="w-full aspect-[4/3] bg-surface-muted relative min-h-[250px] overflow-hidden flex items-center justify-center">
+                          {item.image_url ? (
+                            <img
+                              src={item.image_url}
+                              alt={item.model_no || 'Product image'}
+                              className="w-full h-full object-contain block max-w-full max-h-full"
+                              onError={(e) => {
+                                const img = e.target;
+                                const normalizedUrl = item.image_url;
+                                const originalUrl = item.originalImageUrl;
+
+                                console.error('Image failed to load:', normalizedUrl);
+
+                                // If we have an original URL that's different, try it as fallback
+                                if (originalUrl && originalUrl !== normalizedUrl && !img.dataset.fallbackTried) {
+                                  console.log('Trying original URL as fallback:', originalUrl);
+                                  img.dataset.fallbackTried = 'true';
+                                  // Construct full URL from original if needed
+                                  let fallbackUrl = originalUrl;
+                                  if (!originalUrl.startsWith('http://') && !originalUrl.startsWith('https://') && !originalUrl.startsWith('blob:')) {
+                                    const getImageBase = () => {
+                                      if (typeof window === 'undefined') return '';
+                                      const imgEnv = process.env.NEXT_PUBLIC_IMAGE_BASE_URL || '';
+                                      if (imgEnv) return imgEnv.replace(/\/$/, '');
+                                      const apiEnv = process.env.NEXT_PUBLIC_API_URL || '';
+                                      if (apiEnv) return apiEnv.replace(/\/api\/?$/, '').replace(/\/$/, '');
+                                      return 'https://api.stallioneyewear.in';
+                                    };
+                                    const base = getImageBase();
+                                    fallbackUrl = originalUrl.startsWith('/') ? `${base}${originalUrl}` : `${base}/uploads/products/${originalUrl}`;
+                                  }
+                                  img.src = fallbackUrl;
+                                  return; // Don't mark as invalid yet, wait for fallback to fail
+                                }
+
+                                // Both normalized and original URLs failed, mark as invalid
+                                setInvalidImageUrls(prev => new Set([...prev, normalizedUrl]));
+                                if (originalUrl && originalUrl !== normalizedUrl) {
+                                  setInvalidImageUrls(prev => new Set([...prev, originalUrl]));
+                                }
+
+                                // Don't hide the image, just show error message
+                                const errorDiv = img.nextElementSibling;
+                                if (errorDiv) {
+                                  errorDiv.style.display = 'flex';
+                                  errorDiv.textContent = item.isTemporary
+                                    ? 'Image uploading...'
+                                    : 'Image not found';
+                                }
+                                // Remove from orphaned images if it's unassigned and failed to load
+                                if (item.type === 'unassigned') {
+                                  setOrphanedImages(prev => prev.filter(img => {
+                                    const imgUrl = img.url || img.image_url;
+                                    return imgUrl !== normalizedUrl && imgUrl !== originalUrl;
+                                  }));
+                                }
+                              }}
+                              onLoad={() => {
+                                const errorDiv = document.querySelector(`[data-image-error="${item.id}"]`);
+                                if (errorDiv) {
+                                  errorDiv.style.display = 'none';
+                                }
+                              }}
+                            />
+                          ) : null}
+                          <div
+                            data-image-error={item.id}
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              display: item.image_url ? 'none' : 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              color: '#999',
+                              fontSize: '14px',
+                              position: 'absolute',
+                              top: 0,
+                              left: 0
+                            }}
+                          >
+                            {item.isTemporary ? 'Loading...' : 'No Image'}
+                          </div>
+                        </div>
+
                       </div>
-                      
-                    </div>
-                  ))}
+                    ))}
                   </div>
                 )}
               </div>
             ) : (
-            <TableWithControls
-              title={activeTab === 'Unuploaded Media Gallery' ? 'Unuploaded Media Gallery' : 'Products'}
-              columns={columns}
-              rows={filteredRowsByTab}
-              onAddNew={activeTab === 'Unuploaded Media Gallery' ? null : handleAdd}
-              addNewText="Add New Product"
-              onImport={activeTab === 'Unuploaded Media Gallery' ? null : () => setOpenBulkUpload(true)}
-              importText="Bulk Upload Products"
-              secondaryActions={[]}
-              searchPlaceholder="Search products"
-              loading={loading}
-              serverPagination={activeTab === 'Products'}
-              serverPage={productPage}
-              serverPageCount={productPageCount}
-              serverPageSize={PRODUCTS_PER_PAGE}
-              onServerPageChange={fetchProductsPage}
-            />
+              <TableWithControls
+                title={activeTab === 'Unuploaded Media Gallery' ? 'Unuploaded Media Gallery' : 'Products'}
+                columns={columns}
+                rows={filteredRowsByTab}
+                onAddNew={activeTab === 'Unuploaded Media Gallery' ? null : handleAdd}
+                addNewText="Add New Product"
+                onImport={activeTab === 'Unuploaded Media Gallery' ? null : () => setOpenBulkUpload(true)}
+                importText="Bulk Upload Products"
+                secondaryActions={[]}
+                searchPlaceholder="Search products"
+                loading={loading}
+                serverPagination={activeTab === 'Products'}
+                serverPage={productPage}
+                serverPageCount={productPageCount}
+                serverPageSize={PRODUCTS_PER_PAGE}
+                onServerPageChange={fetchProductsPage}
+              />
             )}
           </div>
         </div>
@@ -2583,8 +2587,8 @@ const DashboardProducts = () => {
         title="Add New Product"
         footer={(
           <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
+            <button
+              className="ui-btn ui-btn--secondary"
               onClick={() => {
                 setOpenAdd(false);
                 resetForm();
@@ -2593,8 +2597,8 @@ const DashboardProducts = () => {
             >
               Cancel
             </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
+            <button
+              className="ui-btn ui-btn--primary"
               onClick={handleSubmit}
               disabled={loading}
             >
@@ -2617,9 +2621,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Brand *</label>
             <DropdownSelector
-              options={brands.map(b => ({ 
-                value: b.brand_id || b.id, 
-                label: b.brand_name 
+              options={brands.map(b => ({
+                value: b.brand_id || b.id,
+                label: b.brand_name
               }))}
               value={formData.brand_id}
               onChange={(value) => handleInputChange('brand_id', value)}
@@ -2630,9 +2634,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Collection *</label>
             <DropdownSelector
-              options={collections.map(c => ({ 
-                value: c.collection_id || c.id, 
-                label: c.collection_name 
+              options={collections.map(c => ({
+                value: c.collection_id || c.id,
+                label: c.collection_name
               }))}
               value={formData.collection_id}
               onChange={(value) => handleInputChange('collection_id', value)}
@@ -2643,9 +2647,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Gender *</label>
             <DropdownSelector
-              options={genders.map(g => ({ 
-                value: g.gender_id || g.id, 
-                label: g.gender_name 
+              options={genders.map(g => ({
+                value: g.gender_id || g.id,
+                label: g.gender_name
               }))}
               value={formData.gender_id}
               onChange={(value) => handleInputChange('gender_id', value)}
@@ -2656,9 +2660,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Color Code *</label>
             <DropdownSelector
-              options={colorCodes.map(c => ({ 
-                value: c.color_code_id || c.id, 
-                label: c.color_code 
+              options={colorCodes.map(c => ({
+                value: c.color_code_id || c.id,
+                label: c.color_code
               }))}
               value={formData.color_code_id}
               onChange={(value) => handleInputChange('color_code_id', value)}
@@ -2669,9 +2673,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Shape *</label>
             <DropdownSelector
-              options={shapes.map(s => ({ 
-                value: s.shape_id || s.id, 
-                label: s.shape_name 
+              options={shapes.map(s => ({
+                value: s.shape_id || s.id,
+                label: s.shape_name
               }))}
               value={formData.shape_id}
               onChange={(value) => handleInputChange('shape_id', value)}
@@ -2682,9 +2686,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Color *</label>
             <DropdownSelector
-              options={lensColors.map(l => ({ 
-                value: l.lens_color_id || l.id, 
-                label: l.lens_color 
+              options={lensColors.map(l => ({
+                value: l.lens_color_id || l.id,
+                label: l.lens_color
               }))}
               value={formData.lens_color_id}
               onChange={(value) => handleInputChange('lens_color_id', value)}
@@ -2695,9 +2699,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Color *</label>
             <DropdownSelector
-              options={frameColors.map(f => ({ 
-                value: f.frame_color_id || f.id, 
-                label: f.frame_color 
+              options={frameColors.map(f => ({
+                value: f.frame_color_id || f.id,
+                label: f.frame_color
               }))}
               value={formData.frame_color_id}
               onChange={(value) => handleInputChange('frame_color_id', value)}
@@ -2708,9 +2712,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Type *</label>
             <DropdownSelector
-              options={frameTypes.map(f => ({ 
-                value: f.frame_type_id || f.id, 
-                label: f.frame_type 
+              options={frameTypes.map(f => ({
+                value: f.frame_type_id || f.id,
+                label: f.frame_type
               }))}
               value={formData.frame_type_id}
               onChange={(value) => handleInputChange('frame_type_id', value)}
@@ -2721,9 +2725,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Material *</label>
             <DropdownSelector
-              options={lensMaterials.map(l => ({ 
-                value: l.lens_material_id || l.id, 
-                label: l.lens_material 
+              options={lensMaterials.map(l => ({
+                value: l.lens_material_id || l.id,
+                label: l.lens_material
               }))}
               value={formData.lens_material_id}
               onChange={(value) => handleInputChange('lens_material_id', value)}
@@ -2734,9 +2738,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Material *</label>
             <DropdownSelector
-              options={frameMaterials.map(f => ({ 
-                value: f.frame_material_id || f.id, 
-                label: f.frame_material 
+              options={frameMaterials.map(f => ({
+                value: f.frame_material_id || f.id,
+                label: f.frame_material
               }))}
               value={formData.frame_material_id}
               onChange={(value) => handleInputChange('frame_material_id', value)}
@@ -2801,7 +2805,7 @@ const DashboardProducts = () => {
               onChange={(value) => handleInputChange('status', value)}
               placeholder="Select status"
             />
-        </div>
+          </div>
         </form>
       </Modal>
       <Modal
@@ -2813,8 +2817,8 @@ const DashboardProducts = () => {
         title="Edit Product"
         footer={(
           <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
+            <button
+              className="ui-btn ui-btn--secondary"
               onClick={() => {
                 setEditRow(null);
                 resetForm();
@@ -2823,8 +2827,8 @@ const DashboardProducts = () => {
             >
               Cancel
             </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
+            <button
+              className="ui-btn ui-btn--primary"
               onClick={handleSubmit}
               disabled={loading}
             >
@@ -2847,9 +2851,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Brand *</label>
             <DropdownSelector
-              options={brands.map(b => ({ 
-                value: b.brand_id || b.id, 
-                label: b.brand_name 
+              options={brands.map(b => ({
+                value: b.brand_id || b.id,
+                label: b.brand_name
               }))}
               value={formData.brand_id}
               onChange={(value) => handleInputChange('brand_id', value)}
@@ -2860,9 +2864,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Collection *</label>
             <DropdownSelector
-              options={collections.map(c => ({ 
-                value: c.collection_id || c.id, 
-                label: c.collection_name 
+              options={collections.map(c => ({
+                value: c.collection_id || c.id,
+                label: c.collection_name
               }))}
               value={formData.collection_id}
               onChange={(value) => handleInputChange('collection_id', value)}
@@ -2873,9 +2877,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Gender *</label>
             <DropdownSelector
-              options={genders.map(g => ({ 
-                value: g.gender_id || g.id, 
-                label: g.gender_name 
+              options={genders.map(g => ({
+                value: g.gender_id || g.id,
+                label: g.gender_name
               }))}
               value={formData.gender_id}
               onChange={(value) => handleInputChange('gender_id', value)}
@@ -2886,9 +2890,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Color Code *</label>
             <DropdownSelector
-              options={colorCodes.map(c => ({ 
-                value: c.color_code_id || c.id, 
-                label: c.color_code 
+              options={colorCodes.map(c => ({
+                value: c.color_code_id || c.id,
+                label: c.color_code
               }))}
               value={formData.color_code_id}
               onChange={(value) => handleInputChange('color_code_id', value)}
@@ -2899,9 +2903,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Shape *</label>
             <DropdownSelector
-              options={shapes.map(s => ({ 
-                value: s.shape_id || s.id, 
-                label: s.shape_name 
+              options={shapes.map(s => ({
+                value: s.shape_id || s.id,
+                label: s.shape_name
               }))}
               value={formData.shape_id}
               onChange={(value) => handleInputChange('shape_id', value)}
@@ -2912,9 +2916,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Color *</label>
             <DropdownSelector
-              options={lensColors.map(l => ({ 
-                value: l.lens_color_id || l.id, 
-                label: l.lens_color 
+              options={lensColors.map(l => ({
+                value: l.lens_color_id || l.id,
+                label: l.lens_color
               }))}
               value={formData.lens_color_id}
               onChange={(value) => handleInputChange('lens_color_id', value)}
@@ -2925,9 +2929,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Color *</label>
             <DropdownSelector
-              options={frameColors.map(f => ({ 
-                value: f.frame_color_id || f.id, 
-                label: f.frame_color 
+              options={frameColors.map(f => ({
+                value: f.frame_color_id || f.id,
+                label: f.frame_color
               }))}
               value={formData.frame_color_id}
               onChange={(value) => handleInputChange('frame_color_id', value)}
@@ -2938,9 +2942,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Type *</label>
             <DropdownSelector
-              options={frameTypes.map(f => ({ 
-                value: f.frame_type_id || f.id, 
-                label: f.frame_type 
+              options={frameTypes.map(f => ({
+                value: f.frame_type_id || f.id,
+                label: f.frame_type
               }))}
               value={formData.frame_type_id}
               onChange={(value) => handleInputChange('frame_type_id', value)}
@@ -2951,9 +2955,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Material *</label>
             <DropdownSelector
-              options={lensMaterials.map(l => ({ 
-                value: l.lens_material_id || l.id, 
-                label: l.lens_material 
+              options={lensMaterials.map(l => ({
+                value: l.lens_material_id || l.id,
+                label: l.lens_material
               }))}
               value={formData.lens_material_id}
               onChange={(value) => handleInputChange('lens_material_id', value)}
@@ -2964,9 +2968,9 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Material *</label>
             <DropdownSelector
-              options={frameMaterials.map(f => ({ 
-                value: f.frame_material_id || f.id, 
-                label: f.frame_material 
+              options={frameMaterials.map(f => ({
+                value: f.frame_material_id || f.id,
+                label: f.frame_material
               }))}
               value={formData.frame_material_id}
               onChange={(value) => handleInputChange('frame_material_id', value)}
@@ -3093,8 +3097,8 @@ const DashboardProducts = () => {
         title="Bulk Upload Products"
         footer={(
           <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
+            <button
+              className="ui-btn ui-btn--secondary"
               onClick={() => {
                 setOpenBulkUpload(false);
                 setSelectedBulkFile(null);
@@ -3105,8 +3109,8 @@ const DashboardProducts = () => {
             >
               Cancel
             </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
+            <button
+              className="ui-btn ui-btn--primary"
               onClick={handleBulkUpload}
               disabled={uploadingBulk || !selectedBulkFile}
             >
@@ -3146,7 +3150,7 @@ const DashboardProducts = () => {
                   {uploadProgress.details}
                 </div>
               )}
-          </div>
+            </div>
           )}
         </div>
       </Modal>
@@ -3161,8 +3165,8 @@ const DashboardProducts = () => {
         title={`Attach Image to Product: ${imageTargetProduct?.model_no || imageTargetProduct?.data?.model_no || ''}`}
         footer={(
           <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
+            <button
+              className="ui-btn ui-btn--secondary"
               onClick={() => {
                 setOpenImageSelectModal(false);
                 setImageTargetProduct(null);
@@ -3174,8 +3178,8 @@ const DashboardProducts = () => {
               Cancel
             </button>
             {selectedImageIds.size > 0 && (
-              <button 
-                className="ui-btn ui-btn--primary" 
+              <button
+                className="ui-btn ui-btn--primary"
                 onClick={handleAttachMultipleImages}
                 disabled={loading || uploadingImage}
               >
@@ -3209,122 +3213,122 @@ const DashboardProducts = () => {
                 {availableImagesForModal.map(item => {
                   const isSelected = selectedImageIds.has(item.id);
                   return (
-                  <div
-                    key={item.id}
-                    style={{
-                      border: isSelected ? '3px solid #3b82f6' : '2px solid #e5e7eb',
-                      borderRadius: '8px',
-                      overflow: 'hidden',
-                      background: isSelected ? '#eff6ff' : '#fff',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s',
-                      position: 'relative'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.borderColor = '#3b82f6';
-                        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.borderColor = '#e5e7eb';
-                        e.currentTarget.style.boxShadow = 'none';
-                      }
-                    }}
-                    onClick={(e) => {
-                      // Toggle selection on click
-                      setSelectedImageIds(prev => {
-                        const newSet = new Set(prev);
-                        if (newSet.has(item.id)) {
-                          newSet.delete(item.id);
-                        } else {
-                          newSet.add(item.id);
+                    <div
+                      key={item.id}
+                      style={{
+                        border: isSelected ? '3px solid #3b82f6' : '2px solid #e5e7eb',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        background: isSelected ? '#eff6ff' : '#fff',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        position: 'relative'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = '#3b82f6';
+                          e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
                         }
-                        return newSet;
-                      });
-                    }}
-                  >
-                    {/* Checkbox for selection */}
-                    <div style={{
-                      position: 'absolute',
-                      top: '8px',
-                      left: '8px',
-                      zIndex: 3,
-                      background: isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.9)',
-                      border: '2px solid #3b82f6',
-                      borderRadius: '4px',
-                      width: '24px',
-                      height: '24px',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      cursor: 'pointer'
-                    }}>
-                      {isSelected && (
-                        <span className="text-white text-sm font-bold">✓</span>
-                      )}
-                    </div>
-                    <div className="w-full aspect-[4/3] bg-surface-muted relative">
-                      {item.image_url ? (
-                        <img
-                          src={item.image_url}
-                          alt={item.model_no || 'Unassigned image'}
-                          className="w-full h-full object-cover block"
-                          onError={(e) => {
-                            // Mark this image URL as invalid
-                            setInvalidImageUrls(prev => new Set([...prev, item.image_url]));
-                            // Don't hide the image, just show error message
-                            const errorDiv = e.target.nextElementSibling;
-                            if (errorDiv) {
-                              errorDiv.style.display = 'flex';
-                            }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = '#e5e7eb';
+                          e.currentTarget.style.boxShadow = 'none';
+                        }
+                      }}
+                      onClick={(e) => {
+                        // Toggle selection on click
+                        setSelectedImageIds(prev => {
+                          const newSet = new Set(prev);
+                          if (newSet.has(item.id)) {
+                            newSet.delete(item.id);
+                          } else {
+                            newSet.add(item.id);
+                          }
+                          return newSet;
+                        });
+                      }}
+                    >
+                      {/* Checkbox for selection */}
+                      <div style={{
+                        position: 'absolute',
+                        top: '8px',
+                        left: '8px',
+                        zIndex: 3,
+                        background: isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.9)',
+                        border: '2px solid #3b82f6',
+                        borderRadius: '4px',
+                        width: '24px',
+                        height: '24px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        cursor: 'pointer'
+                      }}>
+                        {isSelected && (
+                          <span className="text-white text-sm font-bold">✓</span>
+                        )}
+                      </div>
+                      <div className="w-full aspect-[4/3] bg-surface-muted relative">
+                        {item.image_url ? (
+                          <img
+                            src={item.image_url}
+                            alt={item.model_no || 'Unassigned image'}
+                            className="w-full h-full object-cover block"
+                            onError={(e) => {
+                              // Mark this image URL as invalid
+                              setInvalidImageUrls(prev => new Set([...prev, item.image_url]));
+                              // Don't hide the image, just show error message
+                              const errorDiv = e.target.nextElementSibling;
+                              if (errorDiv) {
+                                errorDiv.style.display = 'flex';
+                              }
+                            }}
+                            onLoad={() => {
+                              // Image loaded successfully, ensure it's not marked as invalid
+                              setInvalidImageUrls(prev => {
+                                const newSet = new Set(prev);
+                                newSet.delete(item.image_url);
+                                return newSet;
+                              });
+                            }}
+                          />
+                        ) : null}
+                        <div
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            display: item.image_url ? 'none' : 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: '#999',
+                            fontSize: '12px',
+                            position: 'absolute',
+                            top: 0,
+                            left: 0
                           }}
-                          onLoad={() => {
-                            // Image loaded successfully, ensure it's not marked as invalid
-                            setInvalidImageUrls(prev => {
-                              const newSet = new Set(prev);
-                              newSet.delete(item.image_url);
-                              return newSet;
-                            });
-                          }}
-                        />
-                      ) : null}
-                      <div 
-                        style={{
-                          width: '100%',
-                          height: '100%',
-                          display: item.image_url ? 'none' : 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          color: '#999',
-                          fontSize: '12px',
-                          position: 'absolute',
-                          top: 0,
-                          left: 0
-                        }}
-                      >
-                        No Image
+                        >
+                          No Image
+                        </div>
+                      </div>
+                      <div className="p-2 bg-warning text-white text-[11px] font-semibold text-center">
+                        Unassigned
+                      </div>
+                      <div style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        background: isSelected ? 'rgba(59, 130, 246, 0.9)' : 'rgba(0, 0, 0, 0.6)',
+                        color: '#fff',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        fontSize: '10px',
+                        fontWeight: 600,
+                        pointerEvents: 'none'
+                      }}>
+                        {isSelected ? 'Selected' : 'Click to Select'}
                       </div>
                     </div>
-                    <div className="p-2 bg-warning text-white text-[11px] font-semibold text-center">
-                      Unassigned
-                    </div>
-                    <div style={{
-                      position: 'absolute',
-                      top: '4px',
-                      right: '4px',
-                      background: isSelected ? 'rgba(59, 130, 246, 0.9)' : 'rgba(0, 0, 0, 0.6)',
-                      color: '#fff',
-                      padding: '4px 8px',
-                      borderRadius: '4px',
-                      fontSize: '10px',
-                      fontWeight: 600,
-                      pointerEvents: 'none'
-                    }}>
-                      {isSelected ? 'Selected' : 'Click to Select'}
-                    </div>
-                  </div>
                   );
                 })}
               </div>
