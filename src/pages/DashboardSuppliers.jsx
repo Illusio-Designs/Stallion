@@ -953,8 +953,10 @@ const DashboardSuppliers = () => {
         phone: formData.phone.trim(),
         address: formData.address ? formData.address.trim() : '',
         country_id: formData.country_id,
-        state_id: formData.state_id || '',
-        city_id: formData.city_id || '',
+        // state_id / city_id are optional FKs — send null (not '') when empty,
+        // otherwise the salesmen.city_id/state_id -> cities/states FK rejects ''.
+        state_id: formData.state_id || null,
+        city_id: formData.city_id || null,
         zones: Array.isArray(formData.zones) ? formData.zones : [],
         state_ids: Array.isArray(formData.state_ids) ? formData.state_ids : [],
         zone_preference: Array.isArray(formData.zones) && formData.zones.length > 0
