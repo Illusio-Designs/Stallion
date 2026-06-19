@@ -3,7 +3,8 @@
   /* Brand: deep indigo surface. Layered indigo tones from the brand ramp. */
   background: var(--color-primary-active);
   color: var(--color-text-on-primary);
-  padding: var(--space-12) 0;
+  /* More top padding, tight bottom so the copyright/social bar sits near the base. */
+  padding: var(--space-12) 0 var(--space-5);
   position: relative;
   overflow: hidden;
 }
@@ -162,9 +163,28 @@
   margin: 0;
 }
 
+/* Bottom bar shares the SAME centered container as .footer-content so the
+   copyright lines up under the logo and the social icons under the last column
+   (mirrors .footer-content's max-width + auto margins). */
+.footer-bottom {
+  max-width: 1280px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Social icon buttons in the bottom bar — force light icon color (the icon SVG
+   inherits currentColor) so they're visible over the dark footer. */
+.footer-social a {
+  color: rgba(255, 255, 255, 0.75);
+}
+.footer-social a:hover,
+.footer-social a:focus-visible {
+  color: var(--color-text-on-primary);
+}
+
 @media (max-width: 1024px) {
   .footer {
-    padding: var(--space-10) 0;
+    padding: var(--space-10) 0 var(--space-5);
   }
   .footer-content {
     gap: var(--space-8);
@@ -186,7 +206,7 @@
 
 @media (max-width: 426px) {
   .footer {
-    padding: var(--space-8) 0;
+    padding: var(--space-8) 0 var(--space-4);
   }
   .footer-bg-image {
     width: 0;
