@@ -77,6 +77,50 @@ function resolveOrderStatusFilter(req) {
     return { filter: { order_status: status } };
 }
 
+function resolveOrderDateRangeFilter(req) {
+    const startRaw = String(req.query.start_date ?? '').trim();
+    const endRaw = String(req.query.end_date ?? '').trim();
+    if (!startRaw && !endRaw) {
+        return { filter: null };
+    }
+
+    let startDate = null;
+    let endDate = null;
+
+    if (startRaw) {
+        const parsed = new Date(startRaw);
+        if (Number.isNaN(parsed.getTime())) {
+            return { error: 'Invalid start_date', status: 400 };
+        }
+        startDate = parsed;
+        startDate.setHours(0, 0, 0, 0);
+    }
+
+    if (endRaw) {
+        const parsed = new Date(endRaw);
+        if (Number.isNaN(parsed.getTime())) {
+            return { error: 'Invalid end_date', status: 400 };
+        }
+        endDate = parsed;
+        endDate.setHours(23, 59, 59, 999);
+    }
+
+    if (startDate && endDate && startDate > endDate) {
+        return { error: 'start_date must be on or before end_date', status: 400 };
+    }
+
+    const filter = {};
+    if (startDate && endDate) {
+        filter.order_date = { [Op.between]: [startDate, endDate] };
+    } else if (startDate) {
+        filter.order_date = { [Op.gte]: startDate };
+    } else if (endDate) {
+        filter.order_date = { [Op.lte]: endDate };
+    }
+
+    return { filter };
+}
+
 
 class OrderController {
 
@@ -154,13 +198,21 @@ class OrderController {
             if (statusResult.error) {
                 return res.status(statusResult.status).json({ error: statusResult.error });
             }
+            const dateResult = resolveOrderDateRangeFilter(req);
+            if (dateResult.error) {
+                return res.status(dateResult.status).json({ error: dateResult.error });
+            }
             const searchFilter = buildNamePhoneFilter({
                 name,
                 phone: null,
                 nameFields: ['order_number', 'order_status', 'order_type', 'courier_name', 'courier_tracking_number'],
                 phoneFields: [],
             });
-            const where = mergeWhere(statusResult.filter ?? {}, searchFilter);
+            const baseFilter = {
+                ...(statusResult.filter ?? {}),
+                ...(dateResult.filter ?? {}),
+            };
+            const where = mergeWhere(baseFilter, searchFilter);
             const { count, rows: orders } = await Order.findAndCountAll({
                 where,
                 limit: pagination.limit,
