@@ -48,21 +48,12 @@ const Cart = ({ onPageChange = null }) => {
   const [selectedEvent, setSelectedEvent] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("");
   
-  // Location state for visit orders
+  // Visit-order location is captured silently (no UI). State holds the coords;
+  // locationRef mirrors them for synchronous reads during checkout (state would
+  // be stale inside the same async handler that just captured the location).
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
-  // Fresh coords readable synchronously during checkout (state would be stale
-  // inside the same async handler that just captured the location).
   const locationRef = useRef({ latitude: null, longitude: null });
-  const [locationError, setLocationError] = useState(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-  // True when the browser has location hard-blocked for this site — requires the
-  // user to re-enable it in site settings AND reload (Chrome applies the change
-  // only after a reload), so we surface a Reload action instead of "Try again".
-  const [locationBlocked, setLocationBlocked] = useState(false);
-  // True when coordinates came from the IP-based fallback (approximate) rather
-  // than precise GPS — used to label the captured location honestly.
-  const [locationApprox, setLocationApprox] = useState(false);
   
   // Dropdown data
   const [countries, setCountries] = useState([]);
@@ -165,58 +156,36 @@ const Cart = ({ onPageChange = null }) => {
 
   // Note: fetchCountries removed - countries are fetched on-demand when needed for party orders only
 
-  // Get user's current location for visit orders (returns Promise)
+  // Get the user's precise location (GPS). Resolves with coords, rejects on
+  // failure. Silent — callers decide on fallback. Requires a secure context.
   const getCurrentLocation = () => {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) {
-        const errorMsg = 'Geolocation is not supported by your browser';
-        setLocationError(errorMsg);
-        console.error('[Cart] Geolocation not supported');
-        reject(new Error(errorMsg));
+        reject(new Error('Geolocation not supported'));
         return;
       }
-
-      // Geolocation only works in a secure context (HTTPS or http://localhost).
-      // Over a plain-http IP it's disabled entirely and getCurrentPosition would
-      // fail with a misleading "permission denied".
       if (typeof window !== 'undefined' && window.isSecureContext === false) {
         const err = new Error('Location requires a secure (HTTPS) connection.');
         err.insecure = true;
-        setLocationError('Location needs a secure connection. Open the app over HTTPS or http://localhost (a plain http:// IP address won’t work).');
-        console.error('[Cart] Insecure context — geolocation blocked');
         reject(err);
         return;
       }
-
-      setLocationError(null);
-      console.log('[Cart] Requesting user location...');
-
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const lat = parseFloat(position.coords.latitude);
           const lng = parseFloat(position.coords.longitude);
           setLatitude(lat);
           setLongitude(lng);
-          // Also store in a ref so checkout reads the fresh coords synchronously
-          // (state updates won't be visible inside the same handleCheckout call).
           locationRef.current = { latitude: lat, longitude: lng };
-          console.log('[Cart] ✅ Location captured - Latitude:', lat, 'Longitude:', lng);
           resolve({ latitude: lat, longitude: lng });
         },
         (error) => {
-          console.error('[Cart] Error getting location:', error);
-          const errorMsg = error.message || 'Failed to get location';
-          setLocationError(errorMsg);
           setLatitude(null);
           setLongitude(null);
           locationRef.current = { latitude: null, longitude: null };
           reject(error);
         },
-        {
-          enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 0
-        }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     });
   };
@@ -232,44 +201,21 @@ const Cart = ({ onPageChange = null }) => {
     throw new Error('IP location unavailable');
   };
 
-  // Explicit location request for visit orders. Try precise GPS first; if that
-  // fails (denied / unavailable / no hardware), fall back to approximate IP-based
-  // location so a visit order is never fully blocked. Phones with GPS still get
-  // exact coordinates.
+  // Silently capture the visit-order location: precise GPS first, then an
+  // approximate IP-based fallback (so desktops without GPS still get coords).
+  // No UI/messages — the captured coords go straight onto the order.
   const requestLocation = async () => {
-    setLocationLoading(true);
-    setLocationError(null);
-    setLocationBlocked(false);
-    setLocationApprox(false);
     try {
-      await getCurrentLocation(); // precise GPS (native prompt) — exact coords
-    } catch (err) {
-      // Precise attempt failed — try the IP-based fallback before giving up.
+      await getCurrentLocation(); // precise GPS — exact coords
+    } catch {
       try {
         const ip = await getIpLocation();
         setLatitude(ip.latitude);
         setLongitude(ip.longitude);
         locationRef.current = { latitude: ip.latitude, longitude: ip.longitude };
-        setLocationApprox(true);
-        setLocationBlocked(false);
-        setLocationError(null);
       } catch {
-        // Both precise and IP failed — show the most useful guidance.
-        if (err?.insecure) {
-          // HTTPS message already set by getCurrentLocation.
-        } else if (err && err.code === 1 /* PERMISSION_DENIED */) {
-          setLocationBlocked(true);
-          setLocationError('Couldn’t get your location. Allow location for this site and turn on your device’s location service, then reload — or try again.');
-        } else if (err && err.code === 2 /* POSITION_UNAVAILABLE */) {
-          setLocationError('Your location is currently unavailable. Turn on your device’s location service and try again.');
-        } else if (err && err.code === 3 /* TIMEOUT */) {
-          setLocationError('Getting your location timed out. Please try again.');
-        } else {
-          setLocationError('Could not determine your location. Please try again.');
-        }
+        // Both failed — leave coords null; checkout surfaces a single error.
       }
-    } finally {
-      setLocationLoading(false);
     }
   };
 
@@ -285,7 +231,7 @@ const Cart = ({ onPageChange = null }) => {
       setSelectedParty("");
       setLatitude(null);
       setLongitude(null);
-      setLocationError(null);
+      locationRef.current = { latitude: null, longitude: null };
       lastFetchedOrderType.current = null;
       return;
     }
@@ -300,7 +246,7 @@ const Cart = ({ onPageChange = null }) => {
     setSelectedParty("");
     setLatitude(null);
     setLongitude(null);
-    setLocationError(null);
+    locationRef.current = { latitude: null, longitude: null };
     // Clear events if not event_order
     if (orderType !== 'event_order') {
       setEvents([]);
@@ -438,19 +384,15 @@ const Cart = ({ onPageChange = null }) => {
         showError('Please select an event');
         return;
       }
-      if (orderType === 'visit_order' && (latitude === null || longitude === null)) {
-        // Try to get location and wait for it before proceeding
+      if (orderType === 'visit_order' &&
+          (locationRef.current?.latitude == null || locationRef.current?.longitude == null)) {
+        // Silently capture the visit-order location (precise GPS, then IP
+        // fallback). No prompts/messages — only error if it's truly impossible.
         setLoading(true);
-        try {
-          showError('Please allow location access for visit orders. Capturing location...');
-          await getCurrentLocation();
-          console.log('[Cart] ✅ Location captured successfully, proceeding with checkout');
-          setLoading(false);
-          // Continue with checkout - location is now set
-        } catch (err) {
-          console.error('[Cart] ❌ Failed to capture location:', err);
-          setLoading(false);
-          showError('Failed to get location. Please enable location access in your browser settings and try again.');
+        await requestLocation();
+        setLoading(false);
+        if (locationRef.current?.latitude == null || locationRef.current?.longitude == null) {
+          showError('Could not capture your location for the visit order. Please try again.');
           return;
         }
       }
@@ -1173,50 +1115,8 @@ const Cart = ({ onPageChange = null }) => {
                 </div>
               )}
 
-              {/* Location permission — required for visit orders */}
-              {isSalesman && orderType === 'visit_order' && (
-                <div className="form-group flex flex-col gap-2">
-                  <label className="form-label text-[length:var(--text-sm)] font-medium text-text">Location</label>
-                  {latitude !== null && longitude !== null ? (
-                    <div className="flex items-center gap-2 text-[length:var(--text-sm)]">
-                      <span className="font-medium text-[color:var(--color-success,#16a34a)]">{locationApprox ? '✓ Approximate location (IP-based)' : '✓ Location captured'}</span>
-                      <span className="text-text-muted [font-variant-numeric:tabular-nums]">({Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)})</span>
-                      <button
-                        type="button"
-                        className="ui-btn ui-btn--ghost ui-btn--sm ml-auto"
-                        onClick={requestLocation}
-                        disabled={locationLoading}
-                      >
-                        <span className="ui-btn__label">{locationLoading ? 'Updating…' : 'Update'}</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      <p className="m-0 text-[length:var(--text-sm)] text-text-muted">We need your current location to place a visit order.</p>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          className={`ui-btn ui-btn--primary ui-btn--sm w-fit${locationLoading ? ' ui-btn--loading' : ''}`}
-                          onClick={requestLocation}
-                          disabled={locationLoading}
-                        >
-                          <span className="ui-btn__label">{locationLoading ? 'Getting location…' : (locationError ? 'Try again' : 'Allow location access')}</span>
-                        </button>
-                        {locationBlocked && (
-                          <button
-                            type="button"
-                            className="ui-btn ui-btn--secondary ui-btn--sm w-fit"
-                            onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
-                          >
-                            <span className="ui-btn__label">Reload page</span>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                  {locationError && <p className="ui-field-error" role="alert">{locationError}</p>}
-                </div>
-              )}
+              {/* Visit-order location is captured silently in the background
+                  (GPS, with IP fallback) when "Visit Order" is selected — no UI. */}
 
               {/* Country Dropdown - For Distributor and Salesman (when party selection is needed) */}
               {shouldShowCountryDropdown() && (
