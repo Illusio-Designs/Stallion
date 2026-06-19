@@ -12,7 +12,7 @@ import {
   createOrder,
   updateOrderStatus, 
   deleteOrder,
-  getParties,
+  getPartiesForRole,
   getDistributors,
   getSalesmen,
   getEvents,
@@ -162,8 +162,10 @@ const DashboardOrders = () => {
       
       if (uniquePartyIds.length > 0) {
         try {
-          // One call for all parties instead of one getPartyById per order (N+1)
-          const allParties = await getParties();
+          // One call for all parties instead of one getPartyById per order (N+1).
+          // Role-scoped: field roles (salesman/distributor/party) get /parties/my;
+          // managers get the full list. Avoids a 403 on POST /parties/get.
+          const allParties = await getPartiesForRole(userRole);
           const newPartyNamesMap = { ...partyNamesMap };
           (allParties || []).forEach((p) => {
             const id = p.id || p.party_id;
@@ -358,7 +360,9 @@ const DashboardOrders = () => {
       }
       
       console.log('[fetchPartiesForCountry] Fetching parties for country:', cleanCountryId);
-      const partiesData = await getParties(cleanCountryId);
+      // Role-scoped: salesman/distributor/party get /parties/my; managers get the
+      // country list. Prevents a 403 on POST /parties/get for field roles.
+      const partiesData = await getPartiesForRole(userRole, cleanCountryId);
       console.log('[fetchPartiesForCountry] Received', partiesData?.length || 0, 'parties');
       setAllParties(partiesData || []);
       // Apply filtering based on order type and salesman zone
