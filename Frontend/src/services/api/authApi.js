@@ -107,11 +107,36 @@ export const getRoles = async () => {
 // ==================== USER ENDPOINTS ====================
 
 /**
- * Get all users
+ * Get all users (admin only — GET /users is role-guarded by isAdmin).
  * @returns {Promise<Array>} Array of user objects
  */
 export const getUsers = async () => {
   return apiRequest('/users', {
+    method: 'GET',
+    includeAuth: true,
+  });
+};
+
+/**
+ * Get the current authenticated user's profile (any role).
+ * GET /users/me — use this to refresh the logged-in user instead of GET /users
+ * (which is admin-only and 403s for party/distributor/salesman).
+ * @returns {Promise<Object>} The current user object
+ */
+export const getMe = async () => {
+  return apiRequest('/users/me', {
+    method: 'GET',
+    includeAuth: true,
+  });
+};
+
+/**
+ * Get the current authenticated user's role(s) (any role).
+ * GET /users/role — returns an array of { role_id, role_name, ... }.
+ * @returns {Promise<Array>} Array of role objects for the current user
+ */
+export const getMyRole = async () => {
+  return apiRequest('/users/role', {
     method: 'GET',
     includeAuth: true,
   });
@@ -218,7 +243,10 @@ export const updateUser = async (userId, userData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const deleteUser = async (userId) => {
-  return apiRequest('/users', {
+  const id = String(userId || '').trim();
+  if (!id) throw new Error('User ID is required');
+  // Backend route is DELETE /users/:id (admin only) — the id must be in the path.
+  return apiRequest(`/users/${id}`, {
     method: 'DELETE',
     includeAuth: true,
   });

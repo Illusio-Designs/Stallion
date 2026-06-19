@@ -420,8 +420,10 @@ const scopedList = async (endpoint) => {
   }
 };
 
-// GET /salesmen/parties — parties assigned to the authenticated salesman.
-export const getSalesmanParties = async () => scopedList('/salesmen/parties');
+// GET /parties/my — parties assigned to the authenticated salesman. (There is no
+// /salesmen/parties route; the backend scopes /parties/my by role from the JWT,
+// returning the salesman's assigned-state parties.)
+export const getSalesmanParties = async () => scopedList('/parties/my');
 // GET /distributors/parties — parties under the authenticated distributor.
 export const getDistributorParties = async () => scopedList('/distributors/parties');
 // GET /parties/my — parties for the current user's role.
