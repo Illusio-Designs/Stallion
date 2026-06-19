@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import '../../styles/components/ui.css';
 
 // Keep in sync with the panel's transition duration in ui.css (.ui-aside-panel).
@@ -87,9 +88,12 @@ export default function AsidePanel({
     lastFocused.current = null;
   }, [mounted]);
 
-  if (!mounted) return null;
+  if (!mounted || typeof document === 'undefined') return null;
 
-  return (
+  // Portal to <body> so the fixed overlay covers the whole viewport (above the
+  // dashboard header/footer). Rendering in-place gets trapped by ancestor
+  // transforms (e.g. .page-enter on the dashboard content), which clips it.
+  return createPortal(
     <div
       className={`ui-aside-panel__backdrop${entered ? ' is-open' : ''}`}
       onClick={onClose}
@@ -117,6 +121,7 @@ export default function AsidePanel({
         <div className="ui-aside-panel__body">{children}</div>
         {footer && <div className="ui-aside-panel__footer">{footer}</div>}
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }

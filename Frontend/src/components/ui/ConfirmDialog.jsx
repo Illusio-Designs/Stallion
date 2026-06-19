@@ -1,5 +1,6 @@
 'use client';
 import { useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import '../../styles/components/ui.css';
 
 /**
@@ -31,9 +32,10 @@ export default function ConfirmDialog({
     };
   }, [open, onCancel]);
 
-  if (!open) return null;
+  if (!open || typeof document === 'undefined') return null;
 
-  return (
+  // Portal to <body> so the overlay isn't clipped by ancestor transforms.
+  return createPortal(
     <div
       className="ui-modal__backdrop"
       // Above the aside panel (10050) so a confirm can open over a panel,
@@ -72,6 +74,7 @@ export default function ConfirmDialog({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
