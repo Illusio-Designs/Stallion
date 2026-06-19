@@ -1,15 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import TableWithControls from '../components/ui/TableWithControls';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   addProductToTray,
   deleteProductFromTray,
   deleteTray,
   getBrands,
   getCollections,
-  getProducts,
+  getProductsPage,
   getProductsInTray,
   getTrays,
   updateProductInTray,
@@ -65,6 +66,7 @@ const getStatusColor = (status) => {
 };
 
 const DashboardTray = () => {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('all-trays');
   const [dateRange, setDateRange] = useState('Feb 25, 2025 - Mar 25, 2025');
   const [openAdd, setOpenAdd] = useState(false);
@@ -129,14 +131,27 @@ const DashboardTray = () => {
     }
   };
 
-  const fetchAllProducts = async () => {
+  // Assign-to-tray picker: 20 per page with server-side search (model_no/size).
+  // Opening the picker / picking a tray loads page 1; typing re-queries the server.
+  const fetchAllProducts = async (search = '') => {
+    setLoadingProducts(true);
     try {
-      const result = await getProducts();
-      setAllProducts(result.data || []);
+      const result = await getProductsPage(1, 20, search);
+      setAllProducts(Array.isArray(result) ? result : (result?.data || []));
     } catch (err) {
       console.error('Failed to load products:', err);
       setAllProducts([]);
+    } finally {
+      setLoadingProducts(false);
     }
+  };
+
+  // Debounced server search for the product picker.
+  const productSearchTimer = useRef(null);
+  const handleProductSearchChange = (term) => {
+    setProductSearch(term);
+    if (productSearchTimer.current) clearTimeout(productSearchTimer.current);
+    productSearchTimer.current = setTimeout(() => fetchAllProducts(term), 300);
   };
 
   const fetchBrands = async () => {
@@ -222,7 +237,7 @@ const DashboardTray = () => {
   const handleDelete = async (row) => {
     const trayId = row?.tray_id || row?.id;
     if (!trayId) return;
-    const confirmed = window.confirm(`Delete tray "${row.tray_name}"?`);
+    const confirmed = await confirm(`Delete tray "${row.tray_name}"?`);
     if (!confirmed) return;
     setSaving(true);
     setError(null);
@@ -342,7 +357,7 @@ const DashboardTray = () => {
 
   const handleRemoveProduct = async (trayProduct) => {
     if (!trayProduct?.product_id || !selectedTray) return;
-    const confirmed = window.confirm(`Remove product from tray?`);
+    const confirmed = await confirm(`Remove product from tray?`);
     if (!confirmed) return;
     setSaving(true);
     setError(null);
@@ -380,18 +395,10 @@ const DashboardTray = () => {
 
   // Reset selected tray when switching tabs
   useEffect(() => {
-    if (activeTab === 'assign-products') {
-      // Load products, brands, and collections when switching to assign products tab
-      if (allProducts.length === 0) {
-        fetchAllProducts();
-      }
-      if (brands.length === 0) {
-        fetchBrands();
-      }
-      if (collections.length === 0) {
-        fetchCollections();
-      }
-    } else {
+    if (activeTab !== 'assign-products') {
+      // Products/brands/collections are NOT pre-loaded here: they're fetched on
+      // demand by handleSelectTray once the user actually picks a tray, so the
+      // tab opens without firing several list calls at once.
       // Reset state when switching away from assign products tab
       setSelectedTray('');
       setTrayProducts([]);
@@ -534,7 +541,7 @@ const DashboardTray = () => {
                                       type="text"
                                       placeholder="🔍  Search by model, brand or collection..."
                                       value={productSearch}
-                                      onChange={(e) => setProductSearch(e.target.value)}
+                                      onChange={(e) => handleProductSearchChange(e.target.value)}
                                       onClick={(e) => e.stopPropagation()}
                                       autoFocus
                                       className="box-border w-full rounded-md border border-[#e5e7eb] bg-[#f9fafb] p-[8px_10px] text-[13px] outline-none"
@@ -543,26 +550,16 @@ const DashboardTray = () => {
 
                                   {/* Product list — scrollable */}
                                   <div className="flex-1 overflow-y-auto p-[6px]">
-                                    {allProducts.length === 0 ? (
+                                    {loadingProducts ? (
                                       <div className="p-5 text-center text-[13px] text-[#999]">
-                                        No products available
+                                        Loading…
+                                      </div>
+                                    ) : allProducts.length === 0 ? (
+                                      <div className="p-5 text-center text-[13px] text-[#999]">
+                                        {productSearch.trim() ? `No products match "${productSearch}"` : 'No products available'}
                                       </div>
                                     ) : (() => {
-                                      const filtered = allProducts.filter((p) => {
-                                        if (!productSearch.trim()) return true;
-                                        const q = productSearch.toLowerCase();
-                                        return (
-                                          (p.model_no || '').toLowerCase().includes(q) ||
-                                          (p.brand_name || '').toLowerCase().includes(q) ||
-                                          (p.collection_name || '').toLowerCase().includes(q)
-                                        );
-                                      });
-                                      if (filtered.length === 0) return (
-                                        <div className="p-5 text-center text-[13px] text-[#999]">
-                                          No products match "{productSearch}"
-                                        </div>
-                                      );
-                                      return filtered.map((p) => {
+                                      return allProducts.map((p) => {
                                         const productId = p.id || p.product_id;
                                         const productIdStr = String(productId);
                                         const isSelected = selectedProducts.includes(productIdStr);

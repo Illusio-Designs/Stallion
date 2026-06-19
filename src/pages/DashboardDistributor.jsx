@@ -3,6 +3,7 @@ import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import {
@@ -239,6 +240,7 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
 };
 
 const DashboardDistributor = () => {
+  const confirm = useConfirm();
 
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -274,16 +276,20 @@ const DashboardDistributor = () => {
   const isInitializingEditRef = useRef(false);
   const prevCountryIdRef = useRef('');
 
+  // Countries load on mount because the listing's default-country filter
+  // (India) depends on them. The load-once guard keeps the onOpen fallback on
+  // the form's Country dropdowns a no-op once they're already loaded.
   useEffect(() => {
     fetchCountries();
   }, []);
 
   const fetchCountries = async () => {
+    if (countries.length > 0) return;
     try {
       const countriesData = await getCountries();
       setCountries(countriesData || []);
     } catch (error) {
-      if (!error.message?.toLowerCase().includes('token expired') && 
+      if (!error.message?.toLowerCase().includes('token expired') &&
           !error.message?.toLowerCase().includes('unauthorized')) {
         setError(`Failed to load countries: ${error.message}`);
       }
@@ -613,7 +619,9 @@ const DashboardDistributor = () => {
     setEditRow(row);
     fetchAllZones(row.country_id || selectedCountryFilter); // lazy-load zones for the form (cached after first open)
 
-    // Load dependent data for editing
+    // Load dependent data for editing (countries too, so the Country field
+    // shows its label even if the dropdown was never opened).
+    await fetchCountries();
     if (row.country_id) {
       await fetchStates(row.country_id);
       if (row.state_id) {
@@ -628,7 +636,7 @@ const DashboardDistributor = () => {
   };
 
   const handleDelete = async (row) => {
-    if (!window.confirm(`Are you sure you want to delete this distributor? This will also delete the associated user account.`)) {
+    if (!(await confirm(`Are you sure you want to delete this distributor? This will also delete the associated user account.`))) {
       return;
     }
 
@@ -1287,6 +1295,7 @@ const DashboardDistributor = () => {
                           setLoading(false);
                         }
                       }}
+                      onOpen={fetchCountries}
                       placeholder="All Countries"
                       className="ui-dropdown-custom--full-width"
                     />
@@ -1388,6 +1397,7 @@ const DashboardDistributor = () => {
               ]}
               value={formData.country_id || ''}
               onChange={(value) => handleInputChange('country_id', value || '')}
+              onOpen={fetchCountries}
               placeholder="Select Country"
               className="ui-dropdown-custom--full-width"
             />
@@ -1590,6 +1600,7 @@ const DashboardDistributor = () => {
               ]}
               value={formData.country_id || ''}
               onChange={(value) => handleInputChange('country_id', value || '')}
+              onOpen={fetchCountries}
               placeholder="Select Country"
               className="ui-dropdown-custom--full-width"
             />

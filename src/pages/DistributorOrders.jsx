@@ -6,12 +6,12 @@ import RowActions from '../components/ui/RowActions';
 import Skeleton from '../components/ui/Skeleton';
 import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   createOrder,
   deleteOrder,
-  getCountries,
   getMyOrders,
-  getProducts
+  getProductsPage
 } from '../services/apiService';
 import { getUser } from '../services/authService';
 import { showError, showSuccess } from '../services/notificationService';
@@ -46,6 +46,7 @@ const mapUITabToApiStatus = (tab) => {
 };
 
 const DistributorOrders = () => {
+  const confirm = useConfirm();
   const [editRow, setEditRow] = useState(null);
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
@@ -58,8 +59,8 @@ const DistributorOrders = () => {
   const distributorId = user?.distributor_id || user?.distributorId;
 
   // Dropdown data
-  const [countries, setCountries] = useState([]);
   const [products, setProducts] = useState([]);
+  const [productLoading, setProductLoading] = useState(false);
 
   // Create order form data - order_type is auto-set to distributor_order
   const [createFormData, setCreateFormData] = useState({
@@ -112,14 +113,6 @@ const DistributorOrders = () => {
     fetchOrders();
   }, []);
 
-  // Load create-order form data (products) only when the create modal opens.
-  useEffect(() => {
-    if (createModalOpen && products.length === 0) {
-      fetchInitialData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createModalOpen]);
-
   // Update distributor_id when user data changes
   useEffect(() => {
     if (distributorId) {
@@ -127,17 +120,17 @@ const DistributorOrders = () => {
     }
   }, [distributorId]);
 
-  // Fetch initial data for dropdowns
-  const fetchInitialData = async () => {
+  // Product picker: server-paginated, 20 per page, with server-side search.
+  // Opening loads page 1; typing re-queries the server (debounced).
+  const loadProducts = async (search = '') => {
+    setProductLoading(true);
     try {
-      const [countriesData, productsData] = await Promise.all([
-        getCountries(),
-        getProducts()
-      ]);
-      setCountries(countriesData || []);
-      setProducts(productsData?.data || []);
+      const result = await getProductsPage(1, 20, search);
+      setProducts(Array.isArray(result) ? result : (result?.data || []));
     } catch (err) {
-      console.error('Failed to fetch initial data:', err);
+      console.error('Failed to load products:', err);
+    } finally {
+      setProductLoading(false);
     }
   };
 
@@ -266,7 +259,7 @@ const DistributorOrders = () => {
 
   // Handle delete order
   const handleDelete = async (row) => {
-    if (!window.confirm('Are you sure you want to delete this order?')) return;
+    if (!(await confirm('Are you sure you want to delete this order?'))) return;
 
     try {
       setLoading(true);
@@ -371,8 +364,10 @@ const DistributorOrders = () => {
     const product = products.find(p => (p.product_id || p.id) === productId);
     if (product) {
       const price = product.price || product.selling_price || 0;
+      const label = `${product.model_no || product.product_name || product.name}${price ? ` - ₹${price}` : ''}`;
       updateOrderItem(itemIndex, 'product_id', productId);
       updateOrderItem(itemIndex, 'price', price);
+      updateOrderItem(itemIndex, 'product_label', label);
     } else {
       updateOrderItem(itemIndex, 'product_id', productId);
     }
@@ -558,15 +553,17 @@ const DistributorOrders = () => {
                     <div>
                       <label className="text-xs text-[#666] mb-1 block">Product</label>
                       <DropdownSelector
-                        options={[
-                          { value: '', label: 'Select Product' },
-                          ...products.map(product => ({
-                            value: product.id || product.product_id,
-                            label: `${product.model_no || product.product_name || product.name}${product.price ? ` - ₹${product.price}` : ''}`,
-                          })),
-                        ]}
+                        options={products.map(product => ({
+                          value: product.id || product.product_id,
+                          label: `${product.model_no || product.product_name || product.name}${product.price ? ` - ₹${product.price}` : ''}`,
+                        }))}
                         value={item.product_id || ''}
                         onChange={(value) => handleProductSelect(index, value)}
+                        serverSearch
+                        loading={productLoading}
+                        selectedLabel={item.product_label || ''}
+                        onOpen={() => loadProducts('')}
+                        onSearch={loadProducts}
                         placeholder="Select Product"
                         className="ui-dropdown-custom--full-width"
                       />

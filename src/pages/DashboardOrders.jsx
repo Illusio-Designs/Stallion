@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getOrdersForRole,
   createOrder,
@@ -15,7 +16,7 @@ import {
   getDistributors,
   getSalesmen,
   getEvents,
-  getProducts,
+  getProductsPage,
   getProductById,
   getSalesmanById,
   getCountries
@@ -53,6 +54,7 @@ const mapUITabToApiStatus = (tab) => {
 };
 
 const DashboardOrders = () => {
+  const confirm = useConfirm();
   const [editRow, setEditRow] = useState(null);
   const [editStatus, setEditStatus] = useState('PENDING');
   const [viewRow, setViewRow] = useState(null);
@@ -87,6 +89,7 @@ const DashboardOrders = () => {
   const [salesmen, setSalesmen] = useState([]);
   const [events, setEvents] = useState([]);
   const [products, setProducts] = useState([]);
+  const [productLoading, setProductLoading] = useState(false);
   
   // Create order form data
   // Auto-set order_type based on role
@@ -221,29 +224,32 @@ const DashboardOrders = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
 
-  // Load create-order form data (countries + products) only when the create
-  // modal opens - not on page load, since the listing doesn't need them.
-  useEffect(() => {
-    if (createModalOpen && countries.length === 0) {
-      fetchInitialData();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [createModalOpen]);
-
-  // Fetch initial data for dropdowns
-  const fetchInitialData = async () => {
+  // Lazy, load-once dropdown loaders: each list is fetched only when the user
+  // actually opens that field (wired to DropdownSelector's onOpen) — NOT all at
+  // once when the panel opens. The length guard makes the call fire once.
+  const loadCountries = useCallback(async () => {
+    if (countries.length > 0) return;
     try {
-      const [countriesData, productsData] = await Promise.all([
-        getCountries(),
-        getProducts()
-      ]);
+      const countriesData = await getCountries();
       setCountries(countriesData || []);
-      const productList = Array.isArray(productsData) ? productsData : (productsData?.data || []);
-      if (productList.length > 0) setProducts(productList);
     } catch (err) {
-      console.error('Failed to fetch initial data:', err);
+      console.error('Failed to load countries:', err);
     }
-  };
+  }, [countries.length]);
+
+  // Product picker: server-paginated, 20 per page, with server-side search.
+  // Opening the field loads page 1; typing re-queries the server (debounced).
+  const loadProducts = useCallback(async (search = '') => {
+    setProductLoading(true);
+    try {
+      const result = await getProductsPage(1, 20, search);
+      setProducts(Array.isArray(result) ? result : (result?.data || []));
+    } catch (err) {
+      console.error('Failed to load products:', err);
+    } finally {
+      setProductLoading(false);
+    }
+  }, []);
 
   // Fetch events only when event_order is selected
   const fetchEvents = useCallback(async () => {
@@ -604,7 +610,7 @@ const DashboardOrders = () => {
 
   // Handle delete order
   const handleDelete = async (row) => {
-    if (!window.confirm('Are you sure you want to delete this order?')) return;
+    if (!(await confirm('Are you sure you want to delete this order?'))) return;
 
     try {
       setLoading(true);
@@ -808,8 +814,12 @@ const DashboardOrders = () => {
     const product = products.find(p => (p.product_id || p.id) === productId);
     if (product) {
       const price = product.price || product.selling_price || 0;
+      // Remember the label so the picker still shows it after the 20-result
+      // list changes on a later server search.
+      const label = `${product.model_no || product.product_name || product.name}${price ? ` - ₹${price}` : ''}`;
       updateOrderItem(itemIndex, 'product_id', productId);
       updateOrderItem(itemIndex, 'price', price);
+      updateOrderItem(itemIndex, 'product_label', label);
     } else {
       updateOrderItem(itemIndex, 'product_id', productId);
     }
@@ -1340,6 +1350,7 @@ const DashboardOrders = () => {
               ]}
               value={selectedCountry || ''}
               onChange={(value) => setSelectedCountry(value || null)}
+              onOpen={loadCountries}
               placeholder="Select Country"
               className="ui-dropdown-custom--full-width"
             />
@@ -1491,15 +1502,17 @@ const DashboardOrders = () => {
                     <div>
                       <label className="mb-1 block text-[12px] text-[#666]">Product</label>
                       <DropdownSelector
-                        options={[
-                          { value: '', label: 'Select Product' },
-                          ...products.map(product => ({
-                            value: product.id || product.product_id,
-                            label: `${product.model_no || product.product_name || product.name}${product.price ? ` - ₹${product.price}` : ''}`
-                          }))
-                        ]}
+                        options={products.map(product => ({
+                          value: product.id || product.product_id,
+                          label: `${product.model_no || product.product_name || product.name}${product.price ? ` - ₹${product.price}` : ''}`
+                        }))}
                         value={item.product_id || ''}
                         onChange={(value) => handleProductSelect(index, value)}
+                        serverSearch
+                        loading={productLoading}
+                        selectedLabel={item.product_label || ''}
+                        onOpen={() => loadProducts('')}
+                        onSearch={loadProducts}
                         placeholder="Select Product"
                         className="ui-dropdown-custom--full-width"
                       />

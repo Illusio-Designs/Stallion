@@ -14,6 +14,7 @@ import {
   showSuccess,
 } from "../services/notificationService";
 import { getUserRole, getUser } from "../services/authService";
+import DropdownSelector from "../components/ui/DropdownSelector";
 import {
   getMyParties,
   getPartyById,
@@ -51,6 +52,7 @@ const Cart = ({ onPageChange = null }) => {
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
   const [locationError, setLocationError] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
   
   // Dropdown data
   const [countries, setCountries] = useState([]);
@@ -193,6 +195,32 @@ const Cart = ({ onPageChange = null }) => {
     });
   };
 
+  // Explicit, permission-aware location request for visit orders. Checks the
+  // browser permission state first (where supported) so we can show clear
+  // guidance when it's blocked, then triggers the native prompt.
+  const requestLocation = async () => {
+    setLocationLoading(true);
+    setLocationError(null);
+    try {
+      if (navigator.permissions?.query) {
+        try {
+          const status = await navigator.permissions.query({ name: 'geolocation' });
+          if (status.state === 'denied') {
+            setLocationError('Location access is blocked. Enable it for this site in your browser settings, then tap "Try again".');
+            return;
+          }
+        } catch {
+          /* Permissions API unavailable — fall through to the native prompt */
+        }
+      }
+      await getCurrentLocation(); // shows the native permission prompt
+    } catch {
+      /* locationError is already set inside getCurrentLocation */
+    } finally {
+      setLocationLoading(false);
+    }
+  };
+
   // Fetch parties based on order type for salesman
   useEffect(() => {
     if (!isSalesman || !user) {
@@ -238,9 +266,9 @@ const Cart = ({ onPageChange = null }) => {
         setParties(Array.isArray(partiesData) ? partiesData : []);
         console.log('[Cart] Fetched my parties:', partiesData.length, 'parties');
 
-        // Capture location for visit_order
+        // Capture location for visit_order (permission-aware; shows status UI).
         if (orderType === 'visit_order') {
-          getCurrentLocation();
+          requestLocation();
         }
     } catch (err) {
         console.error('[Cart] Failed to fetch parties for order type:', err);
@@ -1064,12 +1092,17 @@ const Cart = ({ onPageChange = null }) => {
               {isSalesman && (
                 <div className="form-group flex flex-col gap-2">
                   <label htmlFor="order-type" className="form-label text-[length:var(--text-sm)] font-medium text-text">Order Type</label>
-                  <select
-                    id="order-type"
-                    className="summary-dropdown w-full min-h-10 px-3 border border-border-strong rounded-md text-[length:var(--text-base)] text-text bg-surface cursor-pointer transition duration-[120ms] hover:border-grey-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)]"
+                  <DropdownSelector
+                    className="ui-dropdown-custom--full-width"
+                    placeholder="Select Order Type"
+                    options={[
+                      { value: '', label: 'Select Order Type' },
+                      { value: 'visit_order', label: 'Visit Order' },
+                      { value: 'whatsapp_order', label: 'WhatsApp Order' },
+                      { value: 'event_order', label: 'Event Order' },
+                    ]}
                     value={orderType}
-                    onChange={(e) => {
-                      const newOrderType = e.target.value;
+                    onChange={(newOrderType) => {
                       setOrderType(newOrderType);
                       // Reset party and event when order type changes
                       setSelectedParty("");
@@ -1081,12 +1114,41 @@ const Cart = ({ onPageChange = null }) => {
                         setEvents([]);
                       }
                     }}
-                  >
-                    <option value="">Select Order Type</option>
-                    <option value="visit_order">Visit Order</option>
-                    <option value="whatsapp_order">WhatsApp Order</option>
-                    <option value="event_order">Event Order</option>
-                  </select>
+                  />
+                </div>
+              )}
+
+              {/* Location permission — required for visit orders */}
+              {isSalesman && orderType === 'visit_order' && (
+                <div className="form-group flex flex-col gap-2">
+                  <label className="form-label text-[length:var(--text-sm)] font-medium text-text">Location</label>
+                  {latitude !== null && longitude !== null ? (
+                    <div className="flex items-center gap-2 text-[length:var(--text-sm)]">
+                      <span className="font-medium text-[color:var(--color-success,#16a34a)]">✓ Location captured</span>
+                      <span className="text-text-muted [font-variant-numeric:tabular-nums]">({Number(latitude).toFixed(5)}, {Number(longitude).toFixed(5)})</span>
+                      <button
+                        type="button"
+                        className="ui-btn ui-btn--ghost ui-btn--sm ml-auto"
+                        onClick={requestLocation}
+                        disabled={locationLoading}
+                      >
+                        <span className="ui-btn__label">{locationLoading ? 'Updating…' : 'Update'}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      <p className="m-0 text-[length:var(--text-sm)] text-text-muted">We need your current location to place a visit order.</p>
+                      <button
+                        type="button"
+                        className={`ui-btn ui-btn--primary ui-btn--sm w-fit${locationLoading ? ' ui-btn--loading' : ''}`}
+                        onClick={requestLocation}
+                        disabled={locationLoading}
+                      >
+                        <span className="ui-btn__label">{locationLoading ? 'Getting location…' : (locationError ? 'Try again' : 'Allow location access')}</span>
+                      </button>
+                    </div>
+                  )}
+                  {locationError && <p className="ui-field-error" role="alert">{locationError}</p>}
                 </div>
               )}
 
@@ -1094,23 +1156,23 @@ const Cart = ({ onPageChange = null }) => {
               {shouldShowCountryDropdown() && (
                 <div className="form-group flex flex-col gap-2">
                   <label htmlFor="country" className="form-label text-[length:var(--text-sm)] font-medium text-text">Country</label>
-                  <select
-                    id="country"
-                    className="summary-dropdown w-full min-h-10 px-3 border border-border-strong rounded-md text-[length:var(--text-base)] text-text bg-surface cursor-pointer transition duration-[120ms] hover:border-grey-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)]"
+                  <DropdownSelector
+                    className="ui-dropdown-custom--full-width"
+                    placeholder="Select Country"
+                    options={[
+                      { value: '', label: 'Select Country' },
+                      ...countries.map(country => ({
+                        value: country.id || country.country_id,
+                        label: country.country_name || country.name,
+                      })),
+                    ]}
                     value={selectedCountry}
-                    onChange={(e) => {
-                      setSelectedCountry(e.target.value);
+                    onChange={(value) => {
+                      setSelectedCountry(value);
                       // Reset party when country changes
                       setSelectedParty("");
                     }}
-                  >
-                    <option value="">Select Country</option>
-                    {countries.map(country => (
-                      <option key={country.id || country.country_id} value={country.id || country.country_id}>
-                        {country.country_name || country.name}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </div>
               )}
 
@@ -1118,19 +1180,19 @@ const Cart = ({ onPageChange = null }) => {
               {shouldShowEventDropdown() && (
                 <div className="form-group flex flex-col gap-2">
                   <label htmlFor="event" className="form-label text-[length:var(--text-sm)] font-medium text-text">Event</label>
-                  <select
-                    id="event"
-                    className="summary-dropdown w-full min-h-10 px-3 border border-border-strong rounded-md text-[length:var(--text-base)] text-text bg-surface cursor-pointer transition duration-[120ms] hover:border-grey-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)]"
+                  <DropdownSelector
+                    className="ui-dropdown-custom--full-width"
+                    placeholder="Select Event"
+                    options={[
+                      { value: '', label: 'Select Event' },
+                      ...events.map(event => ({
+                        value: event.id || event.event_id,
+                        label: event.event_name || event.name,
+                      })),
+                    ]}
                     value={selectedEvent}
-                    onChange={(e) => setSelectedEvent(e.target.value)}
-                  >
-                    <option value="">Select Event</option>
-                    {events.map(event => (
-                      <option key={event.id || event.event_id} value={event.id || event.event_id}>
-                        {event.event_name || event.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setSelectedEvent(value)}
+                  />
                 </div>
               )}
 
@@ -1138,19 +1200,19 @@ const Cart = ({ onPageChange = null }) => {
               {shouldShowPartyDropdown() && (
                 <div className="form-group flex flex-col gap-2">
                   <label htmlFor="party" className="form-label text-[length:var(--text-sm)] font-medium text-text">Party</label>
-                  <select
-                    id="party"
-                    className="summary-dropdown w-full min-h-10 px-3 border border-border-strong rounded-md text-[length:var(--text-base)] text-text bg-surface cursor-pointer transition duration-[120ms] hover:border-grey-400 focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)]"
+                  <DropdownSelector
+                    className="ui-dropdown-custom--full-width"
+                    placeholder="Select Party"
+                    options={[
+                      { value: '', label: 'Select Party' },
+                      ...parties.map(party => ({
+                        value: party.id || party.party_id,
+                        label: party.party_name || party.name,
+                      })),
+                    ]}
                     value={selectedParty}
-                    onChange={(e) => setSelectedParty(e.target.value)}
-                  >
-                    <option value="">Select Party</option>
-                    {parties.map(party => (
-                      <option key={party.id || party.party_id} value={party.id || party.party_id}>
-                        {party.party_name || party.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(value) => setSelectedParty(value)}
+                  />
                 </div>
               )}
             </div>

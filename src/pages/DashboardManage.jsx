@@ -3,6 +3,7 @@ import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getCountries,
   createCountry,
@@ -65,6 +66,7 @@ import {
 import '../styles/pages/dashboard-orders.css';
 
 const DashboardManage = () => {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('Country');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -920,7 +922,7 @@ const DashboardManage = () => {
   };
 
   const handleDelete = async (row) => {
-    if (!window.confirm(`Are you sure you want to delete this ${row.type}?`)) {
+    if (!(await confirm(`Are you sure you want to delete this ${row.type}?`))) {
       return;
     }
 
