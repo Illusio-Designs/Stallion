@@ -1,25 +1,26 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import TableWithControls from '../components/ui/TableWithControls';
-import Modal from '../components/ui/Modal';
-import RowActions from '../components/ui/RowActions';
-import DropdownSelector from '../components/ui/DropdownSelector';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
+import AsidePanel from '../components/ui/AsidePanel';
+import DropdownSelector from '../components/ui/DropdownSelector';
+import Modal from '../components/ui/Modal';
+import RowActions from '../components/ui/RowActions';
+import TableWithControls from '../components/ui/TableWithControls';
 import {
-  getPartiesForRole,
-  createParty,
-  updateParty,
-  deleteParty,
   bulkUploadParties,
-  getCountries,
-  getStates,
+  createParty,
+  deleteParty,
   getCities,
+  getCountries,
+  getPartiesForRole,
+  getRoles,
+  getStates,
   getZones,
   register,
-  getRoles,
+  updateParty,
 } from '../services/apiService';
-import { showSuccess, showError } from '../services/notificationService';
-import { getUserRole, getUser } from '../services/authService';
+import { getUser, getUserRole } from '../services/authService';
+import { showError, showSuccess } from '../services/notificationService';
 
 const DashboardClients = () => {
   // Memoize user and role to prevent infinite loops
@@ -41,9 +42,9 @@ const DashboardClients = () => {
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
-  
+
   const hasSetDefaultCountry = useRef(false);
-  
+
   const [formData, setFormData] = useState({
     party_name: '',
     trade_name: '',
@@ -189,7 +190,7 @@ const DashboardClients = () => {
       setParties([]);
       return;
     }
-    
+
     setLoading(true);
     setError(null);
     try {
@@ -201,14 +202,14 @@ const DashboardClients = () => {
         setLoading(false);
         return;
       }
-      
+
       console.log('[fetchPartiesForCountry] Fetching parties for country:', cleanCountryId);
       // Role-aware: salesman/distributor/party get their own scoped parties;
       // admin & *_manager roles get the full country-filtered list.
       const partiesData = await getPartiesForRole(userRole, cleanCountryId);
-      
+
       console.log('[fetchPartiesForCountry] Received', partiesData?.length || 0, 'parties from API');
-      
+
       // CRITICAL: Backend returns wrong data, so we MUST filter strictly
       // Filter out ALL parties that don't match the requested country
       const validParties = (partiesData || []).filter(p => {
@@ -216,10 +217,10 @@ const DashboardClients = () => {
           console.warn('[fetchPartiesForCountry] Skipping null/undefined party');
           return false;
         }
-        
+
         const partyCountryId = String(p.country_id || p.countryId || '').trim();
         const matches = partyCountryId === cleanCountryId;
-        
+
         if (!matches) {
           console.warn('[fetchPartiesForCountry] ❌ REJECTING party - country mismatch:', {
             party_id: p.id || p.party_id,
@@ -237,13 +238,13 @@ const DashboardClients = () => {
         }
         return matches;
       });
-      
+
       const filteredOut = partiesData.length - validParties.length;
       if (filteredOut > 0) {
         console.warn('[fetchPartiesForCountry] ⚠️ Backend returned', filteredOut, 'parties with WRONG country_id!');
         console.warn('[fetchPartiesForCountry] This is a backend issue - it should filter by country_id');
       }
-      
+
       if (validParties.length > 0) {
         console.log('[fetchPartiesForCountry] ✅ Found', validParties.length, 'valid parties for country:', cleanCountryId);
       } else {
@@ -252,7 +253,7 @@ const DashboardClients = () => {
           console.warn('[fetchPartiesForCountry] ⚠️ Backend returned', partiesData.length, 'parties but none matched the requested country');
         }
       }
-      
+
       // Filter by zone for salesman and distributor
       let filteredParties = validParties;
       const currentUser = getUser(); // Get fresh user data inside the callback
@@ -265,12 +266,12 @@ const DashboardClients = () => {
         });
         console.log('[fetchPartiesForCountry] Filtered parties by zone:', userZone, 'Total:', validParties.length, 'Filtered:', filteredParties.length);
       }
-      
+
       // Ensure all parties have consistent ID field and preserve all fields including state/city/zone
       const normalizedParties = filteredParties.map(party => {
         const partyId = party.id || party.party_id || party._id;
-        return { 
-          ...party, 
+        return {
+          ...party,
           id: partyId,
           // Ensure state/city/zone are preserved (they might be null)
           state_id: party.state_id || null,
@@ -278,7 +279,7 @@ const DashboardClients = () => {
           zone_id: party.zone_id || null,
         };
       });
-      
+
       // Force update by creating a new array reference
       const newParties = Array.isArray(normalizedParties) ? [...normalizedParties] : [];
       console.log('[fetchPartiesForCountry] Setting', newParties.length, 'parties for country:', cleanCountryId);
@@ -286,14 +287,14 @@ const DashboardClients = () => {
     } catch (error) {
       console.error('[fetchPartiesForCountry] Error:', error);
       const errorMessage = error.message?.toLowerCase() || '';
-      const isNotFound = errorMessage.includes('parties not found') || 
-                        errorMessage.includes('no parties found') ||
-                        errorMessage.includes('party not found') ||
-                        error.statusCode === 404;
-      
-      if (!isNotFound && 
-          !errorMessage.includes('token expired') && 
-          !errorMessage.includes('unauthorized')) {
+      const isNotFound = errorMessage.includes('parties not found') ||
+        errorMessage.includes('no parties found') ||
+        errorMessage.includes('party not found') ||
+        error.statusCode === 404;
+
+      if (!isNotFound &&
+        !errorMessage.includes('token expired') &&
+        !errorMessage.includes('unauthorized')) {
         setError(`Failed to load parties: ${error.message}`);
         showError(`Failed to load parties: ${error.message}`);
       }
@@ -306,8 +307,8 @@ const DashboardClients = () => {
   // Set India as default country filter (only once when countries are loaded)
   useEffect(() => {
     if (countries.length > 0 && !selectedCountryFilter && !hasSetDefaultCountry.current) {
-      const india = countries.find(c => 
-        c.name?.toLowerCase() === 'india' || 
+      const india = countries.find(c =>
+        c.name?.toLowerCase() === 'india' ||
         c.code?.toLowerCase() === 'in'
       );
       if (india) {
@@ -336,18 +337,20 @@ const DashboardClients = () => {
     { key: 'trade_name', label: 'TRADE NAME' },
     { key: 'contact_person', label: 'CONTACT PERSON' },
     { key: 'phone', label: 'PHONE' },
-    { key: 'action', label: 'ACTION', render: (_v, row) => (
-      <RowActions 
-        onEdit={() => handleEdit(row)} 
-        onDelete={() => handleDelete(row)} 
-      />
-    ) },
+    {
+      key: 'action', label: 'ACTION', render: (_v, row) => (
+        <RowActions
+          onEdit={() => handleEdit(row)}
+          onDelete={() => handleDelete(row)}
+        />
+      )
+    },
   ]), []);
 
   const rows = useMemo(() => {
     // CRITICAL: Backend returns wrong data, so we MUST filter strictly by country_id
     let filteredParties = [];
-    
+
     if (selectedCountryFilter) {
       const cleanFilterId = String(selectedCountryFilter).trim();
       // Only show parties that EXACTLY match the selected country
@@ -355,7 +358,7 @@ const DashboardClients = () => {
         if (!party) return false;
         const partyCountryId = String(party.country_id || party.countryId || '').trim();
         const matches = partyCountryId === cleanFilterId;
-        
+
         if (!matches && party.party_name) {
           console.warn('[rows] ❌ Filtering out party with wrong country:', {
             name: party.party_name,
@@ -371,7 +374,7 @@ const DashboardClients = () => {
       filteredParties = [];
       console.log('[rows] No country selected, showing no parties');
     }
-    
+
     // Filter by zone for salesman and distributor
     const currentUser = getUser(); // Get fresh user data
     if ((isSalesman || isDistributor) && currentUser?.zone_preference && filteredParties.length > 0) {
@@ -384,8 +387,8 @@ const DashboardClients = () => {
       });
       console.log('[rows] Zone filter applied:', userZone, 'Before:', beforeZoneFilter, 'After:', filteredParties.length);
     }
-    
-    
+
+
     return filteredParties.map(party => {
       // Ensure ID is preserved - check multiple possible field names
       const partyId = party.id || party.party_id || party._id;
@@ -437,6 +440,7 @@ const DashboardClients = () => {
 
   const handleAdd = () => {
     resetForm();
+    setEditRow(null);
     setOpenAdd(true);
   };
 
@@ -464,7 +468,7 @@ const DashboardClients = () => {
       setError('Invalid party data. Please refresh and try again.');
       return;
     }
-    
+
     // Check for ID in various possible field names
     const partyId = row.id || row.party_id || row._id;
     if (!partyId) {
@@ -472,10 +476,11 @@ const DashboardClients = () => {
       setError('Party ID is missing. Please refresh and try again.');
       return;
     }
-    
+
     // Set flag to prevent useEffect from resetting fields during initialization
     isInitializingEditRef.current = true;
-    
+    setOpenAdd(false);
+
     try {
       // Load states, cities, and zones FIRST before setting formData
       if (row.country_id) {
@@ -487,12 +492,12 @@ const DashboardClients = () => {
           }
         }
       }
-      
+
       // Set previous values to current values to prevent reset
       prevCountryIdRef.current = row.country_id || '';
       prevStateIdRef.current = row.state_id || '';
       prevCityIdRef.current = row.city_id || '';
-      
+
       // Now set formData after all data is loaded
       setFormData({
         party_name: row.party_name || '',
@@ -511,7 +516,7 @@ const DashboardClients = () => {
         credit_days: row.credit_days || '',
         prefered_courier: row.prefered_courier || row.preferred_courier || '',
       });
-      
+
       // Store the complete row object with ensured ID
       setEditRow({ ...row, id: partyId });
     } finally {
@@ -540,24 +545,24 @@ const DashboardClients = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Delete party first
       console.log('[Delete Party] Deleting party with ID:', partyId.trim());
       await deleteParty(partyId.trim());
       console.log('[Delete Party] Party deleted successfully');
-      
+
       // Optimistically remove from table immediately
       setParties(prevParties => prevParties.filter(party => {
         const id = party.id || party.party_id || party._id;
         return id !== partyId.trim();
       }));
-      
+
       // Now find and delete associated user account by phone number
       if (partyPhone) {
         try {
           const { getUsers, deleteUser } = await import('../services/apiService');
           console.log('[Delete Party] Finding user account with phone:', partyPhone);
-          
+
           // Get all users
           const usersResponse = await getUsers();
           let usersArray = [];
@@ -568,28 +573,28 @@ const DashboardClients = () => {
           } else if (usersResponse && Array.isArray(usersResponse.users)) {
             usersArray = usersResponse.users;
           }
-          
+
           console.log('[Delete Party] Total users found:', usersArray.length);
-          
+
           // Normalize phone numbers for comparison (remove +, spaces, dashes)
           const normalizePhone = (phone) => {
             if (!phone) return '';
             return String(phone).trim().replace(/^\+/, '').replace(/[\s-]/g, '');
           };
-          
+
           const normalizedPartyPhone = normalizePhone(partyPhone);
-          
+
           // Find user by phone number
           const foundUser = usersArray.find(u => {
             const userPhone = (u.phone || u.phoneNumber || '').trim();
             const normalizedUserPhone = normalizePhone(userPhone);
-            
-            return userPhone === partyPhone || 
-                   normalizedUserPhone === normalizedPartyPhone ||
-                   userPhone === `+${partyPhone}` ||
-                   `+${userPhone}` === partyPhone;
+
+            return userPhone === partyPhone ||
+              normalizedUserPhone === normalizedPartyPhone ||
+              userPhone === `+${partyPhone}` ||
+              `+${userPhone}` === partyPhone;
           });
-          
+
           if (foundUser) {
             const userId = foundUser.user_id || foundUser.id;
             console.log('[Delete Party] Found associated user account:', {
@@ -597,7 +602,7 @@ const DashboardClients = () => {
               userPhone: foundUser.phone || foundUser.phoneNumber,
               userName: foundUser.full_name || foundUser.name
             });
-            
+
             try {
               await deleteUser(userId);
               console.log('[Delete Party] User account deleted successfully');
@@ -628,11 +633,11 @@ const DashboardClients = () => {
         console.warn('[Delete Party] No phone number found in party record');
         showSuccess('Party deleted successfully!');
       }
-      
+
       setError(null);
     } catch (error) {
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         const errorMsg = error.message || 'Failed to delete party';
         setError(errorMsg);
         showError(errorMsg);
@@ -644,21 +649,21 @@ const DashboardClients = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Helper function to validate UUID format
     const isValidUUID = (str) => {
       if (!str || str.trim() === '') return false;
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       return uuidRegex.test(str.trim());
     };
-    
+
     // Validate country_id is selected and is a valid UUID
     if (!formData.country_id || !isValidUUID(formData.country_id)) {
       setError('Please select a valid country');
       setLoading(false);
       return;
     }
-    
+
     try {
       setLoading(true);
       setError(null);
@@ -701,7 +706,7 @@ const DashboardClients = () => {
       const stateIdValue = getStateId();
       const cityIdValue = getCityId();
       const zoneIdValue = getZoneId();
-      
+
       const dataToSend = {
         party_name: String(formData.party_name || ''),
         trade_name: String(formData.trade_name || ''),
@@ -719,7 +724,7 @@ const DashboardClients = () => {
         credit_days: formData.credit_days ? Number(formData.credit_days) : null,
         prefered_courier: formData.prefered_courier && formData.prefered_courier.trim() !== '' ? String(formData.prefered_courier).trim() : null,
       };
-      
+
       console.log('[Update] Form data state/city/zone:', {
         state_id: formData.state_id,
         city_id: formData.city_id,
@@ -730,7 +735,7 @@ const DashboardClients = () => {
         city_id: cityIdValue,
         zone_id: zoneIdValue,
       });
-      
+
       // Final validation: ensure no undefined values and all fields are present
       const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier'];
       allFields.forEach(key => {
@@ -739,14 +744,14 @@ const DashboardClients = () => {
           dataToSend[key] = key.includes('_id') ? null : '';
         }
       });
-      
+
       // Ensure country_id is never null (it's required)
       if (!dataToSend.country_id) {
         setError('Country is required. Please select a country.');
         setLoading(false);
         return;
       }
-      
+
       console.log('[DashboardClients] Data to send:', JSON.stringify(dataToSend, null, 2));
       console.log('[DashboardClients] Data keys:', Object.keys(dataToSend));
       console.log('[DashboardClients] Has undefined:', Object.values(dataToSend).some(v => v === undefined));
@@ -761,12 +766,12 @@ const DashboardClients = () => {
           setLoading(false);
           return;
         }
-        
+
         // Update table optimistically FIRST (before API call) - this ensures UI updates immediately
         setParties(prev => prev.map(p => {
           const id = p.id || p.party_id || p._id;
           if (id === partyId.trim()) {
-            return { 
+            return {
               ...p,
               party_name: dataToSend.party_name,
               trade_name: dataToSend.trade_name,
@@ -783,42 +788,42 @@ const DashboardClients = () => {
               pan: dataToSend.pan,
               credit_days: dataToSend.credit_days,
               prefered_courier: dataToSend.prefered_courier,
-              id: id 
+              id: id
             };
           }
           return p;
         }));
-        
+
         // Close modal immediately for better UX
         setOpenAdd(false);
         setEditRow(null);
         resetForm();
         showSuccess('Party updated successfully!');
-        
+
         // Try API call in background - if it fails with init error, just refresh data
         // Wrap in async IIFE to prevent any errors from bubbling up
         (async () => {
           try {
             try {
               const updatedParty = await updateParty(partyId.trim(), dataToSend);
-              
+
               // Update with server response if available
               setParties(prev => prev.map(p => {
                 const id = p.id || p.party_id || p._id;
                 if (id === partyId.trim()) {
-                  return { 
-                    ...p, 
+                  return {
+                    ...p,
                     ...updatedParty,
                     // Ensure state/city/zone from our data are preserved
                     state_id: dataToSend.state_id || updatedParty.state_id || null,
                     city_id: dataToSend.city_id || updatedParty.city_id || null,
                     zone_id: dataToSend.zone_id || updatedParty.zone_id || null,
-                    id: id 
+                    id: id
                   };
                 }
                 return p;
               }));
-              
+
               // Refresh data to ensure we have latest
               if (selectedCountryFilter) {
                 await fetchPartiesForCountry(selectedCountryFilter);
@@ -826,10 +831,10 @@ const DashboardClients = () => {
             } catch (apiError) {
               // Check if it's the initialization error - check both the flag and message
               const errorMsg = String(apiError.message || apiError.error || JSON.stringify(apiError) || '').toLowerCase();
-              const isInitError = apiError.isInitializationError || 
-                                 errorMsg.includes("cannot access 'party' before initialization") || 
-                                 (errorMsg.includes("cannot access") && errorMsg.includes("before initialization"));
-              
+              const isInitError = apiError.isInitializationError ||
+                errorMsg.includes("cannot access 'party' before initialization") ||
+                (errorMsg.includes("cannot access") && errorMsg.includes("before initialization"));
+
               if (isInitError) {
                 // Backend error but update might have succeeded - just refresh to verify
                 // DO NOT show error to user - this is a backend timing issue
@@ -866,7 +871,7 @@ const DashboardClients = () => {
             }
           }
         })();
-        
+
         setError(null);
       } else {
         // Create new party - first create user account
@@ -921,7 +926,7 @@ const DashboardClients = () => {
           // Create party linked to the new user account
           const newParty = await createParty({ ...dataToSend, user_id: newUserId });
           showSuccess('Party created successfully!');
-          
+
           // Optimistically add to table if it matches the current filter
           if (selectedCountryFilter && newParty && newParty.country_id === selectedCountryFilter) {
             setParties(prev => [...prev, {
@@ -933,7 +938,7 @@ const DashboardClients = () => {
             // If country doesn't match filter, just refresh
             await fetchPartiesForCountry(selectedCountryFilter);
           }
-          
+
           setError(null);
           setOpenAdd(false);
           setEditRow(null);
@@ -946,20 +951,20 @@ const DashboardClients = () => {
           console.log('[Create Error] Full error object:', error);
           console.log('[Create Error] Error message:', errorMsg);
           console.log('[Create Error] Full error text:', fullErrorText);
-          
+
           if (errorMsg.includes('foreign key constraint') || fullErrorText.includes('foreign key constraint')) {
             let retryData = { ...dataToSend };
             let fixedFields = [];
-            
+
             // Check for each foreign key field (case-insensitive) - check both errorMsg and fullErrorText
             const checkText = errorMsg + ' ' + fullErrorText;
-            
+
             // More specific pattern matching for foreign key field names
             // Match: FOREIGN KEY (`state_id`), `state_id`, state_id, or references states (`id`)
             const stateIdPattern = /(?:foreign\s+key\s*\([^)]*`?state_id`?|`state_id`|state_id|references\s+states\s*\(`id`\))/i;
             const cityIdPattern = /(?:foreign\s+key\s*\([^)]*`?city_id`?|`city_id`|city_id|references\s+cities\s*\(`id`\))/i;
             const zoneIdPattern = /(?:foreign\s+key\s*\([^)]*`?zone_id`?|`zone_id`|zone_id|references\s+zones\s*\(`id`\))/i;
-            
+
             if (stateIdPattern.test(checkText) || checkText.includes('state_id') || checkText.includes('states')) {
               retryData.state_id = null;
               fixedFields.push('State ID');
@@ -978,7 +983,7 @@ const DashboardClients = () => {
               setFormData(prev => ({ ...prev, zone_id: '' }));
               console.log('[Create] Detected zone_id foreign key error');
             }
-            
+
             // Retry with null values for invalid foreign keys
             if (fixedFields.length > 0) {
               console.log(`[Create] Retrying with null values for: ${fixedFields.join(', ')}`);
@@ -1008,8 +1013,8 @@ const DashboardClients = () => {
                   await createParty(retryData);
                   showSuccess('Party created successfully! (All location IDs set to null due to invalid references)');
                   if (selectedCountryFilter) {
-                  await fetchPartiesForCountry(selectedCountryFilter);
-                }
+                    await fetchPartiesForCountry(selectedCountryFilter);
+                  }
                   setError(null);
                   setOpenAdd(false);
                   setEditRow(null);
@@ -1044,8 +1049,8 @@ const DashboardClients = () => {
         }
       }
     } catch (error) {
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         // Suppress backend initialization errors - already handled above
         const errorMsg = (error.message || '').toLowerCase();
         if (errorMsg.includes("cannot access") && errorMsg.includes("before initialization")) {
@@ -1060,10 +1065,10 @@ const DashboardClients = () => {
           resetForm();
           return;
         }
-        
+
         // Handle other errors
         let displayError = error.message || 'Failed to save party';
-        
+
         // Provide user-friendly error messages for foreign key constraints
         if (displayError.includes('foreign key constraint')) {
           if (displayError.includes('state_id')) {
@@ -1078,7 +1083,7 @@ const DashboardClients = () => {
             displayError = 'Invalid reference ID. One or more of the location IDs (state, city, or zone) does not exist in the database.';
           }
         }
-        
+
         setError(displayError);
         showError(displayError);
       }
@@ -1086,6 +1091,205 @@ const DashboardClients = () => {
       setLoading(false);
     }
   };
+
+  const closePartyForm = () => {
+    setOpenAdd(false);
+    setEditRow(null);
+    resetForm();
+  };
+
+  const isPartyFormOpen = openAdd || !!editRow;
+
+  const renderPartyFormFields = () => (
+    <>
+      <div className="form-group">
+        <label className="ui-label">Party Name *</label>
+        <input
+          className="ui-input"
+          placeholder="Party name"
+          value={formData.party_name}
+          onChange={(e) => handleInputChange('party_name', e.target.value)}
+          required
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Trade Name *</label>
+        <input
+          className="ui-input"
+          placeholder="Trade name"
+          value={formData.trade_name}
+          onChange={(e) => handleInputChange('trade_name', e.target.value)}
+          required
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Contact Person *</label>
+        <input
+          className="ui-input"
+          placeholder="Contact person"
+          value={formData.contact_person}
+          onChange={(e) => handleInputChange('contact_person', e.target.value)}
+          required
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Email *</label>
+        <input
+          className="ui-input"
+          type="email"
+          placeholder="Email"
+          value={formData.email}
+          onChange={(e) => handleInputChange('email', e.target.value)}
+          required
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Phone *</label>
+        <PhoneInput
+          defaultCountry="in"
+          value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
+          onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
+          className="phone-intl"
+          inputProps={{
+            required: true,
+            placeholder: 'Enter your phone number',
+          }}
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Country *</label>
+        <DropdownSelector
+          options={[
+            { value: '', label: 'Select Country' },
+            ...countries.map((country) => ({
+              value: country.id,
+              label: country.name,
+            })),
+          ]}
+          value={formData.country_id || ''}
+          onChange={(value) => handleInputChange('country_id', value || '')}
+          placeholder="Select Country"
+          className="ui-dropdown-custom--full-width"
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Address</label>
+        <input
+          className="ui-input"
+          placeholder="Address"
+          value={formData.address}
+          onChange={(e) => handleInputChange('address', e.target.value)}
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Pincode</label>
+        <input
+          className="ui-input"
+          placeholder="Pincode"
+          value={formData.pincode}
+          onChange={(e) => handleInputChange('pincode', e.target.value)}
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">State (Optional)</label>
+        <DropdownSelector
+          options={[
+            { value: '', label: 'Select State' },
+            ...states.map((state) => ({
+              value: state.id,
+              label: state.name,
+            })),
+          ]}
+          value={formData.state_id || ''}
+          onChange={(value) => handleInputChange('state_id', value || '')}
+          placeholder="Select State"
+          disabled={!formData.country_id}
+          className="ui-dropdown-custom--full-width"
+        />
+        {!formData.country_id && (
+          <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a country first</small>
+        )}
+      </div>
+      <div className="form-group">
+        <label className="ui-label">City (Optional)</label>
+        <DropdownSelector
+          options={[
+            { value: '', label: 'Select City' },
+            ...cities.map((city) => ({
+              value: city.id,
+              label: city.name,
+            })),
+          ]}
+          value={formData.city_id || ''}
+          onChange={(value) => handleInputChange('city_id', value || '')}
+          placeholder="Select City"
+          disabled={!formData.state_id}
+          className="ui-dropdown-custom--full-width"
+        />
+        {!formData.state_id && (
+          <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a state first</small>
+        )}
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Zone (Optional)</label>
+        <DropdownSelector
+          options={[
+            { value: '', label: 'Select Zone' },
+            ...zones.map((zone) => ({
+              value: zone.id,
+              label: zone.name,
+            })),
+          ]}
+          value={formData.zone_id || ''}
+          onChange={(value) => handleInputChange('zone_id', value || '')}
+          placeholder="Select Zone"
+          disabled={!formData.city_id}
+          className="ui-dropdown-custom--full-width"
+        />
+        {!formData.city_id && (
+          <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a city first</small>
+        )}
+      </div>
+      <div className="form-group">
+        <label className="ui-label">GSTIN</label>
+        <input
+          className="ui-input"
+          placeholder="GSTIN"
+          value={formData.gstin}
+          onChange={(e) => handleInputChange('gstin', e.target.value)}
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">PAN</label>
+        <input
+          className="ui-input"
+          placeholder="PAN"
+          value={formData.pan}
+          onChange={(e) => handleInputChange('pan', e.target.value)}
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Credit Days</label>
+        <input
+          className="ui-input"
+          type="number"
+          placeholder="Credit Days"
+          value={formData.credit_days}
+          onChange={(e) => handleInputChange('credit_days', e.target.value)}
+          min="0"
+        />
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Preferred Courier</label>
+        <input
+          className="ui-input"
+          placeholder="Preferred Courier"
+          value={formData.prefered_courier}
+          onChange={(e) => handleInputChange('prefered_courier', e.target.value)}
+        />
+      </div>
+    </>
+  );
 
   return (
     <div className="dash-page">
@@ -1207,442 +1411,35 @@ const DashboardClients = () => {
           </div>
         </div>
       </div>
-      <Modal
-        open={openAdd}
-        onClose={() => {
-          setOpenAdd(false);
-          resetForm();
-        }}
-        title="Add New Party"
+      <AsidePanel
+        open={isPartyFormOpen}
+        onClose={closePartyForm}
+        title={editRow ? 'Edit Party' : 'Add New Party'}
         footer={(
           <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
-              onClick={() => {
-                setOpenAdd(false);
-                resetForm();
-              }}
+            <button
+              type="button"
+              className="ui-btn ui-btn--secondary"
+              onClick={closePartyForm}
               disabled={loading}
             >
               Cancel
             </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
+            <button
+              type="button"
+              className="ui-btn ui-btn--primary"
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? (editRow ? 'Updating...' : 'Saving...') : (editRow ? 'Update' : 'Save')}
             </button>
           </>
         )}
       >
         <form className="ui-form" onSubmit={handleSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Party Name *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Party name"
-              value={formData.party_name}
-              onChange={(e) => handleInputChange('party_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Trade Name *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Trade name"
-              value={formData.trade_name}
-              onChange={(e) => handleInputChange('trade_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Contact Person *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Contact person"
-              value={formData.contact_person}
-              onChange={(e) => handleInputChange('contact_person', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Email *</label>
-            <input 
-              className="ui-input" 
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Phone *</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
-              onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                required: true,
-                placeholder: 'Enter your phone number',
-              }}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Country *</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Country' },
-                ...countries.map(country => ({
-                  value: country.id,
-                  label: country.name
-                }))
-              ]}
-              value={formData.country_id || ''}
-              onChange={(value) => handleInputChange('country_id', value || '')}
-              placeholder="Select Country"
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address</label>
-            <input
-              className="ui-input"
-              placeholder="Address"
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Pincode</label>
-            <input
-              className="ui-input"
-              placeholder="Pincode"
-              value={formData.pincode}
-              onChange={(e) => handleInputChange('pincode', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">State (Optional)</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select State' },
-                ...states.map(state => ({
-                  value: state.id,
-                  label: state.name
-                }))
-              ]}
-              value={formData.state_id || ''}
-              onChange={(value) => handleInputChange('state_id', value || '')}
-              placeholder="Select State"
-              disabled={!formData.country_id}
-              className="ui-dropdown-custom--full-width"
-            />
-            {!formData.country_id && (
-              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a country first</small>
-            )}
-          </div>
-          <div className="form-group">
-            <label className="ui-label">City (Optional)</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select City' },
-                ...cities.map(city => ({
-                  value: city.id,
-                  label: city.name
-                }))
-              ]}
-              value={formData.city_id || ''}
-              onChange={(value) => handleInputChange('city_id', value || '')}
-              placeholder="Select City"
-              disabled={!formData.state_id}
-              className="ui-dropdown-custom--full-width"
-            />
-            {!formData.state_id && (
-              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a state first</small>
-            )}
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Zone (Optional)</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Zone' },
-                ...zones.map(zone => ({
-                  value: zone.id,
-                  label: zone.name
-                }))
-              ]}
-              value={formData.zone_id || ''}
-              onChange={(value) => handleInputChange('zone_id', value || '')}
-              placeholder="Select Zone"
-              disabled={!formData.city_id}
-              className="ui-dropdown-custom--full-width"
-            />
-            {!formData.city_id && (
-              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a city first</small>
-            )}
-          </div>
-          <div className="form-group">
-            <label className="ui-label">GSTIN</label>
-            <input
-              className="ui-input"
-              placeholder="GSTIN"
-              value={formData.gstin}
-              onChange={(e) => handleInputChange('gstin', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">PAN</label>
-            <input
-              className="ui-input"
-              placeholder="PAN"
-              value={formData.pan}
-              onChange={(e) => handleInputChange('pan', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Credit Days</label>
-            <input
-              className="ui-input"
-              type="number"
-              placeholder="Credit Days"
-              value={formData.credit_days}
-              onChange={(e) => handleInputChange('credit_days', e.target.value)}
-              min="0"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Preferred Courier</label>
-            <input 
-              className="ui-input" 
-              placeholder="Preferred Courier"
-              value={formData.prefered_courier}
-              onChange={(e) => handleInputChange('prefered_courier', e.target.value)}
-            />
-          </div>
+          {renderPartyFormFields()}
         </form>
-      </Modal>
-      <Modal
-        open={!!editRow}
-        onClose={() => {
-          setEditRow(null);
-          resetForm();
-        }}
-        title="Edit Party"
-        footer={(
-          <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
-              onClick={() => {
-                setEditRow(null);
-                resetForm();
-              }}
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
-              onClick={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? 'Updating...' : 'Update'}
-            </button>
-          </>
-        )}
-      >
-        <form className="ui-form" onSubmit={handleSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Party Name *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Party name"
-              value={formData.party_name}
-              onChange={(e) => handleInputChange('party_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Trade Name *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Trade name"
-              value={formData.trade_name}
-              onChange={(e) => handleInputChange('trade_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Contact Person *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Contact person"
-              value={formData.contact_person}
-              onChange={(e) => handleInputChange('contact_person', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Email *</label>
-            <input 
-              className="ui-input" 
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Phone *</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
-              onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                required: true,
-                placeholder: 'Enter your phone number',
-              }}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Country *</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Country' },
-                ...countries.map(country => ({
-                  value: country.id,
-                  label: country.name
-                }))
-              ]}
-              value={formData.country_id || ''}
-              onChange={(value) => handleInputChange('country_id', value || '')}
-              placeholder="Select Country"
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address</label>
-            <input 
-              className="ui-input" 
-              placeholder="Address"
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Pincode</label>
-            <input 
-              className="ui-input" 
-              placeholder="Pincode"
-              value={formData.pincode}
-              onChange={(e) => handleInputChange('pincode', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">State (Optional)</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select State' },
-                ...states.map(state => ({
-                  value: state.id,
-                  label: state.name
-                }))
-              ]}
-              value={formData.state_id || ''}
-              onChange={(value) => handleInputChange('state_id', value || '')}
-              placeholder="Select State"
-              disabled={!formData.country_id}
-              className="ui-dropdown-custom--full-width"
-            />
-            {!formData.country_id && (
-              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a country first</small>
-            )}
-          </div>
-          <div className="form-group">
-            <label className="ui-label">City (Optional)</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select City' },
-                ...cities.map(city => ({
-                  value: city.id,
-                  label: city.name
-                }))
-              ]}
-              value={formData.city_id || ''}
-              onChange={(value) => handleInputChange('city_id', value || '')}
-              placeholder="Select City"
-              disabled={!formData.state_id}
-              className="ui-dropdown-custom--full-width"
-            />
-            {!formData.state_id && (
-              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a state first</small>
-            )}
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Zone (Optional)</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Zone' },
-                ...zones.map(zone => ({
-                  value: zone.id,
-                  label: zone.name
-                }))
-              ]}
-              value={formData.zone_id || ''}
-              onChange={(value) => handleInputChange('zone_id', value || '')}
-              placeholder="Select Zone"
-              disabled={!formData.city_id}
-              className="ui-dropdown-custom--full-width"
-            />
-            {!formData.city_id && (
-              <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a city first</small>
-            )}
-          </div>
-          <div className="form-group">
-            <label className="ui-label">GSTIN</label>
-            <input 
-              className="ui-input" 
-              placeholder="GSTIN"
-              value={formData.gstin}
-              onChange={(e) => handleInputChange('gstin', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">PAN</label>
-            <input 
-              className="ui-input" 
-              placeholder="PAN"
-              value={formData.pan}
-              onChange={(e) => handleInputChange('pan', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Credit Days</label>
-            <input 
-              className="ui-input" 
-              type="number"
-              placeholder="Credit Days"
-              value={formData.credit_days}
-              onChange={(e) => handleInputChange('credit_days', e.target.value)}
-              min="0"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Prefered Courier</label>
-            <input 
-              className="ui-input" 
-              placeholder="Prefered Courier"
-              value={formData.prefered_courier}
-              onChange={(e) => handleInputChange('prefered_courier', e.target.value)}
-            />
-          </div>
-        </form>
-      </Modal>
+      </AsidePanel>
 
       {/* Bulk Upload Modal */}
       <Modal
