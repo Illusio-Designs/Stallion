@@ -1,0 +1,353 @@
+@import "tailwindcss";
+@import "../styles/animations.css";
+@import "../styles/components/phone-input.css";
+
+/* ============================================================
+   Design tokens — single source of truth for theme values.
+   Use var(--token) instead of hard-coded colors/spacing.
+   ============================================================ */
+:root {
+  /* ---- Brand (locked: indigo + amber) ---- */
+  --color-primary: #181265;
+  --color-primary-hover: #241a8a;
+  --color-primary-active: #120e4d;
+  --color-primary-soft: #f3f3fb;        /* tinted surface for selected/hover states */
+  --color-primary-soft-hover: #e8e8f6;
+  /* Accent = brand blue (no yellow anywhere) */
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-soft: #eef0fd;
+
+  /* ---- Neutral grey ramp (cool, slightly indigo-tinted) ---- */
+  --color-grey-50:  #fafafb;
+  --color-grey-100: #f4f5f7;
+  --color-grey-200: #ebecf0;
+  --color-grey-300: #dfe1e7;
+  --color-grey-400: #c2c5cf;
+  --color-grey-500: #9296a3;
+  --color-grey-600: #6b6f7d;
+  --color-grey-700: #4a4d59;
+  --color-grey-800: #2d2f3a;
+  --color-grey-900: #1a1b23;
+
+  /* ---- Semantic status ---- */
+  --color-error: #d92d20;
+  --color-error-soft: #fdecea;
+  --color-success: #0f7d55;
+  --color-success-soft: #e7f4ee;
+  --color-warning: #b45309;
+  --color-warning-soft: #fbe7d6;
+  --color-info: var(--color-primary);
+  --color-info-soft: var(--color-primary-soft);
+
+  /* ---- Surfaces & borders ---- */
+  --color-bg: var(--color-grey-50);
+  --color-surface: #ffffff;
+  --color-surface-muted: var(--color-grey-100);
+  --color-border: #ebecf0;              /* hairline, soft */
+  --color-border-strong: #dfe1e7;
+
+  /* ---- Text ---- */
+  --color-text: #1a1b23;                /* near-black primary */
+  --color-text-muted: #6b6f7d;          /* secondary */
+  --color-text-subtle: #9296a3;         /* tertiary / meta / placeholder */
+  --color-text-on-primary: #ffffff;
+  --color-text-on-accent: #ffffff;
+
+  /* ---- Spacing scale (4 / 8 rhythm) ---- */
+  --space-0: 0;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+
+  /* ---- Type scale ---- */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 30px;
+  --leading-tight: 1.2;
+  --leading-snug: 1.35;
+  --leading-normal: 1.5;
+  --tracking-label: 0.04em;
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  /* ---- Radius (one system) ---- */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-pill: 999px;
+
+  /* ---- Shadows (soft, layered, low-opacity) ---- */
+  --shadow-xs: 0 1px 2px rgba(24, 18, 101, 0.05);
+  --shadow-sm: 0 1px 2px rgba(24, 18, 101, 0.04), 0 1px 3px rgba(24, 18, 101, 0.06);
+  --shadow-md: 0 2px 4px rgba(24, 18, 101, 0.04), 0 6px 16px rgba(24, 18, 101, 0.08);
+  --shadow-lg: 0 8px 24px rgba(24, 18, 101, 0.10), 0 2px 6px rgba(24, 18, 101, 0.05);
+  --shadow-xl: 0 16px 48px rgba(24, 18, 101, 0.16), 0 4px 12px rgba(24, 18, 101, 0.06);
+
+  /* ---- Focus ring (keyboard accessibility) ---- */
+  --focus-ring: 0 0 0 3px rgba(24, 18, 101, 0.18);
+  --focus-ring-error: 0 0 0 3px rgba(217, 45, 32, 0.18);
+
+  /* ---- Layout ---- */
+  --header-height: 80px;
+
+  /* ---- Motion ---- */
+  --transition-fast: 0.12s ease;
+  --transition: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  /* ---- Effects ---- */
+  --backdrop-blur: 3px;
+}
+
+
+/* Preload main font to prevent FOUT */
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Spoof Trial Font Faces */
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-Thin.otf') format('opentype');
+  font-weight: 100;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-ThinSlanted.otf') format('opentype');
+  font-weight: 100;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-Light.otf') format('opentype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-LightSlanted.otf') format('opentype');
+  font-weight: 300;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-Regular.otf') format('opentype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-RegularSlanted.otf') format('opentype');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-Medium.otf') format('opentype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-MediumSlanted.otf') format('opentype');
+  font-weight: 500;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-Bold.otf') format('opentype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-BoldSlanted.otf') format('opentype');
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-Black.otf') format('opentype');
+  font-weight: 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Spoof Trial';
+  src: url('/SpoofTrial-BlackSlanted.otf') format('opentype');
+  font-weight: 900;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+  --font-spoof: 'Spoof Trial', sans-serif;
+  color-scheme: light only;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-spoof);
+  --font-mono: var(--font-spoof);
+
+  /* ---- Brand colors -> bg-primary, text-accent, etc. ---- */
+  --color-primary: var(--color-primary);
+  --color-primary-hover: var(--color-primary-hover);
+  --color-primary-active: var(--color-primary-active);
+  --color-primary-soft: var(--color-primary-soft);
+  --color-primary-soft-hover: var(--color-primary-soft-hover);
+  --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
+  --color-accent-soft: var(--color-accent-soft);
+
+  /* ---- Neutral grey ramp -> bg-grey-100, text-grey-600, etc. ---- */
+  --color-grey-50: var(--color-grey-50);
+  --color-grey-100: var(--color-grey-100);
+  --color-grey-200: var(--color-grey-200);
+  --color-grey-300: var(--color-grey-300);
+  --color-grey-400: var(--color-grey-400);
+  --color-grey-500: var(--color-grey-500);
+  --color-grey-600: var(--color-grey-600);
+  --color-grey-700: var(--color-grey-700);
+  --color-grey-800: var(--color-grey-800);
+  --color-grey-900: var(--color-grey-900);
+
+  /* ---- Semantic status -> bg-success, text-error, etc. ---- */
+  --color-error: var(--color-error);
+  --color-error-soft: var(--color-error-soft);
+  --color-success: var(--color-success);
+  --color-success-soft: var(--color-success-soft);
+  --color-warning: var(--color-warning);
+  --color-warning-soft: var(--color-warning-soft);
+  --color-info: var(--color-info);
+  --color-info-soft: var(--color-info-soft);
+
+  /* ---- Surfaces & borders -> bg-surface, border-border, etc. ---- */
+  --color-bg: var(--color-bg);
+  --color-surface: var(--color-surface);
+  --color-surface-muted: var(--color-surface-muted);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+
+  /* ---- Text -> text-text, text-muted, text-subtle, etc. ---- */
+  --color-text: var(--color-text);
+  --color-text-muted: var(--color-text-muted);
+  --color-text-subtle: var(--color-text-subtle);
+  --color-text-on-primary: var(--color-text-on-primary);
+  --color-text-on-accent: var(--color-text-on-accent);
+
+  /* ---- Radius -> rounded-sm/md/lg/xl/pill ---- */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-pill: var(--radius-pill);
+
+  /* ---- Shadows -> shadow-xs/sm/md/lg/xl ---- */
+  --shadow-xs: var(--shadow-xs);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-md: var(--shadow-md);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-xl: var(--shadow-xl);
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'Spoof Trial', sans-serif;
+  color-scheme: light only;
+}
+
+* {
+  font-family: 'Spoof Trial', sans-serif;
+  /* Subtle, calm scrollbar (Firefox) */
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-grey-300) transparent;
+}
+
+/* For Webkit browsers (Chrome, Safari, Edge) */
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+  border: none;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--color-grey-300);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--radius-pill);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--color-grey-400);
+  background-clip: padding-box;
+}
+
+/* Hide scrollbar buttons/arrows */
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/* Additional smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+@supports (scrollbar-gutter: stable) {
+  html {
+    scrollbar-gutter: stable;
+  }
+}
