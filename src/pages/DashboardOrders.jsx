@@ -90,6 +90,11 @@ const DashboardOrders = () => {
   const [events, setEvents] = useState([]);
   const [products, setProducts] = useState([]);
   const [productLoading, setProductLoading] = useState(false);
+  // Geolocation for visit orders (the backend rejects a visit_order without lat/lng).
+  const [latitude, setLatitude] = useState(null);
+  const [longitude, setLongitude] = useState(null);
+  const [locationError, setLocationError] = useState(null);
+  const [locationLoading, setLocationLoading] = useState(false);
   
   // Create order form data
   // Auto-set order_type based on role
@@ -236,6 +241,40 @@ const DashboardOrders = () => {
       console.error('Failed to load countries:', err);
     }
   }, [countries.length]);
+
+  // Request the browser location for visit orders (shows the native permission
+  // prompt). Resolves with {latitude, longitude}; rejects on denial/error.
+  const getCurrentLocation = useCallback(() => {
+    return new Promise((resolve, reject) => {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        const msg = 'Geolocation is not supported by your browser';
+        setLocationError(msg);
+        reject(new Error(msg));
+        return;
+      }
+      setLocationError(null);
+      setLocationLoading(true);
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = parseFloat(position.coords.latitude);
+          const lng = parseFloat(position.coords.longitude);
+          setLatitude(lat);
+          setLongitude(lng);
+          setLocationLoading(false);
+          resolve({ latitude: lat, longitude: lng });
+        },
+        (error) => {
+          const msg = error.message || 'Failed to get location';
+          setLocationError(msg);
+          setLatitude(null);
+          setLongitude(null);
+          setLocationLoading(false);
+          reject(error);
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    });
+  }, []);
 
   // Product picker: server-paginated, 20 per page, with server-side search.
   // Opening the field loads page 1; typing re-queries the server (debounced).
@@ -754,6 +793,26 @@ const DashboardOrders = () => {
       }
       if (createFormData.event_id) orderData.event_id = createFormData.event_id;
       if (createFormData.order_notes) orderData.order_notes = createFormData.order_notes;
+
+      // Visit orders must carry the browser location. If we don't have it yet
+      // (permission not granted on selection), request it now and wait.
+      if (finalOrderType === 'visit_order') {
+        let lat = latitude;
+        let lng = longitude;
+        if (lat === null || lng === null) {
+          try {
+            const pos = await getCurrentLocation();
+            lat = pos.latitude;
+            lng = pos.longitude;
+          } catch (locErr) {
+            setLoading(false);
+            showError('Location access is required for visit orders. Please allow location and try again.');
+            return;
+          }
+        }
+        orderData.latitude = Number(lat);
+        orderData.longitude = Number(lng);
+      }
 
       await createOrder(orderData);
       showSuccess('Order created successfully');
@@ -1330,10 +1389,30 @@ const DashboardOrders = () => {
                   if (isSalesman && allParties.length > 0) {
                     filterPartiesByZone(allParties, newOrderType);
                   }
+                  // Visit orders need the browser location — ask up-front so the
+                  // permission prompt isn't a surprise at submit time.
+                  if (newOrderType === 'visit_order') {
+                    getCurrentLocation().catch(() => {/* surfaced via locationError */});
+                  } else {
+                    setLatitude(null);
+                    setLongitude(null);
+                    setLocationError(null);
+                  }
                 }}
                 placeholder="Select Order Type"
                 className="ui-dropdown-custom--full-width"
               />
+              {createFormData.order_type === 'visit_order' && (
+                <p className={`mt-1 text-[12px] ${locationError ? 'text-[#c62828]' : 'text-[#666]'}`}>
+                  {locationLoading
+                    ? 'Getting your location…'
+                    : latitude !== null && longitude !== null
+                      ? `📍 Location captured (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`
+                      : locationError
+                        ? `Location needed for visit orders: ${locationError}`
+                        : 'Visit orders require your location — allow the browser prompt.'}
+                </p>
+              )}
             </div>
           )}
 

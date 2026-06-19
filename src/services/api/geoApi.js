@@ -268,90 +268,44 @@ export const getZones = async (cityId) => {
  * @param {string} countryId - Country ID (optional, defaults to India)
  * @returns {Promise<Array>} Array of all zone objects (deduplicated)
  */
-const fetchAllZonesUncached = async (countryId) => {
+const fetchAllZonesUncached = async () => {
   try {
-    let targetCountryId = countryId;
-
-    // If no countryId provided, find India
-    if (!targetCountryId) {
-      const countries = await apiRequest('/countries', { method: 'GET', includeAuth: true });
-      const countriesArr = Array.isArray(countries) ? countries : (countries?.data || []);
-      const india = countriesArr.find(c =>
-        c.name?.toLowerCase() === 'india' || c.code?.toLowerCase() === 'in'
-      );
-      if (!india) return [];
-      targetCountryId = india.id;
-    }
-
-    // Step 1: get all states for the country
-    const statesResp = await apiRequest('/states/get', {
+    // POST /zones/get with no city_id returns ALL active zones in a SINGLE call
+    // (the backend filters only by is_active when city_id is omitted). This
+    // replaces the old states -> cities -> zones walk, which fired 100+ requests
+    // (one /cities/get per state + one /zones/get per city) on every form open.
+    const resp = await apiRequest('/zones/get', {
       method: 'POST',
-      body: { country_id: targetCountryId },
+      body: {},
       includeAuth: true,
       silent: true,
     });
-    const statesArr = Array.isArray(statesResp) ? statesResp : (statesResp?.data || []);
-    if (statesArr.length === 0) return [];
+    const zonesArr = Array.isArray(resp) ? resp : (resp?.data || []);
 
-    // Step 2: get all cities for each state (parallel)
-    const cityResults = await Promise.all(
-      statesArr.map(state =>
-        fetchAllPages('/cities/get', {
-          method: 'POST',
-          body: { state_id: state.id },
-          includeAuth: true,
-          silent: true,
-        }).catch(() => [])
-      )
-    );
-    const allCities = cityResults.flatMap(r => Array.isArray(r) ? r : (r?.data || []));
-    if (allCities.length === 0) return [];
-
-    // Step 3: get zones for each city (parallel, in batches)
-    const batchSize = 10;
-    let allZones = [];
-    for (let i = 0; i < allCities.length; i += batchSize) {
-      const batch = allCities.slice(i, i + batchSize);
-      const zoneResults = await Promise.all(
-        batch.map(city =>
-          apiRequest('/zones/get', {
-            method: 'POST',
-            body: { city_id: city.id },
-            includeAuth: true,
-            silent: true,
-          }).catch(() => [])
-        )
-      );
-      const batchZones = zoneResults.flatMap(r => Array.isArray(r) ? r : (r?.data || []));
-      allZones = [...allZones, ...batchZones];
-    }
-
-    // Deduplicate by zone id
+    // Deduplicate by zone id (defensive).
     const seen = new Set();
-    return allZones.filter(z => {
+    return zonesArr.filter(z => {
       const id = z.zone_id || z.id;
       if (!id || seen.has(id)) return false;
       seen.add(id);
       return true;
     });
   } catch (error) {
-    console.warn('[getAllZones] Failed to fetch all zones:', error.message);
+    console.warn('[getAllZones] Failed to fetch zones:', error.message);
     return [];
   }
 };
 
 /**
- * Get all zones for a country (cached).
+ * Get all zones (cached). One call to POST /zones/get — the backend returns all
+ * active zones. The countryId arg is accepted for backward compatibility but no
+ * longer scopes the request (the backend has no country filter on zones).
  *
- * There is no "get all zones" endpoint, so this walks states -> cities -> zones,
- * which is expensive. The result is cached so that cascade runs at most once per
- * session/country instead of on every page mount. Invalidated on zone mutations.
- *
- * @param {string} [countryId] - Country ID (defaults to India)
+ * @param {string} [countryId] - ignored; kept for call-site compatibility
  * @returns {Promise<Array>}
  */
 export const getAllZones = async (countryId) => {
-  return getCached(`allZones:${countryId || 'default'}`, () => fetchAllZonesUncached(countryId), TTL_LOOKUP);
+  return getCached('allZones:all', () => fetchAllZonesUncached(), TTL_LOOKUP);
 };
 
 /**
