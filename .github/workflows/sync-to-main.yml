@@ -1,0 +1,66 @@
+name: Sync frontend → main
+
+# When anyone pushes to the `frontend` branch (frontend-only, app at root),
+# mirror its contents into main/Frontend/ and push to main. The branch is the
+# source of truth for that subfolder: main/Frontend is replaced wholesale.
+
+on:
+  push:
+    branches: [frontend]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Serialize with the backend sync so both never push to main at once.
+concurrency:
+  group: sync-to-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          path: main-repo
+
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          ref: frontend
+          path: branch-repo
+
+      - name: Mirror frontend → main/Frontend
+        run: |
+          mkdir -p main-repo/Frontend
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.vscode' \
+            branch-repo/ main-repo/Frontend/
+
+      - name: Commit & push to main
+        working-directory: main-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A Frontend
+          if git diff --cached --quiet; then
+            echo "No changes to sync."
+            exit 0
+          fi
+          git commit -m "chore(sync): frontend → main/Frontend (${GITHUB_SHA::7})"
+          for i in 1 2 3 4 5; do
+            if git push origin main; then
+              echo "Pushed to main."
+              exit 0
+            fi
+            echo "Push rejected (main moved), rebasing and retrying..."
+            git pull --rebase origin main
+          done
+          echo "Failed to push to main after retries." >&2
+          exit 1
