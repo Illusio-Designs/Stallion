@@ -4,7 +4,7 @@ import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import { getOrders, getProducts, getProductById, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
+import { getOrdersForRole, getProducts, getProductById, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
 
 const Dashboard = () => {
@@ -33,7 +33,7 @@ const Dashboard = () => {
         setLoading(true);
         setLoadError(false);
         const [ordersData, productsData] = await Promise.all([
-          getOrders(),
+          getOrdersForRole(userRole),
           getProducts()
         ]);
 

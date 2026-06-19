@@ -6,9 +6,9 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import { 
-  getOrders, 
-  createOrder, 
+import {
+  getOrdersForRole,
+  createOrder,
   updateOrderStatus, 
   deleteOrder,
   getParties,
@@ -113,7 +113,7 @@ const DashboardOrders = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getOrders();
+      const response = await getOrdersForRole(userRole);
       let allOrders = Array.isArray(response) ? response : [];
       
       // Filter orders based on role - only show orders created by the logged-in user

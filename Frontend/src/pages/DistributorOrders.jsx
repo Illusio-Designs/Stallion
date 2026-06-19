@@ -10,7 +10,7 @@ import {
   createOrder,
   deleteOrder,
   getCountries,
-  getOrders,
+  getMyOrders,
   getProducts
 } from '../services/apiService';
 import { getUser } from '../services/authService';
@@ -74,7 +74,7 @@ const DistributorOrders = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getOrders();
+      const response = await getMyOrders();
       // Filter orders for this distributor
       const distributorOrders = distributorId
         ? response.filter(order =>

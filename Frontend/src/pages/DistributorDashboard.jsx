@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import '../styles/pages/dashboard.css';
-import { getOrders, getProducts, getProductById } from '../services/apiService';
+import { getMyOrders, getProducts, getProductById } from '../services/apiService';
 import { getUser } from '../services/authService';
 import { showError } from '../services/notificationService';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -47,7 +47,7 @@ const DistributorDashboard = () => {
     try {
       setLoading(true);
       setError(null);
-      const [allOrders, productsData] = await Promise.all([getOrders(), getProducts()]);
+      const [allOrders, productsData] = await Promise.all([getMyOrders(), getProducts()]);
       setProducts(Array.isArray(productsData) ? productsData : (productsData?.data || []));
       // Filter orders for this distributor
       const distributorOrders = distributorId 

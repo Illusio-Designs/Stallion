@@ -295,6 +295,52 @@ export const getOrders = async () => getCached('orders', async () => {
 }, TTL_TRANSACTIONAL);
 
 /**
+ * Get the current user's own orders (role-scoped by the backend via the JWT).
+ * Hits GET /orders/my — the backend returns only the orders that belong to the
+ * authenticated party / distributor / salesman (and the full list for
+ * admin / *_manager roles). No client-side filtering needed.
+ * @returns {Promise<Array>} Array of order objects (empty array when none)
+ */
+export const getMyOrders = async () => getCached('orders:my', async () => {
+  try {
+    return await apiRequest('/orders/my', {
+      method: 'GET',
+      includeAuth: true,
+    });
+  } catch (error) {
+    // "Orders not found" (404) is a valid empty state, not an error.
+    const errorMessage = (error.message || '').toLowerCase();
+    const errorText = (error.errorData?.error || error.errorData?.message || '').toLowerCase();
+    if (error.statusCode === 404 ||
+        errorMessage.includes('not found') ||
+        errorText.includes('not found')) {
+      if (API_DEBUG) console.log('[getMyOrders] No orders found, returning empty array');
+      return [];
+    }
+    throw error;
+  }
+}, TTL_TRANSACTIONAL);
+
+// Roles whose orders are scoped to themselves — these must use /orders/my.
+// Everyone else (admin, *_manager) sees the full list via /orders.
+const SELF_SCOPED_ORDER_ROLES = new Set(['party', 'distributor', 'salesman']);
+
+/**
+ * Role-aware order fetch. End-user roles (party / distributor / salesman) get
+ * their own token-scoped orders from /orders/my; admin / *_manager roles get the
+ * full list from /orders. Use this instead of getOrders() on any page that an
+ * end-user role can reach.
+ * @param {string} role - current user role (from getUserRole())
+ * @returns {Promise<Array>} Array of order objects
+ */
+export const getOrdersForRole = async (role) => {
+  if (SELF_SCOPED_ORDER_ROLES.has((role || '').toLowerCase().trim())) {
+    return getMyOrders();
+  }
+  return getOrders();
+};
+
+/**
  * Create a new order
  * @param {Object} orderData - Order data
  * @param {string} orderData.order_date - Order date (ISO string)
