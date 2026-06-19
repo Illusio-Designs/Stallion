@@ -1,10 +1,8 @@
-const { Op } = require('sequelize');
 const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const Tray = require('../models/Tray');
 const { TrayStatus } = require('../constants/enums');
 const SalesmanTray = require('../models/SalesmanTray');
-const Party = require('../models/Party');
 const SalesmanZones = require('../models/SalesmanZones');
 const Zone = require('../models/Zone');
 const SalesmanStates = require('../models/SalesmanStates');
@@ -29,32 +27,6 @@ class SalesmanController {
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
             const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
             res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
-        }
-        catch (error) {
-            res.status(500).json({ error: error.message });
-        }
-    }
-
-    async getSalesmanParties(req, res) {
-        try {
-            const id = req.user.user_id;
-            if (!id) {
-                return res.status(400).json({ error: 'User ID is required' });
-            }
-            const salesman = await Salesman.findOne({ where: { user_id: id } });
-            if (!salesman) {
-                return res.status(404).json({ error: 'Salesman not found' });
-            }
-            const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
-            const stateIds = salesmanStates.map((s) => s.state_id);
-            if (salesman.state_id && !stateIds.includes(salesman.state_id)) {
-                stateIds.push(salesman.state_id);
-            }
-            if (stateIds.length === 0) {
-                return res.status(200).json([]);
-            }
-            const parties = await Party.findAll({ where: { state_id: { [Op.in]: stateIds } } });
-            res.status(200).json(parties);
         }
         catch (error) {
             res.status(500).json({ error: error.message });
