@@ -3,7 +3,6 @@ import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import AsidePanel from '../components/ui/AsidePanel';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import Modal from '../components/ui/Modal';
 import RowActions from '../components/ui/RowActions';
 import TableWithControls from '../components/ui/TableWithControls';
 import {
@@ -1442,7 +1441,7 @@ const DashboardClients = () => {
       </AsidePanel>
 
       {/* Bulk Upload Modal */}
-      <Modal
+      <AsidePanel
         open={openBulkUpload}
         onClose={() => { setOpenBulkUpload(false); setBulkFile(null); }}
         title="Bulk Upload Parties"
@@ -1473,7 +1472,7 @@ const DashboardClients = () => {
             </p>
           )}
         </div>
-      </Modal>
+      </AsidePanel>
     </div>
   );
 };

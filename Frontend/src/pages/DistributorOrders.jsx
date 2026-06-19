@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import Modal from '../components/ui/Modal';
+import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import Skeleton from '../components/ui/Skeleton';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -491,7 +491,7 @@ const DistributorOrders = () => {
       </div>
 
       {/* Create Order Modal */}
-      <Modal
+      <AsidePanel
         open={createModalOpen}
         onClose={() => {
           setCreateModalOpen(false);
@@ -619,7 +619,7 @@ const DistributorOrders = () => {
             />
           </div>
         </div>
-      </Modal>
+      </AsidePanel>
     </div>
   );
 };

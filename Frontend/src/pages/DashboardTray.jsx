@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import Modal from '../components/ui/Modal';
+import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import TableWithControls from '../components/ui/TableWithControls';
 import {
@@ -797,7 +797,7 @@ const DashboardTray = () => {
           </div>
         )}
       </div>
-      <Modal
+      <AsidePanel
         open={openAdd}
         onClose={() => setOpenAdd(false)}
         title="Add New Tray"
@@ -832,8 +832,8 @@ const DashboardTray = () => {
             />
           </div>
         </div>
-      </Modal>
-      <Modal
+      </AsidePanel>
+      <AsidePanel
         open={!!editRow}
         onClose={() => setEditRow(null)}
         title="Edit Tray"
@@ -867,10 +867,10 @@ const DashboardTray = () => {
             />
           </div>
         </div>
-      </Modal>
+      </AsidePanel>
 
       {/* Edit Product Status Modal */}
-      <Modal
+      <AsidePanel
         open={openEditProduct}
         onClose={cancelEditProduct}
         title="Edit Product Status"
@@ -923,7 +923,7 @@ const DashboardTray = () => {
             );
           })()}
         </div>
-      </Modal>
+      </AsidePanel>
 
     </div>
   );

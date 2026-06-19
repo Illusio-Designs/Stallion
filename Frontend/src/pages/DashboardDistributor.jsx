@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import TableWithControls from '../components/ui/TableWithControls';
-import Modal from '../components/ui/Modal';
+import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import { PhoneInput } from 'react-international-phone';
@@ -1298,7 +1298,7 @@ const DashboardDistributor = () => {
           </div>
         </div>
       </div>
-      <Modal
+      <AsidePanel
         open={openAdd}
         onClose={() => {
           setOpenAdd(false);
@@ -1493,8 +1493,8 @@ const DashboardDistributor = () => {
             />
           </div>
         </form>
-      </Modal>
-      <Modal
+      </AsidePanel>
+      <AsidePanel
         open={!!editRow}
         onClose={() => {
           setEditRow(null);
@@ -1701,7 +1701,7 @@ const DashboardDistributor = () => {
             />
           </div>
         </form>
-      </Modal>
+      </AsidePanel>
     </div>
   );
 };

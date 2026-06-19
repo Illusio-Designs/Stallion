@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef } from 'react';
 import TableWithControls from '../components/ui/TableWithControls';
-import Modal from '../components/ui/Modal';
+import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import {
@@ -1705,7 +1705,7 @@ const DashboardManage = () => {
         </div>
         )}
       </div>
-      <Modal
+      <AsidePanel
         open={openAdd}
         onClose={() => {
           setOpenAdd(false);
@@ -1737,8 +1737,8 @@ const DashboardManage = () => {
         <form className="ui-form" onSubmit={handleSubmit}>
           {renderFormFields()}
         </form>
-      </Modal>
-      <Modal
+      </AsidePanel>
+      <AsidePanel
         open={!!editRow}
         onClose={() => {
           setEditRow(null);
@@ -1770,7 +1770,7 @@ const DashboardManage = () => {
         <form className="ui-form" onSubmit={handleSubmit}>
           {renderFormFields()}
         </form>
-      </Modal>
+      </AsidePanel>
     </div>
   );
 };
