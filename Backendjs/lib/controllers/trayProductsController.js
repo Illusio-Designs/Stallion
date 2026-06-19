@@ -23,9 +23,6 @@ class TrayProductsController {
                 return res.status(400).json({ error: 'Tray ID is required' });
             }
             const trayProducts = await TrayProducts.findAll({ where: { tray_id: id } });
-            if (!trayProducts || trayProducts.length === 0) {
-                return res.status(404).json({ error: 'Tray products not found' });
-            }
             res.status(200).json(trayProducts);
         } catch (error) {
             res.status(500).json({ error: error.message });

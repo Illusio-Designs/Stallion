@@ -14,9 +14,6 @@ class LensMaterialController {
             });
             const where = mergeWhere({}, searchFilter);
             const lensMaterials = await LensMaterial.findAll({ where });
-            if (!lensMaterials || lensMaterials.length === 0) {
-                return res.status(404).json({ error: 'Lens materials not found' });
-            }
             res.status(200).json(lensMaterials);
         } catch (error) {
             res.status(500).json({ error: error.message });

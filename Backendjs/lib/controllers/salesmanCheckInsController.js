@@ -128,10 +128,6 @@ class SalesmanCheckInsController {
 
             const checkIns = await SalesmanCheckIns.findAll({ where: { salesman_id } });
 
-            if (!checkIns || checkIns.length === 0) {
-                return res.status(404).json({ error: 'Salesman check-ins not found' });
-            }
-
             res.status(200).json(checkIns);
         } catch (error) {
             res.status(500).json({ error: error.message });

@@ -287,12 +287,7 @@ class OrderController {
                     console.log("distributor", distributor);
                     return res.status(404).json({ error: 'Distributor not found' });
                 }
-            }
-            else {
-                if (!zone_id) {
-                    console.log("zone_id", zone_id);
-                    return res.status(400).json({ error: 'Zone ID is required for event orders' });
-                }
+            } else if (zone_id) {
                 const zone = await Zone.findOne({ where: { id: zone_id } });
                 if (!zone) {
                     console.log("zone", zone);

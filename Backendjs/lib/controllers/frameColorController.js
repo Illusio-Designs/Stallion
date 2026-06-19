@@ -14,9 +14,6 @@ class FrameColorController {
             });
             const where = mergeWhere({}, searchFilter);
             const frameColors = await FrameColor.findAll({ where });
-            if (!frameColors || frameColors.length === 0) {
-                return res.status(404).json({ error: 'Frame colors not found' });
-            }
             res.status(200).json(frameColors);
         } catch (error) {
             res.status(500).json({ error: error.message });

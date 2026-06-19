@@ -61,9 +61,6 @@ class SalesmanController {
             });
             const where = mergeWhere({ is_active: true }, searchFilter);
             const salesmen = await Salesman.findAll({ where });
-            if (!salesmen || salesmen.length === 0) {
-                return res.status(404).json({ error: 'Salesmen not found' });
-            }
             const response = await Promise.all(salesmen.map(async (salesman) => {
                 const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
                 return {

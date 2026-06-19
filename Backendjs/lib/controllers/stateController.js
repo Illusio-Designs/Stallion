@@ -16,9 +16,6 @@ class StateController {
             });
             const where = mergeWhere({ is_active: true, country_id }, searchFilter);
             const states = await State.findAll({ where });
-            if (!states || states.length === 0) {
-                return res.status(404).json({ error: 'States not found' });
-            }
             res.status(200).json(states);
         } catch (error) {
             res.status(500).json({ error: error.message });

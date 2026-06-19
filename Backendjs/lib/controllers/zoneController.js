@@ -24,9 +24,6 @@ class ZoneController {
             });
             const where = mergeWhere({ is_active: true, city_id }, searchFilter);
             const zones = await Zone.findAll({ where });
-            if (!zones || zones.length === 0) {
-                return res.status(404).json({ error: 'Zones not found' });
-            }
             res.status(200).json(zones);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -129,9 +126,6 @@ class ZoneController {
                 return res.status(400).json({ error: `Role '${roleName}' is not supported for this operation` });
             }
 
-            if (!zones || zones.length === 0) {
-                return res.status(404).json({ error: 'Zones not found' });
-            }
             res.status(200).json(zones);
         } catch (error) {
             res.status(500).json({ error: error.message });

@@ -13,9 +13,6 @@ class ShapesController {
             });
             const where = mergeWhere({}, searchFilter);
             const shapes = await Shape.findAll({ where });
-            if (!shapes || shapes.length === 0) {
-                return res.status(404).json({ error: 'Shapes not found' });
-            }
             res.status(200).json(shapes);
         } catch (error) {
             res.status(500).json({ error: error.message });

@@ -14,9 +14,6 @@ class CollectionController {
             });
             const where = mergeWhere({}, searchFilter);
             const collections = await Collection.findAll({ where });
-            if (!collections || collections.length === 0) {
-                return res.status(404).json({ error: 'Collections not found' });
-            }
             res.status(200).json(collections);
         } catch (error) {
             res.status(500).json({ error: error.message });

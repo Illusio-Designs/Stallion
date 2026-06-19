@@ -90,9 +90,6 @@ class SalesmanTargetsController {
                 return res.status(400).json({ error: 'Salesman ID is required' });
             }
             const salesmanTargets = await SalesmanTargets.findAll({ where: { salesman_id: salesman_id } });
-            if (!salesmanTargets || salesmanTargets.length === 0) {
-                return res.status(404).json({ error: 'Salesman targets not found' });
-            }
             const enriched = await Promise.all(salesmanTargets.map(enrichTarget));
             res.status(200).json(enriched);
         } catch (error) {

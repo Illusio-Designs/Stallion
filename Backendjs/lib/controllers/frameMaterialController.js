@@ -13,9 +13,6 @@ class FrameMaterialController {
             });
             const where = mergeWhere({}, searchFilter);
             const frameMaterials = await FrameMaterial.findAll({ where });
-            if (!frameMaterials || frameMaterials.length === 0) {
-                return res.status(404).json({ error: 'Frame materials not found' });
-            }
             res.status(200).json(frameMaterials);
         } catch (error) {
             res.status(500).json({ error: error.message });

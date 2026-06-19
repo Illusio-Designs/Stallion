@@ -5,9 +5,6 @@ class EventController {
     async getEvents(req, res) {
         try {
             const events = await Event.findAll();
-            if (!events || events.length === 0) {
-                return res.status(404).json({ error: 'Events not found' });
-            }
             for (const event of events) {
                 let eventStatus;
                 const startDate = new Date(event.start_date);
