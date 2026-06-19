@@ -12,11 +12,10 @@ const SalesmanExpense = sequelize.define('SalesmanExpense', {
     },
     salesman_id: {
         type: DataTypes.UUID,
-        primaryKey: true,
-        defaultValue: DataTypes.UUIDV4,
+        allowNull: false,
         references: {
             model: 'salesmen',
-            key: 'user_id'
+            key: 'salesman_id'
         }
     },
     expense_date: {
@@ -67,7 +66,7 @@ const SalesmanExpense = sequelize.define('SalesmanExpense', {
 
 SalesmanExpense.belongsTo(Salesman, {
     foreignKey: 'salesman_id',
-    targetKey: 'user_id',
+    targetKey: 'salesman_id',
     as: 'salesman',
 });
 

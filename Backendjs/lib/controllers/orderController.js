@@ -63,6 +63,21 @@ async function reverseOrderOperation(orderId, transaction) {
 }
 
 
+function resolveOrderStatusFilter(req) {
+    const status = String(req.query.status ?? req.query.order_status ?? '').trim();
+    if (!status) {
+        return { filter: null };
+    }
+    if (!Object.values(OrderStatus).includes(status)) {
+        return {
+            error: `Invalid order status. Allowed values are: ${Object.values(OrderStatus).join(', ')}`,
+            status: 400,
+        };
+    }
+    return { filter: { order_status: status } };
+}
+
+
 class OrderController {
 
     async getMyOrders(req, res) {
@@ -117,6 +132,7 @@ class OrderController {
                 where,
                 limit: pagination.limit,
                 offset: pagination.offset,
+                order: [['order_date', 'DESC']],
             });
             res.status(200).json(buildPaginatedResponse(orders, pagination, count));
         } catch (error) {
@@ -134,17 +150,22 @@ class OrderController {
                 return res.status(pagination.status).json({ error: pagination.error });
             }
             const { name } = getListSearchParams(req);
+            const statusResult = resolveOrderStatusFilter(req);
+            if (statusResult.error) {
+                return res.status(statusResult.status).json({ error: statusResult.error });
+            }
             const searchFilter = buildNamePhoneFilter({
                 name,
                 phone: null,
                 nameFields: ['order_number', 'order_status', 'order_type', 'courier_name', 'courier_tracking_number'],
                 phoneFields: [],
             });
-            const where = mergeWhere({}, searchFilter);
+            const where = mergeWhere(statusResult.filter ?? {}, searchFilter);
             const { count, rows: orders } = await Order.findAndCountAll({
                 where,
                 limit: pagination.limit,
                 offset: pagination.offset,
+                order: [['order_date', 'DESC']],
             });
             res.status(200).json(buildPaginatedResponse(orders, pagination, count));
         } catch (error) {
@@ -394,9 +415,9 @@ class OrderController {
                         throw new Error(`${product.model_no} Product quantity is not available in warehouse`);
                     }
 
-                    const unitPrice = parseFloat(product.mrp);
+                    const unitPrice = parseFloat(product.whp);
                     if (Number.isNaN(unitPrice) || unitPrice < 0) {
-                        throw new Error(`Invalid MRP for product ${product.model_no}`);
+                        throw new Error(`Invalid WHP for product ${product.model_no}`);
                     }
 
                     const warehouse_qty = product.warehouse_qty;
