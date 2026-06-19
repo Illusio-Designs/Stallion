@@ -56,6 +56,10 @@ const Cart = ({ onPageChange = null }) => {
   const locationRef = useRef({ latitude: null, longitude: null });
   const [locationError, setLocationError] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
+  // True when the browser has location hard-blocked for this site — requires the
+  // user to re-enable it in site settings AND reload (Chrome applies the change
+  // only after a reload), so we surface a Reload action instead of "Try again".
+  const [locationBlocked, setLocationBlocked] = useState(false);
   
   // Dropdown data
   const [countries, setCountries] = useState([]);
@@ -202,27 +206,24 @@ const Cart = ({ onPageChange = null }) => {
     });
   };
 
-  // Explicit, permission-aware location request for visit orders. Checks the
-  // browser permission state first (where supported) so we can show clear
-  // guidance when it's blocked, then triggers the native prompt.
+  // Explicit location request for visit orders. We ALWAYS call getCurrentPosition
+  // (don't pre-bail on navigator.permissions, whose 'denied' state can be stale
+  // until reload). getCurrentPosition shows the native prompt when undecided, or
+  // errors with code 1 (PERMISSION_DENIED) when blocked — which we treat as a
+  // "re-enable in settings + reload" case.
   const requestLocation = async () => {
     setLocationLoading(true);
     setLocationError(null);
+    setLocationBlocked(false);
     try {
-      if (navigator.permissions?.query) {
-        try {
-          const status = await navigator.permissions.query({ name: 'geolocation' });
-          if (status.state === 'denied') {
-            setLocationError('Location access is blocked. Enable it for this site in your browser settings, then tap "Try again".');
-            return;
-          }
-        } catch {
-          /* Permissions API unavailable — fall through to the native prompt */
-        }
+      await getCurrentLocation(); // native prompt, or rejects if blocked
+    } catch (err) {
+      if (err && err.code === 1 /* PERMISSION_DENIED */) {
+        setLocationBlocked(true);
+        setLocationError('Location is blocked for this site. Enable it in your browser’s site settings, then reload the page.');
       }
-      await getCurrentLocation(); // shows the native permission prompt
-    } catch {
-      /* locationError is already set inside getCurrentLocation */
+      // Other errors (timeout / position unavailable) keep the message that
+      // getCurrentLocation already set.
     } finally {
       setLocationLoading(false);
     }
@@ -1148,14 +1149,25 @@ const Cart = ({ onPageChange = null }) => {
                   ) : (
                     <div className="flex flex-col gap-2">
                       <p className="m-0 text-[length:var(--text-sm)] text-text-muted">We need your current location to place a visit order.</p>
-                      <button
-                        type="button"
-                        className={`ui-btn ui-btn--primary ui-btn--sm w-fit${locationLoading ? ' ui-btn--loading' : ''}`}
-                        onClick={requestLocation}
-                        disabled={locationLoading}
-                      >
-                        <span className="ui-btn__label">{locationLoading ? 'Getting location…' : (locationError ? 'Try again' : 'Allow location access')}</span>
-                      </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          className={`ui-btn ui-btn--primary ui-btn--sm w-fit${locationLoading ? ' ui-btn--loading' : ''}`}
+                          onClick={requestLocation}
+                          disabled={locationLoading}
+                        >
+                          <span className="ui-btn__label">{locationLoading ? 'Getting location…' : (locationError ? 'Try again' : 'Allow location access')}</span>
+                        </button>
+                        {locationBlocked && (
+                          <button
+                            type="button"
+                            className="ui-btn ui-btn--secondary ui-btn--sm w-fit"
+                            onClick={() => { if (typeof window !== 'undefined') window.location.reload(); }}
+                          >
+                            <span className="ui-btn__label">Reload page</span>
+                          </button>
+                        )}
+                      </div>
                     </div>
                   )}
                   {locationError && <p className="ui-field-error" role="alert">{locationError}</p>}
