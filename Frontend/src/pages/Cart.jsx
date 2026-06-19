@@ -21,7 +21,6 @@ import {
   getCountries,
   getDistributors,
   createOrder,
-  getPartiesByZoneId,
 } from "../services/apiService";
 
 const Cart = ({ onPageChange = null }) => {
@@ -132,22 +131,22 @@ const Cart = ({ onPageChange = null }) => {
     }
   };
 
-  // Fetch parties by zone_id for distributors
+  // Fetch the distributor's own parties (role-scoped via /parties/my).
   const fetchPartiesByZone = async () => {
     if (!user) {
       setParties([]);
       return;
     }
-    
+
     try {
-      console.log('[Cart] Fetching parties by zone (from token)');
-      
-      // Fetch parties using authorization token (zone_id extracted from token)
-      const partiesData = await getPartiesByZoneId();
+      console.log('[Cart] Fetching my parties (from token)');
+
+      // /parties/my is scoped by the backend from the JWT (distributor -> own parties).
+      const partiesData = await getMyParties();
       setParties(Array.isArray(partiesData) ? partiesData : []);
-      console.log('[Cart] Fetched parties by zone:', partiesData.length, 'parties');
+      console.log('[Cart] Fetched my parties:', partiesData.length, 'parties');
     } catch (err) {
-      console.error('[Cart] Failed to fetch parties by zone:', err);
+      console.error('[Cart] Failed to fetch my parties:', err);
       setParties([]);
     }
   };
@@ -231,24 +230,17 @@ const Cart = ({ onPageChange = null }) => {
 
     const fetchPartiesForOrderType = async () => {
       try {
-        if (orderType === 'visit_order' || orderType === 'whatsapp_order') {
-          // For visit_order and whatsapp_order: use getPartiesByZoneId (token only)
-          console.log('[Cart] Fetching parties by zone for', orderType);
-          const partiesData = await getPartiesByZoneId();
-      setParties(Array.isArray(partiesData) ? partiesData : []);
-          console.log('[Cart] Fetched parties by zone:', partiesData.length, 'parties');
-          
-          // Capture location for visit_order
-          if (orderType === 'visit_order') {
-            getCurrentLocation();
-          }
-        } else if (orderType === 'event_order') {
-          // For event_order: use the role-scoped /parties/my (getParties /
-          // POST /parties/get is manager-only and 403s for salesman).
-          console.log('[Cart] Fetching my parties for event_order');
-          const partiesData = await getMyParties();
-          setParties(Array.isArray(partiesData) ? partiesData : []);
-          console.log('[Cart] Fetched all parties:', partiesData.length, 'parties');
+        // For every order type, load the user's own role-scoped parties via
+        // /parties/my. (getPartiesByZoneId / getParties are not used here — the
+        // backend scopes /parties/my from the JWT for party/distributor/salesman.)
+        console.log('[Cart] Fetching my parties for', orderType);
+        const partiesData = await getMyParties();
+        setParties(Array.isArray(partiesData) ? partiesData : []);
+        console.log('[Cart] Fetched my parties:', partiesData.length, 'parties');
+
+        // Capture location for visit_order
+        if (orderType === 'visit_order') {
+          getCurrentLocation();
         }
     } catch (err) {
         console.error('[Cart] Failed to fetch parties for order type:', err);
