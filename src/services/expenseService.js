@@ -196,24 +196,29 @@ export const deleteSalesmanExpense = async (expenseId) => {
  */
 export const getAllAdminExpenses = async () => {
   const baseUrl = getBaseURL();
-  const fullUrl = `${baseUrl}/salesman_expenses/admin/all`;
-  
+  // Backend `/admin/all` is server-paginated: it REQUIRES page+limit (400 if
+  // missing) and returns `{ data, pagination }` instead of a bare array. Use a
+  // single load-all call (large limit) and unwrap `.data`, matching the
+  // fetchAllPages pattern used by the other list getters.
+  const fullUrl = `${baseUrl}/salesman_expenses/admin/all?page=1&limit=1000`;
+
   console.log('Making admin API call to:', fullUrl);
-  
+
   const response = await fetch(fullUrl, {
     method: 'GET',
     headers: getHeaders(true),
     credentials: 'omit',
   });
-  
+
   console.log('Admin API response status:', response.status);
-  
+
   // Handle 404 as empty array (no expenses found)
   if (response.status === 404) {
     return [];
   }
-  
+
   const result = await handleResponse(response);
   console.log('Parsed admin API result:', result);
-  return result;
+  // Unwrap the paginated envelope → always hand the page a plain array.
+  return Array.isArray(result) ? result : (result && Array.isArray(result.data) ? result.data : []);
 };
