@@ -1051,7 +1051,9 @@ textarea.ui-input {
   position: fixed;
   inset: 0;
   background: rgba(26, 27, 35, 0.25);
-  z-index: 50;
+  /* Above all dashboard chrome (header z-100, sidebar z-1000/10000) so the
+     panel is never clipped by them, but below the toast layer (z-99998). */
+  z-index: 10050;
   backdrop-filter: blur(2px);
   /* Fade the scrim in/out; .is-open is toggled by the component. */
   opacity: 0;
