@@ -89,7 +89,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
       ref={dropdownRef}
       className={`ui-dropdown-custom ui-dropdown-custom--full-width ${isOpen ? 'ui-dropdown-custom--open' : ''} ${disabled ? 'ui-dropdown-custom--disabled' : ''}`}
     >
-      <div className="ui-dropdown-custom__trigger" onClick={() => { if (disabled) return; setIsOpen(o => { const next = !o; if (next) onOpen?.(); return next; }); }}>
+      <div className="ui-dropdown-custom__trigger" onClick={() => { if (disabled) return; if (!isOpen) onOpen?.(); setIsOpen(o => !o); }}>
         <span className={`ui-dropdown-custom__value ${selectedZones.length === 0 ? 'ui-dropdown-custom__value--placeholder' : ''}`}>
           {displayValue}
         </span>
