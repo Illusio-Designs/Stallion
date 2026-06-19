@@ -200,6 +200,18 @@ class SalesmanController {
                 is_active: is_active,
             };
             await Salesman.update(payload, { where: { salesman_id: id } });
+            // Keep the linked login account (users table) in sync. Login (OTP) is
+            // matched against users.phone, so a salesman phone/email/name change
+            // must propagate here or the salesman can no longer log in.
+            if (salesman.user_id) {
+                const userUpdate = { updated_at: new Date() };
+                if (phone !== undefined && phone !== null && String(phone).trim() !== '') userUpdate.phone = phone;
+                if (email !== undefined && email !== null && String(email).trim() !== '') userUpdate.email = email;
+                if (full_name !== undefined && full_name !== null && String(full_name).trim() !== '') userUpdate.full_name = full_name;
+                if (Object.keys(userUpdate).length > 1) {
+                    await User.update(userUpdate, { where: { user_id: salesman.user_id } });
+                }
+            }
             // Replace zone mappings only when `zones` is provided (kept for back-compat)
             if (Array.isArray(zones)) {
                 await SalesmanZones.destroy({ where: { salesman_id: id } });
