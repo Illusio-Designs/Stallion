@@ -13,9 +13,6 @@ class LensColorsController {
             });
             const where = mergeWhere({}, searchFilter);
             const lensColors = await LensColor.findAll({ where });
-            if (!lensColors || lensColors.length === 0) {
-                return res.status(404).json({ error: 'Lens colors not found' });
-            }
             res.status(200).json(lensColors);
         } catch (error) {
             res.status(500).json({ error: error.message });

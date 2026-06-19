@@ -14,9 +14,6 @@ class CountryController {
             });
             const where = mergeWhere({ is_active: true }, searchFilter);
             const countries = await Country.findAll({ where });
-            if (!countries || countries.length === 0) {
-                return res.status(404).json({ error: 'Countries not found' });
-            }
             res.status(200).json(countries);
         } catch (error) {
             res.status(500).json({ error: error.message });

@@ -14,9 +14,6 @@ class BrandController {
             });
             const where = mergeWhere({}, searchFilter);
             const brands = await Brand.findAll({ where });
-            if (!brands || brands.length === 0) {
-                return res.status(404).json({ error: 'Brands not found' });
-            }
             res.status(200).json(brands);
         } catch (error) {
             res.status(500).json({ error: error.message });

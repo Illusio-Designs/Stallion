@@ -14,9 +14,6 @@ class ColorCodesController {
             });
             const where = mergeWhere({}, searchFilter);
             const colorCodes = await ColorCode.findAll({ where });
-            if (!colorCodes || colorCodes.length === 0) {
-                return res.status(404).json({ error: 'Color codes not found' });
-            }
             res.status(200).json(colorCodes);
         } catch (error) {
             res.status(500).json({ error: error.message });

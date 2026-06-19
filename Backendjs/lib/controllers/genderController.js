@@ -4,9 +4,6 @@ class GenderController {
     async getGenders(req, res) {
         try {
             const genders = await Gender.findAll();
-            if (!genders || genders.length === 0) {
-                return res.status(404).json({ error: 'Genders not found' });
-            }
             res.status(200).json(genders);
         } catch (error) {
             res.status(500).json({ error: error.message });

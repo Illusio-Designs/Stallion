@@ -36,15 +36,9 @@ class ProductController {
             const { collection_id } = req.body;
             if (!collection_id || collection_id === '' || collection_id === 'all') {
                 const products = await Product.findAll({ limit: 6 });
-                if (!products || products.length === 0) {
-                    return res.status(404).json({ error: 'Featured products not found' });
-                }
                 return res.status(200).json(products);
             }
             const products = await Product.findAll({ where: { collection_id: collection_id }, limit: 6 });
-            if (!products || products.length === 0) {
-                return res.status(404).json({ error: 'Featured products not found' });
-            }
             res.status(200).json(products);
         }
         catch (error) {
@@ -689,9 +683,6 @@ class ProductController {
                 return res.status(400).json({ error: 'Model number is required' });
             }
             const products = await Product.findAll({ where: { model_no: model_no } });
-            if (!products || products.length === 0) {
-                return res.status(404).json({ error: 'Products not found' });
-            }
             res.status(200).json(products);
         } catch (error) {
             res.status(500).json({ error: error.message });

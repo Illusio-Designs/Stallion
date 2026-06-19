@@ -168,9 +168,6 @@ class PartyController {
                 }
             }
             const parties = await Party.findAll({ where: { salesman_id: salesman_id } });
-            if (!parties || parties.length === 0) {
-                return res.status(404).json({ error: 'Parties not found' });
-            }
             res.status(200).json(parties);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -281,10 +278,6 @@ class PartyController {
 
             // Find all parties in the zone
             const parties = await Party.findAll({ where: { zone_id: zone_id } });
-
-            if (!parties || parties.length === 0) {
-                return res.status(404).json({ error: 'No parties found for the assigned zone' });
-            }
 
             res.status(200).json(parties);
         } catch (error) {

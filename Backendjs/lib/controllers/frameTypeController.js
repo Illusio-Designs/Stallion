@@ -13,9 +13,6 @@ class FrameTypeController {
             });
             const where = mergeWhere({}, searchFilter);
             const frameTypes = await FrameType.findAll({ where });
-            if (!frameTypes || frameTypes.length === 0) {
-                return res.status(404).json({ error: 'Frame types not found' });
-            }
             res.status(200).json(frameTypes);
         } catch (error) {
             res.status(500).json({ error: error.message });

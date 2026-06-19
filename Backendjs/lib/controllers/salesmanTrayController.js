@@ -12,9 +12,6 @@ class SalesmanTrayController {
                 return res.status(400).json({ error: 'Salesman ID is required' });
             }
             const salesmanTrays = await SalesmanTray.findAll({ where: { salesman_id }, include: [Salesman, Tray] });
-            if (!salesmanTrays || salesmanTrays.length === 0) {
-                return res.status(404).json({ error: 'Salesman trays not found' });
-            }
             res.status(200).json(salesmanTrays);
         } catch (error) {
             console.error(error);

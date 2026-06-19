@@ -20,9 +20,6 @@ class SalesmanExpenseController {
                 return res.status(404).json({ error: 'Salesman record not found for this user' });
             }
             const salesmanExpenses = await SalesmanExpense.findAll({ where: { salesman_id: salesmanId } });
-            if (!salesmanExpenses || salesmanExpenses.length === 0) {
-                return res.status(404).json({ error: 'Salesman expenses not found' });
-            }
             res.status(200).json(salesmanExpenses);
         } catch (error) {
             res.status(500).json({ error: error.message });
