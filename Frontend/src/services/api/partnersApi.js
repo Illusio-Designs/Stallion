@@ -341,8 +341,9 @@ export const updateDistributor = async (distributorId, distributorData) => {
     phone: trimmedPhone,
     address: address ? String(address).trim() : '',
     country_id: trimmedCountryId,
-    state_id: (state_id && String(state_id).trim() !== '') ? String(state_id).trim() : '',
-    city_id: (city_id && String(city_id).trim() !== '') ? String(city_id).trim() : '',
+    // Optional FK columns — null (not '') when empty to satisfy the FK constraint.
+    state_id: (state_id && String(state_id).trim() !== '') ? String(state_id).trim() : null,
+    city_id: (city_id && String(city_id).trim() !== '') ? String(city_id).trim() : null,
     zones: Array.isArray(zones) ? zones : [],
     state_ids: Array.isArray(state_ids) ? state_ids : [],
     pincode: pincode ? String(pincode).trim() : '',
@@ -1382,8 +1383,10 @@ export const updateSalesman = async (salesmanId, salesmanData) => {
     phone: trimmedPhone,
     address: address ? String(address).trim() : '',
     country_id: trimmedCountryId,
-    state_id: state_id && String(state_id).trim() !== '' ? String(state_id).trim() : '',
-    city_id: city_id && String(city_id).trim() !== '' ? String(city_id).trim() : '',
+    // Optional FK columns — null (not '') when empty, else the salesmen ->
+    // states/cities foreign keys reject the empty string with a 500.
+    state_id: state_id && String(state_id).trim() !== '' ? String(state_id).trim() : null,
+    city_id: city_id && String(city_id).trim() !== '' ? String(city_id).trim() : null,
     zones: zonesArray,
     state_ids: stateIdsArray,
     zone_preference: salesmanData.zone_preference || '',
