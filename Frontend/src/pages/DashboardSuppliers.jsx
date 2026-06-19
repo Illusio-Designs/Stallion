@@ -31,6 +31,7 @@ import {
   updateSalesmanTarget,
   deleteSalesmanTarget,
   getParties,
+  getMyParties,
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 import { getUser, getUserRole } from '../services/authService';
@@ -476,8 +477,9 @@ const DashboardSuppliers = () => {
         .map(z => String(z.zone_id || z.id || '').trim())
         .filter(Boolean);
 
-      // Step 4: fetch all parties for the salesman's country
-      const allParties = await getParties(mySalesman.country_id);
+      // Step 4: fetch the salesman's own parties via the role-scoped /parties/my
+      // (getParties -> POST /parties/get is party_manager-only and 403s for salesman).
+      const allParties = await getMyParties();
       const partiesArr = Array.isArray(allParties) ? allParties : [];
       console.log('[fetchZoneParties] Total parties for country:', partiesArr.length, '| Salesman zones:', zoneIds);
 
