@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Skeleton from '../components/ui/Skeleton';
+import StatusBadge from '../components/ui/StatusBadge';
+import TableWithControls from '../components/ui/TableWithControls';
 import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
@@ -348,7 +350,7 @@ const Dashboard = () => {
         <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
           <div className="dash-card tall equal col-span-9 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
             <div className="chart-header flex items-center justify-between mb-[10px]">
-              <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700', margin: 0}}>Sales &amp; Revenue</h4>
+              <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] m-0">Sales &amp; Revenue</h4>
               <DropdownSelector
                 options={[
                   { value: 'Monthly', label: 'Monthly' },
@@ -363,7 +365,7 @@ const Dashboard = () => {
             <SalesRevenueChart data={chartData} height={210} />
           </div>
           <div className="dash-card side equal col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 style={{color: '#000000', fontSize: '14px', fontWeight: '700', margin: '0 0 10px'}}>Quick Actions</h4>
+            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-[10px]">Quick Actions</h4>
             <div className="btn-col flex flex-1 flex-col justify-center gap-3">
               <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/products'; }}>Add New Product</button>
               <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/orders'; }}>Create Bulk Order</button>
@@ -432,133 +434,46 @@ const Dashboard = () => {
 
       {/* Salesman Targets - before Order Overview */}
       {isSalesman && (
-        <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3 mt-4">
-          <div className="dash-card col-span-12 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5" style={{gridColumn:'span 12'}}>
-            <h4 style={{color:'#000000', fontSize:'14px', fontWeight:'700', marginBottom:'14px'}}>My Targets</h4>
-            <div className="ui-table__scroll">
-              <table className="w-full border-separate border-spacing-0">
-                <thead>
-                  <tr>
-                    {['TARGET AMOUNT','START DATE','END DATE','ORDER TYPE','STATUS','DESCRIPTION','REMARKS'].map(h => (
-                      <th key={h} className="text-left py-[10px] px-0 text-[11px] text-black border-b border-[#E0E0E0] font-semibold">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {targetsLoading ? (
-                    Array.from({ length: 4 }).map((_, i) => (
-                      <tr key={`target-skel-${i}`}>
-                        {Array.from({ length: 7 }).map((__, c) => (
-                          <td key={c} className="py-[10px] px-0">
-                            <Skeleton width={c === 5 || c === 6 ? 120 : 80} height={14} />
-                          </td>
-                        ))}
-                      </tr>
-                    ))
-                  ) : targets.length === 0 ? (
-                    <tr>
-                      <td colSpan="7" className="p-0">
-                        <div className="ui-state ui-state--empty">
-                          <div className="ui-state__icon">
-                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                              <circle cx="12" cy="12" r="9" />
-                              <circle cx="12" cy="12" r="5" />
-                              <circle cx="12" cy="12" r="1" />
-                            </svg>
-                          </div>
-                          <p className="ui-state__title">No targets yet</p>
-                          <p className="ui-state__desc">You don&apos;t have any sales targets assigned. They&apos;ll appear here once your manager sets them.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : targets.map((t, i) => (
-                    <tr key={i}>
-                      <td className="py-[10px] px-0 text-[13px] font-semibold">₹{parseFloat(t.target_amount || 0).toLocaleString('en-IN')}</td>
-                      <td className="py-[10px] px-0 text-[13px]">{t.start_date ? new Date(t.start_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'}) : '-'}</td>
-                      <td className="py-[10px] px-0 text-[13px]">{t.end_date ? new Date(t.end_date).toLocaleDateString('en-GB', {day:'2-digit', month:'2-digit', year:'numeric'}) : '-'}</td>
-                      <td className="py-[10px] px-0 text-[13px]">{t.order_type || 'Overall'}</td>
-                      <td className="py-[10px] px-0">
-                        <span className="px-[10px] py-[2px] rounded-[12px] text-[12px] font-semibold" style={{
-                          background: t.target_status === 'pending' ? '#fff3cd' : '#d4edda',
-                          color: t.target_status === 'pending' ? '#856404' : '#155724',
-                        }}>{t.target_status || 'pending'}</span>
-                      </td>
-                      <td className="py-[10px] px-0 text-[13px] text-[#6b7280]">{t.target_description || '-'}</td>
-                      <td className="py-[10px] px-0 text-[13px] text-[#6b7280]">{t.target_remarks || '-'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+        <div className="dash-row mt-4">
+          <div className="dash-card full">
+            <TableWithControls
+              title="My Targets"
+              itemName="Target"
+              rows={targets}
+              loading={targetsLoading}
+              selectable={false}
+              columns={[
+                { key: 'target_amount', label: 'TARGET AMOUNT', render: (v) => `₹${parseFloat(v || 0).toLocaleString('en-IN')}` },
+                { key: 'start_date', label: 'START DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                { key: 'end_date', label: 'END DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
+                { key: 'target_status', label: 'STATUS', render: (v) => <StatusBadge status={(v || 'pending') === 'pending' ? 'pending' : 'completed'}>{v || 'pending'}</StatusBadge> },
+                { key: 'target_description', label: 'DESCRIPTION', render: (v) => v || '-' },
+                { key: 'target_remarks', label: 'REMARKS', render: (v) => v || '-' },
+              ]}
+            />
           </div>
         </div>
       )}
 
       {/* Order Overview */}
-      <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3 mt-4">
-        <div className="dash-card col-span-12 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5" style={{gridColumn:'span 12'}}>
-          <h4 style={{color:'#000000', fontSize:'14px', fontWeight:'700', marginBottom:'10px'}}>Order Overview</h4>
-          <div className="ui-table__scroll">
-            <table className="w-full border-separate border-spacing-0">
-              <thead>
-                <tr>
-                  {['ORDER ID','ORDER TYPE','PARTY','STATUS','VALUE','DATE'].map(h => (
-                    <th key={h} className="text-left py-[10px] px-2 text-[11px] text-black border-b border-[#E0E0E0] font-semibold">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  Array.from({ length: 6 }).map((_, i) => (
-                    <tr key={`order-skel-${i}`}>
-                      {Array.from({ length: 6 }).map((__, c) => (
-                        <td key={c} className="py-[10px] px-2">
-                          <Skeleton width={c === 0 ? 70 : c === 3 ? 64 : 90} height={14} />
-                        </td>
-                      ))}
-                    </tr>
-                  ))
-                ) : recentOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="p-0">
-                      <div className="ui-state ui-state--empty">
-                        <div className="ui-state__icon">
-                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                            <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-                            <path d="M3 6h18" />
-                            <path d="M16 10a4 4 0 0 1-8 0" />
-                          </svg>
-                        </div>
-                        <p className="ui-state__title">No orders yet</p>
-                        <p className="ui-state__desc">Orders will show up here as soon as they&apos;re placed.</p>
-                      </div>
-                    </td>
-                  </tr>
-                ) : recentOrders.map((order, i) => {
-                  const orderId = order.order_id || order.id || '';
-                  const orderNum = order.order_number || `#${String(orderId).slice(-6)}`;
-                  const orderType = (order.order_type || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'N/A';
-                  const party = order.party?.party_name || order.party_name || order.party?.name || partyNamesMap[order.party_id] || '-';
-                  const status = (order.order_status || 'pending').toUpperCase();
-                  const value = parseFloat(order.order_total || Number(order.order_total) || order.total_value || order.total_amount || 0);
-                  const date = order.created_at || order.order_date;
-                  const statusColor = status === 'COMPLETED' ? {bg:'#d4edda', color:'#155724'} : status === 'CANCELLED' ? {bg:'#f8d7da', color:'#721c24'} : {bg:'#fff3cd', color:'#856404'};
-                  return (
-                    <tr key={i} className="border-b border-[#f3f4f6]">
-                      <td className="py-[10px] px-2 text-[13px] font-medium">{orderNum}</td>
-                      <td className="py-[10px] px-2 text-[13px]">{orderType}</td>
-                      <td className="py-[10px] px-2 text-[13px]">{party}</td>
-                      <td className="py-[10px] px-2">
-                        <span className="px-[10px] py-[2px] rounded-[12px] text-[12px] font-semibold" style={{background:statusColor.bg, color:statusColor.color}}>{status}</span>
-                      </td>
-                      <td className="py-[10px] px-2 text-[13px] font-semibold">₹{value.toLocaleString('en-IN')}</td>
-                      <td className="py-[10px] px-2 text-[13px] text-[#6b7280]">{date ? new Date(date).toLocaleDateString('en-GB') : '-'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+      <div className="dash-row mt-4">
+        <div className="dash-card full">
+          <TableWithControls
+            title="Order Overview"
+            itemName="Order"
+            rows={recentOrders}
+            loading={loading}
+            selectable={false}
+            columns={[
+              { key: 'order_number', label: 'ORDER ID', render: (v, row) => v || `#${String(row.order_id || row.id || '').slice(-6)}` },
+              { key: 'order_type', label: 'ORDER TYPE', render: (v) => (v || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'N/A' },
+              { key: 'party', label: 'PARTY', render: (_, row) => row.party?.party_name || row.party_name || row.party?.name || partyNamesMap[row.party_id] || '-' },
+              { key: 'order_status', label: 'STATUS', render: (v) => { const s = v || 'pending'; return <StatusBadge status={String(s).toLowerCase().replace(/\s+/g, '-')}>{String(s).toUpperCase()}</StatusBadge>; } },
+              { key: 'order_total', label: 'VALUE', render: (v, row) => `₹${parseFloat(v || row.total_value || row.total_amount || 0).toLocaleString('en-IN')}` },
+              { key: 'created_at', label: 'DATE', render: (v, row) => { const d = v || row.order_date; return d ? new Date(d).toLocaleDateString('en-GB') : '-'; } },
+            ]}
+          />
         </div>
       </div>
     </div>
