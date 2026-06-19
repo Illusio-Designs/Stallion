@@ -283,11 +283,11 @@
   }
 }
 
-@media (max-width: 480px) {
+/* Hide the header Back-to-Shop below md — it lives in the hamburger drawer on
+   mobile. Needed in CSS because the unlayered .dashboard-back-shop display
+   rule outranks the Tailwind `hidden` utility. */
+@media (max-width: 767px) {
   .dashboard-back-shop {
-    padding: var(--space-2);
-  }
-  .dashboard-back-shop__label {
     display: none;
   }
 }
