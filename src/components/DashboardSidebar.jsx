@@ -29,9 +29,15 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     settings: FiSettings,
   };
   
-  // Get user role
-  const userRole = getUserRole();
-  
+  // Role comes from localStorage, which doesn't exist during SSR. Reading it
+  // directly makes the server render the full menu and the client render the
+  // role-filtered menu → hydration mismatch. Defer the role lookup until after
+  // mount so the server and first client render agree (both show the full menu),
+  // then the filtered menu appears once mounted.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const userRole = mounted ? getUserRole() : null;
+
   // All available menu items
   const allMenuItems = [
     { id: 'dashboard', text: 'Dashboard' },
