@@ -395,13 +395,19 @@ const fetchAllPages = async (endpoint, opts = {}) => {
  * Fetch ONE server page (default 20) and return { data, pagination } — the
  * Products-style server-pagination contract for list TABLES.
  * @param {string} endpoint
- * @param {{page?:number, limit?:number, search?:string}} [paging]
+ * @param {{page?:number, limit?:number, search?:string, params?:Object}} [paging]
+ *   params: extra query fields (e.g. { status }) appended when non-empty.
  * @param {Object} [opts] - apiRequest options (method/body/includeAuth/silent)
  */
-const fetchPage = async (endpoint, { page = 1, limit = PAGE_SIZE, search = '' } = {}, opts = {}) => {
+const fetchPage = async (endpoint, { page = 1, limit = PAGE_SIZE, search = '', params = {} } = {}, opts = {}) => {
   let ep = withListPaging(endpoint, { page, limit });
   const term = String(search || '').trim();
   if (term) ep += `&search=${encodeURIComponent(term)}`;
+  for (const [k, v] of Object.entries(params || {})) {
+    if (v !== undefined && v !== null && String(v).trim() !== '') {
+      ep += `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+    }
+  }
   const res = await apiRequest(ep, opts);
   return { data: unwrapList(res), pagination: (res && res.pagination) || null };
 };
