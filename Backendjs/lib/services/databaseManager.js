@@ -434,6 +434,8 @@ class DatabaseManager {
                                 await this.cleanupOrphanedRecords('tray_product', 'product_id', 'product', 'product_id');
                             } else if (modelName === 'OrderOperation') {
                                 await this.cleanupOrphanedRecords('order_operation', 'product_id', 'product', 'product_id');
+                            } else if (modelName === 'SalesmanExpense') {
+                                await this.repairSalesmanExpenseForeignKey();
                             }
                         }
 
@@ -510,6 +512,55 @@ class DatabaseManager {
         for (const [columnName, columnDef] of Object.entries(schema)) {
             if (!currentColumns.includes(columnName)) {
                 await sequelize.getQueryInterface().addColumn(tableName, columnName, columnDef);
+            }
+        }
+    }
+
+    /**
+     * salesman_expense.salesman_id was incorrectly FK'd to salesmen.user_id.
+     * Repair live databases that still have the old constraint.
+     */
+    static async repairSalesmanExpenseForeignKey() {
+        const tableName = 'salesman_expense';
+        if (!(await this.checkTableExists(tableName))) {
+            return;
+        }
+
+        try {
+            const [foreignKeys] = await sequelize.query(`
+                SELECT CONSTRAINT_NAME, REFERENCED_COLUMN_NAME
+                FROM information_schema.KEY_COLUMN_USAGE
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = ?
+                  AND COLUMN_NAME = 'salesman_id'
+                  AND REFERENCED_TABLE_NAME = 'salesmen'
+            `, { replacements: [tableName] });
+
+            const wrongFk = foreignKeys.find((fk) => fk.REFERENCED_COLUMN_NAME === 'user_id');
+            if (!wrongFk) {
+                return;
+            }
+
+            console.log(`🔧 Repairing ${tableName}.salesman_id foreign key (${wrongFk.CONSTRAINT_NAME})`);
+            await sequelize.query(`
+                ALTER TABLE \`${tableName}\`
+                DROP FOREIGN KEY \`${wrongFk.CONSTRAINT_NAME}\`
+            `);
+            await sequelize.getQueryInterface().addConstraint(tableName, {
+                fields: ['salesman_id'],
+                type: 'foreign key',
+                name: 'fk_salesman_expense_salesman_id',
+                references: {
+                    table: 'salesmen',
+                    field: 'salesman_id',
+                },
+                onDelete: 'RESTRICT',
+                onUpdate: 'CASCADE',
+            });
+            console.log(`✅ ${tableName}.salesman_id now references salesmen.salesman_id`);
+        } catch (error) {
+            if (!error.message.includes('Duplicate') && !error.message.includes('already exists')) {
+                console.log(`⚠️ Warning repairing ${tableName} foreign key:`, error.message);
             }
         }
     }

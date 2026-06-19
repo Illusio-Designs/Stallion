@@ -19,7 +19,9 @@ class EventController {
                 event.event_status = eventStatus;
                 await event.save();
             }
-            const updatedEvents = await Event.findAll();
+            const updatedEvents = await Event.findAll({
+                order: [['end_date', 'DESC']],
+            });
             res.status(200).json(updatedEvents);
         } catch (error) {
             res.status(500).json({ error: error.message });
