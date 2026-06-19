@@ -3,7 +3,7 @@ import Button from '../components/ui/Button';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import { showSuccess, showError } from '../services/notificationService';
-import { updateUser, getUsers } from '../services/apiService';
+import { updateUser, getMe } from '../services/apiService';
 import { getUser } from '../services/authService';
 import '../styles/pages/dashboard-settings.css';
 
@@ -48,21 +48,9 @@ const DashboardSettings = () => {
 
         setCurrentUserId(currentUser.id);
         
-        // Fetch all users to find current user's data
-        const usersResponse = await getUsers();
-        let usersArray = [];
-        if (Array.isArray(usersResponse)) {
-          usersArray = usersResponse;
-        } else if (usersResponse && Array.isArray(usersResponse.data)) {
-          usersArray = usersResponse.data;
-        } else if (usersResponse && Array.isArray(usersResponse.users)) {
-          usersArray = usersResponse.users;
-        }
-
-        // Find current user in the list
-        const userData = usersArray.find(u => 
-          (u.user_id || u.id) === currentUser.id
-        );
+        // GET /users/me — current user (works for every role). Was fetching the
+        // whole /users list (admin-only -> 403 for field roles like salesman).
+        const userData = await getMe();
 
         if (userData) {
           setUserName(userData.full_name || userData.name || userData.fullName || '');
@@ -432,15 +420,7 @@ const DashboardSettings = () => {
           // If we uploaded a file but didn't get image back, refetch user data
           console.log('No image in response, refetching user data...');
           try {
-            const usersResponse = await getUsers();
-            let usersArray = [];
-            if (Array.isArray(usersResponse)) {
-              usersArray = usersResponse;
-            } else if (usersResponse?.data) {
-              usersArray = Array.isArray(usersResponse.data) ? usersResponse.data : [];
-            }
-            
-            const updatedUser = usersArray.find(u => (u.user_id || u.id) === currentUserId);
+            const updatedUser = await getMe();
             if (updatedUser) {
               const fetchedImage = updatedUser.image_url || updatedUser.profile_image;
               if (fetchedImage && fetchedImage.trim() !== '') {
