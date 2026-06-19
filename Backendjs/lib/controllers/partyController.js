@@ -299,8 +299,8 @@ class PartyController {
             }
             const user = req.user;
             const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
-            if (!party_name || !phone) {
-                return res.status(400).json({ error: 'Party name and phone are required' });
+            if (!party_name || !phone || !address) {
+                return res.status(400).json({ error: 'Party name, phone, and address are required' });
             }
             // State is required — it drives the salesman/distributor assignment.
             // Accepts a state name or id; city & zone are optional.
@@ -330,6 +330,7 @@ class PartyController {
                 email,
                 fullName: contact_person || party_name,
                 roleName: 'party',
+                address,
             });
 
             const party = await Party.create({
@@ -615,11 +616,19 @@ class PartyController {
                             data: null,
                         };
                     }
+                    if (!row.address) {
+                        return {
+                            success: false,
+                            message: `Row ${rowNum}: address is required to create party login`,
+                            data: null,
+                        };
+                    }
                     const loginUser = await findOrCreateRoleUser({
                         phone: row.phone,
                         email: row.email,
                         fullName: row.contact_person || row.party_name,
                         roleName: 'party',
+                        address: row.address,
                     });
                     await Party.create({
                         ...payload,

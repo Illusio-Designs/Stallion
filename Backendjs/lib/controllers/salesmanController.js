@@ -95,11 +95,15 @@ class SalesmanController {
                 if (!phone) {
                     return res.status(400).json({ error: 'Phone is required to create salesman login' });
                 }
+                if (!address) {
+                    return res.status(400).json({ error: 'Address is required to create salesman login' });
+                }
                 const loginUser = await findOrCreateRoleUser({
                     phone,
                     email,
                     fullName: full_name,
                     roleName: 'salesman',
+                    address,
                 });
                 linkedUserId = loginUser.user_id;
             }

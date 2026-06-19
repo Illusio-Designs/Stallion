@@ -1,24 +1,87 @@
 const SalesmanCheckIns = require('../models/SalesmanCheckIns');
 const { logAudit } = require('../utils/auditLogger');
 const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { SalesmanCheckInType } = require('../constants/enums');
+
+function resolveCheckInFields(body, existing = {}) {
+    return {
+        salesman_id: body.salesman_id !== undefined ? body.salesman_id : existing.salesman_id,
+        check_in_date: body.check_in_date !== undefined ? body.check_in_date : existing.check_in_date,
+        party_id: body.party_id !== undefined ? body.party_id : existing.party_id,
+        contact_person: body.contact_person !== undefined ? body.contact_person : existing.contact_person,
+        type: body.type !== undefined ? body.type : existing.type,
+        order_id: body.order_id !== undefined ? body.order_id : existing.order_id,
+        in_time: body.in_time !== undefined ? body.in_time : existing.in_time,
+        out_time: body.out_time !== undefined ? body.out_time : existing.out_time,
+        next_visit_date: body.next_visit_date !== undefined ? body.next_visit_date : existing.next_visit_date,
+        latitude: body.latitude !== undefined ? body.latitude : existing.latitude,
+        longitude: body.longitude !== undefined ? body.longitude : existing.longitude,
+        check_in_remarks: body.check_in_remarks !== undefined ? body.check_in_remarks : existing.check_in_remarks,
+    };
+}
+
+function validateCheckInFields(fields) {
+    const {
+        salesman_id,
+        check_in_date,
+        party_id,
+        contact_person,
+        type,
+        order_id,
+        in_time,
+        out_time,
+        next_visit_date,
+    } = fields;
+
+    if (!salesman_id || !check_in_date || !party_id || !contact_person || !type || !in_time || !out_time || !next_visit_date) {
+        return 'Salesman ID, check-in date, party ID, contact person, type, in time, out time, and next visit date are required';
+    }
+
+    const validTypes = Object.values(SalesmanCheckInType);
+    if (!validTypes.includes(type)) {
+        return `Type must be one of: ${validTypes.join(', ')}`;
+    }
+
+    if (type === SalesmanCheckInType.ORDERED && !order_id) {
+        return 'Order ID is required when type is ordered';
+    }
+
+    if (type === SalesmanCheckInType.VISIT && order_id) {
+        return 'Order ID must not be set when type is visit';
+    }
+
+    return null;
+}
+
+function toCheckInPayload(fields) {
+    return {
+        salesman_id: fields.salesman_id,
+        check_in_date: fields.check_in_date,
+        party_id: fields.party_id,
+        contact_person: fields.contact_person,
+        type: fields.type,
+        order_id: fields.type === SalesmanCheckInType.ORDERED ? fields.order_id : null,
+        in_time: fields.in_time,
+        out_time: fields.out_time,
+        next_visit_date: fields.next_visit_date,
+        latitude: fields.latitude,
+        longitude: fields.longitude,
+        check_in_remarks: fields.check_in_remarks,
+    };
+}
 
 class SalesmanCheckInsController {
 
     async createSalesmanCheckIn(req, res) {
         try {
-            const { salesman_id, check_in_date, party_id, latitude, longitude, check_in_remarks } = req.body;
-
-            if (!salesman_id || !check_in_date || !party_id) {
-                return res.status(400).json({ error: 'Salesman ID, check-in date, and party ID are required' });
+            const fields = resolveCheckInFields(req.body);
+            const validationError = validateCheckInFields(fields);
+            if (validationError) {
+                return res.status(400).json({ error: validationError });
             }
 
             const salesmanCheckIn = await SalesmanCheckIns.create({
-                salesman_id,
-                check_in_date,
-                party_id,
-                latitude,
-                longitude,
-                check_in_remarks,
+                ...toCheckInPayload(fields),
                 created_at: new Date(),
                 updated_at: new Date(),
             });
@@ -78,7 +141,6 @@ class SalesmanCheckInsController {
     async updateSalesmanCheckIn(req, res) {
         try {
             const { id } = req.params;
-            const { salesman_id, check_in_date, party_id, latitude, longitude, check_in_remarks } = req.body;
 
             if (!id) {
                 return res.status(400).json({ error: 'Check-in ID is required' });
@@ -89,14 +151,15 @@ class SalesmanCheckInsController {
                 return res.status(404).json({ error: 'Salesman check-in not found' });
             }
 
+            const fields = resolveCheckInFields(req.body, existingCheckIn.toJSON());
+            const validationError = validateCheckInFields(fields);
+            if (validationError) {
+                return res.status(400).json({ error: validationError });
+            }
+
             const oldSnapshot = existingCheckIn.toJSON();
             const updatedFields = {
-                salesman_id: salesman_id !== undefined ? salesman_id : existingCheckIn.salesman_id,
-                check_in_date: check_in_date !== undefined ? check_in_date : existingCheckIn.check_in_date,
-                party_id: party_id !== undefined ? party_id : existingCheckIn.party_id,
-                latitude: latitude !== undefined ? latitude : existingCheckIn.latitude,
-                longitude: longitude !== undefined ? longitude : existingCheckIn.longitude,
-                check_in_remarks: check_in_remarks !== undefined ? check_in_remarks : existingCheckIn.check_in_remarks,
+                ...toCheckInPayload(fields),
                 updated_at: new Date(),
             };
 

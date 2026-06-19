@@ -56,6 +56,11 @@ const EventStatus = {
     PAST: 'past',
 };
 
+const SalesmanCheckInType = {
+    VISIT: 'visit',
+    ORDERED: 'ordered',
+};
+
 const AuditAction = {
     CREATE: 'create',
     UPDATE: 'update',
@@ -70,5 +75,6 @@ module.exports = {
     OrderStatusTransitions,
     OrderType,
     EventStatus,
+    SalesmanCheckInType,
     AuditAction,
 };

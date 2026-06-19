@@ -132,11 +132,15 @@ class DistributorController {
                 if (!phone) {
                     return res.status(400).json({ error: 'Phone is required to create distributor login' });
                 }
+                if (!address) {
+                    return res.status(400).json({ error: 'Address is required to create distributor login' });
+                }
                 distributorUser = await findOrCreateRoleUser({
                     phone,
                     email,
                     fullName: contact_person || distributor_name,
                     roleName: 'distributor',
+                    address,
                 });
             }
 
