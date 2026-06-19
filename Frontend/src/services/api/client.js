@@ -360,6 +360,38 @@ const apiRequest = async (endpoint, options = {}) => {
 };
 
 
+// ---- List pagination compatibility ----
+// Several backend list endpoints now REQUIRE page & limit (they 400 without
+// them) and respond { data, pagination } with a STRICT 20-per-page cap. These
+// pages filter/paginate client-side, so we walk every page (limit=20) and return
+// the full flattened array, keeping every caller's existing array contract.
+const PAGE_SIZE = 20; // backend list endpoints are strictly 20 per page
+
+/** Normalize an array | { data, pagination } response to its array. */
+const unwrapList = (res) =>
+  Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
+
+/**
+ * Fetch EVERY page of a paginated list endpoint at the strict 20/page limit and
+ * return the concatenated array. Works for non-paginated endpoints too (they
+ * ignore page/limit and return everything as a single page).
+ * @param {string} endpoint
+ * @param {Object} [opts] - apiRequest options (method/body/includeAuth/silent)
+ */
+const fetchAllPages = async (endpoint, opts = {}) => {
+  const sep = endpoint.includes('?') ? '&' : '?';
+  const all = [];
+  let page = 1;
+  let totalPages = 1;
+  do {
+    const res = await apiRequest(`${endpoint}${sep}page=${page}&limit=${PAGE_SIZE}`, opts);
+    all.push(...unwrapList(res));
+    totalPages = (res && res.pagination && res.pagination.totalPages) || 1;
+    page += 1;
+  } while (page <= totalPages && page <= 1000); // hard safety cap
+  return all;
+};
+
 export {
   getBaseURL,
   getAuthToken,
@@ -370,4 +402,7 @@ export {
   TTL_LOOKUP,
   TTL_PRODUCTS,
   TTL_TRANSACTIONAL,
+  PAGE_SIZE,
+  unwrapList,
+  fetchAllPages,
 };

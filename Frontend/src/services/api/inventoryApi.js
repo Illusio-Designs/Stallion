@@ -1,4 +1,4 @@
-import { apiRequest, API_DEBUG, TTL_TRANSACTIONAL } from './client';
+import { apiRequest, fetchAllPages, API_DEBUG, TTL_TRANSACTIONAL } from './client';
 import { getCached, invalidateCache } from '../cacheService';
 
 // ==================== TRAYS ENDPOINTS ====================
@@ -9,7 +9,7 @@ import { getCached, invalidateCache } from '../cacheService';
  */
 export const getTrays = async () => {
   try {
-    const response = await apiRequest('/trays', {
+    const response = await fetchAllPages('/trays', {
       method: 'GET',
       includeAuth: true,
     });
@@ -268,7 +268,7 @@ export const deleteEvent = async (eventId) => {
  */
 export const getOrders = async () => getCached('orders', async () => {
   try {
-    return await apiRequest('/orders', {
+    return await fetchAllPages('/orders', {
       method: 'GET',
       includeAuth: true,
     });
@@ -303,7 +303,7 @@ export const getOrders = async () => getCached('orders', async () => {
  */
 export const getMyOrders = async () => getCached('orders:my', async () => {
   try {
-    return await apiRequest('/orders/my', {
+    return await fetchAllPages('/orders/my', {
       method: 'GET',
       includeAuth: true,
     });

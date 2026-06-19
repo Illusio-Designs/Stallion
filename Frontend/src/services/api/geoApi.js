@@ -1,4 +1,4 @@
-import { apiRequest, TTL_LOOKUP } from './client';
+import { apiRequest, fetchAllPages, TTL_LOOKUP } from './client';
 import { getCached, invalidateCache } from '../cacheService';
 
 // ==================== COUNTRY ENDPOINTS ====================
@@ -162,7 +162,7 @@ export const deleteState = async (stateId) => {
  */
 export const getCities = async (stateId) => {
   try {
-    const response = await apiRequest('/cities/get', {
+    const response = await fetchAllPages('/cities/get', {
       method: 'POST',
       body: { state_id: stateId },
       includeAuth: true,
@@ -296,7 +296,7 @@ const fetchAllZonesUncached = async (countryId) => {
     // Step 2: get all cities for each state (parallel)
     const cityResults = await Promise.all(
       statesArr.map(state =>
-        apiRequest('/cities/get', {
+        fetchAllPages('/cities/get', {
           method: 'POST',
           body: { state_id: state.id },
           includeAuth: true,
