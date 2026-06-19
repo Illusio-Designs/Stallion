@@ -244,7 +244,7 @@ const DashboardSuppliers = () => {
   const confirm = useConfirm();
   const isSalesman = getUserRole() === 'salesman';
   const [activeTab, setActiveTab] = useState('All');
-  const [mainTab, setMainTab] = useState(isSalesman ? 'Check-ins' : 'Salesmen');
+  const [mainTab, setMainTab] = useState(isSalesman ? 'Visit Report' : 'Salesmen');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -595,7 +595,7 @@ const DashboardSuppliers = () => {
 
   // Fetch checkins/targets when switching to those tabs
   useEffect(() => {
-    if (mainTab === 'Check-ins') {
+    if (mainTab === 'Visit Report') {
       fetchCheckins();
       // For admin: fetch all parties for name lookup
       if (!isSalesman) {
@@ -1164,10 +1164,10 @@ const DashboardSuppliers = () => {
       };
       if (editCheckin) {
         await updateSalesmanCheckin(editCheckin.id, payload);
-        showSuccess('Check-in updated successfully');
+        showSuccess('Visit report updated successfully');
       } else {
         await createSalesmanCheckin(payload);
-        showSuccess('Check-in created successfully');
+        showSuccess('Visit report created successfully');
       }
       setOpenCheckinModal(false);
       setEditCheckin(null);
@@ -1197,7 +1197,7 @@ const DashboardSuppliers = () => {
     if (!(await confirm('Delete this check-in?'))) return;
     try {
       await deleteSalesmanCheckin(row.id);
-      showSuccess('Check-in deleted successfully');
+      showSuccess('Visit report deleted successfully');
       setCheckins(prev => prev.filter(c => c.id !== row.id));
     } catch (error) {
       showError(`Failed to delete check-in: ${error.message}`);
@@ -1273,12 +1273,12 @@ const DashboardSuppliers = () => {
         <div className="dash-row">
           <div className="order-tabs-container">
             {(isSalesman
-              ? ['Check-ins']
-              : ['Salesmen', 'Check-ins', 'Targets']
+              ? ['Visit Report']
+              : ['Salesmen', 'Visit Report', 'Targets']
             ).map(tab => (
               <button
                 key={tab}
-                className={`order-tab ${mainTab === tab ? 'active' : ''}`}
+                className={`order-tab flex-shrink-0 ${mainTab === tab ? 'active' : ''}`}
                 onClick={() => setMainTab(tab)}
               >
                 {tab}
@@ -1391,7 +1391,7 @@ const DashboardSuppliers = () => {
         )}
 
         {/* Check-ins Table */}
-        {mainTab === 'Check-ins' && (
+        {mainTab === 'Visit Report' && (
         <div className="dash-row">
           <div className="dash-card full">
             {!checkinsLoading && checkins.length === 0 ? (
@@ -1402,7 +1402,7 @@ const DashboardSuppliers = () => {
                     <circle cx="12" cy="10" r="3" />
                   </svg>
                 </div>
-                <p className="ui-state__title">No check-ins yet</p>
+                <p className="ui-state__title">No visit reports yet</p>
                 <p className="ui-state__desc">
                   {isSalesman
                     ? 'Record your first visit to a party to see it here.'
@@ -1413,13 +1413,13 @@ const DashboardSuppliers = () => {
                     className="ui-btn ui-btn--primary"
                     onClick={() => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); }}
                   >
-                    Add Check-in
+                    Add Visit Report
                   </button>
                 )}
               </div>
             ) : (
             <TableWithControls
-              title="Salesman Check-ins"
+              title="Visit Report"
               columns={[
                 ...(!isSalesman ? [{ key: 'salesman_id', label: 'SALESMAN', render: (v) => salesmanNameMap[v] || v || '-' }] : []),
                 { key: 'check_in_date', label: 'DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
@@ -1431,7 +1431,7 @@ const DashboardSuppliers = () => {
               ]}
               rows={checkins}
               onAddNew={isSalesman ? () => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); } : undefined}
-              addNewText="Add Check-in"
+              addNewText="Add Visit Report"
               onImport={fetchCheckins}
               importText="Refresh"
               loading={checkinsLoading}
@@ -1860,7 +1860,7 @@ const DashboardSuppliers = () => {
       <AsidePanel
         open={openCheckinModal}
         onClose={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}
-        title={editCheckin ? 'Edit Check-in' : 'Add Check-in'}
+        title={editCheckin ? 'Edit Visit Report' : 'Add Visit Report'}
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}>Cancel</button>

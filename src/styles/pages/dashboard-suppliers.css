@@ -163,8 +163,40 @@
    Responsive — keep the tables readable at 375px without horizontal overflow
    beyond the table's own managed scroll, and keep rows tappable.
    -------------------------------------------------------------------------- */
-@media (max-width: 560px) {
+@media (max-width: 1024px) {
+  /* Keep the Salesmen / Check-ins / Targets tables within the content area on
+     tablets; the table wrapper handles horizontal scroll, so cells must not
+     force the page wider. */
+  .dash-card .ui-table tbody td,
+  .dash-card .ui-table thead th {
+    padding-left: var(--space-3);
+    padding-right: var(--space-3);
+  }
+}
+
+@media (max-width: 640px) {
   .dash-card .ui-table tbody td {
     font-size: var(--text-sm);
+  }
+
+  /* Tighter cell padding on phones so the wider Check-ins / Targets columns fit
+     without pushing the page into horizontal overflow. */
+  .dash-card .ui-table tbody td,
+  .dash-card .ui-table thead th {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+
+  /* The "Filter by Country" popover and its dropdown go full-width so the
+     control never overflows the toolbar on a narrow screen. */
+  .dash-card .ui-table__controls .ui-dropdown-custom,
+  .dash-card .ui-table__controls .ui-dropdown-custom--full-width {
+    width: 100%;
+  }
+
+  /* The Zones / Working-States multi-select chips wrap and the dropdown menu
+     stays within the panel width on phones. */
+  .ui-dropdown-custom__menu {
+    max-width: 100%;
   }
 }

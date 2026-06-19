@@ -95,7 +95,7 @@ const DashboardTray = () => {
   const [openEditProduct, setOpenEditProduct] = useState(false);
 
   const columns = useMemo(() => ([
-    { key: 'tray_name', label: 'TRAY NAME' },
+    { key: 'tray_name', label: 'SAMPLE NAME' },
     {
       key: 'tray_status',
       label: 'STATUS',
@@ -446,7 +446,7 @@ const DashboardTray = () => {
           <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
             <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
               <TableWithControls
-                title="Tray Management"
+                title="Sample Management"
                 columns={columns}
                 rows={rows}
                 selectable={!loading}
@@ -456,7 +456,7 @@ const DashboardTray = () => {
                 importText="Refresh"
                 dateRange={dateRange}
                 onDateChange={setDateRange}
-                itemName="Tray"
+                itemName="Sample"
                 loading={loading}
                 serverPagination
                 serverPage={trayPage}
@@ -486,8 +486,8 @@ const DashboardTray = () => {
         {activeTab === 'assign-products' && (
           <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
             <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
-              <div className="p-5">
-                <h2 className="mt-0 mb-5">Assign Products to Tray</h2>
+              <div className="p-3 sm:p-5">
+                <h2 className="mt-0 mb-5">Assign Products to Sample</h2>
 
                 {error && <div className="mb-3 rounded-lg border border-[#fcc] bg-[#fee] p-3 text-[red]">{error}</div>}
 
@@ -495,7 +495,7 @@ const DashboardTray = () => {
                 <div className="flex flex-col gap-6">
                   {/* Tray Selection */}
                   <div className="form-group">
-                    <label className="ui-label" style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 700 }}>Select Tray</label>
+                    <label className="ui-label" style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 700 }}>Select Sample</label>
                     <DropdownSelector
                       options={trays.map(t => ({
                         value: t.tray_id || t.id,
@@ -509,7 +509,7 @@ const DashboardTray = () => {
 
                   {/* Add Product Section - Only show when tray is selected */}
                   {selectedTray && (
-                    <div className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-6">
+                    <div className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-4 sm:p-6">
                       <h3 className="mb-5 mt-0 text-[18px] font-bold text-[#000000]">
                         Add Products to Tray
                       </h3>
@@ -667,10 +667,10 @@ const DashboardTray = () => {
                   {/* Products List - Always visible */}
                   <div>
                     <h3 className="mb-[15px] mt-0">
-                      Products in Tray ({trayProducts.length})
+                      Products in Sample ({trayProducts.length})
                     </h3>
-                    <div className="max-h-[500px] overflow-y-auto rounded-lg border border-[#e5e7eb]">
-                      <table className="w-full border-collapse">
+                    <div className="max-h-[500px] overflow-x-auto overflow-y-auto rounded-lg border border-[#e5e7eb]">
+                      <table className="w-full min-w-[720px] border-collapse">
                         <thead>
                           <tr className="sticky top-0 bg-[#f0f0f0]">
                             <th className="border-b-2 border-[#ddd] p-3 text-left">MODEL NO</th>
@@ -814,7 +814,7 @@ const DashboardTray = () => {
       <AsidePanel
         open={openAdd}
         onClose={() => setOpenAdd(false)}
-        title="Add New Tray"
+        title="Add New Sample"
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => { resetForm(); setOpenAdd(false); }}>Cancel</button>
@@ -827,7 +827,7 @@ const DashboardTray = () => {
             <label className="ui-label">Title</label>
             <input
               className="ui-input"
-              placeholder="Tray title"
+              placeholder="Sample title"
               value={form.tray_name}
               onChange={(e) => setForm((p) => ({ ...p, tray_name: e.target.value }))}
             />
@@ -850,7 +850,7 @@ const DashboardTray = () => {
       <AsidePanel
         open={!!editRow}
         onClose={() => setEditRow(null)}
-        title="Edit Tray"
+        title="Edit Sample"
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => { setEditRow(null); resetForm(); }}>Cancel</button>

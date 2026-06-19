@@ -323,7 +323,10 @@
 /* Products Grid */
 .products-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  /* minmax(0, 1fr) lets cards shrink below their content's intrinsic width so a
+     non-shrinkable child (e.g. the fixed-width action buttons) can't push the
+     track wider than its share and cause horizontal overflow on small screens. */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-8);
   max-width: 1400px;
   margin: 0 auto;
@@ -710,7 +713,7 @@
     font-size: var(--text-md);
   }
   .products-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-6);
   }
 }
@@ -773,7 +776,7 @@
     align-items: flex-start;
   }
   .products-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: var(--space-4);
   }
   .b2b-advantage-container {

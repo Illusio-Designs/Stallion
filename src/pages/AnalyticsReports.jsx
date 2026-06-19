@@ -9,6 +9,7 @@ import {
   getAllSalesmanCheckins,
   getSalesmanCheckins,
   getSalesmanById,
+  getSalesmanProfile,
   getPartyById,
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
@@ -16,7 +17,7 @@ import { showError } from '../services/notificationService';
 
 const TABS = [
   { key: 'targets', label: 'Target Achievement' },
-  { key: 'checkins', label: 'Salesman Check-ins' },
+  { key: 'checkins', label: 'Visit Report' },
 ];
 
 const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
@@ -66,10 +67,22 @@ const AnalyticsReports = () => {
       e?.statusCode === 404 ||
       `${e?.message || ''} ${e?.errorData?.error || ''}`.toLowerCase().includes('not found');
 
+    // A salesman must see ONLY their own data. The stored user object usually
+    // lacks salesman_id, so resolve it from the salesman profile (GET /salesmen)
+    // before fetching. If it can't be resolved, show empty — never the all list.
+    let sid = salesmanId;
+    if (isSalesman && !sid) {
+      try {
+        const profile = await getSalesmanProfile();
+        const rec = profile?.data || profile;
+        sid = rec?.salesman_id || rec?.id || null;
+      } catch { /* no profile -> empty, never all */ }
+    }
+
     // Independent calls: an empty table (404) or one failing call must not break the other.
     const [tRes, cRes] = await Promise.allSettled([
-      isSalesman && salesmanId ? getSalesmanTargets(salesmanId) : getAllSalesmanTargets(),
-      isSalesman && salesmanId ? getSalesmanCheckins(salesmanId) : getAllSalesmanCheckins(),
+      isSalesman ? (sid ? getSalesmanTargets(sid) : Promise.resolve([])) : getAllSalesmanTargets(),
+      isSalesman ? (sid ? getSalesmanCheckins(sid) : Promise.resolve([])) : getAllSalesmanCheckins(),
     ]);
 
     let realError = false;
@@ -241,11 +254,11 @@ const AnalyticsReports = () => {
             <div className="dash-card full">
               {loadError && !loading ? backendDown : (!loading && checkinRows.length === 0) ? (
                 <div className="ui-state ui-state--empty">
-                  <p className="ui-state__title">No check-ins yet</p>
-                  <p className="ui-state__desc">Salesman visit check-ins (with party and location) will show here.</p>
+                  <p className="ui-state__title">No visit reports yet</p>
+                  <p className="ui-state__desc">Salesman visit reports (with party and location) will show here.</p>
                 </div>
               ) : (
-                <TableWithControls title="Salesman Check-ins" columns={checkinColumns} rows={checkinRows} itemName="Check-in" loading={loading} selectable={false} />
+                <TableWithControls title="Visit Report" columns={checkinColumns} rows={checkinRows} itemName="Visit Report" loading={loading} selectable={false} />
               )}
             </div>
           </div>
