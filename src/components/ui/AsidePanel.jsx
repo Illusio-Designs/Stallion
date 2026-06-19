@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import '../../styles/components/ui.css';
 
 // Keep in sync with the panel's transition duration in ui.css (.ui-aside-panel).
@@ -53,21 +54,32 @@ export default function AsidePanel({
     return () => clearTimeout(t);
   }, [open]);
 
-  // While mounted: lock body scroll, wire Escape, focus the panel.
+  // Keep the latest onClose without making the effects below depend on its
+  // identity (consumers pass an inline arrow, so it changes every render).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; }, [onClose]);
+
+  // Focus the panel ONCE when it opens — not on every parent re-render.
+  // (Re-focusing on each render stole focus from inputs after one keystroke.)
+  useEffect(() => {
+    if (mounted) panelRef.current?.focus();
+  }, [mounted]);
+
+  // While mounted: lock body scroll + wire Escape. Depends only on `mounted`
+  // so typing in the parent never re-runs this (which would thrash focus/scroll).
   useEffect(() => {
     if (!mounted) return;
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     const onKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current?.();
     };
     window.addEventListener('keydown', onKeyDown);
-    panelRef.current?.focus();
     return () => {
       document.body.style.overflow = prevOverflow;
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [mounted, onClose]);
+  }, [mounted]);
 
   // Restore focus to whatever opened the panel once it is fully gone.
   useEffect(() => {
@@ -76,9 +88,12 @@ export default function AsidePanel({
     lastFocused.current = null;
   }, [mounted]);
 
-  if (!mounted) return null;
+  if (!mounted || typeof document === 'undefined') return null;
 
-  return (
+  // Portal to <body> so the fixed overlay covers the whole viewport (above the
+  // dashboard header/footer). Rendering in-place gets trapped by ancestor
+  // transforms (e.g. .page-enter on the dashboard content), which clips it.
+  return createPortal(
     <div
       className={`ui-aside-panel__backdrop${entered ? ' is-open' : ''}`}
       onClick={onClose}
@@ -106,6 +121,7 @@ export default function AsidePanel({
         <div className="ui-aside-panel__body">{children}</div>
         {footer && <div className="ui-aside-panel__footer">{footer}</div>}
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }
