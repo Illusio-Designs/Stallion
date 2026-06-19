@@ -486,7 +486,7 @@ const DashboardTray = () => {
         {activeTab === 'assign-products' && (
           <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
             <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
-              <div className="p-5">
+              <div className="p-3 sm:p-5">
                 <h2 className="mt-0 mb-5">Assign Products to Tray</h2>
 
                 {error && <div className="mb-3 rounded-lg border border-[#fcc] bg-[#fee] p-3 text-[red]">{error}</div>}
@@ -509,7 +509,7 @@ const DashboardTray = () => {
 
                   {/* Add Product Section - Only show when tray is selected */}
                   {selectedTray && (
-                    <div className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-6">
+                    <div className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-4 sm:p-6">
                       <h3 className="mb-5 mt-0 text-[18px] font-bold text-[#000000]">
                         Add Products to Tray
                       </h3>
@@ -669,8 +669,8 @@ const DashboardTray = () => {
                     <h3 className="mb-[15px] mt-0">
                       Products in Tray ({trayProducts.length})
                     </h3>
-                    <div className="max-h-[500px] overflow-y-auto rounded-lg border border-[#e5e7eb]">
-                      <table className="w-full border-collapse">
+                    <div className="max-h-[500px] overflow-x-auto overflow-y-auto rounded-lg border border-[#e5e7eb]">
+                      <table className="w-full min-w-[720px] border-collapse">
                         <thead>
                           <tr className="sticky top-0 bg-[#f0f0f0]">
                             <th className="border-b-2 border-[#ddd] p-3 text-left">MODEL NO</th>

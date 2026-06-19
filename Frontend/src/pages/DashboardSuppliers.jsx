@@ -1278,7 +1278,7 @@ const DashboardSuppliers = () => {
             ).map(tab => (
               <button
                 key={tab}
-                className={`order-tab ${mainTab === tab ? 'active' : ''}`}
+                className={`order-tab flex-shrink-0 ${mainTab === tab ? 'active' : ''}`}
                 onClick={() => setMainTab(tab)}
               >
                 {tab}

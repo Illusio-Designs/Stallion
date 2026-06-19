@@ -2303,8 +2303,8 @@ const DashboardProducts = () => {
             </div>
           </div>
         )}
-        <div className="dash-row flex justify-between items-center">
-          <div className="order-tabs-container">
+        <div className="dash-row flex flex-wrap justify-between items-center gap-3">
+          <div className="order-tabs-container min-w-0 flex-1">
             {['Products', 'Media Gallery', 'Unuploaded Media Gallery'].map(tab => (
               <button
                 key={tab}
@@ -2317,7 +2317,7 @@ const DashboardProducts = () => {
           </div>
           {activeTab === 'Media Gallery' && (
             <button
-              className="ui-btn ui-btn--primary whitespace-nowrap px-4 py-2.5"
+              className="ui-btn ui-btn--primary whitespace-nowrap px-4 py-2.5 max-sm:w-full"
               onClick={handleOpenMediaUpload}
               disabled={uploadingImage}
             >

@@ -1307,7 +1307,7 @@ const DashboardClients = () => {
             {['All', 'Activate', 'Deactivate'].map(tab => (
               <button
                 key={tab}
-                className={`order-tab ${activeTab === tab ? 'active' : ''}`}
+                className={`order-tab flex-shrink-0 ${activeTab === tab ? 'active' : ''}`}
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}
@@ -1473,7 +1473,7 @@ const DashboardClients = () => {
           <input
             type="file"
             accept=".xlsx,.xls,.csv"
-            className="ui-input"
+            className="ui-input w-full max-w-full"
             onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
           />
           {bulkFile && (

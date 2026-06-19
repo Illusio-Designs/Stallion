@@ -122,3 +122,30 @@
 .order-tab.active:focus-visible {
   box-shadow: var(--focus-ring);
 }
+
+/* --- Responsive: tablet — 2 summary cards per row -------------------------- */
+/* Scoped to .orders-summary so the dashboard.css 12-col grid is untouched.
+   On tablet the 4-across metric cards get cramped, so collapse to 2 columns. */
+@media (max-width: 1024px) {
+  .orders-summary .dash-card.metric {
+    grid-column: span 6;
+  }
+}
+
+/* --- Responsive: mobile — single column, tighter padding ------------------ */
+@media (max-width: 640px) {
+  .orders-summary .dash-card.metric {
+    grid-column: 1 / -1;
+    padding: var(--space-4);
+  }
+
+  /* Keep status tabs comfortably tappable but tighter on small screens */
+  .order-tabs-container {
+    padding: var(--space-2);
+  }
+
+  .order-tab {
+    padding: var(--space-2) var(--space-3);
+    font-size: var(--text-sm);
+  }
+}
