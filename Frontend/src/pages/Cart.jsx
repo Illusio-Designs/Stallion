@@ -15,7 +15,7 @@ import {
 } from "../services/notificationService";
 import { getUserRole, getUser } from "../services/authService";
 import {
-  getParties,
+  getMyParties,
   getPartyById,
   getEvents,
   getCountries,
@@ -243,9 +243,10 @@ const Cart = ({ onPageChange = null }) => {
             getCurrentLocation();
           }
         } else if (orderType === 'event_order') {
-          // For event_order: use getParties() without countryId (gets all parties)
-          console.log('[Cart] Fetching all parties for event_order');
-          const partiesData = await getParties(); // No countryId = gets all parties
+          // For event_order: use the role-scoped /parties/my (getParties /
+          // POST /parties/get is manager-only and 403s for salesman).
+          console.log('[Cart] Fetching my parties for event_order');
+          const partiesData = await getMyParties();
           setParties(Array.isArray(partiesData) ? partiesData : []);
           console.log('[Cart] Fetched all parties:', partiesData.length, 'parties');
         }
@@ -492,11 +493,11 @@ const Cart = ({ onPageChange = null }) => {
             
             const userPhone = normalizePhone(user.phone);
             
-            // Fetch all parties in a single call. getParties() with no country
-            // argument returns every party unfiltered - no need to loop countries.
+            // Resolve the logged-in user's own party via the role-scoped
+            // /parties/my (getParties / POST /parties/get is manager-only).
             let allParties = [];
             try {
-              const partiesResp = await getParties();
+              const partiesResp = await getMyParties();
               allParties = Array.isArray(partiesResp) ? partiesResp : [];
             } catch (err) {
               console.warn('[Cart] Failed to fetch parties:', err);
