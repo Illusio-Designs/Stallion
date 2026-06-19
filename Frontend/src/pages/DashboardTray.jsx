@@ -12,7 +12,7 @@ import {
   getCollections,
   getProductsPage,
   getProductsInTray,
-  getTrays,
+  getTraysPage,
   updateProductInTray,
   updateTray,
 } from '../services/apiService';
@@ -72,6 +72,9 @@ const DashboardTray = () => {
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [trays, setTrays] = useState([]);
+  const [trayPage, setTrayPage] = useState(1);
+  const [trayPageCount, setTrayPageCount] = useState(1);
+  const [trayTotal, setTrayTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ tray_name: '', tray_status: TrayStatus.AVAILABLE });
@@ -117,12 +120,17 @@ const DashboardTray = () => {
     },
   ]), []);
 
-  const fetchTrays = async () => {
+  // Server-paginated trays: 20 per page, fetched per page (and on search).
+  const fetchTraysPage = async (page = 1, search = '') => {
     setLoading(true);
     setError(null);
     try {
-      const data = await getTrays();
-      setTrays(Array.isArray(data) ? data : []);
+      const res = await getTraysPage(page, 20, search);
+      const data = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+      setTrays(data);
+      setTrayPage(page);
+      setTrayPageCount(Math.max(1, res?.pagination?.totalPages ?? 1));
+      setTrayTotal(res?.pagination?.total ?? data.length);
     } catch (err) {
       setError(err.message || 'Failed to load trays');
       setTrays([]);
@@ -130,6 +138,9 @@ const DashboardTray = () => {
       setLoading(false);
     }
   };
+
+  // Refresh the current page (used after add/update/delete).
+  const fetchTrays = () => fetchTraysPage(trayPage);
 
   // Assign-to-tray picker: 20 per page with server-side search (model_no/size).
   // Opening the picker / picking a tray loads page 1; typing re-queries the server.
@@ -447,6 +458,12 @@ const DashboardTray = () => {
                 onDateChange={setDateRange}
                 itemName="Tray"
                 loading={loading}
+                serverPagination
+                serverPage={trayPage}
+                serverPageCount={trayPageCount}
+                serverPageSize={20}
+                serverTotal={trayTotal}
+                onServerPageChange={(p) => fetchTraysPage(p)}
               />
               {error && !loading && (
                 <div className="ui-state ui-state--error">

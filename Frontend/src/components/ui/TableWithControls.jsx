@@ -41,6 +41,10 @@ export default function TableWithControls({
   serverPageSize = 20,
   serverTotal = null,
   onServerPageChange,
+  // Server mode only: called (debounced) when the global search query changes,
+  // so the parent can re-fetch page 1 with the search term. When provided, the
+  // client-side row filter is skipped (the server already filtered).
+  onServerSearch,
 }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -91,11 +95,20 @@ export default function TableWithControls({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [filterOpen]);
 
+  // Server-side search: debounce the query and let the parent re-fetch.
+  useEffect(() => {
+    if (!serverPagination || !onServerSearch) return;
+    const t = setTimeout(() => onServerSearch(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query, serverPagination, onServerSearch]);
+
   const filteredRows = useMemo(() => {
+    // In server-search mode the rows are already the filtered current page.
+    if (serverPagination && onServerSearch) return rows;
     if (!query) return rows;
     const q = query.toLowerCase();
     return rows.filter((r) => JSON.stringify(r).toLowerCase().includes(q));
-  }, [rows, query]);
+  }, [rows, query, serverPagination, onServerSearch]);
 
   const sortedRows = useMemo(() => {
     if (!sortBy) return filteredRows;
