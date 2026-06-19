@@ -51,6 +51,9 @@ const Cart = ({ onPageChange = null }) => {
   // Location state for visit orders
   const [latitude, setLatitude] = useState(null);
   const [longitude, setLongitude] = useState(null);
+  // Fresh coords readable synchronously during checkout (state would be stale
+  // inside the same async handler that just captured the location).
+  const locationRef = useRef({ latitude: null, longitude: null });
   const [locationError, setLocationError] = useState(null);
   const [locationLoading, setLocationLoading] = useState(false);
   
@@ -175,6 +178,9 @@ const Cart = ({ onPageChange = null }) => {
           const lng = parseFloat(position.coords.longitude);
           setLatitude(lat);
           setLongitude(lng);
+          // Also store in a ref so checkout reads the fresh coords synchronously
+          // (state updates won't be visible inside the same handleCheckout call).
+          locationRef.current = { latitude: lat, longitude: lng };
           console.log('[Cart] ✅ Location captured - Latitude:', lat, 'Longitude:', lng);
           resolve({ latitude: lat, longitude: lng });
         },
@@ -184,6 +190,7 @@ const Cart = ({ onPageChange = null }) => {
           setLocationError(errorMsg);
           setLatitude(null);
           setLongitude(null);
+          locationRef.current = { latitude: null, longitude: null };
           reject(error);
         },
         {
@@ -826,16 +833,19 @@ const Cart = ({ onPageChange = null }) => {
         return;
       }
 
-      // Final check: Ensure latitude and longitude are set for visit_order
+      // Final check: Ensure latitude and longitude are set for visit_order.
+      // Prefer the ref (fresh within this handler) over state, which may still
+      // be null if the location was only just captured by the guard above.
       if (orderData.order_type === 'visit_order') {
-        // Use state values if orderData doesn't have them
+        const freshLat = locationRef.current?.latitude ?? latitude;
+        const freshLng = locationRef.current?.longitude ?? longitude;
         if (orderData.latitude === undefined || orderData.latitude === null) {
-          orderData.latitude = latitude !== null && latitude !== undefined ? parseFloat(latitude) : latitude;
+          orderData.latitude = freshLat !== null && freshLat !== undefined ? parseFloat(freshLat) : freshLat;
         } else {
           orderData.latitude = parseFloat(orderData.latitude);
         }
         if (orderData.longitude === undefined || orderData.longitude === null) {
-          orderData.longitude = longitude !== null && longitude !== undefined ? parseFloat(longitude) : longitude;
+          orderData.longitude = freshLng !== null && freshLng !== undefined ? parseFloat(freshLng) : freshLng;
         } else {
           orderData.longitude = parseFloat(orderData.longitude);
         }
