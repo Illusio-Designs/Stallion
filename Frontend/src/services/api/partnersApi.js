@@ -1,4 +1,4 @@
-import { apiRequest, fetchAllPages, getBaseURL, getAuthToken, handleResponse } from './client';
+import { apiRequest, fetchAllPages, fetchPage, getBaseURL, getAuthToken, handleResponse } from './client';
 
 // ==================== DISTRIBUTOR ENDPOINTS ====================
 
@@ -441,6 +441,22 @@ export const getPartiesForRole = async (role, countryId) => {
     default: return getParties(countryId);
   }
 };
+
+// ---- Server-paginated (20/page) variants for list TABLES (Products-style) ----
+/** One page of parties (admin list) -> { data, pagination }. */
+export const getPartiesPage = (countryId, page = 1, limit = 20, search = '') =>
+  fetchPage('/parties/get', { page, limit, search }, {
+    method: 'POST',
+    body: countryId ? { country_id: String(countryId).trim() } : {},
+    includeAuth: true,
+  });
+/** One page of distributors -> { data, pagination }. */
+export const getDistributorsPage = (countryId, page = 1, limit = 20, search = '') =>
+  fetchPage('/distributors/get', { page, limit, search }, {
+    method: 'POST',
+    body: countryId ? { country_id: String(countryId).trim() } : {},
+    includeAuth: true,
+  });
 
 export const getParties = async (countryId) => {
   // If no countryId provided, use POST /parties/get with empty body to get all parties

@@ -381,13 +381,29 @@ const withListPaging = (endpoint, { page = 1, limit = LIST_LIMIT } = {}) => {
 
 /**
  * Single request that loads a full list (page 1, large limit) and returns the
- * unwrapped array — one network call, no looping.
+ * unwrapped array — one network call, no looping. Used by dropdowns/dashboards
+ * that need the whole list.
  * @param {string} endpoint
  * @param {Object} [opts] - apiRequest options (method/body/includeAuth/silent)
  */
 const fetchAllPages = async (endpoint, opts = {}) => {
   const res = await apiRequest(withListPaging(endpoint), opts);
   return unwrapList(res);
+};
+
+/**
+ * Fetch ONE server page (default 20) and return { data, pagination } — the
+ * Products-style server-pagination contract for list TABLES.
+ * @param {string} endpoint
+ * @param {{page?:number, limit?:number, search?:string}} [paging]
+ * @param {Object} [opts] - apiRequest options (method/body/includeAuth/silent)
+ */
+const fetchPage = async (endpoint, { page = 1, limit = PAGE_SIZE, search = '' } = {}, opts = {}) => {
+  let ep = withListPaging(endpoint, { page, limit });
+  const term = String(search || '').trim();
+  if (term) ep += `&search=${encodeURIComponent(term)}`;
+  const res = await apiRequest(ep, opts);
+  return { data: unwrapList(res), pagination: (res && res.pagination) || null };
 };
 
 export {
@@ -405,4 +421,5 @@ export {
   unwrapList,
   withListPaging,
   fetchAllPages,
+  fetchPage,
 };

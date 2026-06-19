@@ -1,4 +1,4 @@
-import { apiRequest, fetchAllPages, API_DEBUG, TTL_TRANSACTIONAL } from './client';
+import { apiRequest, fetchAllPages, fetchPage, API_DEBUG, TTL_TRANSACTIONAL } from './client';
 import { getCached, invalidateCache } from '../cacheService';
 
 // ==================== TRAYS ENDPOINTS ====================
@@ -339,6 +339,22 @@ export const getOrdersForRole = async (role) => {
   }
   return getOrders();
 };
+
+// ---- Server-paginated (20/page) variants for list TABLES (Products-style) ----
+/** One page of orders (admin/full list) -> { data, pagination }. */
+export const getOrdersPage = (page = 1, limit = 20, search = '') =>
+  fetchPage('/orders', { page, limit, search }, { method: 'GET', includeAuth: true });
+/** One page of the current user's own orders -> { data, pagination }. */
+export const getMyOrdersPage = (page = 1, limit = 20, search = '') =>
+  fetchPage('/orders/my', { page, limit, search }, { method: 'GET', includeAuth: true });
+/** Role-aware single page of orders -> { data, pagination }. */
+export const getOrdersPageForRole = (role, page = 1, limit = 20, search = '') =>
+  SELF_SCOPED_ORDER_ROLES.has((role || '').toLowerCase().trim())
+    ? getMyOrdersPage(page, limit, search)
+    : getOrdersPage(page, limit, search);
+/** One page of trays -> { data, pagination }. */
+export const getTraysPage = (page = 1, limit = 20, search = '') =>
+  fetchPage('/trays', { page, limit, search }, { method: 'GET', includeAuth: true });
 
 /**
  * Create a new order
