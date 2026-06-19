@@ -126,6 +126,13 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
       filterBody.status = filters.status;
     }
 
+    // search (server-side text search on model_no/size/status) — used by the
+    // 20-per-page picker dropdowns so typing queries the server instead of
+    // pulling the whole catalog.
+    if (filters.search !== undefined && filters.search !== null && String(filters.search).trim() !== '') {
+      filterBody.search = String(filters.search).trim();
+    }
+
     // Always include price filter (backend requires it)
     // If price is not provided, use full range (0-10000) to show all products
     if (filters.price !== undefined && filters.price !== null) {
@@ -176,6 +183,18 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
 export const getProducts = async (page = 1, limit = 20, filters = {}) => {
   const key = `products:${page}:${limit}:${JSON.stringify(filters ?? null)}`;
   return getCached(key, () => fetchProductsUncached(page, limit, filters), TTL_PRODUCTS);
+};
+
+/**
+ * Paginated product getter for picker dropdowns: 20 per page with optional
+ * server-side search. Returns { data, pagination } — never the whole catalog.
+ * @param {number} [page=1]
+ * @param {number} [limit=20]
+ * @param {string} [search=''] - text matched against model_no/size/status
+ */
+export const getProductsPage = async (page = 1, limit = 20, search = '') => {
+  const term = String(search || '').trim();
+  return getProducts(page, limit, term ? { search: term } : null);
 };
 
 /**

@@ -11,23 +11,45 @@ export default function DropdownSelector({
   disabled = false,
   searchable = true, // Enable search by default
   onOpen, // Called when the dropdown is opened (use to lazy-load options)
+  // --- server-search mode (20-per-page pickers) ---
+  serverSearch = false, // when true: never client-filter; ask the parent to query
+  onSearch, // (term) => void — called (debounced) as the user types in server mode
+  loading = false, // show a loading row while the parent fetches
+  selectedLabel = '', // label to show for the current value when it isn't in `options`
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
+  const debounceRef = useRef(null);
 
-  // Find the selected option label
+  // Find the selected option label. In server-search mode the selected item may
+  // not be in the current (filtered) `options`, so fall back to selectedLabel.
   const selectedOption = options.find(opt => String(opt.value) === String(value));
-  const displayValue = selectedOption ? selectedOption.label : placeholder;
-  const hasValue = selectedOption !== undefined;
+  const hasValue = selectedOption !== undefined || (serverSearch && !!value && !!selectedLabel);
+  const displayValue = selectedOption
+    ? selectedOption.label
+    : (hasValue ? selectedLabel : placeholder);
 
-  // Filter options based on search query
-  const filteredOptions = searchQuery
-    ? options.filter(opt => 
-        opt.label.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : options;
+  // Debounced server query as the user types (server-search mode only).
+  useEffect(() => {
+    if (!serverSearch || !onSearch) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => onSearch(searchQuery), 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, serverSearch]);
+
+  // Filter options: server mode shows whatever the parent returned, as-is.
+  const filteredOptions = serverSearch
+    ? options
+    : (searchQuery
+        ? options.filter(opt =>
+            opt.label.toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        : options);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -120,13 +142,13 @@ export default function DropdownSelector({
       
       {isOpen && !disabled && (
         <div className="ui-dropdown-custom__menu absolute top-[calc(100%+6px)] left-0 right-0 min-w-full z-[99999] overflow-hidden bg-surface border border-border rounded-lg shadow-lg">
-          {searchable && options.length > 5 && (
+          {((searchable && options.length > 5) || serverSearch) && (
             <div className="ui-dropdown-custom__search p-2 border-b border-border bg-surface">
               <input
                 ref={searchInputRef}
                 type="text"
                 className="ui-dropdown-custom__search-input w-full px-3 min-h-[36px] border border-border-strong rounded-sm text-[length:var(--text-base)] text-text outline-none transition duration-200 ease-[ease] placeholder:text-text-subtle focus:border-primary focus:shadow-[var(--focus-ring)]"
-                placeholder="Search..."
+                placeholder={serverSearch ? 'Type to search…' : 'Search...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onClick={(e) => e.stopPropagation()}
@@ -134,7 +156,11 @@ export default function DropdownSelector({
             </div>
           )}
           <div className="ui-dropdown-custom__options max-h-[220px] overflow-y-auto py-1">
-            {filteredOptions.length > 0 ? (
+            {loading ? (
+              <div className="ui-dropdown-custom__loading p-3 text-[length:var(--text-base)] text-text-subtle text-center">
+                Loading…
+              </div>
+            ) : filteredOptions.length > 0 ? (
               filteredOptions.map((opt, index) => {
                 const isSelected = String(opt.value) === String(value);
                 return (
