@@ -3,7 +3,7 @@ import '../styles/components/DashboardSidebar.css';
 import {
   FiGrid, FiPackage, FiShoppingCart, FiDollarSign, FiInbox, FiCalendar,
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
-  FiHelpCircle, FiSettings, FiChevronsLeft, FiX,
+  FiHelpCircle, FiSettings, FiChevronsLeft, FiX, FiShoppingBag,
 } from 'react-icons/fi';
 import { getUserRole } from '../services/authService';
 import { filterMenuItemsByRole } from '../utils/rolePermissions';
@@ -163,6 +163,20 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
               </a>
             </li>
           ))}
+          {/* Back to Shop — lives in the drawer on mobile (the header button is
+              hidden below md). A real CTA button (white fill on the indigo
+              sidebar), not a flat nav row. */}
+          <li className="mb-1 mt-3 md:hidden">
+            <a
+              href="/products"
+              className="flex min-h-10 items-center justify-center gap-2 rounded-md bg-white px-4 py-2 text-[length:var(--text-sm)] font-semibold text-primary no-underline shadow-sm outline-none transition-[background-color,transform] duration-200 ease-[ease] hover:bg-white/90 focus-visible:shadow-[0_0_0_2px_rgba(255,255,255,0.7)] active:scale-[0.98] motion-reduce:transition-none"
+              onClick={() => onMobileClose?.()}
+              aria-label="Back to Shop"
+            >
+              <FiShoppingBag size={18} aria-hidden="true" className="flex-shrink-0" />
+              Back to Shop
+            </a>
+          </li>
         </ul>
       </nav>
       <div
