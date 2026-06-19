@@ -137,6 +137,8 @@ const DB_INDEXES = [
     { table: 'salesman_check_ins', fields: ['salesman_id'], name: 'idx_salesman_check_ins_salesman_id' },
     { table: 'salesman_check_ins', fields: ['party_id'], name: 'idx_salesman_check_ins_party_id' },
     { table: 'salesman_check_ins', fields: ['check_in_date'], name: 'idx_salesman_check_ins_date' },
+    { table: 'salesman_check_ins', fields: ['order_id'], name: 'idx_salesman_check_ins_order_id' },
+    { table: 'salesman_check_ins', fields: ['type'], name: 'idx_salesman_check_ins_type' },
 
     // ── zones / cities / states (lookup paths) ───────────────────────────────
     { table: 'zones', fields: ['city_id'], name: 'idx_zones_city_id' },

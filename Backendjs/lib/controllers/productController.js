@@ -15,6 +15,7 @@ const path = require('path');
 const fs = require('fs');
 const { Op, Sequelize } = require('sequelize');
 const { canManageInventory } = require('../utils/roleHelpers');
+const { getListSearchParams } = require('../utils/listSearchHelpers');
 
 const productIncludes = [
     { model: Gender, as: 'gender' },
@@ -63,7 +64,8 @@ class ProductController {
             const pageNum = parseInt(page, 10);
             const limitNum = parseInt(limit, 10);
             const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody } = req.body;
-            const search = (searchQuery || searchBody || '').trim();
+            const { name: nameQuery } = getListSearchParams(req);
+            const search = (searchQuery || searchBody || nameQuery || '').trim();
             const conditions = [];
 
             if (collection_id) {

@@ -9,6 +9,7 @@ const DistributorStates = require('../models/DistributorStates');
 const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 class DistributorController {
     async getDistributor(req, res) {
@@ -67,27 +68,42 @@ class DistributorController {
 
     async getDistributors(req, res) {
         try {
-            const { country_id } = req.body;
-            console.log("country_id", country_id);
-            const distributors = await Distributor.findAll({ where: { is_active: true, country_id: country_id } });
-            if (!distributors || distributors.length === 0) {
-                return res.status(404).json({ error: 'Distributors not found' });
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
             }
-            console.log("distributors", distributors.length);
-            const distributorIds = distributors.map(distributor => distributor.distributor_id);
-            const distributorZones = await DistributorZones.findAll({ where: { distributor_id: distributorIds } });
-            // Resilient: don't let a not-yet-synced states table break the list.
-            let distributorStates = [];
-            try { distributorStates = await DistributorStates.findAll({ where: { distributor_id: distributorIds } }); }
-            catch (e) { console.warn('distributor_states read skipped:', e.message); }
-            const response = distributors.map(distributor => {
-                return {
-                    ...distributor.toJSON(),
-                    zones: distributorZones.filter(zone => zone.distributor_id === distributor.distributor_id).map(zone => zone.toJSON()),
-                    states: distributorStates.filter(s => s.distributor_id === distributor.distributor_id).map(s => s.toJSON())
-                }
+            const { country_id } = req.body;
+            const { name, phone } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone,
+                nameFields: ['distributor_name', 'trade_name', 'contact_person'],
+                phoneFields: ['phone'],
             });
-            res.status(200).json(response);
+            const where = mergeWhere({ is_active: true, country_id }, searchFilter);
+            const { count, rows: distributors } = await Distributor.findAndCountAll({
+                where,
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            const distributorIds = distributors.map(distributor => distributor.distributor_id);
+            const distributorZones = distributorIds.length
+                ? await DistributorZones.findAll({ where: { distributor_id: distributorIds } })
+                : [];
+            let distributorStates = [];
+            if (distributorIds.length) {
+                try {
+                    distributorStates = await DistributorStates.findAll({ where: { distributor_id: distributorIds } });
+                } catch (e) {
+                    console.warn('distributor_states read skipped:', e.message);
+                }
+            }
+            const response = distributors.map(distributor => ({
+                ...distributor.toJSON(),
+                zones: distributorZones.filter(zone => zone.distributor_id === distributor.distributor_id).map(zone => zone.toJSON()),
+                states: distributorStates.filter(s => s.distributor_id === distributor.distributor_id).map(s => s.toJSON()),
+            }));
+            res.status(200).json(buildPaginatedResponse(response, pagination, count));
         } catch (error) {
             console.log("error", error);
             res.status(500).json({ error: error.message });
@@ -116,11 +132,15 @@ class DistributorController {
                 if (!phone) {
                     return res.status(400).json({ error: 'Phone is required to create distributor login' });
                 }
+                if (!address) {
+                    return res.status(400).json({ error: 'Address is required to create distributor login' });
+                }
                 distributorUser = await findOrCreateRoleUser({
                     phone,
                     email,
                     fullName: contact_person || distributor_name,
                     roleName: 'distributor',
+                    address,
                 });
             }
 

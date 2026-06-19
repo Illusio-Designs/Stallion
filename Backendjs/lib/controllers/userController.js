@@ -66,7 +66,10 @@ class UserController {
 
     async createUser(req, res) {
         try {
-            const { name, is_active, phone, role_id, email, image_url } = req.body;
+            const { name, is_active, phone, role_id, email, image_url, address } = req.body;
+            if (!address) {
+                return res.status(400).json({ error: 'Address is required' });
+            }
             const role = await Role.findByPk(role_id);
             if (!role) {
                 return res.status(404).json({ error: 'Role not found' });
@@ -75,6 +78,7 @@ class UserController {
                 full_name: name,
                 phone: phone,
                 email: email,
+                address,
                 role_id: role_id,
                 is_active: is_active,
                 profile_image: image_url,
@@ -104,7 +108,7 @@ class UserController {
         try {
             const id = req.user.user_id;
             console.log("id", id);
-            const { name, is_active, phone, role_id, email, image_url } = req.body;
+            const { name, is_active, phone, role_id, email, image_url, address } = req.body;
             const user = await User.findByPk(id);
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
@@ -114,9 +118,14 @@ class UserController {
                 full_name: name !== undefined ? name : user.full_name,
                 phone: phone !== undefined ? phone : user.phone,
                 email: email !== undefined ? email : user.email,
+                address: address !== undefined ? address : user.address,
                 profile_image: image_url !== undefined ? image_url : user.profile_image,
                 updated_at: new Date(),
             };
+
+            if (!updates.address) {
+                return res.status(400).json({ error: 'Address is required' });
+            }
 
             if (is_active !== undefined) {
                 updates.is_active = is_active;
@@ -141,6 +150,7 @@ class UserController {
                     full_name: name || salesmen.full_name,
                     phone: phone || salesmen.phone,
                     email: email || salesmen.email,
+                    address: address || salesmen.address,
                     updated_at: new Date()
                 });
             }
@@ -150,6 +160,7 @@ class UserController {
                     party_name: name || party.party_name,
                     phone: phone || party.phone,
                     email: email || party.email,
+                    address: address || party.address,
                     updated_at: new Date()
                 });
             }
@@ -159,6 +170,7 @@ class UserController {
                     distributor_name: name || distributor.distributor_name,
                     phone: phone || distributor.phone,
                     email: email || distributor.email,
+                    address: address || distributor.address,
                     updated_at: new Date()
                 });
             }

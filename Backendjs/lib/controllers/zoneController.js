@@ -9,12 +9,21 @@ const Distributor = require('../models/distributor');
 const DistributorZones = require('../models/DistributorZones');
 const User = require('../models/User');
 const { Op } = require('sequelize');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 class ZoneController {
 
     async getZones(req, res) {
         try {
             const { city_id } = req.body;
-            const zones = await Zone.findAll({ where: { is_active: true, city_id: city_id } });
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['name', 'zone_code'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({ is_active: true, city_id }, searchFilter);
+            const zones = await Zone.findAll({ where });
             if (!zones || zones.length === 0) {
                 return res.status(404).json({ error: 'Zones not found' });
             }

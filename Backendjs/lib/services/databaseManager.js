@@ -58,6 +58,11 @@ class DatabaseManager {
                         type: DataTypes.STRING(255),
                         allowNull: false
                     },
+                    address: {
+                        type: DataTypes.TEXT,
+                        allowNull: false,
+                        defaultValue: ''
+                    },
                     profile_image: {
                         type: DataTypes.STRING(500),
                         allowNull: true
@@ -351,6 +356,7 @@ class DatabaseManager {
                     full_name: 'Superadmin',
                     email: 'illusiodesigns@gmail.com',
                     phone: '7600046416',
+                    address: 'Head Office',
                     is_active: true,
                     role_id: adminRole.role_id
                 });

@@ -1,16 +1,30 @@
 const City = require('../models/Cities');
 const { logAudit } = require('../utils/auditLogger');
 const State = require('../models/State');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 class CityController {
 
     async getCities(req, res) {
         try {
-            const { state_id } = req.body;
-            const cities = await City.findAll({ where: { is_active: true, state_id: state_id } });
-            if (!cities || cities.length === 0) {
-                return res.status(404).json({ error: 'Cities not found' });
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
             }
-            res.status(200).json(cities);
+            const { state_id } = req.body;
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['name'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({ is_active: true, state_id }, searchFilter);
+            const { count, rows: cities } = await City.findAndCountAll({
+                where,
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            res.status(200).json(buildPaginatedResponse(cities, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

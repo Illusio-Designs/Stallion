@@ -1,9 +1,18 @@
 const FrameType = require('../models/FrameType');
 const { logAudit } = require('../utils/auditLogger');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 class FrameTypeController {
     async getFrameTypes(req, res) {
         try {
-            const frameTypes = await FrameType.findAll();
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['frame_type'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const frameTypes = await FrameType.findAll({ where });
             if (!frameTypes || frameTypes.length === 0) {
                 return res.status(404).json({ error: 'Frame types not found' });
             }

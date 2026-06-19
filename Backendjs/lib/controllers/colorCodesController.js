@@ -1,10 +1,19 @@
 const ColorCode = require('../models/ColorCode');
 const { logAudit } = require('../utils/auditLogger');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
 class ColorCodesController {
     async getColorCodes(req, res) {
         try {
-            const colorCodes = await ColorCode.findAll();
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['color_code'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const colorCodes = await ColorCode.findAll({ where });
             if (!colorCodes || colorCodes.length === 0) {
                 return res.status(404).json({ error: 'Color codes not found' });
             }

@@ -3,7 +3,6 @@ const { logAudit } = require('../utils/auditLogger');
 const Tray = require('../models/Tray');
 const { TrayStatus } = require('../constants/enums');
 const SalesmanTray = require('../models/SalesmanTray');
-const Party = require('../models/Party');
 const SalesmanZones = require('../models/SalesmanZones');
 const Zone = require('../models/Zone');
 const SalesmanStates = require('../models/SalesmanStates');
@@ -11,6 +10,7 @@ const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const User = require('../models/User');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
 class SalesmanController {
 
@@ -27,24 +27,6 @@ class SalesmanController {
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
             const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
             res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
-        }
-        catch (error) {
-            res.status(500).json({ error: error.message });
-        }
-    }
-
-    async getSalesmanParties(req, res) {
-        try {
-            const id = req.user.user_id;
-            if (!id) {
-                return res.status(400).json({ error: 'User ID is required' });
-            }
-            const salesman = await Salesman.findOne({ where: { user_id: id } });
-            if (!salesman) {
-                return res.status(404).json({ error: 'Salesman not found' });
-            }
-            const parties = await Party.findAll({ where: { salesman_id: salesman.salesman_id } });
-            res.status(200).json(parties);
         }
         catch (error) {
             res.status(500).json({ error: error.message });
@@ -70,7 +52,15 @@ class SalesmanController {
 
     async getSalesmen(req, res) {
         try {
-            const salesmen = await Salesman.findAll({ where: { is_active: true } });
+            const { name, phone } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone,
+                nameFields: ['full_name', 'employee_code'],
+                phoneFields: ['phone', 'alternate_phone'],
+            });
+            const where = mergeWhere({ is_active: true }, searchFilter);
+            const salesmen = await Salesman.findAll({ where });
             if (!salesmen || salesmen.length === 0) {
                 return res.status(404).json({ error: 'Salesmen not found' });
             }
@@ -105,11 +95,15 @@ class SalesmanController {
                 if (!phone) {
                     return res.status(400).json({ error: 'Phone is required to create salesman login' });
                 }
+                if (!address) {
+                    return res.status(400).json({ error: 'Address is required to create salesman login' });
+                }
                 const loginUser = await findOrCreateRoleUser({
                     phone,
                     email,
                     fullName: full_name,
                     roleName: 'salesman',
+                    address,
                 });
                 linkedUserId = loginUser.user_id;
             }

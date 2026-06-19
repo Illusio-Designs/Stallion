@@ -1,10 +1,19 @@
 const Country = require('../models/Country');
 const { logAudit } = require('../utils/auditLogger');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
 class CountryController {
     async getCountries(req, res) {
         try {
-            const countries = await Country.findAll({ where: { is_active: true } });
+            const { name, phone } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone,
+                nameFields: ['name', 'code'],
+                phoneFields: ['phone_code'],
+            });
+            const where = mergeWhere({ is_active: true }, searchFilter);
+            const countries = await Country.findAll({ where });
             if (!countries || countries.length === 0) {
                 return res.status(404).json({ error: 'Countries not found' });
             }

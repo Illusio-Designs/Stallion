@@ -17,6 +17,7 @@ const salesmanTargetsController = require('./salesmanTargetsController');
 const DistributorZones = require('../models/DistributorZones');
 const { canManageOrders, normalizeRole } = require('../utils/roleHelpers');
 const { resolveUserScope, canViewAllOrders } = require('../utils/scopeHelpers');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 // Helper function to reverse an order operation (does not depend on controller instance)
 async function reverseOrderOperation(orderId, transaction) {
@@ -100,11 +101,24 @@ class OrderController {
                 return res.status(403).json({ error: 'Access denied' });
             }
 
-            const orders = await Order.findAll({ where: whereClause });
-            if (!orders || orders.length === 0) {
-                return res.status(404).json({ error: 'Orders not found' });
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['order_number', 'order_status', 'order_type', 'courier_name', 'courier_tracking_number'],
+                phoneFields: [],
+            });
+            const where = mergeWhere(whereClause, searchFilter);
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
             }
-            res.status(200).json(orders);
+            const { count, rows: orders } = await Order.findAndCountAll({
+                where,
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            res.status(200).json(buildPaginatedResponse(orders, pagination, count));
         } catch (error) {
             console.error('Error fetching orders:', error);
             res.status(500).json({ error: 'Failed to fetch orders' });
@@ -115,11 +129,24 @@ class OrderController {
             if (!canViewAllOrders(req.userRoleName)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
-            const orders = await Order.findAll();
-            if (!orders || orders.length === 0) {
-                return res.status(404).json({ error: 'Orders not found' });
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
             }
-            res.status(200).json(orders);
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['order_number', 'order_status', 'order_type', 'courier_name', 'courier_tracking_number'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const { count, rows: orders } = await Order.findAndCountAll({
+                where,
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            res.status(200).json(buildPaginatedResponse(orders, pagination, count));
         } catch (error) {
             console.error('Error fetching orders:', error);
             res.status(500).json({ error: 'Failed to fetch orders' });

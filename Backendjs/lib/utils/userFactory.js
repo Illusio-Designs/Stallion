@@ -2,9 +2,12 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const UserRole = require('../models/UserRole');
 
-async function findOrCreateRoleUser({ phone, email, fullName, roleName }) {
+async function findOrCreateRoleUser({ phone, email, fullName, roleName, address }) {
     if (!phone) {
         throw new Error('Phone is required to create a login user');
+    }
+    if (!address) {
+        throw new Error('Address is required to create a login user');
     }
 
     const role = await Role.findOne({ where: { role_name: roleName } });
@@ -34,6 +37,7 @@ async function findOrCreateRoleUser({ phone, email, fullName, roleName }) {
         phone,
         email: email || null,
         full_name: fullName,
+        address,
         role_id: role.role_id,
         is_active: true,
         created_at: new Date(),

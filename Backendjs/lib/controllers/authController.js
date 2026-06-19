@@ -134,9 +134,9 @@ class AuthController {
 
     async register(req, res) {
         try {
-            const { phoneNumber, fullName, roleId } = req.body;
-            if (!phoneNumber || !fullName || !roleId) {
-                return res.status(400).json({ error: 'Phone number, full name and role id are required' });
+            const { phoneNumber, fullName, roleId, address } = req.body;
+            if (!phoneNumber || !fullName || !roleId || !address) {
+                return res.status(400).json({ error: 'Phone number, full name, role id, and address are required' });
             }
 
             const existingUser = await User.findOne({
@@ -157,6 +157,7 @@ class AuthController {
             const user = await User.create({
                 phone: phoneNumber,
                 full_name: fullName,
+                address,
                 role_id: roleId,
                 is_active: true,
                 created_at: new Date(),

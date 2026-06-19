@@ -1,10 +1,19 @@
 const LensMaterial = require('../models/LensMaterial');
 const { logAudit } = require('../utils/auditLogger');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
 class LensMaterialController {
     async getLensMaterials(req, res) {
         try {
-            const lensMaterials = await LensMaterial.findAll();
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['lens_material'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const lensMaterials = await LensMaterial.findAll({ where });
             if (!lensMaterials || lensMaterials.length === 0) {
                 return res.status(404).json({ error: 'Lens materials not found' });
             }

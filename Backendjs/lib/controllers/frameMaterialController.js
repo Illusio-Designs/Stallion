@@ -1,9 +1,18 @@
 const FrameMaterial = require('../models/FrameMaterial');
 const { logAudit } = require('../utils/auditLogger');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 class FrameMaterialController {
     async getFrameMaterials(req, res) {
         try {
-            const frameMaterials = await FrameMaterial.findAll();
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['frame_material'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const frameMaterials = await FrameMaterial.findAll({ where });
             if (!frameMaterials || frameMaterials.length === 0) {
                 return res.status(404).json({ error: 'Frame materials not found' });
             }

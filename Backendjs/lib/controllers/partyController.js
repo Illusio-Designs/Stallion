@@ -17,6 +17,7 @@ const { resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const { canManageParties, normalizeRole } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 class PartyController {
     async getPartie(req, res) {
@@ -39,11 +40,24 @@ class PartyController {
             if (!canManageParties(req.userRoleName)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
-            const parties = await Party.findAll({ where: { is_active: true } });
-            if (!parties || parties.length === 0) {
-                return res.status(404).json({ error: 'Parties not found' });
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
             }
-            res.status(200).json(parties);
+            const { name, phone } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone,
+                nameFields: ['party_name', 'trade_name', 'contact_person'],
+                phoneFields: ['phone'],
+            });
+            const where = mergeWhere({ is_active: true }, searchFilter);
+            const { count, rows: parties } = await Party.findAndCountAll({
+                where,
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            res.status(200).json(buildPaginatedResponse(parties, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -77,14 +91,16 @@ class PartyController {
         }
     }
 
-
     async getMyParties(req, res) {
         try {
             const user = req.user;
             if (!user) {
                 return res.status(400).json({ error: 'User is required' });
             }
-            let parties = [];
+            const pagination = parsePaginationParams(req);
+            if (pagination.error) {
+                return res.status(pagination.status).json({ error: pagination.error });
+            }
             const userRole = await UserRole.findOne({ where: { user_id: user.user_id } });
             if (!userRole) {
                 return res.status(404).json({ error: 'User role not found' });
@@ -94,38 +110,54 @@ class PartyController {
                 return res.status(404).json({ error: 'Role not found' });
             }
             const roleName = role.role_name.toLowerCase();
-            console.log("roleName", roleName);
+            let where;
+
             if (roleName === 'party') {
-                const party = await Party.findOne({ where: { user_id: user.user_id } });
-                if (!party) {
-                    return res.status(404).json({ error: 'Party not found' });
-                }
-                parties = [party];
+                where = { user_id: user.user_id };
             } else if (roleName === 'salesman') {
                 const salesman = await Salesman.findOne({ where: { user_id: user.user_id } });
                 if (!salesman) {
                     return res.status(404).json({ error: 'Salesman not found' });
                 }
-                console.log("salesman", salesman.salesman_id);
-                parties = await Party.findAll({ where: { salesman_id: salesman.salesman_id } });
+                const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
+                const stateIds = salesmanStates.map((s) => s.state_id);
+                if (salesman.state_id && !stateIds.includes(salesman.state_id)) {
+                    stateIds.push(salesman.state_id);
+                }
+                if (stateIds.length === 0) {
+                    return res.status(200).json(buildPaginatedResponse([], pagination, 0));
+                }
+                where = { state_id: { [Op.in]: stateIds } };
             } else if (roleName === 'distributor') {
                 const distributor = await Distributor.findOne({ where: { user_id: user.user_id } });
                 if (!distributor) {
                     return res.status(404).json({ error: 'Distributor not found' });
                 }
-                console.log("distributor", distributor.distributor_id);
-                parties = await Party.findAll({ where: { distributor_id: distributor.distributor_id } });
+                where = { distributor_id: distributor.distributor_id };
             } else {
                 return res.status(400).json({ error: `Role '${roleName}' is not supported for this operation` });
             }
-            if (!parties || parties.length === 0) {
-                return res.status(404).json({ error: 'Parties not found' });
-            }
-            res.status(200).json(parties);
+
+            const { name, phone } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone,
+                nameFields: ['party_name', 'trade_name', 'contact_person'],
+                phoneFields: ['phone'],
+            });
+            where = mergeWhere(where, searchFilter);
+
+            const { count, rows: parties } = await Party.findAndCountAll({
+                where,
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            res.status(200).json(buildPaginatedResponse(parties, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
     }
+
     async getPartiesBySalesmanId(req, res) {
         try {
             const salesman_id = req.params.salesman_id;
@@ -267,8 +299,8 @@ class PartyController {
             }
             const user = req.user;
             const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
-            if (!party_name || !phone) {
-                return res.status(400).json({ error: 'Party name and phone are required' });
+            if (!party_name || !phone || !address) {
+                return res.status(400).json({ error: 'Party name, phone, and address are required' });
             }
             // State is required — it drives the salesman/distributor assignment.
             // Accepts a state name or id; city & zone are optional.
@@ -298,6 +330,7 @@ class PartyController {
                 email,
                 fullName: contact_person || party_name,
                 roleName: 'party',
+                address,
             });
 
             const party = await Party.create({
@@ -583,11 +616,19 @@ class PartyController {
                             data: null,
                         };
                     }
+                    if (!row.address) {
+                        return {
+                            success: false,
+                            message: `Row ${rowNum}: address is required to create party login`,
+                            data: null,
+                        };
+                    }
                     const loginUser = await findOrCreateRoleUser({
                         phone: row.phone,
                         email: row.email,
                         fullName: row.contact_person || row.party_name,
                         roleName: 'party',
+                        address: row.address,
                     });
                     await Party.create({
                         ...payload,
