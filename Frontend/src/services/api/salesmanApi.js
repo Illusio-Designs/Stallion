@@ -1,4 +1,4 @@
-import { apiRequest } from './client';
+import { apiRequest, fetchAllPages } from './client';
 
 // ==================== SALESMAN CHECK-IN ENDPOINTS ====================
 
@@ -7,7 +7,9 @@ import { apiRequest } from './client';
  * @returns {Promise<Array>} Array of check-in objects
  */
 export const getAllSalesmanCheckins = async () => {
-  return apiRequest('/salesman_checkins', {
+  // GET /salesman_checkins now requires page & limit (400 otherwise). Fetch the
+  // full set for the analytics report (page=1&limit=1000) and unwrap { data }.
+  return fetchAllPages('/salesman_checkins', {
     method: 'GET',
     includeAuth: true,
     silent: true, // empty -> 404 "not found"; callers treat as empty list
@@ -91,7 +93,9 @@ export const deleteSalesmanCheckin = async (checkinId) => {
  * @returns {Promise<Array>} Array of target objects
  */
 export const getAllSalesmanTargets = async () => {
-  return apiRequest('/salesman_targets', {
+  // GET /salesman_targets now requires page & limit (400 otherwise). Fetch the
+  // full set for the analytics report (page=1&limit=1000) and unwrap { data }.
+  return fetchAllPages('/salesman_targets', {
     method: 'GET',
     includeAuth: true,
     silent: true, // empty -> 404 "not found"; callers treat as empty list
