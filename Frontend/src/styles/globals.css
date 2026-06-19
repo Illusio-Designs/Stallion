@@ -134,6 +134,19 @@ select:focus-visible {
   outline: none;
 }
 
+/* iOS Safari auto-zooms when a focused form control has a font-size below 16px
+   and never zooms back out. Force >=16px on form controls on touch devices
+   (phones/tablets of any width) so tapping a field doesn't jump-zoom the page.
+   !important is needed to win over smaller Tailwind text utilities (text-sm,
+   text-[13px], etc.). Excludes checkbox/radio/range, which have no text. */
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
 img,
 svg,
 video {

@@ -52,8 +52,12 @@
   white-space: nowrap;
   transition: background var(--transition), transform var(--transition-fast);
 }
-.dashboard-back-shop:hover {
-  background: var(--color-primary-hover);
+/* Only on hover-capable devices — otherwise the hover background sticks after
+   a tap on iOS/touch and the button looks stuck in its hover state. */
+@media (hover: hover) {
+  .dashboard-back-shop:hover {
+    background: var(--color-primary-hover);
+  }
 }
 .dashboard-back-shop:focus-visible {
   outline: none;
@@ -117,9 +121,11 @@
   color: var(--color-text-muted);
   transition: background var(--transition), color var(--transition);
 }
-.dashboard-icon-btn:hover {
-  background: var(--color-surface-muted);
-  color: var(--color-text);
+@media (hover: hover) {
+  .dashboard-icon-btn:hover {
+    background: var(--color-surface-muted);
+    color: var(--color-text);
+  }
 }
 .dashboard-icon-btn:focus-visible {
   outline: none;
@@ -156,12 +162,19 @@
   z-index: 50;
   box-shadow: var(--shadow-md);
 }
-.dashboard-icon-btn.has-tooltip:hover .header-tooltip,
 .dashboard-icon-btn.has-tooltip:focus-visible .header-tooltip,
-.dashboard-avatar-btn.has-tooltip:hover .header-tooltip,
 .dashboard-avatar-btn.has-tooltip:focus-visible .header-tooltip {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+/* Hover-reveal only on hover-capable devices so the tooltip doesn't stick
+   open after a tap on touchscreens. */
+@media (hover: hover) {
+  .dashboard-icon-btn.has-tooltip:hover .header-tooltip,
+  .dashboard-avatar-btn.has-tooltip:hover .header-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 .header-tooltip::after {
   content: "";
@@ -188,8 +201,10 @@
   overflow: visible;
   transition: box-shadow var(--transition), border-color var(--transition);
 }
-.dashboard-avatar-btn:hover {
-  border-color: var(--color-border-strong);
+@media (hover: hover) {
+  .dashboard-avatar-btn:hover {
+    border-color: var(--color-border-strong);
+  }
 }
 .dashboard-avatar-btn:focus-visible {
   outline: none;
