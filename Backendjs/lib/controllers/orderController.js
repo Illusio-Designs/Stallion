@@ -17,6 +17,7 @@ const salesmanTargetsController = require('./salesmanTargetsController');
 const DistributorZones = require('../models/DistributorZones');
 const { canManageOrders, normalizeRole } = require('../utils/roleHelpers');
 const { resolveUserScope, canViewAllOrders } = require('../utils/scopeHelpers');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
 // Helper function to reverse an order operation (does not depend on controller instance)
 async function reverseOrderOperation(orderId, transaction) {
@@ -100,7 +101,15 @@ class OrderController {
                 return res.status(403).json({ error: 'Access denied' });
             }
 
-            const orders = await Order.findAll({ where: whereClause });
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['order_number', 'order_status', 'order_type', 'courier_name', 'courier_tracking_number'],
+                phoneFields: [],
+            });
+            const where = mergeWhere(whereClause, searchFilter);
+            const orders = await Order.findAll({ where });
             if (!orders || orders.length === 0) {
                 return res.status(404).json({ error: 'Orders not found' });
             }
@@ -115,7 +124,15 @@ class OrderController {
             if (!canViewAllOrders(req.userRoleName)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
-            const orders = await Order.findAll();
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['order_number', 'order_status', 'order_type', 'courier_name', 'courier_tracking_number'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const orders = await Order.findAll({ where });
             if (!orders || orders.length === 0) {
                 return res.status(404).json({ error: 'Orders not found' });
             }

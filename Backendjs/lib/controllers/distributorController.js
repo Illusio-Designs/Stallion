@@ -9,6 +9,7 @@ const DistributorStates = require('../models/DistributorStates');
 const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
 class DistributorController {
     async getDistributor(req, res) {
@@ -68,8 +69,16 @@ class DistributorController {
     async getDistributors(req, res) {
         try {
             const { country_id } = req.body;
+            const { name, phone } = getListSearchParams(req);
             console.log("country_id", country_id);
-            const distributors = await Distributor.findAll({ where: { is_active: true, country_id: country_id } });
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone,
+                nameFields: ['distributor_name', 'trade_name', 'contact_person'],
+                phoneFields: ['phone'],
+            });
+            const where = mergeWhere({ is_active: true, country_id }, searchFilter);
+            const distributors = await Distributor.findAll({ where });
             if (!distributors || distributors.length === 0) {
                 return res.status(404).json({ error: 'Distributors not found' });
             }

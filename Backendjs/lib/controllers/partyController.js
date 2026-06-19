@@ -17,6 +17,7 @@ const { resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const { canManageParties, normalizeRole } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
 class PartyController {
     async getPartie(req, res) {
@@ -39,7 +40,15 @@ class PartyController {
             if (!canManageParties(req.userRoleName)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
-            const parties = await Party.findAll({ where: { is_active: true } });
+            const { name, phone } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone,
+                nameFields: ['party_name', 'trade_name', 'contact_person'],
+                phoneFields: ['phone'],
+            });
+            const where = mergeWhere({ is_active: true }, searchFilter);
+            const parties = await Party.findAll({ where });
             if (!parties || parties.length === 0) {
                 return res.status(404).json({ error: 'Parties not found' });
             }

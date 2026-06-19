@@ -1,10 +1,19 @@
 const Collection = require('../models/Collection');
 const { logAudit } = require('../utils/auditLogger');
 const Brand = require('../models/Brand');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 class CollectionController {
     async getCollections(req, res) {
         try {
-            const collections = await Collection.findAll();
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['collection_name'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const collections = await Collection.findAll({ where });
             if (!collections || collections.length === 0) {
                 return res.status(404).json({ error: 'Collections not found' });
             }

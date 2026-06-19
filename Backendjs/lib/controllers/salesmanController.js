@@ -12,6 +12,7 @@ const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const User = require('../models/User');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
 class SalesmanController {
 
@@ -79,7 +80,15 @@ class SalesmanController {
 
     async getSalesmen(req, res) {
         try {
-            const salesmen = await Salesman.findAll({ where: { is_active: true } });
+            const { name, phone } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone,
+                nameFields: ['full_name', 'employee_code'],
+                phoneFields: ['phone', 'alternate_phone'],
+            });
+            const where = mergeWhere({ is_active: true }, searchFilter);
+            const salesmen = await Salesman.findAll({ where });
             if (!salesmen || salesmen.length === 0) {
                 return res.status(404).json({ error: 'Salesmen not found' });
             }

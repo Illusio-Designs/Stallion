@@ -1,9 +1,18 @@
 const LensColor = require('../models/LensColor');
 const { logAudit } = require('../utils/auditLogger');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 class LensColorsController {
     async getLensColors(req, res) {
         try {
-            const lensColors = await LensColor.findAll();
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['lens_color'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const lensColors = await LensColor.findAll({ where });
             if (!lensColors || lensColors.length === 0) {
                 return res.status(404).json({ error: 'Lens colors not found' });
             }

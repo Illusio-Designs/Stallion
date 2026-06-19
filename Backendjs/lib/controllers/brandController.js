@@ -1,10 +1,19 @@
 const Brand = require('../models/Brand');
 const { logAudit } = require('../utils/auditLogger');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
 class BrandController {
     async getBrands(req, res) {
         try {
-            const brands = await Brand.findAll();
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['brand_name'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const brands = await Brand.findAll({ where });
             if (!brands || brands.length === 0) {
                 return res.status(404).json({ error: 'Brands not found' });
             }

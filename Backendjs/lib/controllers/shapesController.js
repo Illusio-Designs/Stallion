@@ -1,9 +1,18 @@
 const Shape = require('../models/Shape');
 const { logAudit } = require('../utils/auditLogger');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 class ShapesController {
     async getShapes(req, res) {
         try {
-            const shapes = await Shape.findAll();
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['shape_name'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const shapes = await Shape.findAll({ where });
             if (!shapes || shapes.length === 0) {
                 return res.status(404).json({ error: 'Shapes not found' });
             }

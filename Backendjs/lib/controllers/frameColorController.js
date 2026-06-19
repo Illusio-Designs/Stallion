@@ -1,10 +1,19 @@
 const FrameColor = require('../models/FrameColor');
 const { logAudit } = require('../utils/auditLogger');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
 class FrameColorController {
     async getFrameColors(req, res) {
         try {
-            const frameColors = await FrameColor.findAll();
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({
+                name,
+                phone: null,
+                nameFields: ['frame_color'],
+                phoneFields: [],
+            });
+            const where = mergeWhere({}, searchFilter);
+            const frameColors = await FrameColor.findAll({ where });
             if (!frameColors || frameColors.length === 0) {
                 return res.status(404).json({ error: 'Frame colors not found' });
             }
