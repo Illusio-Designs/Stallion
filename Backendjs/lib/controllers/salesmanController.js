@@ -1,3 +1,4 @@
+const { Op } = require('sequelize');
 const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const Tray = require('../models/Tray');
@@ -43,7 +44,15 @@ class SalesmanController {
             if (!salesman) {
                 return res.status(404).json({ error: 'Salesman not found' });
             }
-            const parties = await Party.findAll({ where: { salesman_id: salesman.salesman_id } });
+            const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
+            const stateIds = salesmanStates.map((s) => s.state_id);
+            if (salesman.state_id && !stateIds.includes(salesman.state_id)) {
+                stateIds.push(salesman.state_id);
+            }
+            if (stateIds.length === 0) {
+                return res.status(200).json([]);
+            }
+            const parties = await Party.findAll({ where: { state_id: { [Op.in]: stateIds } } });
             res.status(200).json(parties);
         }
         catch (error) {
