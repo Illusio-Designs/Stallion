@@ -1,0 +1,64 @@
+name: Sync backend → main
+
+# When anyone pushes to the `backend` branch (backend-only, Backendjs/ at the
+# same path as main), mirror Backendjs/ into main and push to main. The branch
+# is the source of truth for that subfolder: main/Backendjs is replaced wholesale.
+
+on:
+  push:
+    branches: [backend]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Serialize with the frontend sync so both never push to main at once.
+concurrency:
+  group: sync-to-main
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          path: main-repo
+
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          ref: backend
+          path: branch-repo
+
+      - name: Mirror backend/Backendjs → main/Backendjs
+        run: |
+          mkdir -p main-repo/Backendjs
+          rsync -a --delete \
+            --exclude='.git' \
+            branch-repo/Backendjs/ main-repo/Backendjs/
+
+      - name: Commit & push to main
+        working-directory: main-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A Backendjs
+          if git diff --cached --quiet; then
+            echo "No changes to sync."
+            exit 0
+          fi
+          git commit -m "chore(sync): backend → main/Backendjs (${GITHUB_SHA::7})"
+          for i in 1 2 3 4 5; do
+            if git push origin main; then
+              echo "Pushed to main."
+              exit 0
+            fi
+            echo "Push rejected (main moved), rebasing and retrying..."
+            git pull --rebase origin main
+          done
+          echo "Failed to push to main after retries." >&2
+          exit 1
