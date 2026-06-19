@@ -173,6 +173,18 @@ const Cart = ({ onPageChange = null }) => {
         return;
       }
 
+      // Geolocation only works in a secure context (HTTPS or http://localhost).
+      // Over a plain-http IP it's disabled entirely and getCurrentPosition would
+      // fail with a misleading "permission denied".
+      if (typeof window !== 'undefined' && window.isSecureContext === false) {
+        const err = new Error('Location requires a secure (HTTPS) connection.');
+        err.insecure = true;
+        setLocationError('Location needs a secure connection. Open the app over HTTPS or http://localhost (a plain http:// IP address won’t work).');
+        console.error('[Cart] Insecure context — geolocation blocked');
+        reject(err);
+        return;
+      }
+
       setLocationError(null);
       console.log('[Cart] Requesting user location...');
 
@@ -218,12 +230,20 @@ const Cart = ({ onPageChange = null }) => {
     try {
       await getCurrentLocation(); // native prompt, or rejects if blocked
     } catch (err) {
-      if (err && err.code === 1 /* PERMISSION_DENIED */) {
+      if (err?.insecure) {
+        // getCurrentLocation already set the HTTPS message; nothing to retry here.
+      } else if (err && err.code === 1 /* PERMISSION_DENIED */) {
+        // Site permission may already be on — a code-1 with the site allowed is
+        // usually the device's location service being off (Chrome surfaces OS
+        // denial as code 1). Cover both, and offer a reload (Chrome applies a
+        // permission change only after reload).
         setLocationBlocked(true);
-        setLocationError('Location is blocked for this site. Enable it in your browser’s site settings, then reload the page.');
+        setLocationError('Location is blocked. Make sure location is allowed for this site AND your device’s location service is turned on, then reload the page.');
+      } else if (err && err.code === 2 /* POSITION_UNAVAILABLE */) {
+        setLocationError('Your location is currently unavailable. Turn on your device’s location service and try again.');
+      } else if (err && err.code === 3 /* TIMEOUT */) {
+        setLocationError('Getting your location timed out. Please try again.');
       }
-      // Other errors (timeout / position unavailable) keep the message that
-      // getCurrentLocation already set.
     } finally {
       setLocationLoading(false);
     }
