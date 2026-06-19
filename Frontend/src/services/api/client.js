@@ -362,34 +362,32 @@ const apiRequest = async (endpoint, options = {}) => {
 
 // ---- List pagination compatibility ----
 // Several backend list endpoints now REQUIRE page & limit (they 400 without
-// them) and respond { data, pagination } with a STRICT 20-per-page cap. These
-// pages filter/paginate client-side, so we walk every page (limit=20) and return
-// the full flattened array, keeping every caller's existing array contract.
-const PAGE_SIZE = 20; // backend list endpoints are strictly 20 per page
+// them) and respond { data, pagination }. Dashboards/dropdowns/client-side
+// tables need the FULL list, so these getters make a SINGLE request with a large
+// limit and return the unwrapped array (no per-page looping). Tables that want
+// true 20/page server pagination pass their own page/limit and read .pagination.
+const PAGE_SIZE = 20;        // strict server page size for true server-paginated tables
+const LIST_LIMIT = 1000;     // single-call "load all" size for client-side lists/dropdowns
 
 /** Normalize an array | { data, pagination } response to its array. */
 const unwrapList = (res) =>
   Array.isArray(res) ? res : (res && Array.isArray(res.data) ? res.data : []);
 
+/** Append page/limit query params (the backend now requires them). */
+const withListPaging = (endpoint, { page = 1, limit = LIST_LIMIT } = {}) => {
+  const sep = endpoint.includes('?') ? '&' : '?';
+  return `${endpoint}${sep}page=${page}&limit=${limit}`;
+};
+
 /**
- * Fetch EVERY page of a paginated list endpoint at the strict 20/page limit and
- * return the concatenated array. Works for non-paginated endpoints too (they
- * ignore page/limit and return everything as a single page).
+ * Single request that loads a full list (page 1, large limit) and returns the
+ * unwrapped array — one network call, no looping.
  * @param {string} endpoint
  * @param {Object} [opts] - apiRequest options (method/body/includeAuth/silent)
  */
 const fetchAllPages = async (endpoint, opts = {}) => {
-  const sep = endpoint.includes('?') ? '&' : '?';
-  const all = [];
-  let page = 1;
-  let totalPages = 1;
-  do {
-    const res = await apiRequest(`${endpoint}${sep}page=${page}&limit=${PAGE_SIZE}`, opts);
-    all.push(...unwrapList(res));
-    totalPages = (res && res.pagination && res.pagination.totalPages) || 1;
-    page += 1;
-  } while (page <= totalPages && page <= 1000); // hard safety cap
-  return all;
+  const res = await apiRequest(withListPaging(endpoint), opts);
+  return unwrapList(res);
 };
 
 export {
@@ -403,6 +401,8 @@ export {
   TTL_PRODUCTS,
   TTL_TRANSACTIONAL,
   PAGE_SIZE,
+  LIST_LIMIT,
   unwrapList,
+  withListPaging,
   fetchAllPages,
 };
