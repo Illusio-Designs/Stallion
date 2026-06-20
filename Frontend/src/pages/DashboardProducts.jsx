@@ -134,15 +134,22 @@ const hasValidImageUrls = (product) => {
 // Build a full, encoded thumbnail URL for a product's first image (or null).
 // Uses the same image host as the Media gallery; handles "[]"/string/array.
 const PRODUCT_IMG_BASE = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/+$/, '');
+const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
 const getProductThumbUrl = (product) => {
   const urls = parseImageUrls(product);
   if (!urls || urls.length === 0) return null;
-  const first = urls.find((u) => typeof u === 'string' && u.trim());
-  if (!first) return null;
-  const clean = first.split('?')[0].split('#')[0].replace(/([\]"\\])+$/, '');
-  const filename = clean.split('/').pop();
-  if (!filename || !filename.includes('.')) return null;
-  return `${PRODUCT_IMG_BASE}/uploads/products/${encodeUploadName(filename)}`;
+  // Find the first entry that's actually an image file. Rows can be dirty (stray
+  // "[" / "]", absolute paths, relative paths, bare filenames), so take each
+  // entry's last path segment and require an image extension.
+  for (const u of urls) {
+    if (typeof u !== 'string') continue;
+    const clean = u.split('?')[0].split('#')[0].replace(/([\]"\\])+$/, '').trim();
+    const filename = clean.split('/').pop().split('\\').pop();
+    if (filename && IMAGE_EXT_RE.test(filename)) {
+      return `${PRODUCT_IMG_BASE}/uploads/products/${encodeUploadName(filename)}`;
+    }
+  }
+  return null;
 };
 
 // Small table-cell thumbnail with a graceful placeholder on missing/broken image.
