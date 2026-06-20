@@ -17,6 +17,38 @@ const { Op, Sequelize } = require('sequelize');
 const { canManageInventory } = require('../utils/roleHelpers');
 const { getListSearchParams } = require('../utils/listSearchHelpers');
 
+// image_urls has historically been stored inconsistently (a real JSON array, an
+// empty array, or a double-encoded JSON STRING like "[]" / "[\"...\"]"). This
+// parses any of those into a clean string array so appends never break (you
+// can't .push() onto a string, and spreading a string yields its characters).
+function normalizeImageUrls(value) {
+    if (Array.isArray(value)) {
+        return value.filter((u) => typeof u === 'string' && u.trim() && u.trim() !== '[]');
+    }
+    if (typeof value === 'string') {
+        let s = value.trim();
+        if (!s || s === '[]') return [];
+        for (let i = 0; i < 3; i++) {
+            try {
+                const parsed = JSON.parse(s);
+                if (Array.isArray(parsed)) {
+                    return parsed.filter((u) => typeof u === 'string' && u.trim());
+                }
+                if (typeof parsed === 'string') { s = parsed; continue; }
+                return [];
+            } catch (_) { break; }
+        }
+        if (s.startsWith('/') || s.startsWith('uploads') || s.startsWith('http')) return [s];
+        return [];
+    }
+    return [];
+}
+
+// Stable, portable relative path stored in image_urls for an uploaded file.
+function productImagePath(filename) {
+    return `uploads/${PRODUCT_IMAGE_UPLOAD_DIR}/${filename}`;
+}
+
 const productIncludes = [
     { model: Gender, as: 'gender' },
     { model: ColorCode, as: 'color_code' },
@@ -418,7 +450,7 @@ class ProductController {
                         if (!appendsByProduct.has(product.product_id)) {
                             appendsByProduct.set(product.product_id, { product, paths: [] });
                         }
-                        appendsByProduct.get(product.product_id).paths.push(file.path);
+                        appendsByProduct.get(product.product_id).paths.push(productImagePath(file.filename));
                         targetIds.push(product.product_id);
                     }
                     attached.push({
@@ -429,9 +461,9 @@ class ProductController {
                 }
 
                 for (const { product, paths } of appendsByProduct.values()) {
-                    const existing = product.image_urls || [];
+                    const existing = normalizeImageUrls(product.image_urls);
                     const oldImageUrls = [...existing];
-                    const image_urls = [...existing, ...paths];
+                    const image_urls = [...new Set([...existing, ...paths])];
                     const status = product.status === 'draft' ? 'active' : product.status;
                     await Product.update(
                         { image_urls, status, updated_at: new Date() },
@@ -467,13 +499,14 @@ class ProductController {
                 return res.status(404).json({ error: 'Product not found' });
             }
 
-            // Get existing image_urls or initialize empty array
-            let image_urls = product.image_urls || [];
+            // Get existing image_urls as a clean array (handles double-encoded "[]").
+            let image_urls = normalizeImageUrls(product.image_urls);
             const oldImageUrls = [...image_urls];
 
-            // Add all uploaded image paths to the array
+            // Add all uploaded image paths (stored as portable relative paths).
             for (const fileInfo of fileInfos) {
-                image_urls.push(fileInfo.path);
+                const rel = productImagePath(fileInfo.filename);
+                if (!image_urls.includes(rel)) image_urls.push(rel);
             }
 
             let status = product.status;
@@ -504,6 +537,112 @@ class ProductController {
                 message: 'Product image saved successfully',
                 data: fileInfos,
                 product: updatedProduct
+            });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    // One-time / on-demand re-link: scan the uploads/products folder and attach
+    // each file to the product(s) whose model_no matches the file's ORIGINAL name
+    // (the stored name is "<original>-<13-digit timestamp><ext>"). Writes the
+    // path into the product's image_urls. Idempotent — re-running won't duplicate.
+    async relinkImagesToProducts(req, res) {
+        try {
+            const uploadsPath = path.join(__dirname, '..', '..', 'uploads', PRODUCT_IMAGE_UPLOAD_DIR);
+            if (!fs.existsSync(uploadsPath)) {
+                return res.status(404).json({ error: 'Upload directory not found' });
+            }
+            const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
+            const files = fs.readdirSync(uploadsPath)
+                .filter((f) => imageExtensions.includes(path.extname(f).toLowerCase()));
+
+            const stripVariantSuffix = (name) =>
+                String(name || '').replace(/(?:[\s._-]\d{1,2}|\s*\(\d{1,2}\))$/, '').trim();
+            // Recover the original base name: drop ext, then the "-<13 digit timestamp>".
+            const baseKeysFor = (file) => {
+                const ext = path.extname(file);
+                let base = path.basename(file, ext).replace(/-\d{13}$/, '').trim();
+                const exact = base;
+                const stripped = stripVariantSuffix(base);
+                return [exact, stripped].filter(Boolean);
+            };
+
+            const fileKeys = files.map((f) => ({ file: f, keys: baseKeysFor(f) }));
+            const allKeys = [...new Set(
+                fileKeys.flatMap((fk) => fk.keys).filter(Boolean).map((k) => k.toLowerCase())
+            )];
+
+            let products = [];
+            if (allKeys.length > 0) {
+                products = await Product.findAll({
+                    where: Sequelize.where(
+                        Sequelize.fn('LOWER', Sequelize.col('model_no')),
+                        { [Op.in]: allKeys }
+                    ),
+                });
+            }
+
+            const byModel = new Map();
+            for (const p of products) {
+                const k = String(p.model_no || '').toLowerCase();
+                if (!byModel.has(k)) byModel.set(k, []);
+                byModel.get(k).push(p);
+            }
+
+            const appendsByProduct = new Map(); // product_id -> { product, paths:Set }
+            const linked = [];
+            const unmatched = [];
+
+            for (const { file, keys } of fileKeys) {
+                const matches = byModel.get(keys[0].toLowerCase())
+                    || byModel.get((keys[1] || '').toLowerCase())
+                    || [];
+                if (matches.length === 0) { unmatched.push(file); continue; }
+                const rel = productImagePath(file);
+                const targetIds = [];
+                for (const product of matches) {
+                    if (!appendsByProduct.has(product.product_id)) {
+                        appendsByProduct.set(product.product_id, { product, paths: new Set() });
+                    }
+                    appendsByProduct.get(product.product_id).paths.add(rel);
+                    targetIds.push(product.product_id);
+                }
+                linked.push({ file, model_no: matches[0].model_no, product_ids: targetIds });
+            }
+
+            let productsUpdated = 0;
+            for (const { product, paths } of appendsByProduct.values()) {
+                const existing = normalizeImageUrls(product.image_urls);
+                const merged = [...new Set([...existing, ...paths])];
+                if (merged.length === existing.length) continue; // nothing new
+                const status = product.status === 'draft' ? 'active' : product.status;
+                await Product.update(
+                    { image_urls: merged, status, updated_at: new Date() },
+                    { where: { product_id: product.product_id } }
+                );
+                productsUpdated++;
+                await logAudit({
+                    req,
+                    action: 'update',
+                    description: 'Product images re-linked from uploads folder',
+                    tableName: 'product',
+                    recordId: product.product_id,
+                    oldValues: { image_urls: existing },
+                    newValues: { image_urls: merged },
+                });
+            }
+
+            return res.status(200).json({
+                message: 'Re-link complete',
+                summary: {
+                    files: files.length,
+                    linked: linked.length,
+                    unmatched: unmatched.length,
+                    productsUpdated,
+                },
+                linked,
+                unmatched,
             });
         } catch (error) {
             res.status(500).json({ error: error.message });
