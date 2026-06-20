@@ -1388,6 +1388,15 @@ const DashboardDistributor = () => {
               required
             />
           </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Address</label>
+            <input
+              className="ui-input"
+              placeholder="Address"
+              value={formData.address}
+              onChange={(e) => handleInputChange('address', e.target.value)}
+            />
+          </div>
           <div className="form-group">
             <label className="ui-label">Country *</label>
             <DropdownSelector
@@ -1445,15 +1454,6 @@ const DashboardDistributor = () => {
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
               onChange={(updated) => handleInputChange('state_ids', updated)}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address</label>
-            <input 
-              className="ui-input" 
-              placeholder="Address"
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
             />
           </div>
           <div className="form-group">
@@ -1589,6 +1589,15 @@ const DashboardDistributor = () => {
               }}
             />
           </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Address</label>
+            <input
+              className="ui-input"
+              placeholder="Address"
+              value={formData.address}
+              onChange={(e) => handleInputChange('address', e.target.value)}
+            />
+          </div>
           <div className="form-group">
             <label className="ui-label">Country *</label>
             <DropdownSelector
@@ -1655,15 +1664,6 @@ const DashboardDistributor = () => {
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
               onChange={(updated) => handleInputChange('state_ids', updated)}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address</label>
-            <input 
-              className="ui-input" 
-              placeholder="Address"
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
             />
           </div>
           <div className="form-group">

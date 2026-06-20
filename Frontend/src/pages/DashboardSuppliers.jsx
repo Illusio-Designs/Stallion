@@ -1566,6 +1566,15 @@ const DashboardSuppliers = () => {
               }}
             />
           </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Address</label>
+            <input
+              className="ui-input"
+              placeholder="Address"
+              value={formData.address}
+              onChange={(e) => handleInputChange('address', e.target.value)}
+            />
+          </div>
           <div className="form-group">
             <label className="ui-label">Country *</label>
             <DropdownSelector
@@ -1660,15 +1669,6 @@ const DashboardSuppliers = () => {
               value={formData.joining_date}
               onChange={(v) => handleInputChange('joining_date', v)}
               placeholder="Joining date"
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address</label>
-            <input 
-              className="ui-input" 
-              placeholder="Address"
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
             />
           </div>
         </form>
@@ -1747,6 +1747,15 @@ const DashboardSuppliers = () => {
               }}
             />
           </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Address</label>
+            <input
+              className="ui-input"
+              placeholder="Address"
+              value={formData.address}
+              onChange={(e) => handleInputChange('address', e.target.value)}
+            />
+          </div>
           <div className="form-group">
             <label className="ui-label">Country *</label>
             <DropdownSelector
@@ -1841,15 +1850,6 @@ const DashboardSuppliers = () => {
               value={formData.joining_date}
               onChange={(v) => handleInputChange('joining_date', v)}
               placeholder="Joining date"
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address</label>
-            <input 
-              className="ui-input" 
-              placeholder="Address"
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
             />
           </div>
         </form>
