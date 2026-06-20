@@ -24,6 +24,17 @@ import {
   createOrder,
 } from "../services/apiService";
 
+// Re-point any product image URL (legacy host, absolute server path, or
+// relative) to the configured image host — the same base the Media gallery and
+// product pages use — so cart thumbnails always resolve.
+const CART_IMAGE_BASE = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/+$/, '');
+const resolveCartImage = (img) => {
+  if (!img || typeof img !== 'string') return '/images/products/spac1.webp';
+  const m = img.match(/\/uploads\/products\/([^/?#"\\\]]+)/);
+  if (m) return `${CART_IMAGE_BASE}/uploads/products/${m[1]}`;
+  return img;
+};
+
 const Cart = ({ onPageChange = null }) => {
   const handlePageChange = (page) => {
     if (onPageChange) {
@@ -998,7 +1009,7 @@ const Cart = ({ onPageChange = null }) => {
                     <div className="item-image w-14 h-14 sm:w-[72px] sm:h-[72px] flex-shrink-0 overflow-hidden flex items-center justify-center bg-surface-muted rounded-md border border-border p-1">
                       <img
                         className="max-w-full max-h-full object-contain"
-                        src={item.image || '/images/products/spac1.webp'}
+                        src={resolveCartImage(item.image)}
                         alt={item.name}
                         onError={(e) => {
                           // Fallback to default image if image fails to load

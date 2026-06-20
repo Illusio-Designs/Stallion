@@ -314,7 +314,10 @@ const ProductDetail = ({ productId: propProductId = null }) => {
         return null;
       };
 
-      // Helper to get image URL
+      // Helper to get image URL. Use the SAME base as the Media gallery page
+      // (NEXT_PUBLIC_IMAGE_BASE_URL) so images resolve to the real upload host
+      // instead of a hard-coded legacy domain.
+      const imageBaseUrl = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/$/, '');
       const getImageUrl = (imageUrls, fallbackImageUrl) => {
         // Handle image_urls (can be array or JSON string)
         const parsedUrls = parseImageUrls(imageUrls);
@@ -323,19 +326,19 @@ const ProductDetail = ({ productId: propProductId = null }) => {
           if (firstImage) {
             const filename = extractFilename(firstImage);
             if (filename) {
-              return `https://stallion.nishree.com/uploads/products/${filename}`;
+              return `${imageBaseUrl}/uploads/products/${filename}`;
             }
           }
         }
-        
+
         // Handle single image_url string (fallback)
         if (fallbackImageUrl) {
           const filename = extractFilename(fallbackImageUrl);
           if (filename) {
-            return `https://stallion.nishree.com/uploads/products/${filename}`;
+            return `${imageBaseUrl}/uploads/products/${filename}`;
           }
         }
-        
+
         // Default fallback
         return '/images/products/spac1.webp';
       };

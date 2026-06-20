@@ -16,6 +16,12 @@ const FALLBACK_IMAGE = '/images/products/spac1.webp';
 // Derive the host from the configured API URL (NEXT_PUBLIC_API_URL) so it
 // follows the environment instead of a hard-coded legacy domain.
 const getUploadBase = () => {
+  // Prefer the dedicated image host (same as the Media gallery), then fall back
+  // to the API origin, so product images resolve consistently everywhere.
+  const imgBase = process.env.NEXT_PUBLIC_IMAGE_BASE_URL;
+  if (imgBase) {
+    return `${imgBase.replace(/\/+$/, '')}/uploads/products`;
+  }
   const envUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.stallioneyewear.in/api';
   const origin = envUrl.replace(/\/+$/, '').replace(/\/api$/, '');
   return `${origin}/uploads/products`;
