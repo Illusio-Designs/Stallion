@@ -17,36 +17,57 @@ const { Op, Sequelize } = require('sequelize');
 const { canManageInventory } = require('../utils/roleHelpers');
 const { getListSearchParams } = require('../utils/listSearchHelpers');
 
-// image_urls has historically been stored inconsistently (a real JSON array, an
-// empty array, or a double-encoded JSON STRING like "[]" / "[\"...\"]"). This
-// parses any of those into a clean string array so appends never break (you
-// can't .push() onto a string, and spreading a string yields its characters).
+const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
+
+// Reduce any historically-messy image_urls value to a clean array of BARE
+// FILENAMES. image_urls has been stored as: a real array, an empty array, a
+// double-encoded JSON string ("[]" / "[\"...\"]"), stray chars ("[", "]") from
+// spreading that string, absolute disk paths, and relative paths — sometimes
+// all mixed in one row. We:
+//   1. coerce the value into an array (parsing double-encoded strings),
+//   2. take only the FILE NAME of each entry (drops the path),
+//   3. drop anything that isn't an image file (kills "[", "]", "[]"),
+//   4. de-dupe.
+// The frontend rebuilds the URL as <IMAGE_BASE>/uploads/products/<filename>.
 function normalizeImageUrls(value) {
+    let arr = [];
     if (Array.isArray(value)) {
-        return value.filter((u) => typeof u === 'string' && u.trim() && u.trim() !== '[]');
-    }
-    if (typeof value === 'string') {
+        arr = value;
+    } else if (typeof value === 'string') {
         let s = value.trim();
-        if (!s || s === '[]') return [];
-        for (let i = 0; i < 3; i++) {
-            try {
-                const parsed = JSON.parse(s);
-                if (Array.isArray(parsed)) {
-                    return parsed.filter((u) => typeof u === 'string' && u.trim());
-                }
-                if (typeof parsed === 'string') { s = parsed; continue; }
-                return [];
-            } catch (_) { break; }
+        if (s && s !== '[]') {
+            for (let i = 0; i < 3; i++) {
+                try {
+                    const parsed = JSON.parse(s);
+                    if (Array.isArray(parsed)) { arr = parsed; break; }
+                    if (typeof parsed === 'string') { s = parsed; continue; }
+                    break;
+                } catch (_) { break; }
+            }
+            if (arr.length === 0) arr = [s]; // a single plain path/filename
         }
-        if (s.startsWith('/') || s.startsWith('uploads') || s.startsWith('http')) return [s];
-        return [];
     }
-    return [];
+
+    const seen = new Set();
+    const out = [];
+    for (const item of arr) {
+        if (typeof item !== 'string') continue;
+        const clean = item.split('?')[0].split('#')[0].trim();
+        if (!clean) continue;
+        // last segment whether the separator is / (URL/posix) or \\ (windows)
+        const filename = clean.split('/').pop().split('\\').pop();
+        if (!filename || !IMAGE_EXT_RE.test(filename)) continue; // drop "[", "]", non-images
+        if (seen.has(filename)) continue;
+        seen.add(filename);
+        out.push(filename);
+    }
+    return out;
 }
 
-// Stable, portable relative path stored in image_urls for an uploaded file.
+// We store only the bare file name in image_urls now (the URL is assembled on
+// the client). Kept as a helper so the intent is explicit at call sites.
 function productImagePath(filename) {
-    return `uploads/${PRODUCT_IMAGE_UPLOAD_DIR}/${filename}`;
+    return filename;
 }
 
 const productIncludes = [
@@ -333,17 +354,20 @@ class ProductController {
                 return res.status(404).json({ error: 'Product image not found' });
             }
             const withPath = `uploads/${PRODUCT_IMAGE_UPLOAD_DIR}/${file_name}`;
-            console.log("withPath", withPath);
-            // MySQL JSON columns don't support LIKE reliably; use JSON_CONTAINS for JSON arrays,
-            // plus a fallback LIKE for any legacy string storage.
+            // image_urls now stores bare filenames; older rows may still hold the
+            // path. Match either so the "assigned" guard works for both.
             const product = await Product.findOne({
                 where: {
                     [Op.or]: [
                         Sequelize.where(
+                            Sequelize.fn('JSON_CONTAINS', Sequelize.col('image_urls'), JSON.stringify(file_name)),
+                            1
+                        ),
+                        Sequelize.where(
                             Sequelize.fn('JSON_CONTAINS', Sequelize.col('image_urls'), JSON.stringify(withPath)),
                             1
                         ),
-                        { image_urls: { [Op.like]: `%${withPath}%` } },
+                        { image_urls: { [Op.like]: `%${file_name}%` } },
                     ],
                 },
             });
@@ -615,7 +639,11 @@ class ProductController {
             for (const { product, paths } of appendsByProduct.values()) {
                 const existing = normalizeImageUrls(product.image_urls);
                 const merged = [...new Set([...existing, ...paths])];
-                if (merged.length === existing.length) continue; // nothing new
+                // Update when there's something new OR when the stored value is
+                // dirty (corrupted array / double-encoded string / paths) so the
+                // re-link also CLEANS old rows down to bare filenames.
+                const rawStr = JSON.stringify(product.image_urls);
+                if (JSON.stringify(merged) === rawStr) continue;
                 const status = product.status === 'draft' ? 'active' : product.status;
                 await Product.update(
                     { image_urls: merged, status, updated_at: new Date() },
@@ -670,13 +698,11 @@ class ProductController {
                     { [Op.gt]: 0 }
                 ),
             });
-            const allProductImages = allProducts
-                .map((product) => product.image_urls)
-                .flat()
-                .filter((u) => typeof u === 'string');
-
-            const normalize = (p) => (typeof p === 'string' ? p.replace(/^\/+/, '') : '');
-            const assignedSet = new Set(allProductImages.map(normalize));
+            // Bare filenames assigned to any product (normalizeImageUrls reduces
+            // every stored entry — filename / path / legacy garbage — to a filename).
+            const assignedSet = new Set(
+                allProducts.flatMap((product) => normalizeImageUrls(product.image_urls))
+            );
 
             // Filter only image files and get their details
             const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
@@ -689,7 +715,7 @@ class ProductController {
                     const filePath = path.join(uploadsPath, file);
                     const stats = fs.statSync(filePath);
                     const url = `/uploads/${PRODUCT_IMAGE_UPLOAD_DIR}/${file}`;
-                    const isAssigned = assignedSet.has(normalize(url));
+                    const isAssigned = assignedSet.has(file);
                     return {
                         filename: file,
                         path: filePath,
