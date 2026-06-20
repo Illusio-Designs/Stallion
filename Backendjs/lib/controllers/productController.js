@@ -70,6 +70,17 @@ function productImagePath(filename) {
     return filename;
 }
 
+// How a clean filename array is persisted into the image_urls column:
+//   0 files  -> []                       (empty)
+//   1 file   -> "filename.png"           (a bare string, as requested)
+//   2+ files -> ["a.png", "b.png"]       (array, to keep them all)
+function toStoredImageUrls(filenames) {
+    const arr = normalizeImageUrls(filenames);
+    if (arr.length === 0) return [];
+    if (arr.length === 1) return arr[0];
+    return arr;
+}
+
 const productIncludes = [
     { model: Gender, as: 'gender' },
     { model: ColorCode, as: 'color_code' },
@@ -490,7 +501,7 @@ class ProductController {
                     const image_urls = [...new Set([...existing, ...paths])];
                     const status = product.status === 'draft' ? 'active' : product.status;
                     await Product.update(
-                        { image_urls, status, updated_at: new Date() },
+                        { image_urls: toStoredImageUrls(image_urls), status, updated_at: new Date() },
                         { where: { product_id: product.product_id } }
                     );
                     await logAudit({
@@ -540,7 +551,7 @@ class ProductController {
 
             // Update product with new image_urls
             await Product.update(
-                { image_urls: image_urls, status: status, updated_at: new Date() },
+                { image_urls: toStoredImageUrls(image_urls), status: status, updated_at: new Date() },
                 { where: { product_id: product_id } }
             );
 
@@ -642,11 +653,11 @@ class ProductController {
                 // Update when there's something new OR when the stored value is
                 // dirty (corrupted array / double-encoded string / paths) so the
                 // re-link also CLEANS old rows down to bare filenames.
-                const rawStr = JSON.stringify(product.image_urls);
-                if (JSON.stringify(merged) === rawStr) continue;
+                const stored = toStoredImageUrls(merged);
+                if (JSON.stringify(stored) === JSON.stringify(product.image_urls)) continue;
                 const status = product.status === 'draft' ? 'active' : product.status;
                 await Product.update(
-                    { image_urls: merged, status, updated_at: new Date() },
+                    { image_urls: stored, status, updated_at: new Date() },
                     { where: { product_id: product.product_id } }
                 );
                 productsUpdated++;
