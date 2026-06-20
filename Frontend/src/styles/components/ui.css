@@ -1601,11 +1601,15 @@ textarea.ui-input {
 }
 
 .ui-table table {
-  width: 100%;
+  /* Size columns to their content and let the row scroll horizontally
+     (.ui-table__scroll) instead of squashing every column to fit the width,
+     which clipped long values like model_no with an ellipsis. min-width:100%
+     keeps narrow tables (few columns) filling the container with no scroll. */
+  width: max-content;
   min-width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  table-layout: fixed;
+  table-layout: auto;
 }
 
 .ui-table thead th {
@@ -1620,8 +1624,7 @@ textarea.ui-input {
   text-transform: uppercase;
   letter-spacing: var(--tracking-label);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow: visible;
   background: var(--color-surface);
   z-index: 1;
 }
@@ -1696,11 +1699,12 @@ textarea.ui-input {
   font-size: var(--text-base);
   color: var(--color-text);
   border-bottom: 1px solid var(--color-border);
-  white-space: normal;
+  /* Show the full value on one line; the row scrolls horizontally rather than
+     truncating. */
+  white-space: nowrap;
   overflow: visible;
   text-overflow: clip;
   position: relative;
-  word-wrap: break-word;
   vertical-align: middle;
 }
 
