@@ -3,6 +3,7 @@ import DropdownSelector from '../components/ui/DropdownSelector';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import { Skeleton } from '../components/ui/Skeleton';
+import MediaImageCard from '../components/ui/MediaImageCard';
 import TableWithControls from '../components/ui/TableWithControls';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
@@ -138,6 +139,7 @@ const DashboardProducts = () => {
   // Server-side pagination for the Products listing (load 20 at a time)
   const [productPage, setProductPage] = useState(1);
   const [productPageCount, setProductPageCount] = useState(1);
+  const [productSearch, setProductSearch] = useState('');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [openBulkUpload, setOpenBulkUpload] = useState(false);
@@ -358,11 +360,14 @@ const DashboardProducts = () => {
 
   // Lightweight paginated fetch for the Products listing tab.
   // Fetches only ONE page (20) of products - NO attribute lookups on listing.
-  const fetchProductsPage = async (targetPage = 1) => {
+  const fetchProductsPage = async (targetPage = 1, search = productSearch) => {
     try {
       setLoading(true);
       setError(null);
-      const result = await getProducts(targetPage, PRODUCTS_PER_PAGE, null);
+      // Server-side search: hit the regular products API with the search param
+      // (matches model_no/size/status). Empty search => the full list (all statuses).
+      const term = String(search || '').trim();
+      const result = await getProducts(targetPage, PRODUCTS_PER_PAGE, term ? { search: term, status: null } : null);
       const list = result.data || [];
       setProducts(list);
       setProductPage(targetPage);
@@ -588,7 +593,12 @@ const DashboardProducts = () => {
       // Products listing: only fetch one page of products (lookups load once, cached)
       fetchProductsPage(1);
     } else if (activeTab === 'Media Gallery') {
-      // Only fetch images from uploads/products folder - no products API call
+      // Load the uploads AND the full product list. The assigned/unassigned
+      // status is computed by cross-referencing product.image_urls, so the
+      // paginated 20-product list isn't enough — without all products, images
+      // assigned to a product on another page show as "unassigned" after a
+      // refresh.
+      fetchProducts();
       fetchAllUploads();
     } else if (activeTab === 'Unuploaded Media Gallery') {
       // Needs the full product list to find products without images
@@ -2102,11 +2112,22 @@ const DashboardProducts = () => {
         await fetchProductsWithoutLoading();
       }
 
-      // Handle orphaned images (uploaded without product_id)
+      // Uploaded without product_id. The backend now AUTO-MAPS each image to the
+      // product whose model_no matches the file name and returns
+      // { attached, unmatched, summary }. Only genuinely unmatched files stay in
+      // the gallery as orphans; matched ones are now on their products.
+      const isAutoMap = !!(response && (response.summary || response.attached || response.unmatched));
       if (isMediaUpload && !targetProductId) {
         // Refresh the media gallery to show the newly uploaded image immediately
         await fetchAllUploads();
+        // Auto-map attached images to products — refresh the product list too.
+        if (isAutoMap) {
+          await fetchProductsWithoutLoading();
+        }
 
+        // Optimistic orphaned-add only for the legacy (non auto-map) path; in
+        // auto-map mode the server refresh above is the source of truth.
+        if (!isAutoMap) {
         // Extract image paths from response - API returns { data: [{ path, filename, ... }] }
         let imageFiles = [];
 
@@ -2177,9 +2198,23 @@ const DashboardProducts = () => {
 
           setOrphanedImages(prev => [...prev, ...newOrphanedImages]);
         }
+        } // end if (!isAutoMap)
       }
 
       const fileCount = files.length;
+      // Auto-map: build a summary from the backend response.
+      if (isAutoMap) {
+        const s = response.summary || {};
+        const nAttached = s.attached ?? (response.attached?.length || 0);
+        const nUnmatched = s.unmatched ?? (response.unmatched?.length || 0);
+        const unmatchedNames = (response.unmatched || []).join(', ');
+        const msg = nUnmatched > 0
+          ? `${nAttached} image(s) attached to products by model no. ${nUnmatched} not matched: ${unmatchedNames}`
+          : `${nAttached} image(s) attached to products by model no.`;
+        setUploadProgress({ success: true, message: msg });
+        if (nAttached > 0) showSuccess(`${nAttached} image(s) auto-attached by model no.`);
+        if (nUnmatched > 0) showError(`${nUnmatched} image(s) had no matching model no.: ${unmatchedNames}`);
+      } else {
       setUploadProgress({
         success: true,
         message: fileCount === 1
@@ -2187,6 +2222,7 @@ const DashboardProducts = () => {
           : (isMediaUpload ? `${fileCount} images uploaded successfully!` : `${fileCount} images attached to ${targetLabel} successfully!`),
       });
       showSuccess(isMediaUpload ? 'Images uploaded successfully' : 'Images attached to product successfully');
+      }
 
       // Close the modal if it was open
       if (openImageSelectModal) {
@@ -2328,13 +2364,13 @@ const DashboardProducts = () => {
         {uploadProgress && (
           <div className="dash-row">
             <div className="dash-card full">
-              <div style={{
-                padding: '12px',
-                backgroundColor: uploadProgress.success ? '#d4edda' : '#f8d7da',
-                border: `1px solid ${uploadProgress.success ? '#c3e6cb' : '#f5c6cb'}`,
-                borderRadius: '8px',
-                color: uploadProgress.success ? '#155724' : '#721c24'
-              }}>
+              <div
+                className={`rounded-lg border p-3 text-sm ${
+                  uploadProgress.success
+                    ? 'border-success/30 bg-success-soft text-success'
+                    : 'border-error/30 bg-error-soft text-error'
+                }`}
+              >
                 <strong>{uploadProgress.success ? 'Success:' : 'Error:'}</strong> {uploadProgress.message}
                 {uploadProgress.details && (
                   <div className="mt-1.5 text-sm">
@@ -2348,9 +2384,9 @@ const DashboardProducts = () => {
         <div className="dash-row">
           <div className="dash-card full">
             {activeTab === 'Media Gallery' ? (
-              <div>
+              <div className="m-[17px] rounded-lg bg-surface p-6 sm:p-8">
                 {loading ? (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-5 p-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5">
                     {Array.from({ length: 8 }).map((_, i) => (
                       <div
                         key={`media-skeleton-${i}`}
@@ -2398,163 +2434,55 @@ const DashboardProducts = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-5 p-5">
-                    {allMediaImages.map(item => (
-                      <div
-                        key={item.id}
-                        className="border border-border rounded-xl overflow-hidden bg-surface flex flex-col shadow-md relative transition-[transform,box-shadow] duration-200 cursor-pointer"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-4px)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                        }}
-                      >
-                        {/* Status Tag - Always show assigned/unassigned status */}
-                        <div
-                          className="absolute top-3 left-3 text-white px-3 py-1.5 rounded-md text-xs font-semibold z-[2] uppercase tracking-[0.5px] shadow-sm"
-                          style={{ background: (item.type === 'assigned') ? 'var(--color-success)' : 'var(--color-warning)' }}
-                        >
-                          {item.type === 'assigned' ? 'Assigned' : 'Unassigned'}
-                        </div>
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5">
+                    {allMediaImages.map(item => {
+                      const assignedModel = item.assignedProduct?.model_no
+                        || (item.model_no && item.model_no !== 'Unassigned' ? item.model_no : null);
+                      const title = item.type === 'assigned'
+                        ? (assignedModel || 'Assigned')
+                        : 'Unassigned image';
+                      const brandCollection = [item.brand_name, item.collection_name]
+                        .filter(v => v && v !== 'N/A')
+                        .join(' · ');
+                      const subtitle = item.type === 'assigned' ? (brandCollection || null) : null;
 
-                        {/* Delete Button */}
-                        <button
-                          className="absolute top-3 right-3 text-white border-none rounded-full w-9 h-9 cursor-pointer flex items-center justify-center z-[2] text-lg font-bold transition-[background] duration-200 shadow-sm bg-[#f44336]"
-                          onClick={async (e) => {
-                            e.stopPropagation();
+                      const handleDelete = async (e) => {
+                        e.stopPropagation();
+                        if (!(await confirm('Are you sure you want to delete this image? This cannot be undone.'))) {
+                          return;
+                        }
+                        try {
+                          setLoading(true);
+                          const imageUrl = item.image_url || item.url;
+                          const fileName = imageUrl ? imageUrl.split('/').pop().split('?')[0] : null;
+                          if (!fileName) {
+                            showError('Could not determine image filename.');
+                            return;
+                          }
+                          await deleteProductImage(fileName);
+                          showSuccess('Image deleted successfully');
+                          await fetchAllUploads();
+                        } catch (error) {
+                          console.error('Error deleting image:', error);
+                          showError(`Failed to delete image: ${error.message}`);
+                        } finally {
+                          setLoading(false);
+                        }
+                      };
 
-                            // If image is assigned, block deletion and show notification
-                            if (item.type === 'assigned') {
-                              showError('This image is assigned to a product. Please unassign it first before deleting.');
-                              return;
-                            }
-
-                            if (!(await confirm('Are you sure you want to delete this image? This cannot be undone.'))) {
-                              return;
-                            }
-
-                            try {
-                              setLoading(true);
-                              // Extract filename from URL
-                              const imageUrl = item.image_url || item.url;
-                              const fileName = imageUrl ? imageUrl.split('/').pop().split('?')[0] : null;
-                              if (!fileName) {
-                                showError('Could not determine image filename.');
-                                return;
-                              }
-                              await deleteProductImage(fileName);
-                              showSuccess('Image deleted successfully');
-                              await fetchAllUploads();
-                            } catch (error) {
-                              console.error('Error deleting image:', error);
-                              showError(`Failed to delete image: ${error.message}`);
-                            } finally {
-                              setLoading(false);
-                            }
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#d32f2f';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#f44336';
-                          }}
-                          disabled={loading}
-                          aria-label="Delete image"
-                          title="Delete image"
-                        >
-                          ✕
-                        </button>
-
-                        {/* Image Container */}
-                        <div className="w-full aspect-[4/3] bg-surface-muted relative min-h-[250px] overflow-hidden flex items-center justify-center">
-                          {item.image_url ? (
-                            <img
-                              src={item.image_url}
-                              alt={item.model_no || 'Product image'}
-                              className="w-full h-full object-contain block max-w-full max-h-full"
-                              onError={(e) => {
-                                const img = e.target;
-                                const normalizedUrl = item.image_url;
-                                const originalUrl = item.originalImageUrl;
-
-                                console.error('Image failed to load:', normalizedUrl);
-
-                                // If we have an original URL that's different, try it as fallback
-                                if (originalUrl && originalUrl !== normalizedUrl && !img.dataset.fallbackTried) {
-                                  console.log('Trying original URL as fallback:', originalUrl);
-                                  img.dataset.fallbackTried = 'true';
-                                  // Construct full URL from original if needed
-                                  let fallbackUrl = originalUrl;
-                                  if (!originalUrl.startsWith('http://') && !originalUrl.startsWith('https://') && !originalUrl.startsWith('blob:')) {
-                                    const getImageBase = () => {
-                                      if (typeof window === 'undefined') return '';
-                                      const imgEnv = process.env.NEXT_PUBLIC_IMAGE_BASE_URL || '';
-                                      if (imgEnv) return imgEnv.replace(/\/$/, '');
-                                      const apiEnv = process.env.NEXT_PUBLIC_API_URL || '';
-                                      if (apiEnv) return apiEnv.replace(/\/api\/?$/, '').replace(/\/$/, '');
-                                      return 'https://api.stallioneyewear.in';
-                                    };
-                                    const base = getImageBase();
-                                    fallbackUrl = originalUrl.startsWith('/') ? `${base}${originalUrl}` : `${base}/uploads/products/${originalUrl}`;
-                                  }
-                                  img.src = fallbackUrl;
-                                  return; // Don't mark as invalid yet, wait for fallback to fail
-                                }
-
-                                // Both normalized and original URLs failed, mark as invalid
-                                setInvalidImageUrls(prev => new Set([...prev, normalizedUrl]));
-                                if (originalUrl && originalUrl !== normalizedUrl) {
-                                  setInvalidImageUrls(prev => new Set([...prev, originalUrl]));
-                                }
-
-                                // Don't hide the image, just show error message
-                                const errorDiv = img.nextElementSibling;
-                                if (errorDiv) {
-                                  errorDiv.style.display = 'flex';
-                                  errorDiv.textContent = item.isTemporary
-                                    ? 'Image uploading...'
-                                    : 'Image not found';
-                                }
-                                // Remove from orphaned images if it's unassigned and failed to load
-                                if (item.type === 'unassigned') {
-                                  setOrphanedImages(prev => prev.filter(img => {
-                                    const imgUrl = img.url || img.image_url;
-                                    return imgUrl !== normalizedUrl && imgUrl !== originalUrl;
-                                  }));
-                                }
-                              }}
-                              onLoad={() => {
-                                const errorDiv = document.querySelector(`[data-image-error="${item.id}"]`);
-                                if (errorDiv) {
-                                  errorDiv.style.display = 'none';
-                                }
-                              }}
-                            />
-                          ) : null}
-                          <div
-                            data-image-error={item.id}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              display: item.image_url ? 'none' : 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#999',
-                              fontSize: '14px',
-                              position: 'absolute',
-                              top: 0,
-                              left: 0
-                            }}
-                          >
-                            {item.isTemporary ? 'Loading...' : 'No Image'}
-                          </div>
-                        </div>
-
-                      </div>
-                    ))}
+                      return (
+                        <MediaImageCard
+                          key={item.id}
+                          imageUrl={item.image_url || null}
+                          title={title}
+                          subtitle={subtitle}
+                          status={item.type}
+                          deletable={item.type !== 'assigned'}
+                          loading={loading}
+                          onDelete={handleDelete}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -2574,7 +2502,8 @@ const DashboardProducts = () => {
                 serverPage={productPage}
                 serverPageCount={productPageCount}
                 serverPageSize={PRODUCTS_PER_PAGE}
-                onServerPageChange={fetchProductsPage}
+                onServerPageChange={(p) => fetchProductsPage(p, productSearch)}
+                onServerSearch={(s) => { setProductSearch(s); fetchProductsPage(1, s); }}
               />
             )}
           </div>

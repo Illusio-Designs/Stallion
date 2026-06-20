@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import '../styles/components/ProductCard.css';
 import { addToCart } from '../services/cartService';
 import { showAddToCartSuccess } from '../services/notificationService';
+import { encodeUploadName } from '../utils/imageUrl';
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-IN', {
@@ -16,9 +17,11 @@ const FALLBACK_IMAGE = '/images/products/spac1.webp';
 // Derive the host from the configured API URL (NEXT_PUBLIC_API_URL) so it
 // follows the environment instead of a hard-coded legacy domain.
 const getUploadBase = () => {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.stallioneyewear.in/api';
-  const origin = envUrl.replace(/\/+$/, '').replace(/\/api$/, '');
-  return `${origin}/uploads/products`;
+  // EXACTLY the same base the Media gallery uses, so a product image that loads
+  // there also loads here. Don't fall back to NEXT_PUBLIC_API_URL — that can
+  // point at a different host than where the images are actually served.
+  const base = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/+$/, '');
+  return `${base}/uploads/products`;
 };
 
 const ProductCard = ({
@@ -76,7 +79,7 @@ const ProductCard = ({
       // Re-point legacy upload URLs (old host) at the current backend host.
       const uploadMatch = cleaned.match(/\/uploads\/products\/([^/?#]+)$/);
       if (uploadMatch) {
-        return `${getUploadBase()}/${uploadMatch[1]}`;
+        return `${getUploadBase()}/${encodeUploadName(uploadMatch[1])}`;
       }
       return cleaned;
     }
@@ -100,7 +103,7 @@ const ProductCard = ({
 
     // Make sure we got a valid filename (not empty, has extension)
     if (filename && filename.includes('.')) {
-      return `${getUploadBase()}/${filename}`;
+      return `${getUploadBase()}/${encodeUploadName(filename)}`;
     }
 
     // Fallback to default image

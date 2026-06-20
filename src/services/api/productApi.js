@@ -435,15 +435,15 @@ export const uploadProductImage = async (productImages, productId) => {
     formData.append('product_id', productId);
   }
 
-  // Handle both single file and multiple files
+  // Backend multer for product images is .array('product_image'), so the field
+  // name MUST be 'product_image' — sending 'file' makes multer reject the
+  // request with "Unexpected field".
   if (Array.isArray(productImages)) {
-    // Multiple files - append each one
     productImages.forEach((file) => {
-      formData.append('file', file);
+      formData.append('product_image', file);
     });
   } else {
-    // Single file
-    formData.append('file', productImages);
+    formData.append('product_image', productImages);
   }
 
   // Make the request

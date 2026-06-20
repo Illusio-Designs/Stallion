@@ -296,7 +296,7 @@ export default function TableWithControls({
                   return (
                     <th
                       key={c.key}
-                      style={c.width ? { width: c.width } : undefined}
+                      style={c.width ? { minWidth: c.width } : undefined}
                     >
                       <button
                         className={`ui-th ui-th__btn`}
@@ -363,7 +363,7 @@ export default function TableWithControls({
                   {columns
                     .filter((c) => visible.has(c.key))
                     .map((c) => (
-                      <td key={c.key} style={c.width ? { width: c.width } : undefined}>
+                      <td key={c.key} style={c.width ? { minWidth: c.width } : undefined}>
                         {c.render
                           ? c.render(row[c.key], row)
                           : String(row[c.key] ?? "")}

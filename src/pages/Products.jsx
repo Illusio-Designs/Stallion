@@ -17,6 +17,7 @@ import { isLoggedIn } from '../services/authService';
 import '../styles/components/filter-chips.css';
 import '../styles/pages/Products.css';
 import { productPath } from '../utils/dashboardRoutes';
+import { encodeUploadName } from '../utils/imageUrl';
 
 const Products = ({ onPageChange }) => {
   // Check authentication on mount
@@ -497,6 +498,10 @@ const Products = ({ onPageChange }) => {
       return null;
     };
 
+    // Same base the Media gallery / product pages use, with the filename
+    // percent-encoded (product file names contain spaces).
+    const imageBase = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/+$/, '');
+
     // Handle image_urls (can be array or JSON string)
     const imageUrls = parseImageUrls(product.image_urls);
     if (imageUrls && imageUrls.length > 0) {
@@ -504,7 +509,7 @@ const Products = ({ onPageChange }) => {
       if (firstImage) {
         const filename = extractFilename(firstImage);
         if (filename) {
-          return `https://stallion.nishree.com/uploads/products/${filename}`;
+          return `${imageBase}/uploads/products/${encodeUploadName(filename)}`;
         }
       }
     }
@@ -513,7 +518,7 @@ const Products = ({ onPageChange }) => {
     if (product.image_url) {
       const filename = extractFilename(product.image_url);
       if (filename) {
-        return `https://stallion.nishree.com/uploads/products/${filename}`;
+        return `${imageBase}/uploads/products/${encodeUploadName(filename)}`;
       }
     }
 
