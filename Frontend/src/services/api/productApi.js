@@ -491,6 +491,17 @@ export const bulkUploadProducts = async (file) => {
  * Get all uploaded images/files
  * @returns {Promise<Array>} Array of uploaded file objects
  */
+/**
+ * Re-link already-uploaded images in the uploads folder to products by model_no.
+ * Backend writes the path into each matching product's image_urls.
+ * @returns {Promise<{message, summary, linked, unmatched}>}
+ */
+export const relinkProductImages = async () => {
+  const res = await apiRequest('/products/relink-images', { method: 'POST', includeAuth: true });
+  invalidateCache('products:'); // image_urls changed — drop cached product lists
+  return res;
+};
+
 export const getAllUploads = async () => {
   try {
     // Try multiple possible endpoints
