@@ -9,7 +9,8 @@
   "scripts": {
     "dev": "nodemon ./lib/index.js",
     "clearDb": "node lib/clearDb.js",
-    "sync:indexes": "node scripts/sync-indexes.js"
+    "sync:indexes": "node scripts/sync-indexes.js",
+    "migrate:user-location": "node scripts/add-user-location-columns.js"
   },
   "dependencies": {
     "axios": "^1.13.2",
