@@ -360,10 +360,104 @@ class ProductController {
                 return res.status(400).json({ error: 'Image not found' });
             }
 
+            // No product_id => auto-map each image to a product by matching the
+            // uploaded file name to model_no (e.g. "RB2140.jpg" -> model_no
+            // "RB2140"). The multer middleware keeps the upload's original name as
+            // originalName. Two-pass match: exact base name first, then a variant
+            // with a short trailing "-n"/"_n"/"(n)" suffix stripped (so RB2140-1,
+            // RB2140_2 all map to RB2140) without chopping digits that belong to
+            // the model_no. A model_no on several products attaches to ALL of them.
             if (!product_id) {
+                const stripVariantSuffix = (name) =>
+                    String(name || '').replace(/(?:[\s._-]\d{1,2}|\s*\(\d{1,2}\))$/, '').trim();
+                const baseOf = (originalName) => {
+                    const ext = path.extname(originalName || '');
+                    return path.basename(originalName || '', ext).trim();
+                };
+
+                const items = fileInfos.map((f) => {
+                    const exact = baseOf(f.originalName || f.filename);
+                    return { file: f, exact, stripped: stripVariantSuffix(exact) };
+                });
+
+                const candidateKeys = [...new Set(
+                    items.flatMap((i) => [i.exact, i.stripped]).filter(Boolean).map((k) => k.toLowerCase())
+                )];
+
+                let products = [];
+                if (candidateKeys.length > 0) {
+                    products = await Product.findAll({
+                        where: Sequelize.where(
+                            Sequelize.fn('LOWER', Sequelize.col('model_no')),
+                            { [Op.in]: candidateKeys }
+                        ),
+                    });
+                }
+
+                const byModel = new Map(); // lower(model_no) -> [products]
+                for (const p of products) {
+                    const k = String(p.model_no || '').toLowerCase();
+                    if (!byModel.has(k)) byModel.set(k, []);
+                    byModel.get(k).push(p);
+                }
+
+                const appendsByProduct = new Map(); // product_id -> { product, paths }
+                const attached = [];
+                const unmatched = [];
+
+                for (const { file, exact, stripped } of items) {
+                    const matches = byModel.get(exact.toLowerCase())
+                        || byModel.get(stripped.toLowerCase())
+                        || [];
+                    if (matches.length === 0) {
+                        unmatched.push(file.originalName || file.filename);
+                        continue;
+                    }
+                    const targetIds = [];
+                    for (const product of matches) {
+                        if (!appendsByProduct.has(product.product_id)) {
+                            appendsByProduct.set(product.product_id, { product, paths: [] });
+                        }
+                        appendsByProduct.get(product.product_id).paths.push(file.path);
+                        targetIds.push(product.product_id);
+                    }
+                    attached.push({
+                        file: file.originalName || file.filename,
+                        model_no: matches[0].model_no,
+                        product_ids: targetIds,
+                    });
+                }
+
+                for (const { product, paths } of appendsByProduct.values()) {
+                    const existing = product.image_urls || [];
+                    const oldImageUrls = [...existing];
+                    const image_urls = [...existing, ...paths];
+                    const status = product.status === 'draft' ? 'active' : product.status;
+                    await Product.update(
+                        { image_urls, status, updated_at: new Date() },
+                        { where: { product_id: product.product_id } }
+                    );
+                    await logAudit({
+                        req,
+                        action: 'update',
+                        description: 'Product image auto-mapped by model number',
+                        tableName: 'product',
+                        recordId: product.product_id,
+                        oldValues: { image_urls: oldImageUrls },
+                        newValues: { image_urls },
+                    });
+                }
+
                 return res.status(200).json({
-                    message: 'Product image uploaded successfully',
+                    message: 'Product images auto-mapped by model number',
                     data: fileInfos,
+                    attached,
+                    unmatched,
+                    summary: {
+                        attached: attached.length,
+                        unmatched: unmatched.length,
+                        productsUpdated: appendsByProduct.size,
+                    },
                 });
             }
 
