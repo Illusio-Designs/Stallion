@@ -138,6 +138,7 @@ const DashboardProducts = () => {
   // Server-side pagination for the Products listing (load 20 at a time)
   const [productPage, setProductPage] = useState(1);
   const [productPageCount, setProductPageCount] = useState(1);
+  const [productSearch, setProductSearch] = useState('');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [openBulkUpload, setOpenBulkUpload] = useState(false);
@@ -358,11 +359,14 @@ const DashboardProducts = () => {
 
   // Lightweight paginated fetch for the Products listing tab.
   // Fetches only ONE page (20) of products - NO attribute lookups on listing.
-  const fetchProductsPage = async (targetPage = 1) => {
+  const fetchProductsPage = async (targetPage = 1, search = productSearch) => {
     try {
       setLoading(true);
       setError(null);
-      const result = await getProducts(targetPage, PRODUCTS_PER_PAGE, null);
+      // Server-side search: hit the regular products API with the search param
+      // (matches model_no/size/status). Empty search => the full list (all statuses).
+      const term = String(search || '').trim();
+      const result = await getProducts(targetPage, PRODUCTS_PER_PAGE, term ? { search: term, status: null } : null);
       const list = result.data || [];
       setProducts(list);
       setProductPage(targetPage);
@@ -2600,7 +2604,8 @@ const DashboardProducts = () => {
                 serverPage={productPage}
                 serverPageCount={productPageCount}
                 serverPageSize={PRODUCTS_PER_PAGE}
-                onServerPageChange={fetchProductsPage}
+                onServerPageChange={(p) => fetchProductsPage(p, productSearch)}
+                onServerSearch={(s) => { setProductSearch(s); fetchProductsPage(1, s); }}
               />
             )}
           </div>
