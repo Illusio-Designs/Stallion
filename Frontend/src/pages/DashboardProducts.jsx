@@ -1382,7 +1382,10 @@ const DashboardProducts = () => {
         }
 
         // Check if this image is assigned to any product
-        let isAssigned = false;
+        // Trust the backend's authoritative flag first (it queries which products
+        // actually reference this file by filename); the client cross-reference
+        // below only augments it / finds the assigned product for the label.
+        let isAssigned = upload.isAssigned === true || upload.is_assigned === true;
         let assignedProduct = null;
 
         // Helper function to extract filename from URL
@@ -2433,16 +2436,16 @@ const DashboardProducts = () => {
             ))}
           </div>
           {activeTab === 'Media Gallery' && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2">
               <button
-                className="ui-btn ui-btn--primary whitespace-nowrap px-4 py-2.5 max-sm:w-full"
+                className="ui-btn ui-btn--primary whitespace-nowrap px-4 py-2.5"
                 onClick={handleOpenMediaUpload}
                 disabled={uploadingImage}
               >
                 {uploadingImage ? 'Uploading...' : 'Upload Images'}
               </button>
               <button
-                className="ui-btn ui-btn--secondary whitespace-nowrap px-4 py-2.5 max-sm:w-full"
+                className="ui-btn ui-btn--secondary whitespace-nowrap px-4 py-2.5"
                 onClick={handleRelinkImages}
                 disabled={relinking}
                 title="Attach uploaded images to products by matching the file name to the model no."
