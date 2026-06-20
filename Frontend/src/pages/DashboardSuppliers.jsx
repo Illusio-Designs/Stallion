@@ -224,23 +224,22 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
         </div>
       )}
       {selectedStates.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-2">
+        <div className="work-state-chips">
           {selectedStates.map(id => {
             const s = states.find(st => idOf(st) === id);
             const label = s ? nameOf(s) : id;
             return (
-              <span
-                key={id}
-                className="inline-flex items-center gap-1.5 rounded-pill border border-primary/25 bg-primary-soft py-1 pl-3 pr-1.5 text-xs font-medium text-primary"
-              >
+              <span key={id} className="work-state-chip">
                 {label}
                 <button
                   type="button"
                   onClick={(e) => { e.stopPropagation(); toggle(id); }}
                   aria-label={`Remove ${label}`}
-                  className="flex h-4 w-4 items-center justify-center rounded-full text-sm leading-none text-primary/60 transition hover:bg-primary hover:text-text-on-primary"
+                  className="work-state-chip__remove"
                 >
-                  ×
+                  <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                    <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" />
+                  </svg>
                 </button>
               </span>
             );
@@ -1493,7 +1492,12 @@ const DashboardSuppliers = () => {
                 { key: 'end_date', label: 'END DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
                 { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
                 { key: 'target_status', label: 'STATUS', render: (v) => (
-                  <span className={`inline-flex items-center rounded-[12px] px-2.5 py-0.5 text-xs font-semibold ${v === 'pending' ? 'bg-warning-soft text-warning' : 'bg-success-soft text-success'}`}>{v || 'pending'}</span>
+                  // Use the shared .ui-badge classes (single source of truth in
+                  // ui.css) — not hand-rolled Tailwind utilities. This gives the
+                  // pill its real shape/padding AND lets the table rules
+                  // (td:has(.ui-badge), .ui-badge max-width) keep it from being
+                  // clipped/squished by the cell, same as every other status.
+                  <span className={`ui-badge ${v === 'pending' ? 'ui-badge--warning' : 'ui-badge--success'}`}>{v || 'pending'}</span>
                 )},
                 { key: 'target_description', label: 'DESCRIPTION' },
                 ...(!isSalesman ? [{ key: 'action', label: 'ACTION', render: (_v, row) => (

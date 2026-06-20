@@ -184,7 +184,20 @@
       "Bash(grep -vE \"//|/\\\\*|checkin|Checkin|tray_|'tray'|/trays|TrayStatus\")",
       "Bash(node --check lib/controllers/productController.js)",
       "Bash(grep -nE \"uploads/products/\\\\\\\\$\\\\{\\(filename|uploadMatch|m\\\\[1\\\\]\\)\" pages/ProductDetail.jsx components/ProductCard.jsx pages/Cart.jsx)",
-      "Bash(grep -nE \"uploads/products/\\\\\\\\\\\\$\\\\{|getUploadBase\\\\\\(\\\\\\)\\\\}/\\\\\\\\\\\\$\\\\{|\\\\\\\\\\\\$\\\\{base\\\\}\\\\\\\\\\\\$\\\\{|\\\\\\\\\\\\$\\\\{CART_IMAGE_BASE\\\\}\" pages/ProductDetail.jsx components/ProductCard.jsx pages/Cart.jsx)"
+      "Bash(grep -nE \"uploads/products/\\\\\\\\\\\\$\\\\{|getUploadBase\\\\\\(\\\\\\)\\\\}/\\\\\\\\\\\\$\\\\{|\\\\\\\\\\\\$\\\\{base\\\\}\\\\\\\\\\\\$\\\\{|\\\\\\\\\\\\$\\\\{CART_IMAGE_BASE\\\\}\" pages/ProductDetail.jsx components/ProductCard.jsx pages/Cart.jsx)",
+      "Bash(grep -nA9 \"ui-label\\\\\">Address\" pages/DashboardSuppliers.jsx)",
+      "Bash(node --check lib/routes/product.js)",
+      "Bash(grep -nA8 \"ui-label\\\\\">Address\" pages/DashboardDistributor.jsx)",
+      "Bash(grep -nE \"image_urls: merged|image_urls: image_urls|\\\\{ image_urls, status|image_urls: image_urls,\" lib/controllers/productController.js)",
+      "Bash(grep -nA10 \"ui-label\\\\\">Alternate Phone\" pages/DashboardSuppliers.jsx)",
+      "Bash(grep -nA4 \"dashboard-back-shop:hover|@media \\\\\\(hover: hover\\\\\\)\" styles/components/DashboardHeader.css)",
+      "Bash(grep -nE \"^button|button \\\\{|button,\" globals.css components/ui.css)",
+      "Bash(grep -nE \"^a[ ,:{]|^a\\\\b|a:hover|a:link|a:visited\" styles/globals.css)",
+      "Bash(grep -nA15 \"manuallyManagedTables\" services/databaseManager.js)",
+      "Bash(echo \"=== exit code: $? \\(1 = no matches = clean\\) ===\")",
+      "Bash(node --check pages/DashboardManage.jsx)",
+      "Bash(node -e \"const s=require\\('fs'\\).readFileSync\\('pages/DashboardManage.jsx','utf8'\\); const o=\\(s.match\\(/{/g\\)||[]\\).length, c=\\(s.match\\(/}/g\\)||[]\\).length, po=\\(s.match\\(/\\\\\\(/g\\)||[]\\).length, pc=\\(s.match\\(/\\\\\\)/g\\)||[]\\).length; console.log\\('braces',o,c, o===c?'OK':'MISMATCH'\\); console.log\\('parens',po,pc, po===pc?'OK':'MISMATCH'\\);\")",
+      "Bash(git -C /e/Stallion check-ignore -v Backendjs/scripts/add-user-location-columns.js)"
     ],
     "additionalDirectories": [
       "\\tmp",
