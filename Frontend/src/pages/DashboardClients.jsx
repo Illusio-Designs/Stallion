@@ -1164,6 +1164,15 @@ const DashboardClients = () => {
         />
       </div>
       <div className="form-group">
+        <label className="ui-label">Address</label>
+        <input
+          className="ui-input"
+          placeholder="Address"
+          value={formData.address}
+          onChange={(e) => handleInputChange('address', e.target.value)}
+        />
+      </div>
+      <div className="form-group">
         <label className="ui-label">Country *</label>
         <DropdownSelector
           options={[
@@ -1178,24 +1187,6 @@ const DashboardClients = () => {
           onOpen={fetchCountries}
           placeholder="Select Country"
           className="ui-dropdown-custom--full-width"
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Address</label>
-        <input
-          className="ui-input"
-          placeholder="Address"
-          value={formData.address}
-          onChange={(e) => handleInputChange('address', e.target.value)}
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Pincode</label>
-        <input
-          className="ui-input"
-          placeholder="Pincode"
-          value={formData.pincode}
-          onChange={(e) => handleInputChange('pincode', e.target.value)}
         />
       </div>
       <div className="form-group">
@@ -1257,6 +1248,15 @@ const DashboardClients = () => {
         {!formData.city_id && (
           <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a city first</small>
         )}
+      </div>
+      <div className="form-group">
+        <label className="ui-label">Pincode</label>
+        <input
+          className="ui-input"
+          placeholder="Pincode"
+          value={formData.pincode}
+          onChange={(e) => handleInputChange('pincode', e.target.value)}
+        />
       </div>
       <div className="form-group">
         <label className="ui-label">GSTIN</label>
