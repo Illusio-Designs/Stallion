@@ -66,7 +66,7 @@ class UserController {
 
     async createUser(req, res) {
         try {
-            const { name, is_active, phone, role_id, email, image_url, address } = req.body;
+            const { name, is_active, phone, role_id, email, image_url, address, country_id, state_id, city_id } = req.body;
             if (!address) {
                 return res.status(400).json({ error: 'Address is required' });
             }
@@ -79,6 +79,9 @@ class UserController {
                 phone: phone,
                 email: email,
                 address,
+                country_id: country_id || null,
+                state_id: state_id || null,
+                city_id: city_id || null,
                 role_id: role_id,
                 is_active: is_active,
                 profile_image: image_url,
@@ -108,7 +111,7 @@ class UserController {
         try {
             const id = req.user.user_id;
             console.log("id", id);
-            const { name, is_active, phone, role_id, email, image_url, address } = req.body;
+            const { name, is_active, phone, role_id, email, image_url, address, country_id, state_id, city_id } = req.body;
             const user = await User.findByPk(id);
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
@@ -119,6 +122,9 @@ class UserController {
                 phone: phone !== undefined ? phone : user.phone,
                 email: email !== undefined ? email : user.email,
                 address: address !== undefined ? address : user.address,
+                country_id: country_id !== undefined ? (country_id || null) : user.country_id,
+                state_id: state_id !== undefined ? (state_id || null) : user.state_id,
+                city_id: city_id !== undefined ? (city_id || null) : user.city_id,
                 profile_image: image_url !== undefined ? image_url : user.profile_image,
                 updated_at: new Date(),
             };
@@ -179,6 +185,73 @@ class UserController {
                 req,
                 action: 'update',
                 description: 'User updated',
+                tableName: 'users',
+                recordId: user.user_id,
+                oldValues: oldSnapshot,
+                newValues: { ...oldSnapshot, ...updates },
+            });
+            const updatedUser = await User.findByPk(id);
+            res.status(200).json(updatedUser);
+        }
+        catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    // Admin: update ANY user by id (office-team management). updateUser above
+    // only updates the logged-in user's own profile, so it can't be used to
+    // edit another office-team member.
+    async updateUserById(req, res) {
+        try {
+            const id = req.params.id;
+            if (!id) {
+                return res.status(400).json({ error: 'User ID is required' });
+            }
+            const { name, is_active, phone, role_id, email, image_url, address, country_id, state_id, city_id } = req.body;
+            const user = await User.findByPk(id);
+            if (!user) {
+                return res.status(404).json({ error: 'User not found' });
+            }
+
+            const updates = {
+                full_name: name !== undefined ? name : user.full_name,
+                phone: phone !== undefined ? phone : user.phone,
+                email: email !== undefined ? email : user.email,
+                address: address !== undefined ? address : user.address,
+                country_id: country_id !== undefined ? (country_id || null) : user.country_id,
+                state_id: state_id !== undefined ? (state_id || null) : user.state_id,
+                city_id: city_id !== undefined ? (city_id || null) : user.city_id,
+                profile_image: image_url !== undefined ? image_url : user.profile_image,
+                updated_at: new Date(),
+            };
+
+            if (!updates.address) {
+                return res.status(400).json({ error: 'Address is required' });
+            }
+            if (is_active !== undefined) {
+                updates.is_active = is_active;
+            }
+            if (role_id !== undefined) {
+                const role = await Role.findByPk(role_id);
+                if (!role) {
+                    return res.status(404).json({ error: 'Role not found' });
+                }
+                updates.role_id = role_id;
+            }
+
+            const oldSnapshot = user.toJSON();
+            await user.update(updates);
+
+            // Keep the role mapping table in sync when the role changes.
+            if (role_id !== undefined && role_id !== oldSnapshot.role_id) {
+                await UserRole.destroy({ where: { user_id: user.user_id } });
+                await UserRole.create({ user_id: user.user_id, role_id });
+            }
+
+            await logAudit({
+                req,
+                action: 'update',
+                description: 'User updated (admin)',
                 tableName: 'users',
                 recordId: user.user_id,
                 oldValues: oldSnapshot,
