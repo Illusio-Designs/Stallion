@@ -455,7 +455,11 @@ export const uploadProductImage = async (productImages, productId) => {
   });
 
   // Use handleResponse which will throw appropriate errors for status codes
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  // Uploading/auto-mapping changes product.image_urls — drop the cached product
+  // lists so the table/catalog refetch fresh data (they're cached for 3 min).
+  invalidateCache('products:');
+  return result;
 };
 
 /**
