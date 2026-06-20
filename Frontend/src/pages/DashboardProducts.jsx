@@ -2384,9 +2384,9 @@ const DashboardProducts = () => {
         <div className="dash-row">
           <div className="dash-card full">
             {activeTab === 'Media Gallery' ? (
-              <div className="rounded-lg bg-surface-muted">
+              <div className="rounded-lg bg-surface-muted p-5 sm:p-6">
                 {loading ? (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4 p-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5">
                     {Array.from({ length: 8 }).map((_, i) => (
                       <div
                         key={`media-skeleton-${i}`}
@@ -2434,7 +2434,7 @@ const DashboardProducts = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4 p-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5">
                     {allMediaImages.map(item => {
                       const assignedModel = item.assignedProduct?.model_no
                         || (item.model_no && item.model_no !== 'Unassigned' ? item.model_no : null);
