@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import '../styles/components/ProductCard.css';
 import { addToCart } from '../services/cartService';
 import { showAddToCartSuccess } from '../services/notificationService';
+import { encodeUploadName } from '../utils/imageUrl';
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-IN', {
@@ -82,7 +83,7 @@ const ProductCard = ({
       // Re-point legacy upload URLs (old host) at the current backend host.
       const uploadMatch = cleaned.match(/\/uploads\/products\/([^/?#]+)$/);
       if (uploadMatch) {
-        return `${getUploadBase()}/${uploadMatch[1]}`;
+        return `${getUploadBase()}/${encodeUploadName(uploadMatch[1])}`;
       }
       return cleaned;
     }
@@ -106,7 +107,7 @@ const ProductCard = ({
 
     // Make sure we got a valid filename (not empty, has extension)
     if (filename && filename.includes('.')) {
-      return `${getUploadBase()}/${filename}`;
+      return `${getUploadBase()}/${encodeUploadName(filename)}`;
     }
 
     // Fallback to default image

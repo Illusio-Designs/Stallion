@@ -14,6 +14,7 @@ import {
   showSuccess,
 } from "../services/notificationService";
 import { getUserRole, getUser } from "../services/authService";
+import { encodeUploadName } from "../utils/imageUrl";
 import DropdownSelector from "../components/ui/DropdownSelector";
 import {
   getMyParties,
@@ -31,7 +32,7 @@ const CART_IMAGE_BASE = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.
 const resolveCartImage = (img) => {
   if (!img || typeof img !== 'string') return '/images/products/spac1.webp';
   const m = img.match(/\/uploads\/products\/([^/?#"\\\]]+)/);
-  if (m) return `${CART_IMAGE_BASE}/uploads/products/${m[1]}`;
+  if (m) return `${CART_IMAGE_BASE}/uploads/products/${encodeUploadName(m[1])}`;
   return img;
 };
 

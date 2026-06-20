@@ -4,6 +4,7 @@ import Skeleton from "../components/ui/Skeleton";
 import { addToCart } from "../services/cartService";
 import { showAddToCartSuccess } from "../services/notificationService";
 import { parseProductPath } from "../utils/dashboardRoutes";
+import { encodeUploadName } from "../utils/imageUrl";
 import {
   getProductModels,
   getProductById,
@@ -326,7 +327,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
           if (firstImage) {
             const filename = extractFilename(firstImage);
             if (filename) {
-              return `${imageBaseUrl}/uploads/products/${filename}`;
+              return `${imageBaseUrl}/uploads/products/${encodeUploadName(filename)}`;
             }
           }
         }

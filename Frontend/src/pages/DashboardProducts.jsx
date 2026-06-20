@@ -3,6 +3,7 @@ import DropdownSelector from '../components/ui/DropdownSelector';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import { Skeleton } from '../components/ui/Skeleton';
+import MediaImageCard from '../components/ui/MediaImageCard';
 import TableWithControls from '../components/ui/TableWithControls';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
@@ -2383,7 +2384,7 @@ const DashboardProducts = () => {
         <div className="dash-row">
           <div className="dash-card full">
             {activeTab === 'Media Gallery' ? (
-              <div>
+              <div className="rounded-lg bg-surface-muted">
                 {loading ? (
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4 p-5">
                     {Array.from({ length: 8 }).map((_, i) => (
@@ -2434,159 +2435,54 @@ const DashboardProducts = () => {
                   </div>
                 ) : (
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4 p-5">
-                    {allMediaImages.map(item => (
-                      <div
-                        key={item.id}
-                        className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-md"
-                      >
-                        {/* Status Tag */}
-                        <span
-                          className="absolute top-2.5 left-2.5 z-[2] rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm"
-                          style={{ background: (item.type === 'assigned') ? 'var(--color-success)' : 'var(--color-warning)' }}
-                        >
-                          {item.type === 'assigned' ? 'Assigned' : 'Unassigned'}
-                        </span>
+                    {allMediaImages.map(item => {
+                      const assignedModel = item.assignedProduct?.model_no
+                        || (item.model_no && item.model_no !== 'Unassigned' ? item.model_no : null);
+                      const title = item.type === 'assigned'
+                        ? (assignedModel || 'Assigned')
+                        : 'Unassigned image';
+                      const brandCollection = [item.brand_name, item.collection_name]
+                        .filter(v => v && v !== 'N/A')
+                        .join(' · ');
+                      const subtitle = item.type === 'assigned' ? (brandCollection || null) : null;
 
-                        {/* Delete — only for unassigned images (assigned ones must be
-                            unassigned from their product first). Revealed on hover on
-                            desktop; always visible on touch. */}
-                        {item.type !== 'assigned' && (
-                          <button
-                            className="absolute top-2.5 right-2.5 z-[2] flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-sm text-[#dc2626] shadow-sm transition hover:bg-white hover:text-[#b91c1c] disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              if (!(await confirm('Are you sure you want to delete this image? This cannot be undone.'))) {
-                                return;
-                              }
-                              try {
-                                setLoading(true);
-                                const imageUrl = item.image_url || item.url;
-                                const fileName = imageUrl ? imageUrl.split('/').pop().split('?')[0] : null;
-                                if (!fileName) {
-                                  showError('Could not determine image filename.');
-                                  return;
-                                }
-                                await deleteProductImage(fileName);
-                                showSuccess('Image deleted successfully');
-                                await fetchAllUploads();
-                              } catch (error) {
-                                console.error('Error deleting image:', error);
-                                showError(`Failed to delete image: ${error.message}`);
-                              } finally {
-                                setLoading(false);
-                              }
-                            }}
-                            disabled={loading}
-                            aria-label="Delete image"
-                            title="Delete image"
-                          >
-                            ✕
-                          </button>
-                        )}
+                      const handleDelete = async (e) => {
+                        e.stopPropagation();
+                        if (!(await confirm('Are you sure you want to delete this image? This cannot be undone.'))) {
+                          return;
+                        }
+                        try {
+                          setLoading(true);
+                          const imageUrl = item.image_url || item.url;
+                          const fileName = imageUrl ? imageUrl.split('/').pop().split('?')[0] : null;
+                          if (!fileName) {
+                            showError('Could not determine image filename.');
+                            return;
+                          }
+                          await deleteProductImage(fileName);
+                          showSuccess('Image deleted successfully');
+                          await fetchAllUploads();
+                        } catch (error) {
+                          console.error('Error deleting image:', error);
+                          showError(`Failed to delete image: ${error.message}`);
+                        } finally {
+                          setLoading(false);
+                        }
+                      };
 
-                        {/* Image */}
-                        <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-surface-muted p-3">
-                          {item.image_url ? (
-                            <img
-                              src={item.image_url}
-                              alt={item.model_no || 'Product image'}
-                              className="block max-h-full max-w-full object-contain"
-                              onError={(e) => {
-                                const img = e.target;
-                                const normalizedUrl = item.image_url;
-                                const originalUrl = item.originalImageUrl;
-
-                                console.error('Image failed to load:', normalizedUrl);
-
-                                // If we have an original URL that's different, try it as fallback
-                                if (originalUrl && originalUrl !== normalizedUrl && !img.dataset.fallbackTried) {
-                                  console.log('Trying original URL as fallback:', originalUrl);
-                                  img.dataset.fallbackTried = 'true';
-                                  // Construct full URL from original if needed
-                                  let fallbackUrl = originalUrl;
-                                  if (!originalUrl.startsWith('http://') && !originalUrl.startsWith('https://') && !originalUrl.startsWith('blob:')) {
-                                    const getImageBase = () => {
-                                      if (typeof window === 'undefined') return '';
-                                      const imgEnv = process.env.NEXT_PUBLIC_IMAGE_BASE_URL || '';
-                                      if (imgEnv) return imgEnv.replace(/\/$/, '');
-                                      const apiEnv = process.env.NEXT_PUBLIC_API_URL || '';
-                                      if (apiEnv) return apiEnv.replace(/\/api\/?$/, '').replace(/\/$/, '');
-                                      return 'https://api.stallioneyewear.in';
-                                    };
-                                    const base = getImageBase();
-                                    fallbackUrl = originalUrl.startsWith('/') ? `${base}${originalUrl}` : `${base}/uploads/products/${originalUrl}`;
-                                  }
-                                  img.src = fallbackUrl;
-                                  return; // Don't mark as invalid yet, wait for fallback to fail
-                                }
-
-                                // Both normalized and original URLs failed, mark as invalid
-                                setInvalidImageUrls(prev => new Set([...prev, normalizedUrl]));
-                                if (originalUrl && originalUrl !== normalizedUrl) {
-                                  setInvalidImageUrls(prev => new Set([...prev, originalUrl]));
-                                }
-
-                                // Don't hide the image, just show error message
-                                const errorDiv = img.nextElementSibling;
-                                if (errorDiv) {
-                                  errorDiv.style.display = 'flex';
-                                  errorDiv.textContent = item.isTemporary
-                                    ? 'Image uploading...'
-                                    : 'Image not found';
-                                }
-                                // Remove from orphaned images if it's unassigned and failed to load
-                                if (item.type === 'unassigned') {
-                                  setOrphanedImages(prev => prev.filter(img => {
-                                    const imgUrl = img.url || img.image_url;
-                                    return imgUrl !== normalizedUrl && imgUrl !== originalUrl;
-                                  }));
-                                }
-                              }}
-                              onLoad={() => {
-                                const errorDiv = document.querySelector(`[data-image-error="${item.id}"]`);
-                                if (errorDiv) {
-                                  errorDiv.style.display = 'none';
-                                }
-                              }}
-                            />
-                          ) : null}
-                          <div
-                            data-image-error={item.id}
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              display: item.image_url ? 'none' : 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              color: '#999',
-                              fontSize: '14px',
-                              position: 'absolute',
-                              top: 0,
-                              left: 0
-                            }}
-                          >
-                            {item.isTemporary ? 'Loading...' : 'No Image'}
-                          </div>
-                        </div>
-
-                        {/* Label — keep in sync with the badge: assigned cards show
-                            the product's model_no, unassigned show a neutral label. */}
-                        <div className="border-t border-border px-3 py-2">
-                          {(() => {
-                            const assignedModel = item.assignedProduct?.model_no
-                              || (item.model_no && item.model_no !== 'Unassigned' ? item.model_no : null);
-                            const label = item.type === 'assigned'
-                              ? (assignedModel || 'Assigned')
-                              : 'Unassigned image';
-                            return (
-                              <p className="truncate text-[13px] font-medium text-text" title={label}>
-                                {label}
-                              </p>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    ))}
+                      return (
+                        <MediaImageCard
+                          key={item.id}
+                          imageUrl={item.image_url || null}
+                          title={title}
+                          subtitle={subtitle}
+                          status={item.type}
+                          deletable={item.type !== 'assigned'}
+                          loading={loading}
+                          onDelete={handleDelete}
+                        />
+                      );
+                    })}
                   </div>
                 )}
               </div>
