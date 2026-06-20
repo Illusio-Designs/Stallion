@@ -2102,11 +2102,22 @@ const DashboardProducts = () => {
         await fetchProductsWithoutLoading();
       }
 
-      // Handle orphaned images (uploaded without product_id)
+      // Uploaded without product_id. The backend now AUTO-MAPS each image to the
+      // product whose model_no matches the file name and returns
+      // { attached, unmatched, summary }. Only genuinely unmatched files stay in
+      // the gallery as orphans; matched ones are now on their products.
+      const isAutoMap = !!(response && (response.summary || response.attached || response.unmatched));
       if (isMediaUpload && !targetProductId) {
         // Refresh the media gallery to show the newly uploaded image immediately
         await fetchAllUploads();
+        // Auto-map attached images to products — refresh the product list too.
+        if (isAutoMap) {
+          await fetchProductsWithoutLoading();
+        }
 
+        // Optimistic orphaned-add only for the legacy (non auto-map) path; in
+        // auto-map mode the server refresh above is the source of truth.
+        if (!isAutoMap) {
         // Extract image paths from response - API returns { data: [{ path, filename, ... }] }
         let imageFiles = [];
 
@@ -2177,9 +2188,23 @@ const DashboardProducts = () => {
 
           setOrphanedImages(prev => [...prev, ...newOrphanedImages]);
         }
+        } // end if (!isAutoMap)
       }
 
       const fileCount = files.length;
+      // Auto-map: build a summary from the backend response.
+      if (isAutoMap) {
+        const s = response.summary || {};
+        const nAttached = s.attached ?? (response.attached?.length || 0);
+        const nUnmatched = s.unmatched ?? (response.unmatched?.length || 0);
+        const unmatchedNames = (response.unmatched || []).join(', ');
+        const msg = nUnmatched > 0
+          ? `${nAttached} image(s) attached to products by model no. ${nUnmatched} not matched: ${unmatchedNames}`
+          : `${nAttached} image(s) attached to products by model no.`;
+        setUploadProgress({ success: true, message: msg });
+        if (nAttached > 0) showSuccess(`${nAttached} image(s) auto-attached by model no.`);
+        if (nUnmatched > 0) showError(`${nUnmatched} image(s) had no matching model no.: ${unmatchedNames}`);
+      } else {
       setUploadProgress({
         success: true,
         message: fileCount === 1
@@ -2187,6 +2212,7 @@ const DashboardProducts = () => {
           : (isMediaUpload ? `${fileCount} images uploaded successfully!` : `${fileCount} images attached to ${targetLabel} successfully!`),
       });
       showSuccess(isMediaUpload ? 'Images uploaded successfully' : 'Images attached to product successfully');
+      }
 
       // Close the modal if it was open
       if (openImageSelectModal) {
