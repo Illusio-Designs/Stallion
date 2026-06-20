@@ -143,6 +143,67 @@ export const getMyRole = async () => {
 };
 
 /**
+ * Create an office-team user (admin). POST /users — persists name, phone,
+ * email, address, country/state/city, role and active flag.
+ * @param {Object} userData
+ * @returns {Promise<Object>} Created user
+ */
+export const createUser = async (userData) => {
+  const {
+    name, phone, phoneNumber, email, address,
+    country_id, state_id, city_id, role_id, is_active, image_url,
+  } = userData;
+  return apiRequest('/users', {
+    method: 'POST',
+    body: {
+      name,
+      phone: phone || phoneNumber || '',
+      email: email || '',
+      address: address || '',
+      country_id: country_id || null,
+      state_id: state_id || null,
+      city_id: city_id || null,
+      role_id,
+      is_active: is_active !== undefined ? is_active : true,
+      image_url: image_url || '',
+    },
+    includeAuth: true,
+  });
+};
+
+/**
+ * Update an office-team user by id (admin). PUT /users/:id — distinct from
+ * updateUser, which only updates the logged-in user's own profile.
+ * @param {string} userId
+ * @param {Object} userData
+ * @returns {Promise<Object>} Updated user
+ */
+export const updateUserById = async (userId, userData) => {
+  const id = String(userId || '').trim();
+  if (!id) throw new Error('User ID is required');
+  const {
+    name, phone, phoneNumber, email, address,
+    country_id, state_id, city_id, role_id, is_active, image_url,
+  } = userData;
+  return apiRequest(`/users/${id}`, {
+    method: 'PUT',
+    body: {
+      name,
+      phone: phone || phoneNumber || '',
+      email: email || '',
+      address: address || '',
+      country_id: country_id || null,
+      state_id: state_id || null,
+      city_id: city_id || null,
+      role_id,
+      is_active,
+      image_url: image_url || '',
+    },
+    includeAuth: true,
+  });
+};
+
+/**
  * Update user
  * @param {string} userId - User ID (UUID)
  * @param {Object} userData - User data to update
