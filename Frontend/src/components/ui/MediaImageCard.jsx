@@ -26,7 +26,6 @@ export default function MediaImageCard({
   loading = false,
 }) {
   const isAssigned = status === 'assigned';
-  const accent = isAssigned ? 'var(--color-success)' : 'var(--color-warning)';
   const [broken, setBroken] = useState(false);
   useEffect(() => { setBroken(false); }, [imageUrl]);
 
@@ -47,12 +46,12 @@ export default function MediaImageCard({
           </div>
         )}
 
-        {/* Status pill */}
+        {/* Status badge — matches the app's soft badge style */}
         <span
-          className="absolute left-2.5 top-2.5 inline-flex items-center gap-1.5 rounded-full bg-white/95 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide shadow-sm ring-1 ring-black/5"
-          style={{ color: accent }}
+          className={`absolute left-2.5 top-2.5 inline-flex items-center rounded-pill px-2.5 py-1 text-[11px] font-semibold leading-none shadow-sm ${
+            isAssigned ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'
+          }`}
         >
-          <span className="h-1.5 w-1.5 rounded-full" style={{ background: accent }} />
           {isAssigned ? 'Assigned' : 'Unassigned'}
         </span>
 
@@ -72,11 +71,14 @@ export default function MediaImageCard({
       </div>
 
       {/* Text bar */}
-      <div className="border-t border-border px-3 py-2.5">
-        <p className="truncate text-sm font-semibold text-text" title={title}>
+      <div className="border-t border-border px-3.5 py-3">
+        <p className="truncate text-sm font-semibold leading-snug text-text" title={title}>
           {title}
         </p>
-        <p className="truncate text-xs text-text-subtle">
+        <p className="mt-1 flex items-center gap-1.5 truncate text-xs leading-none text-text-subtle">
+          <span
+            className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${isAssigned ? 'bg-success' : 'bg-warning'}`}
+          />
           {subtitle || (isAssigned ? 'Assigned to product' : 'Not assigned')}
         </p>
       </div>
