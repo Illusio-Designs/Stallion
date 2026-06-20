@@ -592,7 +592,12 @@ const DashboardProducts = () => {
       // Products listing: only fetch one page of products (lookups load once, cached)
       fetchProductsPage(1);
     } else if (activeTab === 'Media Gallery') {
-      // Only fetch images from uploads/products folder - no products API call
+      // Load the uploads AND the full product list. The assigned/unassigned
+      // status is computed by cross-referencing product.image_urls, so the
+      // paginated 20-product list isn't enough — without all products, images
+      // assigned to a product on another page show as "unassigned" after a
+      // refresh.
+      fetchProducts();
       fetchAllUploads();
     } else if (activeTab === 'Unuploaded Media Gallery') {
       // Needs the full product list to find products without images
@@ -2380,7 +2385,7 @@ const DashboardProducts = () => {
             {activeTab === 'Media Gallery' ? (
               <div>
                 {loading ? (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-5 p-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4 p-5">
                     {Array.from({ length: 8 }).map((_, i) => (
                       <div
                         key={`media-skeleton-${i}`}
@@ -2428,83 +2433,64 @@ const DashboardProducts = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-5 p-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-4 p-5">
                     {allMediaImages.map(item => (
                       <div
                         key={item.id}
-                        className="border border-border rounded-xl overflow-hidden bg-surface flex flex-col shadow-md relative transition-[transform,box-shadow] duration-200 cursor-pointer"
-                        onMouseEnter={(e) => {
-                          e.currentTarget.style.transform = 'translateY(-4px)';
-                          e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.15)';
-                        }}
-                        onMouseLeave={(e) => {
-                          e.currentTarget.style.transform = 'translateY(0)';
-                          e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.1)';
-                        }}
+                        className="group relative flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-[transform,box-shadow] duration-200 hover:-translate-y-1 hover:shadow-md"
                       >
-                        {/* Status Tag - Always show assigned/unassigned status */}
-                        <div
-                          className="absolute top-3 left-3 text-white px-3 py-1.5 rounded-md text-xs font-semibold z-[2] uppercase tracking-[0.5px] shadow-sm"
+                        {/* Status Tag */}
+                        <span
+                          className="absolute top-2.5 left-2.5 z-[2] rounded-md px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white shadow-sm"
                           style={{ background: (item.type === 'assigned') ? 'var(--color-success)' : 'var(--color-warning)' }}
                         >
                           {item.type === 'assigned' ? 'Assigned' : 'Unassigned'}
-                        </div>
+                        </span>
 
-                        {/* Delete Button */}
-                        <button
-                          className="absolute top-3 right-3 text-white border-none rounded-full w-9 h-9 cursor-pointer flex items-center justify-center z-[2] text-lg font-bold transition-[background] duration-200 shadow-sm bg-[#f44336]"
-                          onClick={async (e) => {
-                            e.stopPropagation();
-
-                            // If image is assigned, block deletion and show notification
-                            if (item.type === 'assigned') {
-                              showError('This image is assigned to a product. Please unassign it first before deleting.');
-                              return;
-                            }
-
-                            if (!(await confirm('Are you sure you want to delete this image? This cannot be undone.'))) {
-                              return;
-                            }
-
-                            try {
-                              setLoading(true);
-                              // Extract filename from URL
-                              const imageUrl = item.image_url || item.url;
-                              const fileName = imageUrl ? imageUrl.split('/').pop().split('?')[0] : null;
-                              if (!fileName) {
-                                showError('Could not determine image filename.');
+                        {/* Delete — only for unassigned images (assigned ones must be
+                            unassigned from their product first). Revealed on hover on
+                            desktop; always visible on touch. */}
+                        {item.type !== 'assigned' && (
+                          <button
+                            className="absolute top-2.5 right-2.5 z-[2] flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-sm text-[#dc2626] shadow-sm transition hover:bg-white hover:text-[#b91c1c] disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (!(await confirm('Are you sure you want to delete this image? This cannot be undone.'))) {
                                 return;
                               }
-                              await deleteProductImage(fileName);
-                              showSuccess('Image deleted successfully');
-                              await fetchAllUploads();
-                            } catch (error) {
-                              console.error('Error deleting image:', error);
-                              showError(`Failed to delete image: ${error.message}`);
-                            } finally {
-                              setLoading(false);
-                            }
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.background = '#d32f2f';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.background = '#f44336';
-                          }}
-                          disabled={loading}
-                          aria-label="Delete image"
-                          title="Delete image"
-                        >
-                          ✕
-                        </button>
+                              try {
+                                setLoading(true);
+                                const imageUrl = item.image_url || item.url;
+                                const fileName = imageUrl ? imageUrl.split('/').pop().split('?')[0] : null;
+                                if (!fileName) {
+                                  showError('Could not determine image filename.');
+                                  return;
+                                }
+                                await deleteProductImage(fileName);
+                                showSuccess('Image deleted successfully');
+                                await fetchAllUploads();
+                              } catch (error) {
+                                console.error('Error deleting image:', error);
+                                showError(`Failed to delete image: ${error.message}`);
+                              } finally {
+                                setLoading(false);
+                              }
+                            }}
+                            disabled={loading}
+                            aria-label="Delete image"
+                            title="Delete image"
+                          >
+                            ✕
+                          </button>
+                        )}
 
-                        {/* Image Container */}
-                        <div className="w-full aspect-[4/3] bg-surface-muted relative min-h-[250px] overflow-hidden flex items-center justify-center">
+                        {/* Image */}
+                        <div className="relative flex aspect-square w-full items-center justify-center overflow-hidden bg-surface-muted p-3">
                           {item.image_url ? (
                             <img
                               src={item.image_url}
                               alt={item.model_no || 'Product image'}
-                              className="w-full h-full object-contain block max-w-full max-h-full"
+                              className="block max-h-full max-w-full object-contain"
                               onError={(e) => {
                                 const img = e.target;
                                 const normalizedUrl = item.image_url;
@@ -2583,6 +2569,22 @@ const DashboardProducts = () => {
                           </div>
                         </div>
 
+                        {/* Label — keep in sync with the badge: assigned cards show
+                            the product's model_no, unassigned show a neutral label. */}
+                        <div className="border-t border-border px-3 py-2">
+                          {(() => {
+                            const assignedModel = item.assignedProduct?.model_no
+                              || (item.model_no && item.model_no !== 'Unassigned' ? item.model_no : null);
+                            const label = item.type === 'assigned'
+                              ? (assignedModel || 'Assigned')
+                              : 'Unassigned image';
+                            return (
+                              <p className="truncate text-[13px] font-medium text-text" title={label}>
+                                {label}
+                              </p>
+                            );
+                          })()}
+                        </div>
                       </div>
                     ))}
                   </div>
