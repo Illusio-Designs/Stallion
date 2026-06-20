@@ -31,6 +31,7 @@ import {
   uploadProductImage,
 } from '../services/apiService';
 import { showError, showSuccess } from '../services/notificationService';
+import { invalidateCache } from '../services/cacheService';
 import { encodeUploadName } from '../utils/imageUrl';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard-products.css';
@@ -626,6 +627,14 @@ const DashboardProducts = () => {
       throw error; // Re-throw to be caught by fetchAllData
     }
   };
+
+  // Clear any stale cached product lists on entry. Image links can change from
+  // uploads/relink (or another session), and product lists are cached for a few
+  // minutes — without this the table could show old rows with empty image_urls
+  // while the catalog (a different cache key) shows the images.
+  useEffect(() => {
+    invalidateCache('products:');
+  }, []);
 
   // Fetch data based on active tab. This runs on mount too (activeTab defaults
   // to 'Products'), so there is no separate mount effect - that previously
@@ -1373,7 +1382,10 @@ const DashboardProducts = () => {
         }
 
         // Check if this image is assigned to any product
-        let isAssigned = false;
+        // Trust the backend's authoritative flag first (it queries which products
+        // actually reference this file by filename); the client cross-reference
+        // below only augments it / finds the assigned product for the label.
+        let isAssigned = upload.isAssigned === true || upload.is_assigned === true;
         let assignedProduct = null;
 
         // Helper function to extract filename from URL
@@ -1981,7 +1993,7 @@ const DashboardProducts = () => {
     {
       key: 'image',
       label: 'IMAGE',
-      width: '72px',
+      width: '84px',
       render: (_v, row) => <ProductThumb product={row.data} alt={row.model_no} />,
     },
     { key: 'model_no', label: 'MODEL NO', width: '120px' },
@@ -2424,16 +2436,16 @@ const DashboardProducts = () => {
             ))}
           </div>
           {activeTab === 'Media Gallery' && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex items-center gap-2">
               <button
-                className="ui-btn ui-btn--primary whitespace-nowrap px-4 py-2.5 max-sm:w-full"
+                className="ui-btn ui-btn--primary whitespace-nowrap px-4 py-2.5"
                 onClick={handleOpenMediaUpload}
                 disabled={uploadingImage}
               >
                 {uploadingImage ? 'Uploading...' : 'Upload Images'}
               </button>
               <button
-                className="ui-btn ui-btn--secondary whitespace-nowrap px-4 py-2.5 max-sm:w-full"
+                className="ui-btn ui-btn--secondary whitespace-nowrap px-4 py-2.5"
                 onClick={handleRelinkImages}
                 disabled={relinking}
                 title="Attach uploaded images to products by matching the file name to the model no."

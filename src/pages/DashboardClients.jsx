@@ -671,6 +671,13 @@ const DashboardClients = () => {
       return;
     }
 
+    // State is required for a party.
+    if (!formData.state_id || !isValidUUID(formData.state_id)) {
+      setError('Please select a state');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -1190,7 +1197,7 @@ const DashboardClients = () => {
         />
       </div>
       <div className="form-group">
-        <label className="ui-label">State</label>
+        <label className="ui-label">State *</label>
         <DropdownSelector
           options={[
             { value: '', label: 'Select State' },
