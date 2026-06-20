@@ -44,7 +44,8 @@ class SalesmanController {
                 return res.status(404).json({ error: 'Salesman not found' });
             }
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: id } });
-            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones });
+            const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: id } });
+            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -63,9 +64,11 @@ class SalesmanController {
             const salesmen = await Salesman.findAll({ where });
             const response = await Promise.all(salesmen.map(async (salesman) => {
                 const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
+                const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
                 return {
                     ...salesman.toJSON(),
-                    zones: salesmanZones.map(zone => zone.toJSON())
+                    zones: salesmanZones.map(zone => zone.toJSON()),
+                    states: salesmanStates.map(s => s.toJSON()),
                 }
             }));
             res.status(200).json(response);
