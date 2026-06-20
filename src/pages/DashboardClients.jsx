@@ -1190,7 +1190,7 @@ const DashboardClients = () => {
         />
       </div>
       <div className="form-group">
-        <label className="ui-label">State (Optional)</label>
+        <label className="ui-label">State</label>
         <DropdownSelector
           options={[
             { value: '', label: 'Select State' },
@@ -1210,7 +1210,7 @@ const DashboardClients = () => {
         )}
       </div>
       <div className="form-group">
-        <label className="ui-label">City (Optional)</label>
+        <label className="ui-label">City</label>
         <DropdownSelector
           options={[
             { value: '', label: 'Select City' },
@@ -1230,7 +1230,7 @@ const DashboardClients = () => {
         )}
       </div>
       <div className="form-group">
-        <label className="ui-label">Zone (Optional)</label>
+        <label className="ui-label">Zone</label>
         <DropdownSelector
           options={[
             { value: '', label: 'Select Zone' },
