@@ -1990,7 +1990,7 @@ const DashboardProducts = () => {
     {
       key: 'image',
       label: 'IMAGE',
-      width: '72px',
+      width: '84px',
       render: (_v, row) => <ProductThumb product={row.data} alt={row.model_no} />,
     },
     { key: 'model_no', label: 'MODEL NO', width: '120px' },
