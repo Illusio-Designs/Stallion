@@ -158,7 +158,8 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
   const searchInputRef = useRef(null);
 
   const nameOf = (s) => s.name || s.state_name || '';
-  const idOf = (s) => s.id || s.state_id;
+  // String-normalised so a saved numeric state_id matches a string option id.
+  const idOf = (s) => String(s.id ?? s.state_id ?? '');
   const filtered = searchQuery
     ? states.filter(s => nameOf(s).toLowerCase().includes(searchQuery.toLowerCase()))
     : states;
@@ -736,7 +737,15 @@ const DashboardSuppliers = () => {
       state_id: row.state_id || '',
       city_id: row.city_id || '',
       zones: Array.isArray(row.zones) ? row.zones.map(z => z.zone_id || z.id || z) : [],
-      state_ids: Array.isArray(row.states) ? row.states.map(s => s.state_id || s.id || s) : [],
+      // Pre-fill saved working states. Accept whatever key the API uses, and
+      // string-normalise the ids so they match the dropdown option ids.
+      state_ids: (() => {
+        const src = row.states || row.working_states || row.salesman_states || row.state_ids || [];
+        if (!Array.isArray(src)) return [];
+        return src
+          .map(s => String((s && typeof s === 'object') ? (s.state_id ?? s.id ?? '') : s))
+          .filter(Boolean);
+      })(),
       joining_date: row.joining_date ? row.joining_date.split('T')[0] : '',
     });
     setEditRow(row);
