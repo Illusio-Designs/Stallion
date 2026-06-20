@@ -33,12 +33,12 @@ export default function MediaImageCard({
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-shadow duration-200 hover:shadow-md">
       {/* Image — contained on white (no crop) */}
-      <div className="relative aspect-[4/3] w-full bg-white">
+      <div className="relative aspect-square w-full bg-white">
         {imageUrl && !broken ? (
           <img
             src={imageUrl}
             alt={title || 'Product image'}
-            className="absolute inset-0 h-full w-full object-contain p-3"
+            className="absolute inset-0 h-full w-full object-contain p-4"
             onError={() => setBroken(true)}
           />
         ) : (
@@ -70,11 +70,11 @@ export default function MediaImageCard({
       </div>
 
       {/* Text bar */}
-      <div className="border-t border-border px-3 py-2">
-        <p className="truncate text-[13px] font-semibold leading-snug text-text" title={title}>
+      <div className="border-t border-border px-4 py-3">
+        <p className="truncate text-sm font-semibold leading-snug text-text" title={title}>
           {title}
         </p>
-        <p className="mt-0.5 truncate text-[11px] leading-none text-text-subtle">
+        <p className="mt-1 truncate text-xs leading-none text-text-subtle">
           {subtitle || (isAssigned ? 'Assigned to product' : 'Not assigned')}
         </p>
       </div>
