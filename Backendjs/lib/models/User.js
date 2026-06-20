@@ -26,6 +26,18 @@ const User = sequelize.define('User', {
     type: DataTypes.TEXT,
     allowNull: false
   },
+  country_id: {
+    type: DataTypes.UUID,
+    allowNull: true
+  },
+  state_id: {
+    type: DataTypes.UUID,
+    allowNull: true
+  },
+  city_id: {
+    type: DataTypes.UUID,
+    allowNull: true
+  },
   profile_image: {
     type: DataTypes.STRING(500),
     allowNull: true
