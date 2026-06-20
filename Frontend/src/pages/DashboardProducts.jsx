@@ -2384,7 +2384,7 @@ const DashboardProducts = () => {
         <div className="dash-row">
           <div className="dash-card full">
             {activeTab === 'Media Gallery' ? (
-              <div className="rounded-lg bg-surface p-5 sm:p-6">
+              <div className="rounded-lg bg-surface p-6 sm:p-8">
                 {loading ? (
                   <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5">
                     {Array.from({ length: 8 }).map((_, i) => (
