@@ -1566,6 +1566,18 @@ const DashboardSuppliers = () => {
               }}
             />
           </div>
+          <div className="form-group">
+            <label className="ui-label">Alternate Phone</label>
+            <PhoneInput
+              defaultCountry="in"
+              value={formData.alternate_phone ? (String(formData.alternate_phone).startsWith('+') ? String(formData.alternate_phone) : '+' + formData.alternate_phone) : ''}
+              onChange={(phone) => handleInputChange('alternate_phone', phone.replace(/^\+/, ''))}
+              className="phone-intl"
+              inputProps={{
+                placeholder: 'Enter alternate phone number',
+              }}
+            />
+          </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Address</label>
             <input
@@ -1640,18 +1652,6 @@ const DashboardSuppliers = () => {
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
               onChange={(selected) => handleInputChange('state_ids', selected)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Alternate Phone</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.alternate_phone ? (String(formData.alternate_phone).startsWith('+') ? String(formData.alternate_phone) : '+' + formData.alternate_phone) : ''}
-              onChange={(phone) => handleInputChange('alternate_phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                placeholder: 'Enter alternate phone number',
-              }}
             />
           </div>
           <div className="form-group">
@@ -1747,6 +1747,18 @@ const DashboardSuppliers = () => {
               }}
             />
           </div>
+          <div className="form-group">
+            <label className="ui-label">Alternate Phone</label>
+            <PhoneInput
+              defaultCountry="in"
+              value={formData.alternate_phone ? (String(formData.alternate_phone).startsWith('+') ? String(formData.alternate_phone) : '+' + formData.alternate_phone) : ''}
+              onChange={(phone) => handleInputChange('alternate_phone', phone.replace(/^\+/, ''))}
+              className="phone-intl"
+              inputProps={{
+                placeholder: 'Enter alternate phone number',
+              }}
+            />
+          </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Address</label>
             <input
@@ -1821,18 +1833,6 @@ const DashboardSuppliers = () => {
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
               onChange={(selected) => handleInputChange('state_ids', selected)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Alternate Phone</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.alternate_phone ? (String(formData.alternate_phone).startsWith('+') ? String(formData.alternate_phone) : '+' + formData.alternate_phone) : ''}
-              onChange={(phone) => handleInputChange('alternate_phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                placeholder: 'Enter alternate phone number',
-              }}
             />
           </div>
           <div className="form-group">
