@@ -31,6 +31,7 @@ import {
   uploadProductImage,
 } from '../services/apiService';
 import { showError, showSuccess } from '../services/notificationService';
+import { invalidateCache } from '../services/cacheService';
 import { encodeUploadName } from '../utils/imageUrl';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard-products.css';
@@ -626,6 +627,14 @@ const DashboardProducts = () => {
       throw error; // Re-throw to be caught by fetchAllData
     }
   };
+
+  // Clear any stale cached product lists on entry. Image links can change from
+  // uploads/relink (or another session), and product lists are cached for a few
+  // minutes — without this the table could show old rows with empty image_urls
+  // while the catalog (a different cache key) shows the images.
+  useEffect(() => {
+    invalidateCache('products:');
+  }, []);
 
   // Fetch data based on active tab. This runs on mount too (activeTab defaults
   // to 'Products'), so there is no separate mount effect - that previously
