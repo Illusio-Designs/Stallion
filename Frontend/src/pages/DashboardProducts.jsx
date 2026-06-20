@@ -2364,13 +2364,13 @@ const DashboardProducts = () => {
         {uploadProgress && (
           <div className="dash-row">
             <div className="dash-card full">
-              <div style={{
-                padding: '12px',
-                backgroundColor: uploadProgress.success ? '#d4edda' : '#f8d7da',
-                border: `1px solid ${uploadProgress.success ? '#c3e6cb' : '#f5c6cb'}`,
-                borderRadius: '8px',
-                color: uploadProgress.success ? '#155724' : '#721c24'
-              }}>
+              <div
+                className={`rounded-lg border p-3 text-sm ${
+                  uploadProgress.success
+                    ? 'border-success/30 bg-success-soft text-success'
+                    : 'border-error/30 bg-error-soft text-error'
+                }`}
+              >
                 <strong>{uploadProgress.success ? 'Success:' : 'Error:'}</strong> {uploadProgress.message}
                 {uploadProgress.details && (
                   <div className="mt-1.5 text-sm">
@@ -2386,7 +2386,7 @@ const DashboardProducts = () => {
             {activeTab === 'Media Gallery' ? (
               <div className="rounded-lg bg-surface p-5 sm:p-6">
                 {loading ? (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-4">
                     {Array.from({ length: 8 }).map((_, i) => (
                       <div
                         key={`media-skeleton-${i}`}
@@ -2434,7 +2434,7 @@ const DashboardProducts = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-5">
+                  <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-4">
                     {allMediaImages.map(item => {
                       const assignedModel = item.assignedProduct?.model_no
                         || (item.model_no && item.model_no !== 'Unassigned' ? item.model_no : null);

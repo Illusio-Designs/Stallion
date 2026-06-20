@@ -3,9 +3,8 @@ import React, { useEffect, useState } from 'react';
 
 /**
  * Product media tile. Product images are shot on a white background, so the
- * image is shown *contained* (never cropped) on a clean surface, with the
- * status pill overlaid on the image and a readable text bar below for the
- * model_no. Styled entirely with Tailwind.
+ * image is shown *contained* (never cropped). A readable status chip overlays
+ * the image and the model_no sits in a compact text bar below. Tailwind only.
  *
  * Props:
  * - imageUrl    image src (already a full, encoded URL)
@@ -26,33 +25,33 @@ export default function MediaImageCard({
   loading = false,
 }) {
   const isAssigned = status === 'assigned';
+  const dotClass = isAssigned ? 'bg-success' : 'bg-warning';
+  const textClass = isAssigned ? 'text-success' : 'text-warning';
   const [broken, setBroken] = useState(false);
   useEffect(() => { setBroken(false); }, [imageUrl]);
 
   return (
-    <div className="group flex flex-col overflow-hidden rounded-2xl border border-border bg-surface shadow-sm transition-shadow duration-200 hover:shadow-md">
-      {/* Image — contained on white so the full product is visible */}
-      <div className="relative aspect-square w-full bg-white p-4">
+    <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-surface shadow-sm transition-shadow duration-200 hover:shadow-md">
+      {/* Image — contained on white (no crop) */}
+      <div className="relative aspect-[4/3] w-full bg-white">
         {imageUrl && !broken ? (
           <img
             src={imageUrl}
             alt={title || 'Product image'}
-            className="h-full w-full object-contain"
+            className="absolute inset-0 h-full w-full object-contain p-3"
             onError={() => setBroken(true)}
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-sm text-text-subtle">
+          <div className="absolute inset-0 flex items-center justify-center text-xs text-text-subtle">
             No image
           </div>
         )}
 
-        {/* Status badge — matches the app's soft badge style */}
-        <span
-          className={`absolute left-2.5 top-2.5 inline-flex items-center rounded-pill px-2.5 py-1 text-[11px] font-semibold leading-none shadow-sm ${
-            isAssigned ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning'
-          }`}
-        >
-          {isAssigned ? 'Assigned' : 'Unassigned'}
+        {/* Status chip — white pill with a coloured dot so it reads clearly on
+            the white product shot */}
+        <span className="absolute left-2 top-2 inline-flex items-center gap-1.5 rounded-pill bg-white/95 px-2 py-1 text-[10px] font-semibold uppercase leading-none tracking-wide shadow-sm ring-1 ring-border backdrop-blur">
+          <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
+          <span className={textClass}>{isAssigned ? 'Assigned' : 'Unassigned'}</span>
         </span>
 
         {/* Delete — revealed on hover (desktop), always visible on touch */}
@@ -63,7 +62,7 @@ export default function MediaImageCard({
             disabled={loading}
             aria-label="Delete image"
             title="Delete image"
-            className="absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full bg-white/95 text-sm text-[#dc2626] shadow-sm ring-1 ring-black/5 transition hover:bg-white hover:text-[#b91c1c] disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
+            className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/95 text-xs text-[#dc2626] shadow-sm ring-1 ring-border transition hover:bg-white hover:text-[#b91c1c] disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100"
           >
             ✕
           </button>
@@ -71,14 +70,11 @@ export default function MediaImageCard({
       </div>
 
       {/* Text bar */}
-      <div className="border-t border-border px-3.5 py-3">
-        <p className="truncate text-sm font-semibold leading-snug text-text" title={title}>
+      <div className="border-t border-border px-3 py-2">
+        <p className="truncate text-[13px] font-semibold leading-snug text-text" title={title}>
           {title}
         </p>
-        <p className="mt-1 flex items-center gap-1.5 truncate text-xs leading-none text-text-subtle">
-          <span
-            className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${isAssigned ? 'bg-success' : 'bg-warning'}`}
-          />
+        <p className="mt-0.5 truncate text-[11px] leading-none text-text-subtle">
           {subtitle || (isAssigned ? 'Assigned to product' : 'Not assigned')}
         </p>
       </div>
