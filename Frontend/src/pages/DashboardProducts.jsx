@@ -1339,22 +1339,24 @@ const DashboardProducts = () => {
       });
     });
 
-    // TEMP DIAGNOSTIC — remove once the assigned/unassigned issue is resolved.
-    if (typeof window !== 'undefined') {
-      const sampleUpload = (allUploads && allUploads[0]) || null;
-      // eslint-disable-next-line no-console
-      console.log('[media-debug]', {
-        products: products.length,
-        productImageFilenames: productImageFilenames.size,
-        sampleProductImageUrls: products[0]?.image_urls,
-        sampleProductParsed: products[0] ? parseImageUrls(products[0]) : null,
-        someFilenames: [...productImageFilenames].slice(0, 3),
-        uploads: allUploads?.length,
-        sampleUploadFilename: sampleUpload?.filename,
-        sampleUploadIsAssigned: sampleUpload?.isAssigned,
-        sampleUploadInProducts: sampleUpload?.filename ? productImageFilenames.has(sampleUpload.filename) : null,
-      });
-    }
+    // Also index products by model_no so an upload can be matched to its product
+    // by NAME (the uploaded file is named after the model_no). This makes the
+    // assigned status reliable even when image_urls linking is stale/missing.
+    const productByModel = new Map();
+    products.forEach((p) => {
+      const m = String(p.model_no || '').trim().toLowerCase();
+      if (m) productByModel.set(m, p);
+    });
+    // Recover the model_no candidate(s) from a stored upload filename
+    // ("<model_no>-<13-digit timestamp>.<ext>", optional -1/_2 variant suffix).
+    const modelKeysFromFilename = (name) => {
+      if (!name) return [];
+      const dot = name.lastIndexOf('.');
+      const noExt = dot > 0 ? name.slice(0, dot) : name;
+      const base = noExt.replace(/-\d{13}$/, '').trim();
+      const stripped = base.replace(/(?:[\s._-]\d{1,2}|\s*\(\d{1,2}\))$/, '').trim();
+      return [...new Set([base, stripped])].filter(Boolean);
+    };
 
     // Only include images from allUploads (from uploads/products folder)
     const mediaImages = [];
@@ -1519,6 +1521,19 @@ const DashboardProducts = () => {
               }
             }
             if (isAssigned) break;
+          }
+        }
+
+        // Fallback: match the file to a product by model_no (the file is named
+        // after the model_no). Reliable even when image_urls linking is missing.
+        if (!isAssigned && fileName) {
+          for (const key of modelKeysFromFilename(fileName)) {
+            const matched = productByModel.get(key.toLowerCase());
+            if (matched) {
+              isAssigned = true;
+              assignedProduct = matched;
+              break;
+            }
           }
         }
 
