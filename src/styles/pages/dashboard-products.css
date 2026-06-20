@@ -26,9 +26,9 @@
 
 .dash-page .product-media-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: var(--space-6);                 /* 24px */
-  padding: var(--space-6);
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--space-5);                 /* 20px */
+  padding: var(--space-6);             /* 24px — space from the panel edges */
 }
 
 @media (max-width: 480px) {
@@ -81,10 +81,11 @@
 
 .dash-page .product-thumb {
   width: 100%;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 1 / 1;
   display: block;
   object-fit: contain;
-  background: var(--color-surface-muted);
+  padding: var(--space-4);             /* keep the product off the edges */
+  background: var(--color-surface);    /* white — seamless with product shots */
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -93,10 +94,26 @@
   width: 48px;
   height: 48px;
   aspect-ratio: 1 / 1;
-  object-fit: cover;
+  object-fit: contain;
+  padding: 3px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+/* Placeholder for a table row with no image */
+.dash-page .product-thumb-ph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
   background: var(--color-surface-muted);
+  color: var(--color-text-subtle);
+  font-size: var(--text-base);
+  line-height: 1;
 }
 
 /* Placeholder shown when a product has no image */
@@ -154,23 +171,37 @@
   position: absolute;
   top: var(--space-2);
   left: var(--space-2);
+  z-index: 2;
   display: inline-flex;
   align-items: center;
+  gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
   font-size: var(--text-xs);
-  font-weight: var(--font-weight-medium);
+  font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   border-radius: var(--radius-pill);
+  /* White chip with a coloured dot — readable on the white product shot
+     (the soft-tinted fill was nearly invisible). */
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-xs);
+}
+
+/* Status dot (inherits the chip's text colour) */
+.dash-page .product-media-status::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
 }
 
 .dash-page .product-media-status--assigned {
-  background: var(--color-success-soft);
   color: var(--color-success);
 }
 
 .dash-page .product-media-status--unassigned {
-  background: var(--color-warning-soft);
   color: var(--color-warning);
 }
 
@@ -216,6 +247,13 @@
 
 .dash-page .product-media-remove:active {
   transform: scale(0.94);
+}
+
+/* Touch devices have no hover to reveal the action — keep it visible. */
+@media (hover: none) {
+  .dash-page .product-media-remove {
+    opacity: 1;
+  }
 }
 
 /* --- Inline banner (replaces the inline-styled error/success boxes) ------- */

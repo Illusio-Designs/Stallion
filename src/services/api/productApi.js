@@ -455,7 +455,11 @@ export const uploadProductImage = async (productImages, productId) => {
   });
 
   // Use handleResponse which will throw appropriate errors for status codes
-  return await handleResponse(response);
+  const result = await handleResponse(response);
+  // Uploading/auto-mapping changes product.image_urls — drop the cached product
+  // lists so the table/catalog refetch fresh data (they're cached for 3 min).
+  invalidateCache('products:');
+  return result;
 };
 
 /**
@@ -491,6 +495,17 @@ export const bulkUploadProducts = async (file) => {
  * Get all uploaded images/files
  * @returns {Promise<Array>} Array of uploaded file objects
  */
+/**
+ * Re-link already-uploaded images in the uploads folder to products by model_no.
+ * Backend writes the path into each matching product's image_urls.
+ * @returns {Promise<{message, summary, linked, unmatched}>}
+ */
+export const relinkProductImages = async () => {
+  const res = await apiRequest('/products/relink-images', { method: 'POST', includeAuth: true });
+  invalidateCache('products:'); // image_urls changed — drop cached product lists
+  return res;
+};
+
 export const getAllUploads = async () => {
   try {
     // Try multiple possible endpoints

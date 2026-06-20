@@ -26,10 +26,12 @@ import {
   getProductsInTray,
   getShapes,
   getTrays,
+  relinkProductImages,
   updateProduct,
   uploadProductImage,
 } from '../services/apiService';
 import { showError, showSuccess } from '../services/notificationService';
+import { encodeUploadName } from '../utils/imageUrl';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard-products.css';
 
@@ -127,6 +129,39 @@ const parseImageUrls = (product) => {
 const hasValidImageUrls = (product) => {
   const imageUrls = parseImageUrls(product);
   return imageUrls.length > 0;
+};
+
+// Build a full, encoded thumbnail URL for a product's first image (or null).
+// Uses the same image host as the Media gallery; handles "[]"/string/array.
+const PRODUCT_IMG_BASE = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/+$/, '');
+const getProductThumbUrl = (product) => {
+  const urls = parseImageUrls(product);
+  if (!urls || urls.length === 0) return null;
+  const first = urls.find((u) => typeof u === 'string' && u.trim());
+  if (!first) return null;
+  const clean = first.split('?')[0].split('#')[0].replace(/([\]"\\])+$/, '');
+  const filename = clean.split('/').pop();
+  if (!filename || !filename.includes('.')) return null;
+  return `${PRODUCT_IMG_BASE}/uploads/products/${encodeUploadName(filename)}`;
+};
+
+// Small table-cell thumbnail with a graceful placeholder on missing/broken image.
+const ProductThumb = ({ product, alt }) => {
+  const src = getProductThumbUrl(product);
+  const [broken, setBroken] = useState(false);
+  useEffect(() => { setBroken(false); }, [src]);
+  if (!src || broken) {
+    return <span className="product-thumb-ph" title="No image" aria-label="No image">—</span>;
+  }
+  return (
+    <img
+      src={src}
+      alt={alt || 'Product image'}
+      className="product-thumb--sm"
+      loading="lazy"
+      onError={() => setBroken(true)}
+    />
+  );
 };
 
 const DashboardProducts = () => {
@@ -1936,6 +1971,12 @@ const DashboardProducts = () => {
   };
 
   const columns = useMemo(() => ([
+    {
+      key: 'image',
+      label: 'IMAGE',
+      width: '72px',
+      render: (_v, row) => <ProductThumb product={row.data} alt={row.model_no} />,
+    },
     { key: 'model_no', label: 'MODEL NO', width: '120px' },
     { key: 'gender_name', label: 'GENDER', width: '100px' },
     { key: 'color_code_name', label: 'COLOR CODE', width: '120px' },
@@ -1972,6 +2013,30 @@ const DashboardProducts = () => {
     setImageTargetProduct(null);
     setError(null);
     imageInputRef.current?.click();
+  };
+
+  // Link already-uploaded images (in the uploads folder) to products by model_no.
+  const [relinking, setRelinking] = useState(false);
+  const handleRelinkImages = async () => {
+    try {
+      setRelinking(true);
+      setError(null);
+      const res = await relinkProductImages();
+      const s = res?.summary || {};
+      const msg = `Linked ${s.linked ?? 0} image(s) to ${s.productsUpdated ?? 0} product(s).`
+        + (s.unmatched ? ` ${s.unmatched} file(s) had no matching model no.` : '');
+      setUploadProgress({ success: true, message: msg });
+      showSuccess(msg);
+      // Refresh so the new links show in the table + gallery.
+      await fetchProducts();
+      await fetchAllUploads();
+    } catch (err) {
+      const message = `Failed to link images: ${err.message}`;
+      setError(message);
+      showError(message);
+    } finally {
+      setRelinking(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -2352,31 +2417,39 @@ const DashboardProducts = () => {
             ))}
           </div>
           {activeTab === 'Media Gallery' && (
-            <button
-              className="ui-btn ui-btn--primary whitespace-nowrap px-4 py-2.5 max-sm:w-full"
-              onClick={handleOpenMediaUpload}
-              disabled={uploadingImage}
-            >
-              {uploadingImage ? 'Uploading...' : 'Upload Images'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="ui-btn ui-btn--primary whitespace-nowrap px-4 py-2.5 max-sm:w-full"
+                onClick={handleOpenMediaUpload}
+                disabled={uploadingImage}
+              >
+                {uploadingImage ? 'Uploading...' : 'Upload Images'}
+              </button>
+              <button
+                className="ui-btn ui-btn--secondary whitespace-nowrap px-4 py-2.5 max-sm:w-full"
+                onClick={handleRelinkImages}
+                disabled={relinking}
+                title="Attach uploaded images to products by matching the file name to the model no."
+              >
+                {relinking ? 'Linking…' : 'Link images to products'}
+              </button>
+            </div>
           )}
         </div>
         {uploadProgress && (
           <div className="dash-row">
             <div className="dash-card full">
               <div
-                className={`rounded-lg border p-3 text-sm ${
-                  uploadProgress.success
-                    ? 'border-success/30 bg-success-soft text-success'
-                    : 'border-error/30 bg-error-soft text-error'
+                className={`product-banner ${
+                  uploadProgress.success ? 'product-banner--success' : 'product-banner--error'
                 }`}
               >
-                <strong>{uploadProgress.success ? 'Success:' : 'Error:'}</strong> {uploadProgress.message}
-                {uploadProgress.details && (
-                  <div className="mt-1.5 text-sm">
-                    {uploadProgress.details}
-                  </div>
-                )}
+                <div>
+                  <strong>{uploadProgress.success ? 'Success:' : 'Error:'}</strong> {uploadProgress.message}
+                  {uploadProgress.details && (
+                    <div className="product-banner__detail">{uploadProgress.details}</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -2384,17 +2457,15 @@ const DashboardProducts = () => {
         <div className="dash-row">
           <div className="dash-card full">
             {activeTab === 'Media Gallery' ? (
-              <div className="m-[17px] rounded-lg bg-surface p-6 sm:p-8">
+              <div>
                 {loading ? (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5">
+                  <div className="product-media-grid">
                     {Array.from({ length: 8 }).map((_, i) => (
-                      <div
-                        key={`media-skeleton-${i}`}
-                        className="border border-border rounded-xl overflow-hidden bg-surface flex flex-col shadow-md"
-                      >
-                        <Skeleton width="100%" height={250} radius={0} />
-                        <div className="p-3">
-                          <Skeleton width="60%" height={14} />
+                      <div key={`media-skeleton-${i}`} className="product-media-card">
+                        <Skeleton width="100%" height={200} radius={0} />
+                        <div className="product-media-meta">
+                          <Skeleton width="70%" height={14} />
+                          <Skeleton width="45%" height={12} />
                         </div>
                       </div>
                     ))}
@@ -2434,7 +2505,7 @@ const DashboardProducts = () => {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-[repeat(auto-fill,minmax(210px,1fr))] gap-5">
+                  <div className="product-media-grid">
                     {allMediaImages.map(item => {
                       const assignedModel = item.assignedProduct?.model_no
                         || (item.model_no && item.model_no !== 'Unassigned' ? item.model_no : null);
