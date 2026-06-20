@@ -14,6 +14,7 @@ router.put('/:id', authenticateToken, checkRole(['admin', 'product_manager', 'tr
 router.delete('/:id', authenticateToken, isProductManager, productController.deleteProduct);
 router.delete('/images/:file_name', authenticateToken, isProductManager, productController.deleteProductImage);
 router.post('/image-upload', authenticateToken, isProductManager, productImageUpload, productController.uploadProductImage);
+router.post('/relink-images', authenticateToken, isProductManager, productController.relinkImagesToProducts);
 router.post('/bulk-upload',
     authenticateToken,
     isProductManager,
