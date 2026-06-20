@@ -1339,6 +1339,23 @@ const DashboardProducts = () => {
       });
     });
 
+    // TEMP DIAGNOSTIC — remove once the assigned/unassigned issue is resolved.
+    if (typeof window !== 'undefined') {
+      const sampleUpload = (allUploads && allUploads[0]) || null;
+      // eslint-disable-next-line no-console
+      console.log('[media-debug]', {
+        products: products.length,
+        productImageFilenames: productImageFilenames.size,
+        sampleProductImageUrls: products[0]?.image_urls,
+        sampleProductParsed: products[0] ? parseImageUrls(products[0]) : null,
+        someFilenames: [...productImageFilenames].slice(0, 3),
+        uploads: allUploads?.length,
+        sampleUploadFilename: sampleUpload?.filename,
+        sampleUploadIsAssigned: sampleUpload?.isAssigned,
+        sampleUploadInProducts: sampleUpload?.filename ? productImageFilenames.has(sampleUpload.filename) : null,
+      });
+    }
+
     // Only include images from allUploads (from uploads/products folder)
     const mediaImages = [];
     const seenUrls = new Set();
