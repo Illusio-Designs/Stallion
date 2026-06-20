@@ -6,7 +6,7 @@ import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import { useConfirm } from '../components/ui/ConfirmProvider';
-import { register, getRoles, getUsers, updateUser, deleteUser } from '../services/apiService';
+import { createUser, updateUserById, getRoles, getUsers, deleteUser, getCountries, getStates, getCities } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 
 const DashboardOfficeTeam = () => {
@@ -17,16 +17,29 @@ const DashboardOfficeTeam = () => {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [countries, setCountries] = useState([]);
+  const [states, setStates] = useState([]);
+  const [cities, setCities] = useState([]);
   const [formData, setFormData] = useState({
     fullName: '',
     phoneNumber: '',
     roleId: '',
+    email: '',
+    address: '',
+    country_id: '',
+    state_id: '',
+    city_id: '',
   });
   const [editFormData, setEditFormData] = useState({
     fullName: '',
     phoneNumber: '',
     roleId: '',
     isActive: true,
+    email: '',
+    address: '',
+    country_id: '',
+    state_id: '',
+    city_id: '',
   });
 
   // Fetch roles on component mount
@@ -64,6 +77,29 @@ const DashboardOfficeTeam = () => {
     fetchRoles();
   }, []);
 
+  // Fetch countries once on mount for the cascade dropdowns
+  useEffect(() => {
+    getCountries()
+      .then(r => setCountries(Array.isArray(r) ? r : (r?.data || [])))
+      .catch(() => {});
+  }, []);
+
+  const fetchStates = async (countryId) => {
+    if (!countryId) { setStates([]); return; }
+    try {
+      const r = await getStates(countryId);
+      setStates(Array.isArray(r) ? r : (r?.data || []));
+    } catch { setStates([]); }
+  };
+
+  const fetchCities = async (stateId) => {
+    if (!stateId) { setCities([]); return; }
+    try {
+      const r = await getCities(stateId);
+      setCities(Array.isArray(r) ? r : (r?.data || []));
+    } catch { setCities([]); }
+  };
+
   // Update edit form data when editRow changes
   useEffect(() => {
     if (editRow) {
@@ -72,7 +108,14 @@ const DashboardOfficeTeam = () => {
         phoneNumber: editRow.phoneNumber || '',
         roleId: editRow.roleId || '',
         isActive: editRow.isActive !== undefined ? editRow.isActive : true,
+        email: editRow.email || '',
+        address: editRow.address || '',
+        country_id: editRow.country_id || '',
+        state_id: editRow.state_id || '',
+        city_id: editRow.city_id || '',
       });
+      fetchStates(editRow.country_id);
+      fetchCities(editRow.state_id);
     }
   }, [editRow]);
 
@@ -107,6 +150,10 @@ const DashboardOfficeTeam = () => {
         isActive: user.is_active || false,
         profile_image: user.profile_image || '',
         email: user.email || '',
+        address: user.address || '',
+        country_id: user.country_id || '',
+        state_id: user.state_id || '',
+        city_id: user.city_id || '',
       };
     });
   };
@@ -216,6 +263,8 @@ const DashboardOfficeTeam = () => {
   const columns = useMemo(() => ([
     { key: 'fullName', label: 'FULL NAME' },
     { key: 'phoneNumber', label: 'PHONE NUMBER' },
+    { key: 'email', label: 'EMAIL' },
+    { key: 'address', label: 'ADDRESS' },
     { key: 'role', label: 'ROLE' },
     { key: 'status', label: 'STATUS' },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
@@ -246,18 +295,29 @@ const DashboardOfficeTeam = () => {
       }
 
       const userData = {
-        phoneNumber,
-        fullName: formData.fullName.trim(),
-        roleId: formData.roleId,
+        name: formData.fullName.trim(),
+        phone: phoneNumber,
+        email: formData.email || '',
+        address: formData.address || '',
+        country_id: formData.country_id || null,
+        state_id: formData.state_id || null,
+        city_id: formData.city_id || null,
+        role_id: formData.roleId,
+        is_active: true,
       };
 
-      await register(userData);
-      
+      await createUser(userData);
+
       // Reset form and close modal
       setFormData({
         fullName: '',
         phoneNumber: '',
         roleId: '',
+        email: '',
+        address: '',
+        country_id: '',
+        state_id: '',
+        city_id: '',
       });
       setOpenAdd(false);
       
@@ -301,17 +361,17 @@ const DashboardOfficeTeam = () => {
         phoneNumber = `+${phoneNumber}`;
       }
 
-      const userData = {
+      await updateUserById(editRow.id, {
         name: editFormData.fullName,
-        phoneNumber: phoneNumber,
-        email: editRow.email || '',
-        profile_image: '', // Legacy field, kept empty
+        phone: phoneNumber,
+        email: editFormData.email || '',
+        address: editFormData.address || '',
+        country_id: editFormData.country_id || null,
+        state_id: editFormData.state_id || null,
+        city_id: editFormData.city_id || null,
         is_active: editFormData.isActive,
-        image_url: editRow.profile_image || '',
         role_id: editFormData.roleId,
-      };
-
-      await updateUser(editRow.id, userData);
+      });
       
       // Refresh users list
       const response = await getUsers();
@@ -546,6 +606,11 @@ const DashboardOfficeTeam = () => {
             fullName: '',
             phoneNumber: '',
             roleId: '',
+            email: '',
+            address: '',
+            country_id: '',
+            state_id: '',
+            city_id: '',
           });
         }}
         title="Add New User"
@@ -559,6 +624,11 @@ const DashboardOfficeTeam = () => {
                   fullName: '',
                   phoneNumber: '',
                   roleId: '',
+                  email: '',
+                  address: '',
+                  country_id: '',
+                  state_id: '',
+                  city_id: '',
                 });
               }}
               disabled={loading}
@@ -568,7 +638,7 @@ const DashboardOfficeTeam = () => {
             <button
               className="ui-btn ui-btn--primary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text-on-primary shadow-xs transition-colors hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
               onClick={handleSubmit}
-              disabled={loading || !formData.fullName || !formData.phoneNumber || !formData.roleId}
+              disabled={loading || !formData.fullName || !formData.phoneNumber || !formData.roleId || !formData.address}
             >
               {loading ? 'Saving...' : 'Save'}
             </button>
@@ -600,12 +670,82 @@ const DashboardOfficeTeam = () => {
             />
           </div>
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Email</label>
+            <input
+              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
+              type="email"
+              placeholder="Enter email"
+              value={formData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)}
+            />
+          </div>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Address *</label>
+            <input
+              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
+              placeholder="Enter address"
+              value={formData.address}
+              onChange={(e) => handleInputChange('address', e.target.value)}
+            />
+          </div>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
             <label className="ui-label text-[var(--text-sm)] font-medium text-text">Role *</label>
             <DropdownSelector
               options={roleOptions}
               value={formData.roleId}
               onChange={(value) => handleInputChange('roleId', value)}
               placeholder="Select a role"
+            />
+          </div>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Country</label>
+            <DropdownSelector
+              options={[
+                { value: '', label: 'Select Country' },
+                ...countries.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              value={formData.country_id}
+              onChange={(value) => {
+                handleInputChange('country_id', value);
+                handleInputChange('state_id', '');
+                handleInputChange('city_id', '');
+                fetchStates(value);
+              }}
+              onOpen={() => { if (!countries.length) getCountries().then(r => setCountries(Array.isArray(r) ? r : (r?.data || []))).catch(() => {}); }}
+              placeholder="Select Country"
+              className="ui-dropdown-custom--full-width"
+            />
+          </div>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">State</label>
+            <DropdownSelector
+              options={[
+                { value: '', label: 'Select State' },
+                ...states.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+              value={formData.state_id}
+              onChange={(value) => {
+                handleInputChange('state_id', value);
+                handleInputChange('city_id', '');
+                fetchCities(value);
+              }}
+              placeholder="Select State"
+              disabled={!formData.country_id}
+              className="ui-dropdown-custom--full-width"
+            />
+          </div>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">City</label>
+            <DropdownSelector
+              options={[
+                { value: '', label: 'Select City' },
+                ...cities.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              value={formData.city_id}
+              onChange={(value) => handleInputChange('city_id', value)}
+              placeholder="Select City"
+              disabled={!formData.state_id}
+              className="ui-dropdown-custom--full-width"
             />
           </div>
         </form>
@@ -619,6 +759,11 @@ const DashboardOfficeTeam = () => {
             phoneNumber: '',
             roleId: '',
             isActive: true,
+            email: '',
+            address: '',
+            country_id: '',
+            state_id: '',
+            city_id: '',
           });
         }}
         title="Edit User"
@@ -633,6 +778,11 @@ const DashboardOfficeTeam = () => {
                   phoneNumber: '',
                   roleId: '',
                   isActive: true,
+                  email: '',
+                  address: '',
+                  country_id: '',
+                  state_id: '',
+                  city_id: '',
                 });
               }}
               disabled={loading}
@@ -642,7 +792,7 @@ const DashboardOfficeTeam = () => {
             <button
               className="ui-btn ui-btn--primary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text-on-primary shadow-xs transition-colors hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
               onClick={handleEditSubmit}
-              disabled={loading || !editFormData.fullName || !editFormData.phoneNumber || !editFormData.roleId}
+              disabled={loading || !editFormData.fullName || !editFormData.phoneNumber || !editFormData.roleId || !editFormData.address}
             >
               {loading ? 'Updating...' : 'Update'}
             </button>
@@ -674,12 +824,79 @@ const DashboardOfficeTeam = () => {
             />
           </div>
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Email</label>
+            <input
+              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
+              type="email"
+              placeholder="Enter email"
+              value={editFormData.email}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, email: e.target.value }))}
+            />
+          </div>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Address *</label>
+            <input
+              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
+              placeholder="Enter address"
+              value={editFormData.address}
+              onChange={(e) => setEditFormData(prev => ({ ...prev, address: e.target.value }))}
+            />
+          </div>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
             <label className="ui-label text-[var(--text-sm)] font-medium text-text">Role *</label>
             <DropdownSelector
               options={roleOptions}
               value={editFormData.roleId}
               onChange={(value) => setEditFormData(prev => ({ ...prev, roleId: value }))}
               placeholder="Select a role"
+            />
+          </div>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Country</label>
+            <DropdownSelector
+              options={[
+                { value: '', label: 'Select Country' },
+                ...countries.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              value={editFormData.country_id}
+              onChange={(value) => {
+                setEditFormData(prev => ({ ...prev, country_id: value, state_id: '', city_id: '' }));
+                fetchStates(value);
+              }}
+              onOpen={() => { if (!countries.length) getCountries().then(r => setCountries(Array.isArray(r) ? r : (r?.data || []))).catch(() => {}); }}
+              placeholder="Select Country"
+              className="ui-dropdown-custom--full-width"
+            />
+          </div>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">State</label>
+            <DropdownSelector
+              options={[
+                { value: '', label: 'Select State' },
+                ...states.map((s) => ({ value: s.id, label: s.name })),
+              ]}
+              value={editFormData.state_id}
+              onChange={(value) => {
+                setEditFormData(prev => ({ ...prev, state_id: value, city_id: '' }));
+                fetchCities(value);
+              }}
+              placeholder="Select State"
+              disabled={!editFormData.country_id}
+              className="ui-dropdown-custom--full-width"
+            />
+          </div>
+          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">City</label>
+            <DropdownSelector
+              options={[
+                { value: '', label: 'Select City' },
+                ...cities.map((c) => ({ value: c.id, label: c.name })),
+              ]}
+              value={editFormData.city_id}
+              onChange={(value) => setEditFormData(prev => ({ ...prev, city_id: value }))}
+              placeholder="Select City"
+              disabled={!editFormData.state_id}
+              className="ui-dropdown-custom--full-width"
             />
           </div>
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">

@@ -158,7 +158,8 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
   const searchInputRef = useRef(null);
 
   const nameOf = (s) => s.name || s.state_name || '';
-  const idOf = (s) => s.id || s.state_id;
+  // String-normalised so a saved numeric state_id matches a string option id.
+  const idOf = (s) => String(s.id ?? s.state_id ?? '');
   const filtered = searchQuery
     ? states.filter(s => nameOf(s).toLowerCase().includes(searchQuery.toLowerCase()))
     : states;
@@ -223,14 +224,24 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
         </div>
       )}
       {selectedStates.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           {selectedStates.map(id => {
             const s = states.find(st => idOf(st) === id);
             const label = s ? nameOf(s) : id;
             return (
-              <span key={id} className="inline-flex items-center gap-1.5 bg-[var(--color-primary-soft)] text-[var(--color-primary)] rounded-full px-2.5 py-[3px] text-xs font-medium">
+              <span
+                key={id}
+                className="inline-flex items-center gap-1.5 rounded-pill border border-primary/25 bg-primary-soft py-1 pl-3 pr-1.5 text-xs font-medium text-primary"
+              >
                 {label}
-                <button type="button" onClick={(e) => { e.stopPropagation(); toggle(id); }} aria-label={`Remove ${label}`} className="border-none bg-transparent text-inherit cursor-pointer text-sm leading-none p-0">×</button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); toggle(id); }}
+                  aria-label={`Remove ${label}`}
+                  className="flex h-4 w-4 items-center justify-center rounded-full text-sm leading-none text-primary/60 transition hover:bg-primary hover:text-text-on-primary"
+                >
+                  ×
+                </button>
               </span>
             );
           })}
@@ -726,7 +737,15 @@ const DashboardSuppliers = () => {
       state_id: row.state_id || '',
       city_id: row.city_id || '',
       zones: Array.isArray(row.zones) ? row.zones.map(z => z.zone_id || z.id || z) : [],
-      state_ids: Array.isArray(row.states) ? row.states.map(s => s.state_id || s.id || s) : [],
+      // Pre-fill saved working states. Accept whatever key the API uses, and
+      // string-normalise the ids so they match the dropdown option ids.
+      state_ids: (() => {
+        const src = row.states || row.working_states || row.salesman_states || row.state_ids || [];
+        if (!Array.isArray(src)) return [];
+        return src
+          .map(s => String((s && typeof s === 'object') ? (s.state_id ?? s.id ?? '') : s))
+          .filter(Boolean);
+      })(),
       joining_date: row.joining_date ? row.joining_date.split('T')[0] : '',
     });
     setEditRow(row);
@@ -901,29 +920,30 @@ const DashboardSuppliers = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validate required fields
+    // Validate required fields. Use toasts (not setError) so the form/aside
+    // panel stays open instead of being replaced by the page error state.
     if (!formData.employee_code || formData.employee_code.trim() === '') {
-      setError('Please enter employee code');
+      showError('Please enter employee code');
       return;
     }
     if (!formData.full_name || formData.full_name.trim() === '') {
-      setError('Please enter full name');
+      showError('Please enter full name');
       return;
     }
     if (!formData.email || formData.email.trim() === '') {
-      setError('Please enter email');
+      showError('Please enter email');
       return;
     }
     if (!formData.phone || formData.phone.trim() === '') {
-      setError('Please enter phone number');
+      showError('Please enter phone number');
       return;
     }
     if (!formData.country_id) {
-      setError('Please select a country');
+      showError('Please select a country');
       return;
     }
     if (!Array.isArray(formData.state_ids) || formData.state_ids.length === 0) {
-      setError('Please select at least one Working State');
+      showError('Please select at least one Working State');
       return;
     }
 
