@@ -36,6 +36,11 @@ class DatabaseManager {
                 console.error('❌ Failed creating state join tables:', e.message);
             }
 
+            // Add the optional users location columns BEFORE any User query below
+            // (the admin-seed findOne selects country_id/state_id/city_id, so this
+            // MUST run first or init crash-loops with "Unknown column 'country_id'").
+            await this.ensureUserLocationColumns();
+
             // Define table schemas
             const schemas = {
                 users: {
@@ -474,11 +479,6 @@ class DatabaseManager {
 
             // Idempotent index sync for all tables (safe on existing live databases)
             await this.syncIndexes();
-
-            // `users` is in manuallyManagedTables (excluded from model sync), so
-            // new model columns aren't auto-created. Add the location columns
-            // idempotently here — safe on a live DB (only adds when missing).
-            await this.ensureUserLocationColumns();
 
             await Country.initializeDefaultCountries();
             await State.initializeDefaultStates();
