@@ -475,6 +475,11 @@ class DatabaseManager {
             // Idempotent index sync for all tables (safe on existing live databases)
             await this.syncIndexes();
 
+            // `users` is in manuallyManagedTables (excluded from model sync), so
+            // new model columns aren't auto-created. Add the location columns
+            // idempotently here — safe on a live DB (only adds when missing).
+            await this.ensureUserLocationColumns();
+
             await Country.initializeDefaultCountries();
             await State.initializeDefaultStates();
             console.log('✨ Database initialization completed');
@@ -482,6 +487,24 @@ class DatabaseManager {
         } catch (error) {
             console.error('❌ Database initialization error:', error);
             throw error;
+        }
+    }
+
+    // Idempotently add the optional location columns to the manually-managed
+    // `users` table (it's excluded from model sync). Only adds a column when it
+    // doesn't already exist, so it's safe to run on every startup / live DB.
+    static async ensureUserLocationColumns() {
+        try {
+            const qi = sequelize.getQueryInterface();
+            const table = await qi.describeTable('users');
+            for (const col of ['country_id', 'state_id', 'city_id']) {
+                if (!table[col]) {
+                    await qi.addColumn('users', col, { type: DataTypes.UUID, allowNull: true });
+                    console.log(`✅ Added column users.${col}`);
+                }
+            }
+        } catch (error) {
+            console.log('⚠️ ensureUserLocationColumns warning:', error.message);
         }
     }
 
