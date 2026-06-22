@@ -270,16 +270,29 @@ const DashboardOffers = () => {
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
-        <div className="dash-row">
-          <div className="dash-card full">
+        <div className="dash-row grid grid-cols-1 gap-3 min-[560px]:grid-cols-12 min-[560px]:gap-4">
+          <div className="dash-card full col-span-full bg-surface border border-border rounded-lg shadow-sm p-0">
             {error && !loading ? (
               <div className="ui-state ui-state--error">
+                <div className="ui-state__icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                    <circle cx="12" cy="12" r="9" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </div>
                 <p className="ui-state__title">Couldn't load offers</p>
                 <p className="ui-state__desc">{error}</p>
                 <button className="ui-btn ui-btn--secondary" onClick={fetchOffers}>Try again</button>
               </div>
             ) : !loading && offers.length === 0 ? (
               <div className="ui-state ui-state--empty">
+                <div className="ui-state__icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                    <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z" />
+                    <line x1="7" y1="7" x2="7.01" y2="7" />
+                  </svg>
+                </div>
                 <p className="ui-state__title">No offers yet</p>
                 <p className="ui-state__desc">Create a flat, product-wise or buy-X-get-Y offer for the cart.</p>
                 <button className="ui-btn ui-btn--primary" onClick={openAdd}>Add Offer</button>
@@ -289,10 +302,12 @@ const DashboardOffers = () => {
                 title="Offers"
                 columns={columns}
                 rows={offers}
+                selectable={!loading}
                 onAddNew={openAdd}
                 addNewText="Add Offer"
                 onImport={fetchOffers}
                 importText="Refresh"
+                itemName="Offer"
                 loading={loading}
               />
             )}
@@ -321,14 +336,14 @@ const DashboardOffers = () => {
 
           <div className="form-group form-group--full">
             <label className="ui-label">Offer Type *</label>
-            <DropdownSelector options={TYPE_OPTIONS} value={form.offer_type} onChange={(v) => set('offer_type', v)} placeholder="Select type" />
+            <DropdownSelector className="ui-dropdown-custom--full-width" options={TYPE_OPTIONS} value={form.offer_type} onChange={(v) => set('offer_type', v)} placeholder="Select type" />
           </div>
 
           {showRate && (
             <>
               <div className="form-group">
                 <label className="ui-label">Discount Mode *</label>
-                <DropdownSelector options={MODE_OPTIONS} value={form.discount_mode} onChange={(v) => set('discount_mode', v)} placeholder="Mode" />
+                <DropdownSelector className="ui-dropdown-custom--full-width" options={MODE_OPTIONS} value={form.discount_mode} onChange={(v) => set('discount_mode', v)} placeholder="Mode" />
               </div>
               <div className="form-group">
                 <label className="ui-label">Discount Value *</label>
@@ -365,6 +380,7 @@ const DashboardOffers = () => {
             <div className="form-group form-group--full">
               <label className="ui-label">Products *</label>
               <DropdownSelector
+                className="ui-dropdown-custom--full-width"
                 options={productOpts}
                 value=""
                 onChange={addProduct}
