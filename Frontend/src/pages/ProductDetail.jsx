@@ -1047,28 +1047,6 @@ const ProductDetail = ({ productId: propProductId = null }) => {
               </div>
               <div className="main-product-info flex flex-col gap-6">
                 <h2 className="product-title text-[length:var(--text-2xl)] text-text-on-primary m-0 font-semibold leading-[var(--leading-tight)] tracking-[-0.02em]">{display(currentProduct.name)}</h2>
-                <div className="color-selectors flex gap-3" role="group" aria-label="Select colour variation">
-                  {productVariations.slice(0, 3).map((variation, index) => (
-                    <button
-                      type="button"
-                      key={variation.id}
-                      className={`color-swatch w-8 h-8 p-0 rounded-pill border border-[rgba(255,255,255,0.35)] cursor-pointer transition duration-200 hover:scale-[1.08] active:scale-[0.96] focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.45)] motion-reduce:transition-none ${
-                        selectedVariation === index ? "active shadow-[0_0_0_2px_var(--color-primary-active),0_0_0_4px_var(--color-accent)]" : ""
-                      }`}
-                      aria-label={`Colour variation ${index + 1}`}
-                      aria-pressed={selectedVariation === index}
-                      onClick={() => handleVariationClick(index)}
-                      style={{
-                        backgroundColor:
-                          index === 0
-                            ? "#000000"
-                            : index === 1
-                            ? "#FFFFFF"
-                            : "#FFB6C1",
-                      }}
-                    ></button>
-                  ))}
-                </div>
                 <div className="price-info flex flex-col gap-2">
                   <div className="price-item flex items-baseline gap-4">
                     <span className="price-label text-[length:var(--text-sm)] text-[rgba(255,255,255,0.7)] font-normal uppercase tracking-[var(--tracking-label)] min-w-[44px]">MRP</span>
