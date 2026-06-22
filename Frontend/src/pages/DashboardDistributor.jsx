@@ -937,6 +937,7 @@ const DashboardDistributor = () => {
             phoneNumber,
             fullName: formData.contact_person.trim() || formData.distributor_name.trim(),
             roleId: distributorRoleId,
+            address: formData.address ? formData.address.trim() : '',
           };
 
           console.log('[Create Distributor] Creating user account with:', {
