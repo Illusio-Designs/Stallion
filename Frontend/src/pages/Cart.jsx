@@ -1370,30 +1370,24 @@ const Cart = ({ onPageChange = null }) => {
                 />
               </div>
 
-              {/* Offer selector — always shown so the buyer can pick an active
-                  offer for this cart; the discount applies live below. */}
-              {cartItems.length > 0 && (
+              {/* Offer selector — pick one active offer for this cart. The
+                  discount amount is shown per option and applied live below. */}
+              {availableOffers.length > 0 && (
                 <div className="form-group flex flex-col gap-2">
-                  <label htmlFor="offer" className="form-label text-[length:var(--text-sm)] font-semibold text-text">Offer</label>
-                  {availableOffers.length > 0 ? (
-                    <DropdownSelector
-                      className="ui-dropdown-custom--full-width"
-                      placeholder="Select an offer"
-                      options={[
-                        { value: '', label: 'No offer' },
-                        ...availableOffers.map((o) => ({
-                          value: o.offer_id,
-                          label: `${o.title} — ₹${Number(o.discount_amount || 0).toLocaleString('en-IN')} off`,
-                        })),
-                      ]}
-                      value={selectedOffer}
-                      onChange={(v) => setSelectedOffer(v)}
-                    />
-                  ) : (
-                    <div className="rounded-md border border-border bg-surface-muted px-3 py-2.5 text-[length:var(--text-sm)] text-text-subtle">
-                      No offers available for these products.
-                    </div>
-                  )}
+                  <label htmlFor="offer" className="form-label text-[length:var(--text-sm)] font-medium text-text">Offer <span className="text-text-subtle font-normal">(optional)</span></label>
+                  <DropdownSelector
+                    className="ui-dropdown-custom--full-width"
+                    placeholder="No offer"
+                    options={[
+                      { value: '', label: 'No offer' },
+                      ...availableOffers.map((o) => ({
+                        value: o.offer_id,
+                        label: `${o.title} — ₹${Number(o.discount_amount || 0).toLocaleString('en-IN')} off`,
+                      })),
+                    ]}
+                    value={selectedOffer}
+                    onChange={(v) => setSelectedOffer(v)}
+                  />
                 </div>
               )}
             </div>
