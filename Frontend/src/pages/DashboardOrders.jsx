@@ -17,7 +17,7 @@ import {
   getSalesmen,
   getEvents,
   getProductsPage,
-  getProductById,
+  getProductsByIds,
   getSalesmanById,
   getCountries
 } from '../services/apiService';
@@ -53,10 +53,29 @@ const mapUITabToApiStatus = (tab) => {
   return tabMap[tab];
 };
 
+// Canonical UI-status label <-> API status value (single source of truth for
+// the edit modal). Keep in sync with mapApiStatusToUI above.
+const UI_TO_API_STATUS = {
+  'PENDING': 'pending',
+  'PROCESSING': 'processed',
+  'HOLD BY TREY': 'hold_by_tray',
+  'PARTIALLY DISPATCH': 'partially_dispatched',
+  'DISPATCH': 'dispatched',
+  'COMPLETED': 'completed',
+  'CANCEL': 'cancelled',
+};
+// Statuses that require courier name + tracking number (and, for partial,
+// a dispatch quantity) — mirrors the backend validation.
+const DISPATCH_STATUSES = ['dispatched', 'partially_dispatched'];
+
 const DashboardOrders = () => {
   const confirm = useConfirm();
   const [editRow, setEditRow] = useState(null);
   const [editStatus, setEditStatus] = useState('PENDING');
+  // Extra data captured for dispatch / partial-dispatch status changes
+  const [courierName, setCourierName] = useState('');
+  const [courierTracking, setCourierTracking] = useState('');
+  const [partialQty, setPartialQty] = useState('');
   const [viewRow, setViewRow] = useState(null);
   const [viewItems, setViewItems] = useState([]);
   const [viewItemsLoading, setViewItemsLoading] = useState(false);
@@ -68,6 +87,7 @@ const DashboardOrders = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [partyNamesMap, setPartyNamesMap] = useState({}); // Map of party_id -> party_name
+  const [partyAddressMap, setPartyAddressMap] = useState({}); // Map of party_id -> address string
   const [salesmanNamesMap, setSalesmanNamesMap] = useState({}); // Map of salesman_id -> name
   // Memoize so the reference is stable across renders — getUser()/getUserRole()
   // parse localStorage and return a fresh object each call, which otherwise
@@ -154,12 +174,14 @@ const DashboardOrders = () => {
       
       setOrders(allOrders);
       
-      // Fetch party names for orders that don't have party_name
+      // Fetch party details (name + address) for the orders' parties. We need
+      // the address for the View/Download "From" block even when the name is
+      // already embedded, so key off any party_id present.
       const uniquePartyIds = [...new Set(allOrders
-        .filter(order => order.party_id && !order.party?.party_name && !order.party_name)
+        .filter(order => order.party_id)
         .map(order => order.party_id)
       )];
-      
+
       if (uniquePartyIds.length > 0) {
         try {
           // One call for all parties instead of one getPartyById per order (N+1).
@@ -167,13 +189,18 @@ const DashboardOrders = () => {
           // managers get the full list. Avoids a 403 on POST /parties/get.
           const allParties = await getPartiesForRole(userRole);
           const newPartyNamesMap = { ...partyNamesMap };
+          const newPartyAddressMap = { ...partyAddressMap };
           (allParties || []).forEach((p) => {
             const id = p.id || p.party_id;
-            if (id) newPartyNamesMap[id] = p.party_name || p.name || 'N/A';
+            if (!id) return;
+            newPartyNamesMap[id] = p.party_name || p.name || 'N/A';
+            const addr = [p.address, p.pincode].filter(Boolean).join(' - ');
+            if (addr) newPartyAddressMap[id] = addr;
           });
           setPartyNamesMap(newPartyNamesMap);
+          setPartyAddressMap(newPartyAddressMap);
         } catch (err) {
-          console.error('Failed to fetch party names:', err);
+          console.error('Failed to fetch party details:', err);
         }
       }
     } catch (err) {
@@ -520,12 +547,14 @@ const DashboardOrders = () => {
       const lookup = {};
       if (unresolved.length > 0) {
         setViewItemsLoading(true);
-        await Promise.all(unresolved.map(async (pid) => {
-          try {
-            const p = await getProductById(pid);
-            if (p) lookup[pid] = p.model_no || p.product_name || p.name;
-          } catch { /* leave unresolved */ }
-        }));
+        // One call for every unresolved item in this order (limit = id count),
+        // not one 1000-row call per item.
+        try {
+          const fetched = await getProductsByIds(unresolved);
+          fetched.forEach((p) => {
+            lookup[String(p.product_id ?? p.id)] = p.model_no || p.product_name || p.name;
+          });
+        } catch { /* leave unresolved */ }
       }
       if (cancelled) return;
       setViewItems(items.map(it => ({
@@ -549,10 +578,13 @@ const DashboardOrders = () => {
       const orderId = order.order_id || order.id;
       const orderNumber = order.order_number || `#${orderId?.toString().slice(-6) || 'N/A'}`;
       // Get party name from order object, or from partyNamesMap if not available
-      const partyName = order.party?.party_name || 
-                       order.party_name || 
-                       (order.party_id ? partyNamesMap[order.party_id] : null) || 
+      const partyName = order.party?.party_name ||
+                       order.party_name ||
+                       (order.party_id ? partyNamesMap[order.party_id] : null) ||
                        'N/A';
+      // Party address for the View/Download "From" block.
+      const partyAddress = [order.party?.address, order.party?.pincode].filter(Boolean).join(' - ') ||
+                       (order.party_id ? partyAddressMap[order.party_id] : '') || '';
       const orderStatus = mapApiStatusToUI(order.order_status);
       
       // Parse order_items (can be JSON string or array)
@@ -588,6 +620,7 @@ const DashboardOrders = () => {
         orderId: orderNumber,
         orderType: orderTypeDisplay,
         client: partyName,
+        clientAddress: partyAddress,
         salesman: salesmanLabel,
         date: orderDate,
         qty: totalQuantity,
@@ -598,7 +631,7 @@ const DashboardOrders = () => {
     });
 
     return tableRows;
-  }, [orders, partyNamesMap, salesmanNamesMap]);
+  }, [orders, partyNamesMap, partyAddressMap, salesmanNamesMap]);
 
   // Filter rows by active tab + selected date range
   const filteredRowsByTab = useMemo(() => {
@@ -676,36 +709,81 @@ const DashboardOrders = () => {
 
   // Handle update order status
   const handleUpdateStatus = async (row, newStatus) => {
-    try {
-      setLoading(true);
-      const orderId = row.originalOrder?.order_id || row.originalOrder?.id;
-      if (!orderId) {
-        showError('Order ID not found');
+    const orderId = row.originalOrder?.order_id || row.originalOrder?.id;
+    if (!orderId) {
+      showError('Order ID not found');
+      return;
+    }
+
+    const apiStatus = UI_TO_API_STATUS[newStatus] || newStatus.toLowerCase();
+    const payload = { order_status: apiStatus };
+
+    // Dispatch & partial-dispatch require courier details; partial also needs a
+    // dispatched quantity. Validate client-side (toast, panel stays open) so we
+    // don't bounce off the backend's 400.
+    if (DISPATCH_STATUSES.includes(apiStatus)) {
+      const name = courierName.trim();
+      const tracking = courierTracking.trim();
+      if (!name || !tracking) {
+        showError('Courier name and tracking number are required to dispatch this order.');
         return;
       }
+      payload.courier_name = name;
+      payload.courier_tracking_number = tracking;
+    }
+    if (apiStatus === 'partially_dispatched') {
+      const qty = Number(partialQty);
+      const totalQty = Number(row.qty) || 0;
+      if (!partialQty || !Number.isFinite(qty) || qty <= 0) {
+        showError('Enter a valid partial dispatch quantity (greater than 0).');
+        return;
+      }
+      if (totalQty > 0 && qty > totalQty) {
+        showError(`Partial dispatch quantity cannot exceed the order quantity (${totalQty}).`);
+        return;
+      }
+      payload.partial_dispatch_qty = qty;
+    }
 
-      // Map UI status back to API status
-      const statusMap = {
-        'PENDING': 'pending',
-        'PROCESSING': 'processed',
-        'HOLD BY TREY': 'hold_by_tray',
-        'PARTIALLY DISPATCH': 'partially_dispatched',
-        'DISPATCH': 'dispatched',
-        'COMPLETED': 'completed',
-        'CANCEL': 'cancelled'
-      };
+    // Confirm before committing — a status change can't be reversed.
+    if (!(await confirm(`Change this order's status to "${newStatus}"? This action cannot be undone.`))) {
+      return;
+    }
 
-      const apiStatus = statusMap[newStatus] || newStatus.toLowerCase();
-      await updateOrderStatus(orderId, { order_status: apiStatus });
+    try {
+      setLoading(true);
+      await updateOrderStatus(orderId, payload);
       showSuccess('Order status updated successfully');
       await fetchOrders();
-      setEditRow(null);
+      closeEditPanel();
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Failed to update order status';
       showError(message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // Open the edit panel for a row, pre-filling status + any existing courier
+  // details so an edit doesn't wipe them.
+  const openEditPanel = (row) => {
+    setEditRow(row);
+    setEditStatus(row?.status || 'PENDING');
+    setCourierName(row?.originalOrder?.courier_name || '');
+    setCourierTracking(row?.originalOrder?.courier_tracking_number || '');
+    setPartialQty(
+      row?.originalOrder?.partial_dispatch_qty != null
+        ? String(row.originalOrder.partial_dispatch_qty)
+        : ''
+    );
+  };
+
+  const closeEditPanel = () => {
+    setEditRow(null);
+    setEditStatus('PENDING');
+    setCourierName('');
+    setCourierTracking('');
+    setPartialQty('');
   };
 
   // Handle create order
@@ -919,9 +997,13 @@ const DashboardOrders = () => {
 
     const unresolved = [...new Set(orderItems.filter(it => !nameFrom(it, {})).map(it => String(it.product_id)).filter(Boolean))];
     const lookup = {};
-    await Promise.all(unresolved.map(async (pid) => {
-      try { const p = await getProductById(pid); if (p) lookup[pid] = p.model_no || p.product_name || p.name; } catch { /* ignore */ }
-    }));
+    if (unresolved.length > 0) {
+      // Single batched lookup (limit = id count) rather than a 1000-row fetch per item.
+      try {
+        const fetched = await getProductsByIds(unresolved);
+        fetched.forEach((p) => { lookup[String(p.product_id ?? p.id)] = p.model_no || p.product_name || p.name; });
+      } catch { /* ignore */ }
+    }
 
     const items = orderItems.map((it) => {
       const qty = Number(it.quantity) || 0;
@@ -982,6 +1064,20 @@ const DashboardOrders = () => {
     drawMeta(metaL, M, M);
     drawMeta(metaR, 112, 112);
     y += metaL.length * 13 + 2;
+
+    // ---- From address ----
+    if (row.clientAddress) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...MUTE);
+      doc.text('FROM ADDRESS', M, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...INK);
+      const addrLines = doc.splitTextToSize(String(row.clientAddress), PW - M * 2);
+      doc.text(addrLines, M, y + 5);
+      y += 5 + addrLines.length * 5 + 4;
+    }
 
     // ---- Items table ----
     const colNum = M + 2;
@@ -1077,11 +1173,8 @@ const DashboardOrders = () => {
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions 
         onView={() => setViewRow(row)} 
-        onEdit={() => {
-          setEditRow(row);
-          setEditStatus(row?.status || 'PENDING');
-        }} 
-        onDownload={() => handleDownload(row)} 
+        onEdit={() => openEditPanel(row)}
+        onDownload={() => handleDownload(row)}
       />
     ) },
   ]), []);
@@ -1209,6 +1302,13 @@ const DashboardOrders = () => {
                 </div>
               </div>
 
+              {viewRow.clientAddress && (
+                <div>
+                  <h5 className="ord-view__section-title">From Address</h5>
+                  <div className="ord-notes">{viewRow.clientAddress}</div>
+                </div>
+              )}
+
               <div>
                 <h5 className="ord-view__section-title">Order Items</h5>
                 <div className="ui-table__scroll">
@@ -1263,21 +1363,15 @@ const DashboardOrders = () => {
       </AsidePanel>
 
       {/* Edit Order Status Modal */}
-      <AsidePanel open={!!editRow} onClose={() => {
-        setEditRow(null);
-        setEditStatus('PENDING');
-      }} title="Edit Order Status" footer={(
+      <AsidePanel open={!!editRow} onClose={closeEditPanel} title="Edit Order Status" footer={(
         <>
-          <Button variant="secondary" onClick={() => {
-            setEditRow(null);
-            setEditStatus('PENDING');
-          }} disabled={loading}>Cancel</Button>
-          <Button 
+          <Button variant="secondary" onClick={closeEditPanel} disabled={loading}>Cancel</Button>
+          <Button
             onClick={() => {
               if (editStatus && editRow) {
                 handleUpdateStatus(editRow, editStatus);
               }
-            }} 
+            }}
             disabled={loading}
           >
             {loading ? 'Updating...' : 'Update'}
@@ -1304,20 +1398,53 @@ const DashboardOrders = () => {
           <div className="form-group">
             <label className="ui-label">Status</label>
             <DropdownSelector
-              options={[
-                { value: 'PENDING', label: 'PENDING' },
-                { value: 'PROCESSING', label: 'PROCESSING' },
-                { value: 'HOLD BY TREY', label: 'HOLD BY TREY' },
-                { value: 'PARTIALLY DISPATCH', label: 'PARTIALLY DISPATCH' },
-                { value: 'DISPATCH', label: 'DISPATCH' },
-                { value: 'COMPLETED', label: 'COMPLETED' },
-                { value: 'CANCEL', label: 'CANCEL' }
-              ]}
+              options={Object.keys(UI_TO_API_STATUS).map(label => ({ value: label, label }))}
               value={editStatus}
               onChange={(value) => setEditStatus(value)}
               placeholder="Select status"
             />
           </div>
+
+          {/* Dispatch details — required by the backend when dispatching or
+              partially dispatching an order. */}
+          {DISPATCH_STATUSES.includes(UI_TO_API_STATUS[editStatus]) && (
+            <>
+              <div className="form-group">
+                <label className="ui-label">Courier Name *</label>
+                <input
+                  className="ui-input"
+                  placeholder="e.g., Blue Dart, DTDC"
+                  value={courierName}
+                  onChange={(e) => setCourierName(e.target.value)}
+                />
+              </div>
+              <div className="form-group">
+                <label className="ui-label">Courier Tracking Number *</label>
+                <input
+                  className="ui-input"
+                  placeholder="Enter tracking number"
+                  value={courierTracking}
+                  onChange={(e) => setCourierTracking(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
+          {/* Partial dispatch also needs the dispatched quantity. */}
+          {UI_TO_API_STATUS[editStatus] === 'partially_dispatched' && (
+            <div className="form-group">
+              <label className="ui-label">Partial Dispatch Quantity *</label>
+              <input
+                type="number"
+                min="1"
+                max={editRow?.qty || undefined}
+                className="ui-input"
+                placeholder={`How many of ${editRow?.qty || 0} are being dispatched`}
+                value={partialQty}
+                onChange={(e) => setPartialQty(e.target.value)}
+              />
+            </div>
+          )}
         </div>
       </AsidePanel>
 

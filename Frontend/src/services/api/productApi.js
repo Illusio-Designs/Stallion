@@ -365,6 +365,24 @@ export const getProductById = async (productId) => {
   return list.find((p) => String(p.product_id ?? p.id) === String(productId)) || null;
 };
 
+/**
+ * Resolve several products by id in a SINGLE request. Uses the `product_ids`
+ * filter on POST /products with a limit sized to the id list — so an order with
+ * N items costs one call for N rows, not N calls of 1000 rows each.
+ * @param {Array<string|number>} ids - product ids to fetch
+ * @returns {Promise<Array>} matching product objects (may be fewer than ids)
+ */
+export const getProductsByIds = async (ids) => {
+  const unique = [...new Set((ids || []).map((v) => String(v)).filter(Boolean))];
+  if (unique.length === 0) return [];
+  const resp = await apiRequest(`/products?page=1&limit=${unique.length}`, {
+    method: 'POST',
+    body: { product_ids: unique },
+    includeAuth: true,
+  });
+  return Array.isArray(resp) ? resp : (resp?.data || []);
+};
+
 export const getProductModels = async (modelNo) => {
   try {
     const response = await apiRequest('/products/product-models', {
