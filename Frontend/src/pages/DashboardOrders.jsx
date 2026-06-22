@@ -1023,6 +1023,11 @@ const DashboardOrders = () => {
     });
     const grandTotal = items.reduce((s, it) => s + it.subtotal, 0) ||
       parseFloat(String(row.value || '').replace(/[^0-9.]/g, '')) || 0;
+    // Discount-aware totals: gross subtotal, offer discount, final payable.
+    // Falls back to grandTotal for orders placed before offers existed.
+    const pdfDiscount = Number(order?.discount_total) || 0;
+    const pdfSubtotal = order?.subtotal != null ? Number(order.subtotal) : grandTotal;
+    const pdfFinal = order?.order_total != null ? Number(order.order_total) : (pdfSubtotal - pdfDiscount);
 
     const rawDate = order?.order_date || order?.created_at;
     const orderDate = rawDate ? new Date(rawDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
@@ -1057,7 +1062,7 @@ const DashboardOrders = () => {
     // ---- Meta grid ----
     let y = 44;
     const metaL = [['Order ID', row.orderId], ['Party Name', row.client], ['Order Type', row.orderType]];
-    const metaR = [['Order Date', orderDate], ['Status', row.status], ['Total', money(grandTotal)]];
+    const metaR = [['Order Date', orderDate], ['Status', row.status], ['Total', money(pdfFinal)]];
     const drawMeta = (pairs, lx, vx) => {
       let yy = y;
       pairs.forEach(([label, value]) => {
@@ -1153,13 +1158,28 @@ const DashboardOrders = () => {
     // ---- Totals ----
     y += 8;
     const boxX = 120;
+    // Subtotal + discount lines above the TOTAL box (only when an offer applied).
+    if (pdfDiscount > 0) {
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9.5);
+      doc.setTextColor(...MUTE);
+      doc.text('Subtotal', boxX + 4, y + 4);
+      doc.setTextColor(...INK);
+      doc.text(money(pdfSubtotal), PW - M - 4, y + 4, { align: 'right' });
+      doc.setTextColor(...MUTE);
+      const offerLabel = (order?.applied_offer && order.applied_offer.title) ? String(order.applied_offer.title) : 'Discount';
+      doc.text(doc.splitTextToSize(offerLabel, 70)[0], boxX + 4, y + 10);
+      doc.setTextColor(...INK);
+      doc.text(`- ${money(pdfDiscount)}`, PW - M - 4, y + 10, { align: 'right' });
+      y += 12;
+    }
     doc.setFillColor(...LIGHT);
     doc.rect(boxX, y, PW - M - boxX, 14, 'F');
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(11);
     doc.setTextColor(...BRAND);
     doc.text('TOTAL', boxX + 4, y + 9);
-    doc.text(money(grandTotal), PW - M - 4, y + 9, { align: 'right' });
+    doc.text(money(pdfFinal), PW - M - 4, y + 9, { align: 'right' });
 
     // ---- Notes ----
     if (order?.order_notes) {
@@ -1373,6 +1393,18 @@ const DashboardOrders = () => {
                     </tbody>
                     {viewItems.length > 0 && (
                       <tfoot>
+                        {Number(order?.discount_total) > 0 && (
+                          <>
+                            <tr>
+                              <td colSpan={4} className="ta-r">Subtotal</td>
+                              <td className="ta-r">₹{Number(order.subtotal || 0).toLocaleString('en-IN')}</td>
+                            </tr>
+                            <tr>
+                              <td colSpan={4} className="ta-r">{order.applied_offer?.title || 'Discount'}</td>
+                              <td className="ta-r">− ₹{Number(order.discount_total).toLocaleString('en-IN')}</td>
+                            </tr>
+                          </>
+                        )}
                         <tr>
                           <td colSpan={4} className="ta-r">Total</td>
                           <td className="ta-r">{viewRow.value}</td>
