@@ -582,9 +582,13 @@ const DashboardOrders = () => {
                        order.party_name ||
                        (order.party_id ? partyNamesMap[order.party_id] : null) ||
                        'N/A';
-      // Party address for the View/Download "From" block.
-      const partyAddress = [order.party?.address, order.party?.pincode].filter(Boolean).join(' - ') ||
+      // Party shipping + billing address. The order response now includes these
+      // directly (party_address / party_billing_address); fall back to the
+      // nested party object / lookup map for older responses.
+      const partyAddress = order.party_address ||
+                       [order.party?.address, order.party?.pincode].filter(Boolean).join(' - ') ||
                        (order.party_id ? partyAddressMap[order.party_id] : '') || '';
+      const partyBillingAddress = order.party_billing_address || order.party?.billing_address || '';
       const orderStatus = mapApiStatusToUI(order.order_status);
       
       // Parse order_items (can be JSON string or array)
@@ -621,6 +625,7 @@ const DashboardOrders = () => {
         orderType: orderTypeDisplay,
         client: partyName,
         clientAddress: partyAddress,
+        clientBillingAddress: partyBillingAddress,
         salesman: salesmanLabel,
         date: orderDate,
         qty: totalQuantity,
@@ -1071,18 +1076,32 @@ const DashboardOrders = () => {
     drawMeta(metaR, 112, 112);
     y += metaL.length * 13 + 2;
 
-    // ---- From address ----
+    // ---- Shipping address ----
     if (row.clientAddress) {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(...MUTE);
-      doc.text('FROM ADDRESS', M, y);
+      doc.text('SHIPPING ADDRESS', M, y);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(10);
       doc.setTextColor(...INK);
       const addrLines = doc.splitTextToSize(String(row.clientAddress), PW - M * 2);
       doc.text(addrLines, M, y + 5);
       y += 5 + addrLines.length * 5 + 4;
+    }
+
+    // ---- Billing address (only when it differs from shipping) ----
+    if (row.clientBillingAddress && row.clientBillingAddress !== row.clientAddress) {
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(8);
+      doc.setTextColor(...MUTE);
+      doc.text('BILLING ADDRESS', M, y);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setTextColor(...INK);
+      const billLines = doc.splitTextToSize(String(row.clientBillingAddress), PW - M * 2);
+      doc.text(billLines, M, y + 5);
+      y += 5 + billLines.length * 5 + 4;
     }
 
     // ---- Items table ----
@@ -1310,8 +1329,15 @@ const DashboardOrders = () => {
 
               {viewRow.clientAddress && (
                 <div>
-                  <h5 className="ord-view__section-title">From Address</h5>
+                  <h5 className="ord-view__section-title">Shipping Address</h5>
                   <div className="ord-notes">{viewRow.clientAddress}</div>
+                </div>
+              )}
+
+              {viewRow.clientBillingAddress && viewRow.clientBillingAddress !== viewRow.clientAddress && (
+                <div>
+                  <h5 className="ord-view__section-title">Billing Address</h5>
+                  <div className="ord-notes">{viewRow.clientBillingAddress}</div>
                 </div>
               )}
 
