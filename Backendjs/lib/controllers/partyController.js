@@ -15,7 +15,7 @@ const SalesmanStates = require('../models/SalesmanStates');
 const DistributorStates = require('../models/DistributorStates');
 const { resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
-const { canManageParties, normalizeRole } = require('../utils/roleHelpers');
+const { canManageParties, canCreateParty, normalizeRole } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
@@ -287,7 +287,7 @@ class PartyController {
 
     async createParty(req, res) {
         try {
-            if (!canManageParties(req.userRoleName)) {
+            if (!canCreateParty(req.userRoleName)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const user = req.user;

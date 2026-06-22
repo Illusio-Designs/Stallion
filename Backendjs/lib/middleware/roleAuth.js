@@ -24,6 +24,9 @@ const checkRole = (roles) => {
 const isAdmin = checkRole(['admin']);
 const isOrderManager = checkRole(['admin', 'order_manager']);
 const isPartyManager = checkRole(['admin', 'party_manager', 'sales_manager']);
+// Creating a party is additionally open to field roles (salesman/distributor);
+// other party routes stay limited to isPartyManager.
+const isPartyCreator = checkRole(['admin', 'party_manager', 'sales_manager', 'salesman', 'distributor']);
 const isProductManager = checkRole(['admin', 'product_manager']);
 const isInventoryManager = checkRole(['admin', 'tray_manager']);
 const isOfficeStaff = checkRole([
@@ -43,6 +46,7 @@ module.exports = {
     isAdmin,
     isOrderManager,
     isPartyManager,
+    isPartyCreator,
     isProductManager,
     isInventoryManager,
     isOfficeStaff,
