@@ -17,6 +17,7 @@ export const DASHBOARD_PAGE_KEYS = [
   'expenses',
   'tray',
   'events',
+  'offers',
   'party',
   'salesmen',
   'distributor',
