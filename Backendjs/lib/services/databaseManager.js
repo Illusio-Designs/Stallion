@@ -405,6 +405,7 @@ class DatabaseManager {
             require('../models/DistributorZones');
             require('../models/SalesmanStates');
             require('../models/DistributorStates');
+            require('../models/Offer');
 
             // List of tables that are manually managed (should not be auto-synced)
             const manuallyManagedTables = ['users', 'roles', 'user_roles', 'audit_logs'];
