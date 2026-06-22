@@ -8,6 +8,7 @@ import SalesRevenueChart from '../components/charts/SalesRevenueChart';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import { getOrdersForRole, getProducts, getProductById, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
+import { FiMapPin, FiShoppingBag, FiBarChart2 } from 'react-icons/fi';
 
 const Dashboard = () => {
   const [period, setPeriod] = useState('Monthly');
@@ -437,11 +438,34 @@ const Dashboard = () => {
       {isSalesman && (
         <div className="dash-row mt-4">
           <div className="dash-card full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Quick Actions</h4>
-            <div className="flex flex-wrap gap-3">
-              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/salesmen'; }}>Add Visit</button>
-              <button className="ui-btn ui-btn--secondary" onClick={() => { window.location.href = '/dashboard/orders'; }}>My Orders</button>
-              <button className="ui-btn ui-btn--secondary" onClick={() => { window.location.href = '/dashboard/analytics'; }}>View Report</button>
+            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
+            <div className="grid grid-cols-3 gap-3 max-[640px]:grid-cols-1">
+              {[
+                { icon: FiMapPin, label: 'Add Visit', desc: 'Log a party visit', href: '/dashboard/salesmen', primary: true },
+                { icon: FiShoppingBag, label: 'My Orders', desc: 'View your orders', href: '/dashboard/orders' },
+                { icon: FiBarChart2, label: 'View Report', desc: 'Targets & analytics', href: '/dashboard/analytics' },
+              ].map(({ icon: Icon, label, desc, href, primary }) => (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => { window.location.href = href; }}
+                  className={`group flex items-center gap-3 rounded-lg border p-4 text-left transition-colors duration-150 outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary)] active:scale-[0.99] ${
+                    primary
+                      ? 'border-transparent bg-primary text-text-on-primary hover:bg-primary/90'
+                      : 'border-border bg-surface text-text hover:border-primary hover:bg-primary-soft'
+                  }`}
+                >
+                  <span className={`inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md ${
+                    primary ? 'bg-white/15' : 'bg-primary-soft text-primary group-hover:bg-white'
+                  }`}>
+                    <Icon size={20} aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-semibold leading-tight text-[var(--text-sm)]">{label}</span>
+                    <span className={`block text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
         </div>
