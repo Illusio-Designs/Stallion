@@ -22,7 +22,7 @@ const mapApiStatusToUI = (apiStatus) => {
   const statusMap = {
     'pending': 'PENDING',
     'processed': 'PROCESSING',
-    'hold_by_tray': 'HOLD BY TREY',
+    'hold_by_tray': 'HOLD BY SAMPLE',
     'partially_dispatched': 'PARTIALLY DISPATCH',
     'dispatched': 'DISPATCH',
     'completed': 'COMPLETED',
@@ -36,7 +36,7 @@ const mapUITabToApiStatus = (tab) => {
   const tabMap = {
     'Pending': 'pending',
     'Processing': 'processed',
-    'Hold by Trey': 'hold_by_tray',
+    'Hold by Sample': 'hold_by_tray',
     'Partially Dispatch': 'partially_dispatched',
     'Dispatch': 'dispatched',
     'Completed': 'completed',
@@ -417,7 +417,7 @@ const DistributorOrders = () => {
         {/* Order Status Tabs */}
         <div className="dash-row">
           <div className="order-tabs-container bg-surface border border-border rounded-lg shadow-sm flex gap-2 overflow-x-auto px-3 py-2 w-full [grid-column:1/-1] [scrollbar-width:thin]">
-            {['All', 'Pending', 'Processing', 'Hold by Trey', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].map(tab => (
+            {['All', 'Pending', 'Processing', 'Hold by Sample', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].map(tab => (
               <button
                 key={tab}
                 className={`order-tab inline-flex items-center min-h-10 px-4 py-2 rounded-md font-semibold text-[var(--text-base)] leading-snug cursor-pointer whitespace-nowrap shrink-0 transition-[background,color,box-shadow] duration-[0.12s] ease-[ease] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] ${activeTab === tab

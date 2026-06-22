@@ -102,6 +102,16 @@
   background-color: var(--color-error-soft);
 }
 
+/* In the Expense Details modal the generic `.detail-row span { flex: 1 }` rule
+   would stretch the status pill across the whole row. Keep it content-sized
+   (and right-aligned via the row's justify-between). Two classes (0,2,0) beat
+   `.detail-row span` (0,1,1). */
+.detail-row .status-pending,
+.detail-row .status-approved,
+.detail-row .status-rejected {
+  flex: 0 0 auto;
+}
+
 /* --- Admin actions block ------------------------------------------------- */
 .admin-actions {
   margin-top: var(--space-6);

@@ -4,6 +4,7 @@ import 'react-international-phone/style.css';
 import AsidePanel from '../components/ui/AsidePanel';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import RowActions from '../components/ui/RowActions';
+import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
@@ -53,6 +54,8 @@ const DashboardClients = () => {
     email: '',
     phone: '',
     address: '',
+    billing_address: '',
+    billing_same_as_shipping: true,
     country_id: '',
     state_id: '',
     city_id: '',
@@ -62,6 +65,7 @@ const DashboardClients = () => {
     pan: '',
     credit_days: '',
     prefered_courier: '',
+    is_active: true,
   });
 
   // Countries load on mount because the listing's default-country filter
@@ -342,6 +346,9 @@ const DashboardClients = () => {
     { key: 'trade_name', label: 'TRADE NAME' },
     { key: 'contact_person', label: 'CONTACT PERSON' },
     { key: 'phone', label: 'PHONE' },
+    { key: 'status', label: 'STATUS', render: (_v, row) => (
+      <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>{row.isActive ? 'Active' : 'Inactive'}</StatusBadge>
+    ) },
     {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
@@ -431,6 +438,8 @@ const DashboardClients = () => {
       email: '',
       phone: '',
       address: '',
+      billing_address: '',
+      billing_same_as_shipping: true,
       country_id: '',
       state_id: '',
       city_id: '',
@@ -440,6 +449,7 @@ const DashboardClients = () => {
       pan: '',
       credit_days: '',
       prefered_courier: '',
+      is_active: true,
     });
   };
 
@@ -513,6 +523,8 @@ const DashboardClients = () => {
         email: row.email || '',
         phone: row.phone || '',
         address: row.address || '',
+        billing_address: row.billing_address || '',
+        billing_same_as_shipping: row.billing_same_as_shipping !== false,
         country_id: row.country_id || '',
         state_id: row.state_id || '',
         city_id: row.city_id || '',
@@ -522,6 +534,7 @@ const DashboardClients = () => {
         pan: row.pan || '',
         credit_days: row.credit_days || '',
         prefered_courier: row.prefered_courier || row.preferred_courier || '',
+        is_active: row.is_active !== false,
       });
 
       // Store the complete row object with ensured ID
@@ -678,6 +691,13 @@ const DashboardClients = () => {
       return;
     }
 
+    // Preferred courier is required when creating a party.
+    if (!editRow && (!formData.prefered_courier || formData.prefered_courier.trim() === '')) {
+      setError('Please enter a preferred courier');
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
@@ -737,6 +757,9 @@ const DashboardClients = () => {
         pan: String(formData.pan || ''),
         credit_days: formData.credit_days ? Number(formData.credit_days) : null,
         prefered_courier: formData.prefered_courier && formData.prefered_courier.trim() !== '' ? String(formData.prefered_courier).trim() : null,
+        billing_same_as_shipping: formData.billing_same_as_shipping !== false,
+        billing_address: formData.billing_same_as_shipping === false ? String(formData.billing_address || '') : null,
+        is_active: formData.is_active !== false,
       };
 
       console.log('[Update] Form data state/city/zone:', {
@@ -751,7 +774,7 @@ const DashboardClients = () => {
       });
 
       // Final validation: ensure no undefined values and all fields are present
-      const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier'];
+      const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'billing_address', 'billing_same_as_shipping', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier', 'is_active'];
       allFields.forEach(key => {
         if (dataToSend[key] === undefined) {
           console.warn(`[DashboardClients] Undefined value detected for ${key}, setting to default`);
@@ -1179,6 +1202,28 @@ const DashboardClients = () => {
           onChange={(e) => handleInputChange('address', e.target.value)}
         />
       </div>
+      <div className="form-group form-group--full">
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            className="accent-primary"
+            checked={formData.billing_same_as_shipping !== false}
+            onChange={(e) => handleInputChange('billing_same_as_shipping', e.target.checked)}
+          />
+          <span className="ui-label m-0">Billing address same as shipping</span>
+        </label>
+      </div>
+      {formData.billing_same_as_shipping === false && (
+        <div className="form-group form-group--full">
+          <label className="ui-label">Billing Address</label>
+          <input
+            className="ui-input"
+            placeholder="Billing address"
+            value={formData.billing_address}
+            onChange={(e) => handleInputChange('billing_address', e.target.value)}
+          />
+        </div>
+      )}
       <div className="form-group">
         <label className="ui-label">Country *</label>
         <DropdownSelector
@@ -1295,7 +1340,7 @@ const DashboardClients = () => {
         />
       </div>
       <div className="form-group">
-        <label className="ui-label">Preferred Courier</label>
+        <label className="ui-label">Preferred Courier *</label>
         <input
           className="ui-input"
           placeholder="Preferred Courier"
@@ -1303,6 +1348,19 @@ const DashboardClients = () => {
           onChange={(e) => handleInputChange('prefered_courier', e.target.value)}
         />
       </div>
+      {editRow && (
+        <div className="form-group form-group--full">
+          <label className="flex cursor-pointer items-center gap-2">
+            <input
+              type="checkbox"
+              className="accent-primary"
+              checked={formData.is_active !== false}
+              onChange={(e) => handleInputChange('is_active', e.target.checked)}
+            />
+            <span className="ui-label m-0">Active (uncheck to deactivate)</span>
+          </label>
+        </div>
+      )}
     </>
   );
 

@@ -711,6 +711,27 @@ textarea.ui-input {
   font-weight: var(--font-weight-medium);
 }
 
+/* Action option that reads as a button (e.g. "+ Add New Party"). Unlayered so
+   it wins over the Tailwind utilities on the option div, including hover. */
+.ui-dropdown-custom__option--action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-1);
+  margin: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+  font-weight: var(--font-weight-semibold);
+  text-align: center;
+}
+.ui-dropdown-custom__option--action:hover {
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+
 .ui-dropdown-custom__no-results {
   padding: var(--space-3);
   font-size: var(--text-base);

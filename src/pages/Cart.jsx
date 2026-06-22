@@ -16,19 +16,25 @@ import {
 import { getUserRole, getUser } from "../services/authService";
 import { encodeUploadName } from "../utils/imageUrl";
 import DropdownSelector from "../components/ui/DropdownSelector";
+import AsidePanel from "../components/ui/AsidePanel";
 import {
   getMyParties,
   getPartyById,
   getEvents,
   getCountries,
+  getStates,
   getDistributors,
   createOrder,
+  createParty,
 } from "../services/apiService";
 
 // Re-point any product image URL (legacy host, absolute server path, or
 // relative) to the configured image host — the same base the Media gallery and
 // product pages use — so cart thumbnails always resolve.
 const CART_IMAGE_BASE = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/+$/, '');
+
+// Sentinel value for the "+ Add New Party" item inside the party dropdown.
+const ADD_PARTY_OPTION = '__add_party__';
 const resolveCartImage = (img) => {
   if (!img || typeof img !== 'string') return '/images/products/spac1.webp';
   const m = img.match(/\/uploads\/products\/([^/?#"\\\]]+)/);
@@ -59,6 +65,20 @@ const Cart = ({ onPageChange = null }) => {
   const [selectedParty, setSelectedParty] = useState("");
   const [selectedEvent, setSelectedEvent] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("");
+  const [orderNote, setOrderNote] = useState("");
+
+  // Inline "Add Party" (salesman + distributor can create a party from here)
+  const [addPartyOpen, setAddPartyOpen] = useState(false);
+  const [addPartySaving, setAddPartySaving] = useState(false);
+  const [addPartyStates, setAddPartyStates] = useState([]);
+  const [addPartyForm, setAddPartyForm] = useState({
+    party_name: "",
+    phone: "",
+    address: "",
+    state_id: "",
+    pincode: "",
+    contact_person: "",
+  });
   
   // Visit-order location is captured silently (no UI). State holds the coords;
   // locationRef mirrors them for synchronous reads during checkout (state would
@@ -163,6 +183,81 @@ const Cart = ({ onPageChange = null }) => {
     } catch (err) {
       console.error('[Cart] Failed to fetch my parties:', err);
       setParties([]);
+    }
+  };
+
+  // ---- Inline "Add Party" (salesman + distributor) -----------------------
+  // Load the state list (drives the backend's distributor/salesman assignment).
+  // Defaults to India's states, matching the rest of the app.
+  const loadAddPartyStates = async () => {
+    try {
+      let list = countries;
+      if (!list || list.length === 0) {
+        list = await getCountries().catch(() => []);
+        setCountries(list || []);
+      }
+      const india = (list || []).find(c =>
+        c.name?.toLowerCase() === 'india' || c.code?.toLowerCase() === 'in'
+      ) || (list || [])[0];
+      if (india) {
+        const states = await getStates(india.id).catch(() => []);
+        setAddPartyStates((states || []).map(s => ({ value: s.id, label: s.name })));
+      }
+    } catch (err) {
+      console.error('[Cart] Failed to load states for Add Party:', err);
+      setAddPartyStates([]);
+    }
+  };
+
+  const openAddParty = () => {
+    setAddPartyForm({ party_name: '', phone: '', address: '', state_id: '', pincode: '', contact_person: '' });
+    setAddPartyOpen(true);
+    if (addPartyStates.length === 0) loadAddPartyStates();
+  };
+
+  const handleAddPartyField = (field, value) => {
+    setAddPartyForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleCreateParty = async () => {
+    const name = addPartyForm.party_name.trim();
+    const phone = addPartyForm.phone.trim();
+    const address = addPartyForm.address.trim();
+    if (!name || !phone || !address) {
+      showError('Party name, phone and address are required.');
+      return;
+    }
+    if (!addPartyForm.state_id) {
+      showError('Please select a state.');
+      return;
+    }
+    try {
+      setAddPartySaving(true);
+      const created = await createParty({
+        party_name: name,
+        phone,
+        address,
+        state_id: addPartyForm.state_id,
+        pincode: addPartyForm.pincode.trim(),
+        contact_person: addPartyForm.contact_person.trim(),
+      });
+      const newId = created?.party_id || created?.id;
+      // Refresh the list and select the new party. If backend scoping doesn't
+      // surface it immediately, fall back to appending the returned record.
+      const partiesData = await getMyParties().catch(() => []);
+      const list = Array.isArray(partiesData) ? partiesData : [];
+      if (newId && created && !list.some(p => (p.id || p.party_id) === newId)) {
+        list.push(created);
+      }
+      setParties(list);
+      if (newId) setSelectedParty(newId);
+      showSuccess('Party added successfully.');
+      setAddPartyOpen(false);
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Failed to add party';
+      showError(message);
+    } finally {
+      setAddPartySaving(false);
     }
   };
 
@@ -799,8 +894,8 @@ const Cart = ({ onPageChange = null }) => {
       const formattedDate = orderDate.toISOString().split('.')[0]; // Remove milliseconds
       orderData.order_date = formattedDate;
 
-      // Add optional order_notes
-      orderData.order_notes = orderData.order_notes || 'Order placed from cart';
+      // Add optional order_notes — use the note the user typed, else a default.
+      orderData.order_notes = (orderNote && orderNote.trim()) || orderData.order_notes || 'Order placed from cart';
 
       // Safety check: Ensure latitude and longitude are set for visit_order (in case they weren't set earlier)
       if (orderData.order_type === 'visit_order') {
@@ -1183,16 +1278,37 @@ const Cart = ({ onPageChange = null }) => {
                     placeholder="Select Party"
                     options={[
                       { value: '', label: 'Select Party' },
+                      // Field roles can add a new party right from the dropdown.
+                      ...((isSalesman || isDistributor) ? [{ value: ADD_PARTY_OPTION, label: '+ Add New Party', className: 'ui-dropdown-custom__option--action' }] : []),
                       ...parties.map(party => ({
                         value: party.id || party.party_id,
                         label: party.party_name || party.name,
                       })),
                     ]}
                     value={selectedParty}
-                    onChange={(value) => setSelectedParty(value)}
+                    onChange={(value) => {
+                      if (value === ADD_PARTY_OPTION) {
+                        openAddParty();
+                        return; // don't change the selected party
+                      }
+                      setSelectedParty(value);
+                    }}
                   />
                 </div>
               )}
+
+              {/* Order note — optional; shown in the order View + downloaded PDF */}
+              <div className="form-group flex flex-col gap-2">
+                <label htmlFor="order-note" className="form-label text-[length:var(--text-sm)] font-medium text-text">Note <span className="text-text-subtle font-normal">(optional)</span></label>
+                <textarea
+                  id="order-note"
+                  className="ui-input min-h-[72px] resize-y"
+                  placeholder="Add a note for this order"
+                  value={orderNote}
+                  onChange={(e) => setOrderNote(e.target.value)}
+                  rows={2}
+                />
+              </div>
             </div>
 
             <div className={`summary-breakdown flex flex-col gap-5 mb-8 ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'pt-6 mt-6 border-t border-border' : 'pt-3 mt-0'}`}>
@@ -1223,6 +1339,52 @@ const Cart = ({ onPageChange = null }) => {
           </div>
         </div>
       </div>
+
+      <AsidePanel
+        open={addPartyOpen}
+        onClose={() => setAddPartyOpen(false)}
+        title="Add Party"
+        footer={(
+          <>
+            <button className="ui-btn ui-btn--secondary" onClick={() => setAddPartyOpen(false)} disabled={addPartySaving}>Cancel</button>
+            <button className="ui-btn ui-btn--primary" onClick={handleCreateParty} disabled={addPartySaving}>
+              {addPartySaving ? 'Saving...' : 'Add Party'}
+            </button>
+          </>
+        )}
+      >
+        <div className="ui-form">
+          <div className="form-group">
+            <label className="ui-label">Party Name *</label>
+            <input className="ui-input" placeholder="Enter party name" value={addPartyForm.party_name} onChange={(e) => handleAddPartyField('party_name', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">Phone *</label>
+            <input className="ui-input" placeholder="Enter phone number" value={addPartyForm.phone} onChange={(e) => handleAddPartyField('phone', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">Address *</label>
+            <input className="ui-input" placeholder="Enter address" value={addPartyForm.address} onChange={(e) => handleAddPartyField('address', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">State *</label>
+            <DropdownSelector
+              options={addPartyStates}
+              value={addPartyForm.state_id}
+              onChange={(value) => handleAddPartyField('state_id', value)}
+              placeholder="Select state"
+            />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">Pincode</label>
+            <input className="ui-input" placeholder="Enter pincode" value={addPartyForm.pincode} onChange={(e) => handleAddPartyField('pincode', e.target.value)} />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">Contact Person</label>
+            <input className="ui-input" placeholder="Enter contact person" value={addPartyForm.contact_person} onChange={(e) => handleAddPartyField('contact_person', e.target.value)} />
+          </div>
+        </div>
+      </AsidePanel>
     </div>
   );
 };

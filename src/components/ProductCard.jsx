@@ -172,20 +172,6 @@ const ProductCard = ({
         </div>
       )}
 
-      <div className="color-options flex flex-wrap items-center gap-3 mt-2 mb-3">
-        {colors.map((colorItem, index) => (
-          <button
-            type="button"
-            key={index}
-            className={`color-swatch h-[22px] w-[22px] flex-none cursor-pointer appearance-none rounded-pill border p-0 shadow-xs transition duration-[120ms] ease-[ease] hover:scale-110 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] ${activeColor === index ? 'active border-surface shadow-[0_0_0_2px_var(--color-surface),0_0_0_4px_var(--color-primary)]' : 'border-border-strong'}`}
-            style={{backgroundColor: colorItem.color}}
-            onClick={() => handleColorClick(index)}
-            title={colorItem.name}
-            aria-label={`Select colour ${colorItem.name}`}
-            aria-pressed={activeColor === index}
-          ></button>
-        ))}
-      </div>
       <div className="pc-actions flex w-full flex-wrap items-center gap-2 mt-3">
         <button
           type="button"

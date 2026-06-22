@@ -704,6 +704,8 @@ export const createParty = async (partyData) => {
     email,
     phone,
     address,
+    billing_address,
+    billing_same_as_shipping,
     country_id,
     state_id,
     city_id,
@@ -745,6 +747,9 @@ const getCityId = () => {
     email: String(email || ''),
     phone: String(phone || ''),
     address: String(address || ''),
+    // Billing address only matters when it differs from shipping (address).
+    billing_same_as_shipping: billing_same_as_shipping !== false,
+    billing_address: billing_same_as_shipping === false ? String(billing_address || '') : null,
     country_id: (country_id && isValidUUID(country_id)) ? String(country_id).trim() : null,
     state_id: getStateId(),
     city_id: getCityId(),
@@ -825,6 +830,8 @@ export const updateParty = async (partyId, partyData) => {
     email,
     phone,
     address,
+    billing_address,
+    billing_same_as_shipping,
     country_id,
     state_id,
     city_id,
@@ -834,6 +841,7 @@ export const updateParty = async (partyId, partyData) => {
     pan,
     credit_days,
     prefered_courier,
+    is_active,
   } = partyData;
   
   // Helper functions to get validated UUIDs
@@ -864,6 +872,11 @@ export const updateParty = async (partyId, partyData) => {
     email: String(email || ''),
     phone: String(phone || ''),
     address: String(address || ''),
+    // Billing: only send a billing_address when it differs from shipping.
+    billing_same_as_shipping: billing_same_as_shipping !== false,
+    billing_address: billing_same_as_shipping === false ? String(billing_address || '') : null,
+    // Active/deactivate — only when explicitly provided.
+    ...(is_active !== undefined ? { is_active: !!is_active } : {}),
     country_id: (country_id && isValidUUID(country_id)) ? String(country_id).trim() : null,
     state_id: getStateId(),
     city_id: getCityId(),
@@ -894,7 +907,7 @@ export const updateParty = async (partyId, partyData) => {
   // Final validation: ensure absolutely no undefined values for required fields
   // Optional fields (credit_days, prefered_courier) can be undefined and will be omitted from JSON
   const finalRequestBody = {};
-  const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier'];
+  const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'billing_address', 'billing_same_as_shipping', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier', 'is_active'];
   allFields.forEach(field => {
     const value = requestBody[field];
     // Only include the field if it has a value (undefined will be omitted during JSON.stringify)

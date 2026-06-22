@@ -2,18 +2,22 @@
 import React from 'react';
 import '../../styles/components/ui.css';
 
-const BASE =
-  'ui-badge inline-flex items-center gap-1 py-[2px] px-2 min-h-[22px] text-[length:var(--text-xs)] leading-[1.4] rounded-pill font-semibold whitespace-nowrap';
+// Shape + colour come entirely from the unlayered `.ui-badge` / `.ui-badge--*`
+// rules in ui.css. We deliberately do NOT add Tailwind utilities here: those
+// live in @layer utilities and always lose to the unlayered .ui-badge, so
+// duplicating them just creates dead, overlapping declarations. Single source
+// of truth = ui.css.
+const BASE = 'ui-badge';
 
-const WARNING = `${BASE} ui-badge--warning bg-warning-soft text-warning`;
-const INFO = `${BASE} ui-badge--info bg-primary-soft text-primary`;
-const SUCCESS = `${BASE} ui-badge--success bg-success-soft text-success`;
-const DANGER = `${BASE} ui-badge--danger bg-error-soft text-error`;
+const WARNING = `${BASE} ui-badge--warning`;
+const INFO = `${BASE} ui-badge--info`;
+const SUCCESS = `${BASE} ui-badge--success`;
+const DANGER = `${BASE} ui-badge--danger`;
 
 const MAP = {
   pending: WARNING,
   processing: INFO,
-  'hold-by-trey': WARNING,
+  'hold-by-sample': WARNING,
   'partially-dispatch': INFO,
   'partially-dispatched': INFO,
   dispatch: INFO,
@@ -23,7 +27,7 @@ const MAP = {
   delivered: SUCCESS,
   cancelled: DANGER,
   rejected: DANGER,
-  default: `${BASE} bg-grey-100 text-grey-700`,
+  default: BASE,
 };
 
 export default function StatusBadge({ status, children, className = '' }) {

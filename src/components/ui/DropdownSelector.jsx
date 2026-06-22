@@ -170,7 +170,7 @@ export default function DropdownSelector({
                       isSelected
                         ? 'ui-dropdown-custom__option--selected bg-primary-soft text-primary font-medium'
                         : 'text-text font-normal hover:bg-grey-100'
-                    }`}
+                    } ${opt.className || ''}`}
                     onClick={() => handleSelect(opt.value)}
                   >
                     {opt.label}

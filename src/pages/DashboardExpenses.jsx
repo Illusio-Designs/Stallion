@@ -28,13 +28,19 @@ const DashboardExpenses = () => {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
   const [activeTab, setActiveTab] = useState('All');
-  
+  // The user role comes from localStorage, which is empty during SSR. Reading it
+  // on the first render produces server/client markup that disagrees (hydration
+  // mismatch). Gate role-dependent UI on `mounted` so the first client render
+  // matches the server, then switch to the real role after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+
   const userRole = getUserRole();
   const user = getUser();
   
   // More flexible role checking
   const normalizedRole = userRole?.toLowerCase()?.trim();
-  const isAdmin = normalizedRole === 'admin' || normalizedRole === 'administrator';
+  const isAdmin = mounted && (normalizedRole === 'admin' || normalizedRole === 'administrator');
   const isSalesman = normalizedRole === 'salesman' || normalizedRole === 'sales' || normalizedRole === 'salesperson';
   
   // Safety check: if not explicitly admin, treat as salesman for this page
@@ -112,8 +118,10 @@ const DashboardExpenses = () => {
   };
 
   useEffect(() => {
-    fetchExpenses();
-  }, []);
+    // Wait for mount so the role (from localStorage) is resolved before we
+    // pick the admin vs salesman endpoint — avoids a wrong first fetch.
+    if (mounted) fetchExpenses();
+  }, [mounted]);
 
   // Cleanup preview URLs on unmount
   useEffect(() => {

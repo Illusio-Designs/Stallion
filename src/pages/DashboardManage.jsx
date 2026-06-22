@@ -22,46 +22,6 @@ import {
   createZone,
   updateZone,
   deleteZone,
-  getColorCodes,
-  createColorCode,
-  updateColorCode,
-  deleteColorCode,
-  getFrameColors,
-  createFrameColor,
-  updateFrameColor,
-  deleteFrameColor,
-  getFrameMaterials,
-  createFrameMaterial,
-  updateFrameMaterial,
-  deleteFrameMaterial,
-  getFrameTypes,
-  createFrameType,
-  updateFrameType,
-  deleteFrameType,
-  getGenders,
-  createGender,
-  updateGender,
-  deleteGender,
-  getLensColors,
-  createLensColor,
-  updateLensColor,
-  deleteLensColor,
-  getLensMaterials,
-  createLensMaterial,
-  updateLensMaterial,
-  deleteLensMaterial,
-  getShapes,
-  createShape,
-  updateShape,
-  deleteShape,
-  getBrands,
-  createBrand,
-  updateBrand,
-  deleteBrand,
-  getCollections,
-  createCollection,
-  updateCollection,
-  deleteCollection,
 } from '../services/apiService';
 import '../styles/pages/dashboard-orders.css';
 
@@ -79,17 +39,7 @@ const DashboardManage = () => {
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
   const [allZones, setAllZones] = useState([]); // all zones unfiltered
-  const [colorCodes, setColorCodes] = useState([]);
-  const [frameColors, setFrameColors] = useState([]);
-  const [frameMaterials, setFrameMaterials] = useState([]);
-  const [frameTypes, setFrameTypes] = useState([]);
-  const [genders, setGenders] = useState([]);
-  const [lensColors, setLensColors] = useState([]);
-  const [lensMaterials, setLensMaterials] = useState([]);
-  const [shapes, setShapes] = useState([]);
-  const [brands, setBrands] = useState([]);
-  const [collections, setCollections] = useState([]);
-  
+
   // Form states
   const [formData, setFormData] = useState({
     type: 'Country',
@@ -106,34 +56,12 @@ const DashboardManage = () => {
     city_id: '',
     description: '',
     zone_code: '',
-    // Color Codes fields
-    color_code: '',
-    // Frame Colors fields
-    frame_color: '',
-    // Frame Materials fields
-    frame_material: '',
-    // Frame Types fields
-    frame_type: '',
-    // Genders fields
-    gender_name: '',
-    // Lens Colors fields
-    lens_color: '',
-    // Lens Materials fields
-    lens_material: '',
-    // Shapes fields
-    shape_name: '',
-    // Brands fields
-    brand_name: '',
-    // Collections fields
-    collection_name: '',
-    brand_id: '',
   });
-  
+
   // Options for dropdowns
   const [countryOptions, setCountryOptions] = useState([]);
   const [stateOptions, setStateOptions] = useState([]);
   const [cityOptions, setCityOptions] = useState([]);
-  const [brandOptions, setBrandOptions] = useState([]);
   
   // Filter states for tabs
   const [stateCountryFilter, setStateCountryFilter] = useState('');
@@ -314,14 +242,6 @@ const DashboardManage = () => {
     setCountryOptions(countries.map(c => ({ value: c.id, label: c.name })));
   }, [countries]);
 
-  // Update brand options when brands change
-  useEffect(() => {
-    setBrandOptions(brands.map(b => ({ 
-      value: b.brand_id || b.id, 
-      label: b.brand_name 
-    })));
-  }, [brands]);
-
   // Update stateOptions from states array (for filters) - only when not in form
   useEffect(() => {
     if (!openAdd && !editRow) {
@@ -362,26 +282,6 @@ const DashboardManage = () => {
       setZones([]);
     }
   }, [formData.city_id]);
-
-  // Load brands when Collections form is opened
-  useEffect(() => {
-    if ((openAdd || editRow) && activeTab === 'Collections' && brands.length === 0) {
-      getBrands()
-        .then((brandsData) => {
-          setBrands(brandsData || []);
-          setBrandOptions((brandsData || []).map(b => ({ 
-            value: b.brand_id || b.id, 
-            label: b.brand_name 
-          })));
-        })
-        .catch((error) => {
-          if (!error.message?.toLowerCase().includes('token expired') && 
-              !error.message?.toLowerCase().includes('unauthorized')) {
-            console.error('Error fetching brands for Collections form:', error);
-          }
-        });
-    }
-  }, [openAdd, editRow, activeTab, brands.length]);
 
   const fetchDataForTab = async (tab) => {
     setLoading(true);
@@ -445,67 +345,7 @@ const DashboardManage = () => {
             setCities(citiesArrays.flat());
           }
           break;
-        
-        case 'Color Codes':
-          const colorCodesData = await getColorCodes().catch(() => []);
-          setColorCodes(colorCodesData || []);
-          break;
-        
-        case 'Frame Colors':
-          const frameColorsData = await getFrameColors().catch(() => []);
-          setFrameColors(frameColorsData || []);
-          break;
-        
-        case 'Frame Materials':
-          const frameMaterialsData = await getFrameMaterials().catch(() => []);
-          setFrameMaterials(frameMaterialsData || []);
-          break;
-        
-        case 'Frame Types':
-          const frameTypesData = await getFrameTypes().catch(() => []);
-          setFrameTypes(frameTypesData || []);
-          break;
-        
-        case 'Genders':
-          const gendersData = await getGenders().catch(() => []);
-          setGenders(gendersData || []);
-          break;
-        
-        case 'Lens Colors':
-          const lensColorsData = await getLensColors().catch(() => []);
-          setLensColors(lensColorsData || []);
-          break;
-        
-        case 'Lens Materials':
-          const lensMaterialsData = await getLensMaterials().catch(() => []);
-          setLensMaterials(lensMaterialsData || []);
-          break;
-        
-        case 'Shapes':
-          const shapesData = await getShapes().catch(() => []);
-          setShapes(shapesData || []);
-          break;
-        
-        case 'Brands':
-          const brandsData = await getBrands().catch(() => []);
-          setBrands(brandsData || []);
-          break;
-        
-        case 'Collections':
-          // Fetch both collections and brands (for dropdown)
-          const [collectionsData, brandsForCollections] = await Promise.all([
-            getCollections().catch(() => []),
-            getBrands().catch(() => [])
-          ]);
-          setCollections(collectionsData || []);
-          setBrands(brandsForCollections || []);
-          // Update brand options for dropdown
-          setBrandOptions((brandsForCollections || []).map(b => ({ 
-            value: b.brand_id || b.id, 
-            label: b.brand_name 
-          })));
-          break;
-        
+
         default:
           break;
       }
@@ -632,110 +472,9 @@ const DashboardManage = () => {
         data: zone,
       });
     });
-    
-    colorCodes.forEach(colorCode => {
-      allRows.push({
-        id: colorCode.color_code_id || colorCode.id,
-        type: 'Color Codes',
-        name: colorCode.color_code || '',
-        details: colorCode.color_code || '',
-        data: colorCode,
-      });
-    });
-    
-    frameColors.forEach(frameColor => {
-      allRows.push({
-        id: frameColor.frame_color_id || frameColor.id,
-        type: 'Frame Colors',
-        name: frameColor.frame_color || '',
-        details: frameColor.frame_color || '',
-        data: frameColor,
-      });
-    });
-    
-    frameMaterials.forEach(frameMaterial => {
-      allRows.push({
-        id: frameMaterial.frame_material_id || frameMaterial.id,
-        type: 'Frame Materials',
-        name: frameMaterial.frame_material || '',
-        details: frameMaterial.frame_material || '',
-        data: frameMaterial,
-      });
-    });
-    
-    frameTypes.forEach(frameType => {
-      allRows.push({
-        id: frameType.frame_type_id || frameType.id,
-        type: 'Frame Types',
-        name: frameType.frame_type || '',
-        details: frameType.frame_type || '',
-        data: frameType,
-      });
-    });
-    
-    genders.forEach(gender => {
-      allRows.push({
-        id: gender.gender_id || gender.id,
-        type: 'Genders',
-        name: gender.gender_name || '',
-        details: gender.gender_name || '',
-        data: gender,
-      });
-    });
-    
-    lensColors.forEach(lensColor => {
-      allRows.push({
-        id: lensColor.lens_color_id || lensColor.id,
-        type: 'Lens Colors',
-        name: lensColor.lens_color || '',
-        details: lensColor.lens_color || '',
-        data: lensColor,
-      });
-    });
-    
-    lensMaterials.forEach(lensMaterial => {
-      allRows.push({
-        id: lensMaterial.lens_material_id || lensMaterial.id,
-        type: 'Lens Materials',
-        name: lensMaterial.lens_material || '',
-        details: lensMaterial.lens_material || '',
-        data: lensMaterial,
-      });
-    });
-    
-    shapes.forEach(shape => {
-      allRows.push({
-        id: shape.shape_id || shape.id,
-        type: 'Shapes',
-        name: shape.shape_name || '',
-        details: shape.shape_name || '',
-        data: shape,
-      });
-    });
-    
-    brands.forEach(brand => {
-      allRows.push({
-        id: brand.brand_id || brand.id,
-        type: 'Brands',
-        name: brand.brand_name || '',
-        details: brand.brand_name || '',
-        data: brand,
-      });
-    });
-    
-    collections.forEach(collection => {
-      const brand = brands.find(b => (b.brand_id || b.id) === collection.brand_id);
-      allRows.push({
-        id: collection.collection_id || collection.id,
-        type: 'Collections',
-        name: collection.collection_name || '',
-        details: brand?.brand_name || 'N/A',
-        data: collection,
-      });
-    });
-    
+
     return allRows;
-  }, [countries, states, cities, allZones, colorCodes, frameColors, frameMaterials, frameTypes, genders, lensColors, lensMaterials, shapes, brands, collections]);
+  }, [countries, states, cities, allZones]);
 
   const columns = useMemo(() => {
     // Different columns for different tabs
@@ -745,33 +484,6 @@ const DashboardManage = () => {
         { key: 'code', label: 'CODE' },
         { key: 'phone_code', label: 'PHONE CODE' },
         { key: 'currency', label: 'CURRENCY' },
-        { key: 'action', label: 'ACTION', render: (_v, row) => (
-          <RowActions 
-            onEdit={() => handleEdit(row)} 
-            onDelete={() => handleDelete(row)} 
-          />
-        ) },
-      ];
-    }
-    // Simple columns for new entity tabs (no type column needed)
-    if (['Color Codes', 'Frame Colors', 'Frame Materials', 'Frame Types', 'Genders', 'Lens Colors', 'Lens Materials', 'Shapes', 'Brands'].includes(activeTab)) {
-      return [
-        { key: 'name', label: 'NAME' },
-        { key: 'details', label: 'VALUE' },
-        { key: 'action', label: 'ACTION', render: (_v, row) => (
-          <RowActions 
-            onEdit={() => handleEdit(row)} 
-            onDelete={() => handleDelete(row)} 
-          />
-        ) },
-      ];
-    }
-    
-    // Collections tab - show brand name in details
-    if (activeTab === 'Collections') {
-      return [
-        { key: 'name', label: 'COLLECTION NAME' },
-        { key: 'details', label: 'BRAND' },
         { key: 'action', label: 'ACTION', render: (_v, row) => (
           <RowActions 
             onEdit={() => handleEdit(row)} 
@@ -795,20 +507,10 @@ const DashboardManage = () => {
   }, [activeTab]);
 
   const tabs = useMemo(() => ([
-    'Country', 
-    'State', 
-    'City', 
+    'Country',
+    'State',
+    'City',
     'Zone',
-    'Color Codes',
-    'Frame Colors',
-    'Frame Materials',
-    'Frame Types',
-    'Genders',
-    'Lens Colors',
-    'Lens Materials',
-    'Shapes',
-    'Brands',
-    'Collections'
   ]), []);
 
   const filteredRowsByTab = useMemo(() => {
@@ -854,17 +556,6 @@ const DashboardManage = () => {
       city_id: '',
       description: '',
       zone_code: '',
-      color_code: '',
-      frame_color: '',
-      frame_material: '',
-      frame_type: '',
-      gender_name: '',
-      lens_color: '',
-      lens_material: '',
-      shape_name: '',
-      brand_name: '',
-      collection_name: '',
-      brand_id: '',
     });
   };
 
@@ -887,19 +578,8 @@ const DashboardManage = () => {
       city_id: data.city_id || '',
       description: data.description || '',
       zone_code: data.zone_code || '',
-      color_code: data.color_code || '',
-      frame_color: data.frame_color || '',
-      frame_material: data.frame_material || '',
-      frame_type: data.frame_type || '',
-      gender_name: data.gender_name || '',
-      lens_color: data.lens_color || '',
-      lens_material: data.lens_material || '',
-      shape_name: data.shape_name || '',
-      brand_name: data.brand_name || '',
-      collection_name: data.collection_name || '',
-      brand_id: data.brand_id || '',
     };
-    
+
     setFormData(editData);
     setEditRow(row);
     
@@ -912,12 +592,6 @@ const DashboardManage = () => {
           await fetchZones(editData.city_id);
         }
       }
-    }
-    
-    // Load brands for Collections tab
-    if (type === 'Collections' && brands.length === 0) {
-      const brandsData = await getBrands().catch(() => []);
-      setBrands(brandsData || []);
     }
   };
 
@@ -941,36 +615,6 @@ const DashboardManage = () => {
         case 'Zone':
           await deleteZone(row.id);
           break;
-        case 'Color Codes':
-          await deleteColorCode(row.id);
-          break;
-        case 'Frame Colors':
-          await deleteFrameColor(row.id);
-          break;
-        case 'Frame Materials':
-          await deleteFrameMaterial(row.id);
-          break;
-        case 'Frame Types':
-          await deleteFrameType(row.id);
-          break;
-        case 'Genders':
-          await deleteGender(row.id);
-          break;
-        case 'Lens Colors':
-          await deleteLensColor(row.id);
-          break;
-        case 'Lens Materials':
-          await deleteLensMaterial(row.id);
-          break;
-        case 'Shapes':
-          await deleteShape(row.id);
-          break;
-        case 'Brands':
-          await deleteBrand(row.id);
-          break;
-        case 'Collections':
-          await deleteCollection(row.id);
-          break;
       }
       await fetchDataForTab(activeTab);
       setError(null); // Clear any previous errors
@@ -984,17 +628,10 @@ const DashboardManage = () => {
       console.error('Error deleting:', error);
       
       // Check for foreign key constraint errors
-      if (error.message?.toLowerCase().includes('foreign key constraint') || 
+      if (error.message?.toLowerCase().includes('foreign key constraint') ||
           error.message?.toLowerCase().includes('cannot delete or update a parent row')) {
-        // Provide specific error messages based on the tab
-        if (activeTab === 'Brands') {
-          setError('Cannot delete this brand because it has collections linked to it. Please delete the collections first.');
-        } else if (activeTab === 'Collections') {
-          setError('Cannot delete this collection because it has products linked to it. Please delete or reassign the products first.');
-        } else {
-          setError('Cannot delete this item because other records depend on it. Please delete the dependent records first.');
-        }
-      } else if (error.message?.toLowerCase().includes("doesn't exist") || 
+        setError('Cannot delete this item because other records depend on it. Please delete the dependent records first.');
+      } else if (error.message?.toLowerCase().includes("doesn't exist") ||
           error.message?.toLowerCase().includes('table')) {
         setError('Database tables not found. Please contact the administrator to set up the database tables.');
       } else {
@@ -1063,107 +700,6 @@ const DashboardManage = () => {
             await updateZone(editRow.id, dataToSend);
           } else {
             await createZone(dataToSend);
-          }
-          break;
-        case 'Color Codes':
-          dataToSend = {
-            color_code: formData.color_code,
-          };
-          if (editRow) {
-            await updateColorCode(editRow.id, dataToSend);
-          } else {
-            await createColorCode(dataToSend);
-          }
-          break;
-        case 'Frame Colors':
-          dataToSend = {
-            frame_color: formData.frame_color,
-          };
-          if (editRow) {
-            await updateFrameColor(editRow.id, dataToSend);
-          } else {
-            await createFrameColor(dataToSend);
-          }
-          break;
-        case 'Frame Materials':
-          dataToSend = {
-            frame_material: formData.frame_material,
-          };
-          if (editRow) {
-            await updateFrameMaterial(editRow.id, dataToSend);
-          } else {
-            await createFrameMaterial(dataToSend);
-          }
-          break;
-        case 'Frame Types':
-          dataToSend = {
-            frame_type: formData.frame_type,
-          };
-          if (editRow) {
-            await updateFrameType(editRow.id, dataToSend);
-          } else {
-            await createFrameType(dataToSend);
-          }
-          break;
-        case 'Genders':
-          dataToSend = {
-            gender_name: formData.gender_name,
-          };
-          if (editRow) {
-            await updateGender(editRow.id, dataToSend);
-          } else {
-            await createGender(dataToSend);
-          }
-          break;
-        case 'Lens Colors':
-          dataToSend = {
-            lens_color: formData.lens_color,
-          };
-          if (editRow) {
-            await updateLensColor(editRow.id, dataToSend);
-          } else {
-            await createLensColor(dataToSend);
-          }
-          break;
-        case 'Lens Materials':
-          dataToSend = {
-            lens_material: formData.lens_material,
-          };
-          if (editRow) {
-            await updateLensMaterial(editRow.id, dataToSend);
-          } else {
-            await createLensMaterial(dataToSend);
-          }
-          break;
-        case 'Shapes':
-          dataToSend = {
-            shape_name: formData.shape_name,
-          };
-          if (editRow) {
-            await updateShape(editRow.id, dataToSend);
-          } else {
-            await createShape(dataToSend);
-          }
-          break;
-        case 'Brands':
-          dataToSend = {
-            brand_name: formData.brand_name,
-          };
-          if (editRow) {
-            await updateBrand(editRow.id, dataToSend);
-          } else {
-            await createBrand(dataToSend);
-          }
-          break;
-        case 'Collections':
-          dataToSend = {
-            collection_name: formData.collection_name,
-            brand_id: formData.brand_id,
-          };
-          if (editRow) {
-            await updateCollection(editRow.id, dataToSend);
-          } else {
-            await createCollection(dataToSend);
           }
           break;
       }
@@ -1375,176 +911,7 @@ const DashboardManage = () => {
             </div>
           </>
         );
-      
-      case 'Color Codes':
-        return (
-          <>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Color Code *</label>
-              <input
-                className="ui-input"
-                placeholder="Enter color code (e.g., #FFFFFF)"
-                value={formData.color_code}
-                onChange={(e) => handleInputChange('color_code', e.target.value)}
-                required
-              />
-            </div>
-          </>
-        );
-      
-      case 'Frame Colors':
-        return (
-          <>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Frame Color *</label>
-              <input
-                className="ui-input"
-                placeholder="Enter frame color (e.g., #FF)"
-                value={formData.frame_color}
-                onChange={(e) => handleInputChange('frame_color', e.target.value)}
-                required
-              />
-            </div>
-          </>
-        );
-      
-      case 'Frame Materials':
-        return (
-          <>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Frame Material *</label>
-              <input
-                className="ui-input"
-                placeholder="Enter frame material (e.g., Glass, Wooden)"
-                value={formData.frame_material}
-                onChange={(e) => handleInputChange('frame_material', e.target.value)}
-                required
-              />
-            </div>
-          </>
-        );
-      
-      case 'Frame Types':
-        return (
-          <>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Frame Type *</label>
-              <input
-                className="ui-input"
-                placeholder="Enter frame type (e.g., Wooden)"
-                value={formData.frame_type}
-                onChange={(e) => handleInputChange('frame_type', e.target.value)}
-                required
-              />
-            </div>
-          </>
-        );
-      
-      case 'Genders':
-        return (
-          <>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Gender Name *</label>
-              <input
-                className="ui-input"
-                placeholder="Enter gender name (e.g., Male, Female)"
-                value={formData.gender_name}
-                onChange={(e) => handleInputChange('gender_name', e.target.value)}
-                required
-              />
-            </div>
-          </>
-        );
-      
-      case 'Lens Colors':
-        return (
-          <>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Lens Color *</label>
-              <input
-                className="ui-input"
-                placeholder="Enter lens color (e.g., #FFFFFF)"
-                value={formData.lens_color}
-                onChange={(e) => handleInputChange('lens_color', e.target.value)}
-                required
-              />
-            </div>
-          </>
-        );
-      
-      case 'Lens Materials':
-        return (
-          <>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Lens Material *</label>
-              <input
-                className="ui-input"
-                placeholder="Enter lens material (e.g., Glass, Plastic)"
-                value={formData.lens_material}
-                onChange={(e) => handleInputChange('lens_material', e.target.value)}
-                required
-              />
-            </div>
-          </>
-        );
-      
-      case 'Shapes':
-        return (
-          <>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Shape Name *</label>
-              <input
-                className="ui-input"
-                placeholder="Enter shape name (e.g., Circle, Square)"
-                value={formData.shape_name}
-                onChange={(e) => handleInputChange('shape_name', e.target.value)}
-                required
-              />
-            </div>
-          </>
-        );
-      
-      case 'Brands':
-        return (
-          <>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Brand Name *</label>
-              <input
-                className="ui-input"
-                placeholder="Enter brand name (e.g., Ray-Ban, Oakley)"
-                value={formData.brand_name}
-                onChange={(e) => handleInputChange('brand_name', e.target.value)}
-                required
-              />
-            </div>
-          </>
-        );
-      
-      case 'Collections':
-        return (
-          <>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Brand *</label>
-              <DropdownSelector
-                options={brandOptions}
-                value={formData.brand_id}
-                onChange={(value) => handleInputChange('brand_id', value)}
-                placeholder="Select brand"
-              />
-            </div>
-            <div className="form-group form-group--full">
-              <label className="ui-label">Collection Name *</label>
-              <input
-                className="ui-input"
-                placeholder="Enter collection name (e.g., Summer Collection)"
-                value={formData.collection_name}
-                onChange={(e) => handleInputChange('collection_name', e.target.value)}
-                required
-              />
-            </div>
-          </>
-        );
-      
+
       default:
         return null;
     }

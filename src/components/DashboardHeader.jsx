@@ -202,8 +202,13 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
         </div>
 
         <div className="dashboard-header-actions flex items-center gap-3 min-w-0">
-          <a href="/products" className="dashboard-back-shop hidden md:inline-flex items-center gap-1 px-4 py-2 min-h-[40px] rounded-md bg-primary text-text-on-primary text-[length:var(--text-sm)] font-semibold no-underline whitespace-nowrap transition duration-200 ease-[ease] hover:bg-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-primary-active active:scale-[0.98] motion-reduce:transition-none">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="shrink-0">
+          {/* Shape, colour, hover/active and the responsive show/hide all come
+              from the unlayered `.dashboard-back-shop` rules in
+              DashboardHeader.css (incl. the <768px hide). Tailwind utilities
+              here would only duplicate and lose to those, so we don't add any —
+              except the label's max-[480px]:hidden, which has no CSS equivalent. */}
+          <a href="/products" className="dashboard-back-shop">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
               <polyline points="9 22 9 12 15 12 15 22"/>
             </svg>
