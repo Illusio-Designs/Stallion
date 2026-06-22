@@ -456,12 +456,15 @@ const Dashboard = () => {
                   }`}
                 >
                   <span className={`inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md ${
-                    primary ? 'bg-white/15' : 'bg-primary-soft text-primary group-hover:bg-white'
+                    primary ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary group-hover:bg-white'
                   }`}>
                     <Icon size={20} aria-hidden="true" />
                   </span>
                   <span className="min-w-0">
-                    <span className="block font-semibold leading-tight text-[var(--text-sm)]">{label}</span>
+                    {/* Explicit colour: the unlayered global `button { color: inherit }`
+                        defeats the layered text-* utility on the button, so an
+                        un-coloured label would inherit the card's dark text. */}
+                    <span className={`block font-semibold leading-tight text-[var(--text-sm)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
                     <span className={`block text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>
                   </span>
                 </button>
