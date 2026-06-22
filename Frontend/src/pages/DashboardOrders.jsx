@@ -745,8 +745,14 @@ const DashboardOrders = () => {
       payload.partial_dispatch_qty = qty;
     }
 
-    // Confirm before committing — a status change can't be reversed.
-    if (!(await confirm(`Change this order's status to "${newStatus}"? This action cannot be undone.`))) {
+    // Confirm before committing — a status change can't be reversed. Uses the
+    // app ConfirmDialog (via useConfirm), same as the delete confirmations.
+    if (!(await confirm({
+      title: 'Update order status',
+      message: `Change this order's status to "${newStatus}"? This action cannot be undone.`,
+      confirmLabel: 'Update status',
+      danger: true,
+    }))) {
       return;
     }
 

@@ -1279,7 +1279,7 @@ const Cart = ({ onPageChange = null }) => {
                     options={[
                       { value: '', label: 'Select Party' },
                       // Field roles can add a new party right from the dropdown.
-                      ...((isSalesman || isDistributor) ? [{ value: ADD_PARTY_OPTION, label: '+ Add New Party' }] : []),
+                      ...((isSalesman || isDistributor) ? [{ value: ADD_PARTY_OPTION, label: '+ Add New Party', className: 'ui-dropdown-custom__option--action' }] : []),
                       ...parties.map(party => ({
                         value: party.id || party.party_id,
                         label: party.party_name || party.name,
