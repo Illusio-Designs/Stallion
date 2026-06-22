@@ -439,7 +439,7 @@ const Dashboard = () => {
           <div className="dash-card full bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Quick Actions</h4>
             <div className="flex flex-wrap gap-3">
-              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/products'; }}>New Visit Order</button>
+              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/salesmen'; }}>Add Visit</button>
               <button className="ui-btn ui-btn--secondary" onClick={() => { window.location.href = '/dashboard/orders'; }}>My Orders</button>
               <button className="ui-btn ui-btn--secondary" onClick={() => { window.location.href = '/dashboard/analytics'; }}>View Report</button>
             </div>
