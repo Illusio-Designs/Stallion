@@ -5,7 +5,7 @@ const Distributor = require('../models/distributor');
 const Salesman = require('../models/Salesman');
 const Product = require('../models/Product');
 const TrayProducts = require('../models/TrayProducts');
-const { TrayProductStatus, OrderStatus, OrderStatusTransitions, OrderType } = require('../constants/enums');
+const { TrayProductStatus, OrderStatus, OrderType } = require('../constants/enums');
 const { generateUniqueOrderNumber } = require('../services/order_number_generator');
 const Event = require('../models/event');
 const OrderOperation = require('../models/OrderOperation');
@@ -645,21 +645,10 @@ class OrderController {
             if (!Object.values(OrderStatus).includes(order_status)) {
                 return res.status(400).json({ error: 'Invalid order status. Allowed values are: ' + Object.values(OrderStatus).join(', ') });
             }
+            // Status can be moved to any value directly (no forced step-by-step
+            // sequence). We still capture the previous status to guard the
+            // cancellation inventory reversal below against running twice.
             const currentStatus = order.order_status;
-            if (currentStatus !== order_status) {
-                const allowedNextStatuses = OrderStatusTransitions[currentStatus] || [];
-                if (!allowedNextStatuses.includes(order_status)) {
-                    if (currentStatus === OrderStatus.CANCELLED) {
-                        return res.status(400).json({ error: 'Cancelled orders cannot be updated' });
-                    }
-                    if (currentStatus === OrderStatus.COMPLETED) {
-                        return res.status(400).json({ error: 'Completed orders cannot be updated' });
-                    }
-                    return res.status(400).json({
-                        error: `Cannot update order status from '${currentStatus}' to '${order_status}'`
-                    });
-                }
-            }
             if (order_status === OrderStatus.DISPATCHED || order_status === OrderStatus.PARTIALLY_DISPATCHED) {
                 if (!courier_name || !courier_tracking_number) {
                     return res.status(400).json({ error: 'Courier name and tracking number are required' });
@@ -673,7 +662,9 @@ class OrderController {
                 }
                 order.partial_dispatch_qty = partial_dispatch_qty;
             }
-            if (order_status === OrderStatus.CANCELLED) {
+            // Reverse stock only when an order first transitions INTO cancelled,
+            // not on a cancelled -> cancelled no-op (which would reverse twice).
+            if (order_status === OrderStatus.CANCELLED && currentStatus !== OrderStatus.CANCELLED) {
                 await sequelize.transaction(async (transaction) => {
                     await reverseOrderOperation(order.order_id, transaction);
                 });
