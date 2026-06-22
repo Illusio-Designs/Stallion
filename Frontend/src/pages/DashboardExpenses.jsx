@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
 import StatusBadge from '../components/ui/StatusBadge';
+import DatePicker from '../components/ui/DatePicker';
 import Button from '../components/ui/Button';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
@@ -563,12 +564,9 @@ const DashboardExpenses = () => {
         <div className="modal-form flex flex-col gap-4">
           <div className="form-group flex flex-col gap-2">
             <label className="text-[length:var(--text-sm)] font-medium text-text">Expense Date *</label>
-            <input
-              className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
-              type="date"
+            <DatePicker
               value={createFormData.expense_date}
-              onChange={(e) => setCreateFormData({ ...createFormData, expense_date: e.target.value })}
-              required
+              onChange={(v) => setCreateFormData({ ...createFormData, expense_date: v })}
             />
           </div>
 

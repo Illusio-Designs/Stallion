@@ -1970,7 +1970,7 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
-            <input type="date" className="ui-input" value={checkinForm.next_visit_date} onChange={(e) => setCheckinForm(prev => ({ ...prev, next_visit_date: e.target.value }))} />
+            <DatePicker value={checkinForm.next_visit_date} onChange={(v) => setCheckinForm(prev => ({ ...prev, next_visit_date: v }))} />
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Remarks</label>

@@ -4,6 +4,7 @@ import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import StatusBadge from '../components/ui/StatusBadge';
 import DropdownSelector from '../components/ui/DropdownSelector';
+import DatePicker from '../components/ui/DatePicker';
 import PagedMultiSelect from '../components/ui/PagedMultiSelect';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
@@ -378,11 +379,11 @@ const DashboardOffers = () => {
 
           <div className="form-group">
             <label className="ui-label">Start Date</label>
-            <input type="date" className="ui-input" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />
+            <DatePicker value={form.start_date} onChange={(v) => set('start_date', v)} />
           </div>
           <div className="form-group">
             <label className="ui-label">End Date</label>
-            <input type="date" className="ui-input" value={form.end_date} onChange={(e) => set('end_date', e.target.value)} />
+            <DatePicker value={form.end_date} onChange={(v) => set('end_date', v)} />
           </div>
 
           <div className="form-group">
