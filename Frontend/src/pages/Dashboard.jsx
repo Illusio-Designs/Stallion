@@ -479,7 +479,7 @@ const Dashboard = () => {
       {/* Quick Actions (salesman) */}
       {isSalesman && (
         <div className="dash-row mt-4">
-          <div className="dash-card full bg-surface border border-border rounded-lg shadow-sm p-5">
+          <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5 max-md:p-4">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
             <div className="grid grid-cols-3 items-stretch gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
               <QuickActionCard icon={FiMapPin} label="Add Visit" desc="Log a party visit" primary onClick={() => { window.location.href = '/dashboard/salesmen'; }} />
