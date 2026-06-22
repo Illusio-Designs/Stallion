@@ -107,9 +107,11 @@ const DashboardOffers = () => {
   const [panelOpen, setPanelOpen] = useState(false);
   const [form, setForm] = useState(emptyForm());
 
-  // Product search for the scope picker (server-paged, 20 at a time).
-  const [productOpts, setProductOpts] = useState([]);
+  // Product scope picker — server-paged, 20 at a time, with Next/Prev.
+  const [productList, setProductList] = useState([]); // current page
   const [productLoading, setProductLoading] = useState(false);
+  const [productPage, setProductPage] = useState(1);
+  const [productSearch, setProductSearch] = useState('');
 
   const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
@@ -131,33 +133,41 @@ const DashboardOffers = () => {
 
   useEffect(() => { fetchOffers(); }, []);
 
-  const searchProducts = async (term) => {
+  // Fetch one page (20) of products for the scope picker.
+  const fetchProductPage = async (page, search) => {
     setProductLoading(true);
     try {
-      const resp = await getProductsPage(1, 20, term || '');
+      const resp = await getProductsPage(page, 20, search || '');
       const list = Array.isArray(resp) ? resp : (resp?.data || []);
-      setProductOpts(list.map((p) => ({
+      setProductList(list.map((p) => ({
         value: String(p.product_id || p.id),
         label: p.model_no || p.product_name || p.name || String(p.product_id || p.id),
       })));
+      setProductPage(page);
     } catch {
-      setProductOpts([]);
+      setProductList([]);
     } finally {
       setProductLoading(false);
     }
   };
 
-  const addProduct = (value) => {
-    if (!value) return;
-    const opt = productOpts.find((o) => o.value === value);
-    const label = opt ? opt.label : value;
-    setForm((f) => f.products.some((p) => p.id === value)
-      ? f
-      : { ...f, products: [...f.products, { id: value, label }] });
+  // Load page 1 when the scope picker is shown, and on (debounced) search.
+  useEffect(() => {
+    if (!panelOpen || (form.offer_type !== 'product' && form.offer_type !== 'bogo')) return;
+    const t = setTimeout(() => fetchProductPage(1, productSearch), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panelOpen, form.offer_type, productSearch]);
+
+  const toggleProduct = (opt) => {
+    setForm((f) => f.products.some((p) => p.id === opt.value)
+      ? { ...f, products: f.products.filter((p) => p.id !== opt.value) }
+      : { ...f, products: [...f.products, { id: opt.value, label: opt.label }] });
   };
   const removeProduct = (id) => setForm((f) => ({ ...f, products: f.products.filter((p) => p.id !== id) }));
 
-  const openAdd = () => { setForm(emptyForm()); setPanelOpen(true); };
+  const resetPicker = () => { setProductSearch(''); setProductPage(1); setProductList([]); };
+  const openAdd = () => { setForm(emptyForm()); resetPicker(); setPanelOpen(true); };
 
   const openEdit = (offer) => {
     const c = offer.config || {};
@@ -183,6 +193,7 @@ const DashboardOffers = () => {
       get_qty: c.get_qty ?? 1,
       get_discount_percent: c.get_discount_percent ?? 100,
     });
+    resetPicker();
     setPanelOpen(true);
   };
 
@@ -378,18 +389,35 @@ const DashboardOffers = () => {
 
           {showScope && (
             <div className="form-group form-group--full">
-              <label className="ui-label">Products *</label>
-              <DropdownSelector
-                className="ui-dropdown-custom--full-width"
-                options={productOpts}
-                value=""
-                onChange={addProduct}
-                onOpen={() => { if (productOpts.length === 0) searchProducts(''); }}
-                serverSearch
-                onSearch={searchProducts}
-                loading={productLoading}
-                placeholder="Search & add products"
+              <label className="ui-label">Products * <span className="text-text-subtle font-normal">({form.products.length} selected)</span></label>
+              <input
+                className="ui-input mb-2"
+                placeholder="Search products by model no…"
+                value={productSearch}
+                onChange={(e) => setProductSearch(e.target.value)}
               />
+              <div className="rounded-md border border-border divide-y divide-border max-h-[240px] overflow-y-auto">
+                {productLoading ? (
+                  <div className="p-3 text-center text-[length:var(--text-sm)] text-text-subtle">Loading…</div>
+                ) : productList.length === 0 ? (
+                  <div className="p-3 text-center text-[length:var(--text-sm)] text-text-subtle">No products found</div>
+                ) : (
+                  productList.map((opt) => {
+                    const checked = form.products.some((p) => p.id === opt.value);
+                    return (
+                      <label key={opt.value} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-grey-100">
+                        <input type="checkbox" className="accent-primary cursor-pointer" checked={checked} onChange={() => toggleProduct(opt)} />
+                        <span className="text-[length:var(--text-base)] text-text">{opt.label}</span>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+              <div className="flex items-center justify-between gap-2 mt-2">
+                <button type="button" className="ui-btn ui-btn--secondary" disabled={productLoading || productPage <= 1} onClick={() => fetchProductPage(productPage - 1, productSearch)}>← Previous</button>
+                <span className="text-[length:var(--text-sm)] text-text-muted">Page {productPage}</span>
+                <button type="button" className="ui-btn ui-btn--secondary" disabled={productLoading || productList.length < 20} onClick={() => fetchProductPage(productPage + 1, productSearch)}>Next →</button>
+              </div>
               {form.products.length > 0 && (
                 <div className="work-state-chips">
                   {form.products.map((p) => (

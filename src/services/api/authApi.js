@@ -83,11 +83,14 @@ export const login = async (phoneNumber, accessToken = null) => {
  * @returns {Promise<Object>} Response with user data
  */
 export const register = async (userData) => {
-  const { phoneNumber, fullName, email, roleId } = userData;
+  const { phoneNumber, fullName, email, roleId, address } = userData;
+  // POST /auth/register is admin-protected (authenticateToken + isAdmin), so it
+  // MUST send the admin's bearer token — otherwise the API returns 401. The
+  // backend reads camelCase fields (fullName/roleId) and requires `address`.
   return apiRequest('/auth/register', {
     method: 'POST',
-    body: { phoneNumber, full_name: fullName, email, role_id: roleId },
-    includeAuth: false,
+    body: { phoneNumber, fullName, email, roleId, address },
+    includeAuth: true,
   });
 };
 

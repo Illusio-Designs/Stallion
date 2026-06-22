@@ -1083,6 +1083,7 @@ const DashboardSuppliers = () => {
             phoneNumber,
             fullName: formData.full_name.trim(),
             roleId: salesmanRoleId,
+            address: formData.address ? formData.address.trim() : '',
           };
 
           const registeredUser = await register(userData);

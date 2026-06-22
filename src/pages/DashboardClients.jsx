@@ -951,6 +951,7 @@ const DashboardClients = () => {
             phoneNumber,
             fullName: formData.contact_person.trim() || formData.party_name.trim(),
             roleId: partyRoleId,
+            address: formData.address ? formData.address.trim() : '',
           };
 
           const registeredUser = await register(userData);
