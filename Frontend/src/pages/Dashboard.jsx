@@ -8,7 +8,33 @@ import SalesRevenueChart from '../components/charts/SalesRevenueChart';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import { getOrdersForRole, getProducts, getProductById, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
-import { FiMapPin, FiShoppingBag, FiBarChart2 } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag } from 'react-icons/fi';
+
+// Quick Action button — pure Tailwind (no legacy ui-btn / .btn-col CSS, no
+// inline styles). Colours are set explicitly on the children because the
+// unlayered global `button { color: inherit }` reset outranks any layered
+// text-* utility placed on the <button> itself.
+const QuickActionCard = ({ icon: Icon, label, desc, onClick, primary }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={`group flex items-center gap-3 rounded-lg border p-4 text-left transition-colors duration-150 outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary)] active:scale-[0.99] ${
+      primary
+        ? 'border-transparent bg-primary hover:bg-primary/90'
+        : 'border-border bg-surface hover:border-primary hover:bg-primary-soft'
+    }`}
+  >
+    <span className={`inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md ${
+      primary ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary group-hover:bg-white'
+    }`}>
+      <Icon size={20} aria-hidden="true" />
+    </span>
+    <span className="min-w-0">
+      <span className={`block font-semibold leading-tight text-[var(--text-sm)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
+      {desc && <span className={`block text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>}
+    </span>
+  </button>
+);
 
 const Dashboard = () => {
   const [period, setPeriod] = useState('Monthly');
@@ -375,11 +401,11 @@ const Dashboard = () => {
           </div>
           <div className="dash-card side equal col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-[10px]">Quick Actions</h4>
-            <div className="btn-col flex flex-1 flex-col justify-center gap-3">
-              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/orders'; }}>View All Order</button>
-              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/analytics'; }}>View Report</button>
+            <div className="flex flex-1 flex-col justify-center gap-3">
+              <QuickActionCard icon={FiShoppingCart} label="View All Order" desc="All customer orders" primary onClick={() => { window.location.href = '/dashboard/orders'; }} />
+              <QuickActionCard icon={FiBarChart2} label="View Report" desc="Sales analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
               {/* Display only — offers feature not built yet. */}
-              <button className="ui-btn ui-btn--secondary" onClick={() => showInfo('Offers — coming soon')}>Create Offer</button>
+              <QuickActionCard icon={FiTag} label="Create Offer" desc="Coming soon" onClick={() => showInfo('Offers — coming soon')} />
             </div>
           </div>
         </div>
@@ -448,35 +474,9 @@ const Dashboard = () => {
           <div className="dash-card full bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
             <div className="grid grid-cols-3 gap-3 max-[640px]:grid-cols-1">
-              {[
-                { icon: FiMapPin, label: 'Add Visit', desc: 'Log a party visit', href: '/dashboard/salesmen', primary: true },
-                { icon: FiShoppingBag, label: 'My Orders', desc: 'View your orders', href: '/dashboard/orders' },
-                { icon: FiBarChart2, label: 'View Report', desc: 'Targets & analytics', href: '/dashboard/analytics' },
-              ].map(({ icon: Icon, label, desc, href, primary }) => (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => { window.location.href = href; }}
-                  className={`group flex items-center gap-3 rounded-lg border p-4 text-left transition-colors duration-150 outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary)] active:scale-[0.99] ${
-                    primary
-                      ? 'border-transparent bg-primary text-text-on-primary hover:bg-primary/90'
-                      : 'border-border bg-surface text-text hover:border-primary hover:bg-primary-soft'
-                  }`}
-                >
-                  <span className={`inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md ${
-                    primary ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary group-hover:bg-white'
-                  }`}>
-                    <Icon size={20} aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0">
-                    {/* Explicit colour: the unlayered global `button { color: inherit }`
-                        defeats the layered text-* utility on the button, so an
-                        un-coloured label would inherit the card's dark text. */}
-                    <span className={`block font-semibold leading-tight text-[var(--text-sm)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
-                    <span className={`block text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>
-                  </span>
-                </button>
-              ))}
+              <QuickActionCard icon={FiMapPin} label="Add Visit" desc="Log a party visit" primary onClick={() => { window.location.href = '/dashboard/salesmen'; }} />
+              <QuickActionCard icon={FiShoppingBag} label="My Orders" desc="View your orders" onClick={() => { window.location.href = '/dashboard/orders'; }} />
+              <QuickActionCard icon={FiBarChart2} label="View Report" desc="Targets & analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
             </div>
           </div>
         </div>
