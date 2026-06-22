@@ -739,6 +739,46 @@ textarea.ui-input {
   text-align: center;
 }
 
+/* Pager footer for heavy/paged dropdowns (PagedMultiSelect) — sits inside the
+   menu, below the options, with Previous / Next + page indicator. */
+.ui-dropdown-custom__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.ui-dropdown-custom__pager-btn {
+  padding: 4px var(--space-2);
+  min-height: 30px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+@media (hover: hover) {
+  .ui-dropdown-custom__pager-btn:hover:not(:disabled) {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+}
+.ui-dropdown-custom__pager-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ui-dropdown-custom__pager-info {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
 /* Scrollbar styling for dropdown options */
 .ui-dropdown-custom__options::-webkit-scrollbar {
   width: 8px;
