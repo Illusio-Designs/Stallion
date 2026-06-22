@@ -3,7 +3,7 @@ import '../styles/components/DashboardSidebar.css';
 import {
   FiGrid, FiPackage, FiShoppingCart, FiDollarSign, FiInbox, FiCalendar,
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
-  FiHelpCircle, FiSettings, FiChevronsLeft, FiX, FiShoppingBag,
+  FiHelpCircle, FiSettings, FiChevronsLeft, FiX, FiShoppingBag, FiTag,
 } from 'react-icons/fi';
 import { getUserRole } from '../services/authService';
 import { filterMenuItemsByRole } from '../utils/rolePermissions';
@@ -19,6 +19,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     expenses: FiDollarSign,
     tray: FiInbox,
     events: FiCalendar,
+    offers: FiTag,
     party: FiUsers,
     salesmen: FiUser,
     distributor: FiTruck,
@@ -46,6 +47,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     { id: 'expenses', text: 'Expenses' },
     { id: 'tray', text: 'Sample' },
     { id: 'events', text: 'Events' },
+    { id: 'offers', text: 'Offers' },
     { id: 'party', text: 'Party' },
     { id: 'salesmen', text: 'Salesmen' },
     { id: 'distributor', text: 'Distributor' },
