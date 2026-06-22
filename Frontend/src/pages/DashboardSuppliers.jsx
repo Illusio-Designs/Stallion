@@ -117,7 +117,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
             onClick={toggleAll}
           >
             <span className="flex items-center gap-2">
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} onClick={(e) => e.stopPropagation()} className="cursor-pointer accent-primary" />
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} onClick={(e) => e.stopPropagation()} className="ui-checkbox" />
               {allSelected ? 'Uncheck All' : 'Check All'}
             </span>
           </div>
@@ -137,7 +137,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
                   onClick={() => toggleZone(zoneId)}
                 >
                   <span className="flex items-center gap-2">
-                    <input type="checkbox" checked={isChecked} onChange={() => toggleZone(zoneId)} onClick={(e) => e.stopPropagation()} className="cursor-pointer accent-primary" />
+                    <input type="checkbox" checked={isChecked} onChange={() => toggleZone(zoneId)} onClick={(e) => e.stopPropagation()} className="ui-checkbox" />
                     {zoneName}
                   </span>
                 </div>

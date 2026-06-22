@@ -107,7 +107,7 @@ export default function PagedMultiSelect({
                   onClick={() => onToggle && onToggle(opt)}
                 >
                   <span className="flex items-center gap-2">
-                    <input type="checkbox" checked={checked} onChange={() => onToggle && onToggle(opt)} onClick={(e) => e.stopPropagation()} className="accent-primary cursor-pointer" />
+                    <input type="checkbox" checked={checked} onChange={() => onToggle && onToggle(opt)} onClick={(e) => e.stopPropagation()} className="ui-checkbox" />
                     {opt.label}
                   </span>
                 </div>

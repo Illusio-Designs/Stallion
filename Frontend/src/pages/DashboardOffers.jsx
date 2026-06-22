@@ -390,7 +390,7 @@ const DashboardOffers = () => {
             <input type="number" className="ui-input" value={form.priority} onChange={(e) => set('priority', e.target.value)} />
           </div>
           <div className="form-group flex flex-row items-center gap-2">
-            <input id="offer-active" type="checkbox" className="accent-primary cursor-pointer" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
+            <input id="offer-active" type="checkbox" className="ui-checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
             <label htmlFor="offer-active" className="ui-label !mb-0 cursor-pointer">Active</label>
           </div>
         </div>
