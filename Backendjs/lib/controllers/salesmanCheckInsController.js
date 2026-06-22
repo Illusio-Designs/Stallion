@@ -1,7 +1,37 @@
 const SalesmanCheckIns = require('../models/SalesmanCheckIns');
+const Party = require('../models/Party');
+const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 const { SalesmanCheckInType } = require('../constants/enums');
+
+// Enrich check-ins for the Visit Report: add party_name, and for ORDERED
+// check-ins (type='ordered', which carry an order_id) the linked order's
+// number / total / notes(remark) / status. VISIT check-ins use check_in_remarks.
+async function enrichCheckIns(checkIns) {
+    const rows = checkIns.map((c) => (typeof c.toJSON === 'function' ? c.toJSON() : c));
+    const partyIds = [...new Set(rows.map((r) => r.party_id).filter(Boolean))];
+    const orderIds = [...new Set(rows.map((r) => r.order_id).filter(Boolean))];
+    const [parties, orders] = await Promise.all([
+        partyIds.length ? Party.findAll({ where: { party_id: partyIds } }) : [],
+        orderIds.length ? Order.findAll({ where: { order_id: orderIds } }) : [],
+    ]);
+    const partyMap = {};
+    parties.forEach((p) => { partyMap[p.party_id] = p.party_name; });
+    const orderMap = {};
+    orders.forEach((o) => { orderMap[o.order_id] = o; });
+    return rows.map((r) => {
+        const o = r.order_id ? orderMap[r.order_id] : null;
+        return {
+            ...r,
+            party_name: partyMap[r.party_id] || null,
+            order_number: o ? o.order_number : null,
+            order_total: o ? o.order_total : null,
+            order_notes: o ? o.order_notes : null,
+            order_status: o ? o.order_status : null,
+        };
+    });
+}
 
 function resolveCheckInFields(body, existing = {}) {
     return {
@@ -112,7 +142,8 @@ class SalesmanCheckInsController {
                 limit: pagination.limit,
                 offset: pagination.offset,
             });
-            res.status(200).json(buildPaginatedResponse(checkIns, pagination, count));
+            const enriched = await enrichCheckIns(checkIns);
+            res.status(200).json(buildPaginatedResponse(enriched, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -127,8 +158,9 @@ class SalesmanCheckInsController {
             }
 
             const checkIns = await SalesmanCheckIns.findAll({ where: { salesman_id } });
+            const enriched = await enrichCheckIns(checkIns);
 
-            res.status(200).json(checkIns);
+            res.status(200).json(enriched);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
