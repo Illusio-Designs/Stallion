@@ -277,7 +277,7 @@ const DashboardSuppliers = () => {
   const [openCheckinModal, setOpenCheckinModal] = useState(false);
   const [editCheckin, setEditCheckin] = useState(null);
   const [checkinForm, setCheckinForm] = useState({
-    salesman_id: '', check_in_date: '', party_id: '', latitude: '', longitude: '', check_in_remarks: '',
+    salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: '', out_time: '', next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '',
   });
 
   // Targets state
@@ -1148,12 +1148,37 @@ const DashboardSuppliers = () => {
   };
 
   // ---- Check-in handlers ----
-  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', latitude: '', longitude: '', check_in_remarks: '' });
+  // datetime-local value for "now" (YYYY-MM-DDTHH:mm) — local time, no seconds.
+  const nowDatetimeLocal = () => {
+    const d = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  };
+  // Default in/out time to "now" (the visit is being logged on the spot); the
+  // salesman can adjust. Done here (a client-side user action) — not in the
+  // initial state — to avoid an SSR/client hydration mismatch from new Date().
+  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: nowDatetimeLocal(), out_time: nowDatetimeLocal(), next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
 
   const handleCheckinSubmit = async (e) => {
     e.preventDefault();
     if (!checkinForm.party_id) {
       showError('Please select a party before saving.');
+      return;
+    }
+    if (!checkinForm.contact_person || !checkinForm.contact_person.trim()) {
+      showError('Please enter the contact person.');
+      return;
+    }
+    if (!checkinForm.in_time) {
+      showError('Please set the in time.');
+      return;
+    }
+    if (!checkinForm.out_time) {
+      showError('Please set the out time.');
+      return;
+    }
+    if (!checkinForm.next_visit_date) {
+      showError('Please set the next visit date.');
       return;
     }
     try {
@@ -1173,16 +1198,27 @@ const DashboardSuppliers = () => {
       }
 
       const currentUser = getUser();
+      // Preserve an existing 'ordered' check-in's type when editing; a brand-new
+      // entry from this form is always a plain visit.
+      const checkinType = editCheckin?.type || 'visit';
       const payload = {
         salesman_id: isSalesman
           ? (mySalesmanId || currentUser?.salesman_id || checkinForm.salesman_id)
           : checkinForm.salesman_id,
         check_in_date: checkInDate,
         party_id: checkinForm.party_id,
+        contact_person: checkinForm.contact_person.trim(),
+        type: checkinType,
+        in_time: checkinForm.in_time,
+        out_time: checkinForm.out_time,
+        next_visit_date: checkinForm.next_visit_date,
         latitude,
         longitude,
         check_in_remarks: checkinForm.check_in_remarks,
       };
+      if (checkinType === 'ordered' && editCheckin?.order_id) {
+        payload.order_id = editCheckin.order_id;
+      }
       if (editCheckin) {
         await updateSalesmanCheckin(editCheckin.id, payload);
         showSuccess('Visit report updated successfully');
@@ -1207,6 +1243,11 @@ const DashboardSuppliers = () => {
       salesman_id: row.salesman_id || '',
       check_in_date: row.check_in_date ? row.check_in_date.split('T')[0] : '',
       party_id: row.party_id || '',
+      contact_person: row.contact_person || '',
+      // DATE columns come back as ISO; slice to the datetime-local / date shapes.
+      in_time: row.in_time ? String(row.in_time).slice(0, 16) : '',
+      out_time: row.out_time ? String(row.out_time).slice(0, 16) : '',
+      next_visit_date: row.next_visit_date ? String(row.next_visit_date).split('T')[0] : '',
       latitude: row.latitude || '',
       longitude: row.longitude || '',
       check_in_remarks: row.check_in_remarks || '',
@@ -1913,6 +1954,22 @@ const DashboardSuppliers = () => {
               placeholder="Select Party"
               className="ui-dropdown-custom--full-width"
             />
+          </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Contact Person <span className="text-error">*</span></label>
+            <input className="ui-input" placeholder="Person you met" value={checkinForm.contact_person} onChange={(e) => setCheckinForm(prev => ({ ...prev, contact_person: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">In Time <span className="text-error">*</span></label>
+            <input type="datetime-local" className="ui-input" value={checkinForm.in_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, in_time: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">Out Time <span className="text-error">*</span></label>
+            <input type="datetime-local" className="ui-input" value={checkinForm.out_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, out_time: e.target.value }))} />
+          </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
+            <input type="date" className="ui-input" value={checkinForm.next_visit_date} onChange={(e) => setCheckinForm(prev => ({ ...prev, next_visit_date: e.target.value }))} />
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Remarks</label>
