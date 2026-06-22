@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
+import StatusBadge from '../components/ui/StatusBadge';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import DatePicker from '../components/ui/DatePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
@@ -1441,9 +1442,13 @@ const DashboardSuppliers = () => {
               title="Visit Report"
               columns={[
                 ...(!isSalesman ? [{ key: 'salesman_id', label: 'SALESMAN', render: (v) => salesmanNameMap[v] || v || '-' }] : []),
+                { key: 'type', label: 'TYPE', render: (v) => (
+                  <StatusBadge status={v === 'ordered' ? 'completed' : 'processing'}>{v === 'ordered' ? 'Order' : 'Visit'}</StatusBadge>
+                ) },
                 { key: 'check_in_date', label: 'DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
-                { key: 'party_id', label: 'PARTY', render: (v) => partyNameMap[v] || v || '-' },
-                { key: 'check_in_remarks', label: 'REMARKS' },
+                { key: 'party_id', label: 'PARTY', render: (_v, row) => row.party_name || partyNameMap[row.party_id] || row.party_id || '-' },
+                { key: 'order_total', label: 'VALUE', render: (v, row) => (row.type === 'ordered' && v != null) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
+                { key: 'check_in_remarks', label: 'REMARKS', render: (v, row) => (row.type === 'ordered' ? (row.order_notes || v) : v) || '-' },
                 ...(isSalesman ? [{ key: 'action', label: 'ACTION', render: (_v, row) => (
                   <RowActions onEdit={() => handleCheckinEdit(row)} onDelete={() => handleCheckinDelete(row)} />
                 )}] : []),
