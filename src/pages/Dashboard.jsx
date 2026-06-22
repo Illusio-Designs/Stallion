@@ -29,14 +29,16 @@ const QuickActionCard = ({ icon: Icon, label, desc, onClick, primary }) => (
     }`}>
       <Icon size={20} aria-hidden="true" />
     </span>
-    <span className="min-w-0">
-      <span className={`block font-semibold leading-tight text-[var(--text-sm)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
-      {desc && <span className={`block text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>}
+    <span className="min-w-0 flex-1">
+      {/* truncate so the card degrades to a clean single line in narrow
+          containers (e.g. the admin side column) instead of wrapping. */}
+      <span className={`block truncate font-semibold leading-tight text-[var(--text-sm)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
+      {desc && <span className={`block truncate text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>}
     </span>
     <FiChevronRight
       size={18}
       aria-hidden="true"
-      className={`ml-auto flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none ${primary ? 'text-white/70' : 'text-text-subtle'}`}
+      className={`flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none ${primary ? 'text-white/70' : 'text-text-subtle'}`}
     />
   </button>
 );
@@ -410,7 +412,7 @@ const Dashboard = () => {
           <div className="dash-card side equal col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-[10px]">Quick Actions</h4>
             <div className="flex flex-1 flex-col justify-center gap-3">
-              <QuickActionCard icon={FiShoppingCart} label="View All Order" desc="All customer orders" primary onClick={() => { window.location.href = '/dashboard/orders'; }} />
+              <QuickActionCard icon={FiShoppingCart} label="View All Orders" desc="All orders" primary onClick={() => { window.location.href = '/dashboard/orders'; }} />
               <QuickActionCard icon={FiBarChart2} label="View Report" desc="Sales analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
               {/* Display only — offers feature not built yet. */}
               <QuickActionCard icon={FiTag} label="Create Offer" desc="Coming soon" onClick={() => showInfo('Offers — coming soon')} />

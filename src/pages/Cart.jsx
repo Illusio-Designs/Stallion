@@ -1370,24 +1370,44 @@ const Cart = ({ onPageChange = null }) => {
                 />
               </div>
 
-              {/* Offer selector — pick one active offer for this cart. The
-                  discount amount is shown per option and applied live below. */}
+              {/* Offers — coupon cards. Tap Apply to use one offer; tap again to
+                  remove it. The discount applies live in the summary below. */}
               {availableOffers.length > 0 && (
-                <div className="form-group flex flex-col gap-2">
-                  <label htmlFor="offer" className="form-label text-[length:var(--text-sm)] font-medium text-text">Offer <span className="text-text-subtle font-normal">(optional)</span></label>
-                  <DropdownSelector
-                    className="ui-dropdown-custom--full-width"
-                    placeholder="No offer"
-                    options={[
-                      { value: '', label: 'No offer' },
-                      ...availableOffers.map((o) => ({
-                        value: o.offer_id,
-                        label: `${o.title} — ₹${Number(o.discount_amount || 0).toLocaleString('en-IN')} off`,
-                      })),
-                    ]}
-                    value={selectedOffer}
-                    onChange={(v) => setSelectedOffer(v)}
-                  />
+                <div className="form-group flex flex-col gap-3">
+                  <span className="form-label text-[length:var(--text-sm)] font-semibold text-text">Offers</span>
+                  <div className="flex flex-col gap-2.5">
+                    {availableOffers.map((o) => {
+                      const applied = selectedOffer === o.offer_id;
+                      const save = Number(o.discount_amount || 0);
+                      return (
+                        <div
+                          key={o.offer_id}
+                          className={`relative flex overflow-hidden rounded-xl bg-surface transition ${applied ? 'border border-primary shadow-[0_0_0_1px_var(--color-primary),0_8px_20px_-12px_var(--color-primary)]' : 'border border-grey-100'}`}
+                        >
+                          <div className="flex items-center justify-center bg-primary px-2.5 [writing-mode:vertical-rl] rotate-180">
+                            <span className="text-text-on-primary text-[length:var(--text-xs)] font-bold uppercase tracking-wider [font-variant-numeric:tabular-nums]">
+                              ₹{save.toLocaleString('en-IN')} OFF
+                            </span>
+                          </div>
+                          <div className="flex-1 p-3.5">
+                            <div className="flex items-start justify-between gap-3">
+                              <h4 className="text-[length:var(--text-base)] font-bold text-text leading-[var(--leading-snug)] break-words">{o.title}</h4>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedOffer(applied ? '' : o.offer_id)}
+                                className={`shrink-0 text-[length:var(--text-sm)] font-bold uppercase tracking-[var(--tracking-label)] ${applied ? 'text-success' : 'text-primary hover:text-primary-hover'}`}
+                              >
+                                {applied ? '✓ Applied' : 'Apply'}
+                              </button>
+                            </div>
+                            <p className="mt-1 text-[length:var(--text-sm)] font-medium text-success [font-variant-numeric:tabular-nums]">
+                              Save ₹{save.toLocaleString('en-IN')} on this order!
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
@@ -1401,9 +1421,7 @@ const Cart = ({ onPageChange = null }) => {
               </div>
               {quote && Number(quote.discount_total) > 0 && (
                 <div className="breakdown-item flex justify-between items-baseline gap-4">
-                  <span className="breakdown-label text-[length:var(--text-base)] text-success font-normal">
-                    {quote.applied_offer?.title || 'Discount'}:
-                  </span>
+                  <span className="breakdown-label text-[length:var(--text-base)] text-success font-normal">Discount:</span>
                   <span className="breakdown-value text-[length:var(--text-base)] text-success font-semibold [font-variant-numeric:tabular-nums]">
                     − {formatPrice(Number(quote.discount_total))}
                   </span>
