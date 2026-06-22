@@ -253,9 +253,20 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
 
 const DashboardSuppliers = () => {
   const confirm = useConfirm();
-  const isSalesman = getUserRole() === 'salesman';
+  // Role comes from localStorage (empty on the server), so reading it during
+  // render mismatches hydration AND flashes the admin tabs to a salesman.
+  // Resolve it only after mount.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const isSalesman = mounted && getUserRole() === 'salesman';
   const [activeTab, setActiveTab] = useState('All');
-  const [mainTab, setMainTab] = useState(isSalesman ? 'Visit Report' : 'Salesmen');
+  const [mainTab, setMainTab] = useState('Salesmen');
+  // Once mounted, default a salesman to their Visit Report tab.
+  useEffect(() => {
+    if (mounted && getUserRole() === 'salesman') {
+      setMainTab((t) => (t === 'Salesmen' ? 'Visit Report' : t));
+    }
+  }, [mounted]);
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -1334,7 +1345,7 @@ const DashboardSuppliers = () => {
         {/* Main tabs */}
         <div className="dash-row">
           <div className="order-tabs-container">
-            {(isSalesman
+            {mounted && (isSalesman
               ? ['Visit Report']
               : ['Salesmen', 'Visit Report', 'Targets']
             ).map(tab => (
@@ -1352,7 +1363,7 @@ const DashboardSuppliers = () => {
         {/* Sub-tabs for Salesmen tab removed - show all salesmen by default */}
 
         {/* Salesmen Table - admin only */}
-        {!isSalesman && mainTab === 'Salesmen' && (
+        {mounted && !isSalesman && mainTab === 'Salesmen' && (
         <div className="dash-row">
           <div className="dash-card full">
             {error ? (

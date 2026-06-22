@@ -21,7 +21,7 @@ const QuickActionCard = ({ icon: Icon, label, desc, onClick, primary }) => (
     className={`group flex h-full w-full items-center gap-4 rounded-2xl border p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 outline-none focus-visible:shadow-[0_0_0_3px_var(--color-primary-soft),0_0_0_4px_var(--color-primary)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
       primary
         ? 'border-transparent bg-primary shadow-[0_10px_28px_-14px_var(--color-primary)] hover:shadow-[0_16px_32px_-12px_var(--color-primary)]'
-        : 'border-transparent bg-surface-muted hover:bg-surface hover:border-grey-100 hover:shadow-[0_8px_22px_-12px_rgba(16,18,38,0.18)]'
+        : 'border-border-strong bg-surface shadow-[0_1px_3px_rgba(16,18,38,0.06)] hover:border-primary/40 hover:shadow-[0_12px_26px_-12px_rgba(16,18,38,0.22)]'
     }`}
   >
     <span className={`inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
