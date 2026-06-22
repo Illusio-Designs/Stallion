@@ -15,7 +15,7 @@ const SalesmanStates = require('../models/SalesmanStates');
 const DistributorStates = require('../models/DistributorStates');
 const { resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
-const { canManageParties, canCreateParty, normalizeRole } = require('../utils/roleHelpers');
+const { canManageParties, canCreateParty, normalizeRole, partyActiveFilter, denyInactiveParty, isAdmin } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
@@ -27,7 +27,7 @@ class PartyController {
                 return res.status(400).json({ error: 'User ID is required' });
             }
             const party = await Party.findOne({ where: { user_id: id } });
-            if (!party) {
+            if (denyInactiveParty(party, req.userRoleName)) {
                 return res.status(404).json({ error: 'Party not found' });
             }
             res.status(200).json(party);
@@ -35,6 +35,20 @@ class PartyController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    /** GET / — party managers/admins get paginated list; party role gets own record */
+    async getPartiesRoot(req, res) {
+        if (canManageParties(req.userRoleName)) {
+            if (!req.query.page) req.query.page = '1';
+            if (!req.query.limit) req.query.limit = '20';
+            return this.getParties(req, res);
+        }
+        if (normalizeRole(req.userRoleName) === 'party') {
+            return this.getPartie(req, res);
+        }
+        return res.status(403).json({ error: 'Access denied' });
+    }
+
     async getParties(req, res) {
         try {
             if (!canManageParties(req.userRoleName)) {
@@ -51,7 +65,7 @@ class PartyController {
                 nameFields: ['party_name', 'trade_name', 'contact_person'],
                 phoneFields: ['phone'],
             });
-            const where = mergeWhere({ is_active: true }, searchFilter);
+            const where = mergeWhere(partyActiveFilter(req.userRoleName), searchFilter);
             const { count, rows: parties } = await Party.findAndCountAll({
                 where,
                 limit: pagination.limit,
@@ -70,7 +84,7 @@ class PartyController {
                 return res.status(400).json({ error: 'Party ID is required' });
             }
             const party = await Party.findOne({ where: { party_id: id } });
-            if (!party) {
+            if (denyInactiveParty(party, req.userRoleName)) {
                 return res.status(404).json({ error: 'Party not found' });
             }
 
@@ -146,6 +160,7 @@ class PartyController {
                 phoneFields: ['phone'],
             });
             where = mergeWhere(where, searchFilter);
+            where = mergeWhere(where, partyActiveFilter(roleName));
 
             const { count, rows: parties } = await Party.findAndCountAll({
                 where,
@@ -167,7 +182,9 @@ class PartyController {
                     return res.status(403).json({ error: 'Access denied' });
                 }
             }
-            const parties = await Party.findAll({ where: { salesman_id: salesman_id } });
+            const parties = await Party.findAll({
+                where: mergeWhere({ salesman_id: salesman_id }, partyActiveFilter(req.userRoleName)),
+            });
             res.status(200).json(parties);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -277,7 +294,9 @@ class PartyController {
             }
 
             // Find all parties in the zone
-            const parties = await Party.findAll({ where: { zone_id: zone_id } });
+            const parties = await Party.findAll({
+                where: mergeWhere({ zone_id: zone_id }, partyActiveFilter(roleName)),
+            });
 
             res.status(200).json(parties);
         } catch (error) {
@@ -291,10 +310,12 @@ class PartyController {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const user = req.user;
-            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
+            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
             if (!party_name || !phone || !address) {
                 return res.status(400).json({ error: 'Party name, phone, and address are required' });
             }
+            const billingSameAsShipping = billing_same_as_shipping !== false;
+            const billing = billingSameAsShipping ? null : (billing_address || null);
             // State is required — it drives the salesman/distributor assignment.
             // Accepts a state name or id; city & zone are optional.
             if (!state_id) {
@@ -336,6 +357,8 @@ class PartyController {
                 email,
                 phone,
                 address,
+                billing_address: billing,
+                billing_same_as_shipping: billingSameAsShipping,
                 country_id,
                 state_id: resolvedStateId,
                 city_id,
@@ -372,7 +395,7 @@ class PartyController {
             }
             const user = req.user;
             const party = await Party.findOne({ where: { party_id: id } });
-            if (!party) {
+            if (denyInactiveParty(party, req.userRoleName)) {
                 return res.status(404).json({ error: 'Party not found' });
             }
 
@@ -387,8 +410,30 @@ class PartyController {
             }
 
             const { distributor_id, salesman_id, party_name, trade_name, contact_person, email,
-                phone, address, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
+                phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, is_active } = req.body;
+
+            if (is_active !== undefined) {
+                if (!isAdmin(req.userRoleName)) {
+                    return res.status(403).json({ error: 'Only admin can change party status' });
+                }
+                if (typeof is_active !== 'boolean') {
+                    return res.status(400).json({ error: 'is_active must be a boolean' });
+                }
+            }
+
             const oldSnapshot = party.toJSON();
+
+            let billingSameAsShipping = party.billing_same_as_shipping;
+            if (billing_same_as_shipping !== undefined) {
+                billingSameAsShipping = billing_same_as_shipping !== false;
+            }
+            let billing = party.billing_address;
+            if (billingSameAsShipping) {
+                billing = null;
+            } else if (billing_address !== undefined) {
+                billing = billing_address || null;
+            }
+
             const payload = {
                 distributor_id: distributor_id !== undefined ? distributor_id : party.distributor_id,
                 salesman_id: salesman_id !== undefined ? salesman_id : party.salesman_id,
@@ -398,6 +443,8 @@ class PartyController {
                 email: email !== undefined ? email : party.email,
                 phone: phone !== undefined ? phone : party.phone,
                 address: address !== undefined ? address : party.address,
+                billing_address: billing,
+                billing_same_as_shipping: billingSameAsShipping,
                 country_id: country_id !== undefined ? country_id : party.country_id,
                 state_id: state_id !== undefined ? state_id : party.state_id,
                 city_id: city_id !== undefined ? city_id : party.city_id,
@@ -410,12 +457,27 @@ class PartyController {
                 updated_at: new Date(),
                 updated_by: user.user_id
             };
+            if (is_active !== undefined) {
+                payload.is_active = is_active;
+            }
             await Party.update(payload, { where: { party_id: id } });
+
+            if (is_active !== undefined) {
+                await User.update(
+                    { is_active, updated_at: new Date() },
+                    { where: { user_id: party.user_id } }
+                );
+            }
+
+            let description = 'Party updated';
+            if (is_active !== undefined && is_active !== party.is_active) {
+                description = is_active ? 'Party reactivated' : 'Party deactivated';
+            }
 
             await logAudit({
                 req,
                 action: 'update',
-                description: 'Party updated',
+                description,
                 tableName: 'parties',
                 recordId: id,
                 oldValues: oldSnapshot,
@@ -426,6 +488,7 @@ class PartyController {
             res.status(500).json({ error: error.message });
         }
     }
+
     async deleteParty(req, res) {
         try {
             const id = req.params.id;
@@ -565,6 +628,9 @@ class PartyController {
                     },
                 });
 
+                const billingSameAsShipping = row.billing_same_as_shipping !== false;
+                const billing = billingSameAsShipping ? null : (row.billing_address ?? null);
+
                 const payload = {
                     party_name: row.party_name,
                     trade_name: row.trade_name ?? null,
@@ -572,6 +638,8 @@ class PartyController {
                     email: row.email ?? null,
                     phone: row.phone ?? null,
                     address: row.address ?? null,
+                    billing_address: billing,
+                    billing_same_as_shipping: billingSameAsShipping,
                     country_id: country_id ?? null,
                     state_id: state_id ?? null,
                     city_id: city_id ?? null,
@@ -659,7 +727,9 @@ class PartyController {
             if (!resolved) {
                 return res.status(404).json({ error: `State not found: ${state_id}` });
             }
-            const parties = await Party.findAll({ where: { state_id: resolved } });
+            const parties = await Party.findAll({
+                where: mergeWhere({ state_id: resolved }, partyActiveFilter(req.userRoleName)),
+            });
             res.status(200).json(parties);
         } catch (error) {
             res.status(error.statusCode || 500).json({ error: error.message });

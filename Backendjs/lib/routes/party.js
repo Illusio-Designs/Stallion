@@ -6,7 +6,7 @@ const { isPartyManager, isPartyCreator } = require('../middleware/roleAuth');
 const { partyFileUpload } = require('../constants/multer');
 const parsePartyFile = require('../middleware/party_parser');
 
-router.get('/', authenticateToken, partyController.getPartie);
+router.get('/', authenticateToken, (req, res) => partyController.getPartiesRoot(req, res));
 router.get('/my', authenticateToken, partyController.getMyParties);
 router.get('/salesman/:salesman_id', authenticateToken, partyController.getPartiesBySalesmanId);
 router.get('/:id', authenticateToken, partyController.getPartyById);

@@ -40,6 +40,7 @@ class DatabaseManager {
             // (the admin-seed findOne selects country_id/state_id/city_id, so this
             // MUST run first or init crash-loops with "Unknown column 'country_id'").
             await this.ensureUserLocationColumns();
+            await this.ensurePartyBillingColumns();
 
             // Define table schemas
             const schemas = {
@@ -505,6 +506,33 @@ class DatabaseManager {
             }
         } catch (error) {
             console.log('⚠️ ensureUserLocationColumns warning:', error.message);
+        }
+    }
+
+    static async ensurePartyBillingColumns() {
+        try {
+            if (!(await this.checkTableExists('parties'))) {
+                return;
+            }
+            const qi = sequelize.getQueryInterface();
+            const table = await qi.describeTable('parties');
+            if (!table.billing_address) {
+                await qi.addColumn('parties', 'billing_address', { type: DataTypes.TEXT, allowNull: true });
+                console.log('✅ Added column parties.billing_address');
+            }
+            if (!table.billing_same_as_shipping) {
+                await qi.addColumn('parties', 'billing_same_as_shipping', {
+                    type: DataTypes.BOOLEAN,
+                    allowNull: false,
+                    defaultValue: true,
+                });
+                console.log('✅ Added column parties.billing_same_as_shipping');
+            }
+            await sequelize.query(
+                'UPDATE parties SET billing_same_as_shipping = 1 WHERE billing_same_as_shipping IS NULL'
+            );
+        } catch (error) {
+            console.log('⚠️ ensurePartyBillingColumns warning:', error.message);
         }
     }
 

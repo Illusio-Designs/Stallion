@@ -7,6 +7,8 @@ contact_person VARCHAR(255),
 email VARCHAR(255),
 phone VARCHAR(20),
 address TEXT,
+billing_address TEXT,
+billing_same_as_shipping BOOLEAN DEFAULT true,
 country_id UUID,
 state_id UUID,
 city_id UUID,
@@ -54,6 +56,15 @@ const Party = sequelize.define('Party', {
     address: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    billing_address: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    billing_same_as_shipping: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
     },
     country_id: {
         type: DataTypes.UUID,
@@ -121,11 +132,6 @@ const Party = sequelize.define('Party', {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW
-    },
-    is_active: {
-        type: DataTypes.BOOLEAN,
-        allowNull: false,
-        defaultValue: true
     },
     credit_days: {
         type: DataTypes.INTEGER,

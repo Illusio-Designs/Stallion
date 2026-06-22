@@ -59,7 +59,13 @@ class SalesmanExpenseController {
             if (pagination.error) {
                 return res.status(pagination.status).json({ error: pagination.error });
             }
+            const where = {};
+            const salesmanId = String(req.query.salesman_id ?? '').trim();
+            if (salesmanId) {
+                where.salesman_id = salesmanId;
+            }
             const { count, rows: salesmanExpenses } = await SalesmanExpense.findAndCountAll({
+                where,
                 include: [
                     {
                         model: Salesman,

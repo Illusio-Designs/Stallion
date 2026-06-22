@@ -116,4 +116,12 @@ const Order = sequelize.define('Order', {
     ],
 });
 
+const Party = require('./Party');
+
+Order.belongsTo(Party, {
+    foreignKey: 'party_id',
+    targetKey: 'party_id',
+    as: 'party',
+});
+
 module.exports = Order;

@@ -10,6 +10,7 @@ const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { partyActiveFilter } = require('../utils/roleHelpers');
 
 class DistributorController {
     async getDistributor(req, res) {
@@ -41,7 +42,12 @@ class DistributorController {
             if (!distributor) {
                 return res.status(404).json({ error: 'Distributor not found' });
             }
-            const parties = await Party.findAll({ where: { distributor_id: distributor.distributor_id } });
+            const parties = await Party.findAll({
+                where: mergeWhere(
+                    { distributor_id: distributor.distributor_id },
+                    partyActiveFilter(req.userRoleName)
+                ),
+            });
             res.status(200).json(parties);
         } catch (error) {
             res.status(500).json({ error: error.message });

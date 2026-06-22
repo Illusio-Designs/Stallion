@@ -23,6 +23,16 @@ function mapRecordToParty(record) {
     const activeVal = getCell(record, 'active', 'Active', 'is_active', 'is_active');
     const isActive = activeVal === null ? true : /^(1|true|yes|y)$/i.test(activeVal);
 
+    const billingSameVal = getCell(
+        record,
+        'billing_same_as_shipping',
+        'Billing Same As Shipping',
+        'billing same as shipping'
+    );
+    const billingSameAsShipping = billingSameVal === null
+        ? true
+        : /^(1|true|yes|y)$/i.test(billingSameVal);
+
     return {
         party_name: getCell(record, 'party_name', 'Party Name', 'party name'),
         trade_name: getCell(record, 'trade_name', 'Trade Name', 'trade name'),
@@ -30,6 +40,8 @@ function mapRecordToParty(record) {
         email: getCell(record, 'email', 'Email'),
         phone: getCell(record, 'phone', 'Phone'),
         address: getCell(record, 'address', 'Address'),
+        billing_address: getCell(record, 'billing_address', 'Billing Address', 'billing address'),
+        billing_same_as_shipping: billingSameAsShipping,
         country: getCell(record, 'country', 'Country'),
         state: getCell(record, 'state', 'State'),
         city: getCell(record, 'city', 'City'),
