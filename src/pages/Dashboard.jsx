@@ -24,10 +24,18 @@ const Dashboard = () => {
   // Read once — these don't change during a session
   const [userRole] = useState(() => getUserRole());
   const [user] = useState(() => getUser());
-  const isAdmin = userRole === 'admin';
-  const isDistributor = userRole === 'distributor';
-  const isParty = userRole === 'party';
-  const isSalesman = userRole === 'salesman';
+
+  // The role comes from localStorage, which doesn't exist during SSR, so the
+  // server renders with no role (admin-default blocks) while the client renders
+  // the real role → hydration mismatch. Defer all role-gated rendering until
+  // after mount so the server and first client render agree.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  const role = mounted ? userRole : null;
+  const isAdmin = role === 'admin';
+  const isDistributor = role === 'distributor';
+  const isParty = role === 'party';
+  const isSalesman = role === 'salesman';
 
   // Fetch orders and products — runs once on mount
   useEffect(() => {
