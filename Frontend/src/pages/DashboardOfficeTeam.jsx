@@ -3,6 +3,7 @@ import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
+import ActiveToggle from '../components/ui/ActiveToggle';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import { useConfirm } from '../components/ui/ConfirmProvider';
@@ -901,16 +902,10 @@ const DashboardOfficeTeam = () => {
           </div>
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
             <label className="ui-label text-[var(--text-sm)] font-medium text-text">Status</label>
-            <div className="flex items-center gap-4">
-              <label className="flex cursor-pointer items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={editFormData.isActive}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, isActive: e.target.checked }))}
-                />
-                <span>Active</span>
-              </label>
-            </div>
+            <ActiveToggle
+              checked={editFormData.isActive}
+              onChange={(v) => setEditFormData(prev => ({ ...prev, isActive: v }))}
+            />
           </div>
         </form>
       </AsidePanel>

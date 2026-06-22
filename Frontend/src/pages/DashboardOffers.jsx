@@ -5,6 +5,7 @@ import RowActions from '../components/ui/RowActions';
 import StatusBadge from '../components/ui/StatusBadge';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import PagedMultiSelect from '../components/ui/PagedMultiSelect';
+import ActiveToggle from '../components/ui/ActiveToggle';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getOffers,
@@ -389,10 +390,7 @@ const DashboardOffers = () => {
             <label className="ui-label">Priority</label>
             <input type="number" className="ui-input" value={form.priority} onChange={(e) => set('priority', e.target.value)} />
           </div>
-          <div className="form-group flex flex-row items-center gap-2">
-            <input id="offer-active" type="checkbox" className="ui-checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
-            <label htmlFor="offer-active" className="ui-label !mb-0 cursor-pointer">Active</label>
-          </div>
+          <ActiveToggle checked={form.is_active} onChange={(v) => set('is_active', v)} />
         </div>
       </AsidePanel>
     </div>

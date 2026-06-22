@@ -4,6 +4,7 @@ import 'react-international-phone/style.css';
 import AsidePanel from '../components/ui/AsidePanel';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import RowActions from '../components/ui/RowActions';
+import ActiveToggle from '../components/ui/ActiveToggle';
 import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
 import { useConfirm } from '../components/ui/ConfirmProvider';
@@ -1350,17 +1351,11 @@ const DashboardClients = () => {
         />
       </div>
       {editRow && (
-        <div className="form-group form-group--full">
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              className="accent-primary"
-              checked={formData.is_active !== false}
-              onChange={(e) => handleInputChange('is_active', e.target.checked)}
-            />
-            <span className="ui-label m-0">Active (uncheck to deactivate)</span>
-          </label>
-        </div>
+        <ActiveToggle
+          className="form-group--full"
+          checked={formData.is_active !== false}
+          onChange={(v) => handleInputChange('is_active', v)}
+        />
       )}
     </>
   );
