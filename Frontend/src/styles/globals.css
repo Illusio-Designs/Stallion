@@ -8,7 +8,13 @@
   font-display: swap;
 }
 
-/* Global Common Styles */
+/* Global Common Styles.
+   These bare-element resets live in @layer base so Tailwind utilities (a later
+   layer) win over them — otherwise unlayered element rules like
+   `button { color: inherit }` or `* { padding: 0 }` override every Tailwind
+   class (layer order beats specificity in Tailwind v4). Component CSS *classes*
+   stay unlayered and still win over both, so nothing class-styled changes. */
+@layer base {
 * {
   margin: 0;
   padding: 0;
@@ -133,6 +139,7 @@ textarea:focus-visible,
 select:focus-visible {
   outline: none;
 }
+} /* end @layer base */
 
 /* iOS Safari auto-zooms when a focused form control has a font-size below 16px
    and never zooms back out. Force >=16px on form controls on touch devices
