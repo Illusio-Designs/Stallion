@@ -508,21 +508,11 @@ const DashboardSuppliers = () => {
       // Store all parties for name lookup in the table
       setAllPartiesLookup(partiesArr);
 
-      // Step 5: filter by zone — if no zones assigned, show all parties for the country
-      const filtered = zoneIds.length > 0
-        ? partiesArr.filter(p => {
-            const partyZoneId = String(p.zone_id || p.zoneId || '').trim();
-            return zoneIds.includes(partyZoneId);
-          })
-        : partiesArr;
-
-      console.log('[fetchZoneParties] Filtered parties:', filtered.length);
-      if (partiesArr.length > 0 && filtered.length === 0 && zoneIds.length > 0) {
-        console.warn('[fetchZoneParties] No match — sample party zone_ids:',
-          partiesArr.slice(0, 5).map(p => ({ name: p.party_name, zone_id: p.zone_id || p.zoneId }))
-        );
-      }
-      setZoneParties(filtered);
+      // Use the parties from /parties/my as-is: the backend already scopes them
+      // to this salesman. The previous zone filter dropped valid parties whose
+      // zone_id didn't match the salesman's zones, leaving the check-in party
+      // list empty — so the Add Visit dropdown showed nothing.
+      setZoneParties(partiesArr);
     } catch (error) {
       console.error('Failed to load zone parties:', error);
       setZoneParties([]);
