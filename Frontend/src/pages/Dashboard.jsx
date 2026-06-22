@@ -8,7 +8,7 @@ import SalesRevenueChart from '../components/charts/SalesRevenueChart';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import { getOrdersForRole, getProducts, getProductById, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
-import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight } from 'react-icons/fi';
 
 // Quick Action button — pure Tailwind (no legacy ui-btn / .btn-col CSS, no
 // inline styles). Colours are set explicitly on the children because the
@@ -18,13 +18,13 @@ const QuickActionCard = ({ icon: Icon, label, desc, onClick, primary }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`group flex h-full w-full items-center gap-3 rounded-lg border p-4 text-left transition-colors duration-150 outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary)] active:scale-[0.99] ${
+    className={`group flex h-full w-full items-center gap-3 rounded-lg border p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
       primary
         ? 'border-transparent bg-primary hover:bg-primary/90'
         : 'border-border bg-surface hover:border-primary hover:bg-primary-soft'
     }`}
   >
-    <span className={`inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md ${
+    <span className={`inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md transition-colors duration-150 ${
       primary ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary group-hover:bg-white'
     }`}>
       <Icon size={20} aria-hidden="true" />
@@ -33,6 +33,11 @@ const QuickActionCard = ({ icon: Icon, label, desc, onClick, primary }) => (
       <span className={`block font-semibold leading-tight text-[var(--text-sm)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
       {desc && <span className={`block text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>}
     </span>
+    <FiChevronRight
+      size={18}
+      aria-hidden="true"
+      className={`ml-auto flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none ${primary ? 'text-white/70' : 'text-text-subtle'}`}
+    />
   </button>
 );
 
