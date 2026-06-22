@@ -739,6 +739,107 @@ textarea.ui-input {
   text-align: center;
 }
 
+/* Pager footer for heavy/paged dropdowns (PagedMultiSelect) — sits inside the
+   menu, below the options, with Previous / Next + page indicator. */
+.ui-dropdown-custom__pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.ui-dropdown-custom__pager-btn {
+  padding: 4px var(--space-2);
+  min-height: 30px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+@media (hover: hover) {
+  .ui-dropdown-custom__pager-btn:hover:not(:disabled) {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+  }
+}
+.ui-dropdown-custom__pager-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.ui-dropdown-custom__pager-info {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+/* ---- Checkbox -----------------------------------------------------------
+   Branded custom checkbox (replaces bare native / accent-color boxes). Apply
+   `ui-checkbox` to any <input type="checkbox">. */
+.ui-checkbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  flex: none;
+  margin: 0;
+  border: 1.5px solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  cursor: pointer;
+  display: inline-grid;
+  place-content: center;
+  transition: background var(--transition-fast), border-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+.ui-checkbox::before {
+  content: "";
+  width: 10px;
+  height: 10px;
+  transform: scale(0);
+  transition: transform var(--transition-fast);
+  background-color: var(--color-text-on-primary);
+  /* checkmark shape */
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+.ui-checkbox:checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.ui-checkbox:checked::before {
+  transform: scale(1);
+}
+.ui-checkbox:indeterminate {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+.ui-checkbox:indeterminate::before {
+  transform: scale(1);
+  clip-path: none;
+  width: 10px;
+  height: 2px;
+  border-radius: 1px;
+}
+@media (hover: hover) {
+  .ui-checkbox:hover:not(:disabled) {
+    border-color: var(--color-primary);
+  }
+}
+.ui-checkbox:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+.ui-checkbox:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* Scrollbar styling for dropdown options */
 .ui-dropdown-custom__options::-webkit-scrollbar {
   width: 8px;

@@ -4,6 +4,7 @@ import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import StatusBadge from '../components/ui/StatusBadge';
 import DropdownSelector from '../components/ui/DropdownSelector';
+import PagedMultiSelect from '../components/ui/PagedMultiSelect';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getOffers,
@@ -107,12 +108,6 @@ const DashboardOffers = () => {
   const [panelOpen, setPanelOpen] = useState(false);
   const [form, setForm] = useState(emptyForm());
 
-  // Product scope picker — server-paged, 20 at a time, with Next/Prev.
-  const [productList, setProductList] = useState([]); // current page
-  const [productLoading, setProductLoading] = useState(false);
-  const [productPage, setProductPage] = useState(1);
-  const [productSearch, setProductSearch] = useState('');
-
   const set = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
   const fetchOffers = async () => {
@@ -133,31 +128,12 @@ const DashboardOffers = () => {
 
   useEffect(() => { fetchOffers(); }, []);
 
-  // Fetch one page (20) of products for the scope picker.
-  const fetchProductPage = async (page, search) => {
-    setProductLoading(true);
-    try {
-      const resp = await getProductsPage(page, 20, search || '');
-      const list = Array.isArray(resp) ? resp : (resp?.data || []);
-      setProductList(list.map((p) => ({
-        value: String(p.product_id || p.id),
-        label: p.model_no || p.product_name || p.name || String(p.product_id || p.id),
-      })));
-      setProductPage(page);
-    } catch {
-      setProductList([]);
-    } finally {
-      setProductLoading(false);
-    }
-  };
-
-  // Load page 1 when the scope picker is shown, and on (debounced) search.
-  useEffect(() => {
-    if (!panelOpen || (form.offer_type !== 'product' && form.offer_type !== 'bogo')) return;
-    const t = setTimeout(() => fetchProductPage(1, productSearch), 300);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [panelOpen, form.offer_type, productSearch]);
+  // One page (20) of products for the scope picker — passed to PagedMultiSelect.
+  const fetchProductPage = (page, search) => getProductsPage(page, 20, search || '');
+  const mapProduct = (p) => ({
+    value: String(p.product_id || p.id),
+    label: p.model_no || p.product_name || p.name || String(p.product_id || p.id),
+  });
 
   const toggleProduct = (opt) => {
     setForm((f) => f.products.some((p) => p.id === opt.value)
@@ -166,8 +142,7 @@ const DashboardOffers = () => {
   };
   const removeProduct = (id) => setForm((f) => ({ ...f, products: f.products.filter((p) => p.id !== id) }));
 
-  const resetPicker = () => { setProductSearch(''); setProductPage(1); setProductList([]); };
-  const openAdd = () => { setForm(emptyForm()); resetPicker(); setPanelOpen(true); };
+  const openAdd = () => { setForm(emptyForm()); setPanelOpen(true); };
 
   const openEdit = (offer) => {
     const c = offer.config || {};
@@ -193,7 +168,6 @@ const DashboardOffers = () => {
       get_qty: c.get_qty ?? 1,
       get_discount_percent: c.get_discount_percent ?? 100,
     });
-    resetPicker();
     setPanelOpen(true);
   };
 
@@ -390,46 +364,15 @@ const DashboardOffers = () => {
           {showScope && (
             <div className="form-group form-group--full">
               <label className="ui-label">Products * <span className="text-text-subtle font-normal">({form.products.length} selected)</span></label>
-              <input
-                className="ui-input mb-2"
-                placeholder="Search products by model no…"
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
+              <PagedMultiSelect
+                fetchPage={fetchProductPage}
+                mapItem={mapProduct}
+                selected={form.products}
+                onToggle={toggleProduct}
+                onRemove={removeProduct}
+                placeholder="Select products"
+                searchPlaceholder="Search products by model no…"
               />
-              <div className="rounded-md border border-border divide-y divide-border max-h-[240px] overflow-y-auto">
-                {productLoading ? (
-                  <div className="p-3 text-center text-[length:var(--text-sm)] text-text-subtle">Loading…</div>
-                ) : productList.length === 0 ? (
-                  <div className="p-3 text-center text-[length:var(--text-sm)] text-text-subtle">No products found</div>
-                ) : (
-                  productList.map((opt) => {
-                    const checked = form.products.some((p) => p.id === opt.value);
-                    return (
-                      <label key={opt.value} className="flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-grey-100">
-                        <input type="checkbox" className="accent-primary cursor-pointer" checked={checked} onChange={() => toggleProduct(opt)} />
-                        <span className="text-[length:var(--text-base)] text-text">{opt.label}</span>
-                      </label>
-                    );
-                  })
-                )}
-              </div>
-              <div className="flex items-center justify-between gap-2 mt-2">
-                <button type="button" className="ui-btn ui-btn--secondary" disabled={productLoading || productPage <= 1} onClick={() => fetchProductPage(productPage - 1, productSearch)}>← Previous</button>
-                <span className="text-[length:var(--text-sm)] text-text-muted">Page {productPage}</span>
-                <button type="button" className="ui-btn ui-btn--secondary" disabled={productLoading || productList.length < 20} onClick={() => fetchProductPage(productPage + 1, productSearch)}>Next →</button>
-              </div>
-              {form.products.length > 0 && (
-                <div className="work-state-chips">
-                  {form.products.map((p) => (
-                    <span key={p.id} className="work-state-chip">
-                      {p.label}
-                      <button type="button" className="work-state-chip__remove" aria-label={`Remove ${p.label}`} onClick={() => removeProduct(p.id)}>
-                        <svg width="11" height="11" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M3.5 3.5l7 7M10.5 3.5l-7 7" /></svg>
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
           )}
 
@@ -447,7 +390,7 @@ const DashboardOffers = () => {
             <input type="number" className="ui-input" value={form.priority} onChange={(e) => set('priority', e.target.value)} />
           </div>
           <div className="form-group flex flex-row items-center gap-2">
-            <input id="offer-active" type="checkbox" className="accent-primary cursor-pointer" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
+            <input id="offer-active" type="checkbox" className="ui-checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
             <label htmlFor="offer-active" className="ui-label !mb-0 cursor-pointer">Active</label>
           </div>
         </div>
