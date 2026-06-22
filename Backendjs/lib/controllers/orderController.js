@@ -9,6 +9,7 @@ const { TrayProductStatus, OrderStatus, OrderType } = require('../constants/enum
 const { generateUniqueOrderNumber } = require('../services/order_number_generator');
 const Event = require('../models/event');
 const OrderOperation = require('../models/OrderOperation');
+const SalesmanCheckIns = require('../models/SalesmanCheckIns');
 const Zone = require('../models/Zone');
 const User = require('../models/User');
 const sequelize = require('../constants/database');
@@ -708,6 +709,14 @@ class OrderController {
                 });
             }
             const snapshot = order.toJSON();
+            // Clear the rows that reference this order before deleting it,
+            // otherwise the FK constraints block the delete (the generic 500):
+            //  - salesman_check_ins: a visit order is created from a check-in;
+            //    keep the visit record but drop the order link (order_id is nullable).
+            //  - order_operation: usually removed by the reversal above, but a
+            //    cancelled/completed order skips that, so clear any leftovers.
+            await SalesmanCheckIns.update({ order_id: null }, { where: { order_id: order.order_id } });
+            await OrderOperation.destroy({ where: { order_id: order.order_id } });
             await order.destroy();
             await logAudit({
                 req,
@@ -722,7 +731,7 @@ class OrderController {
         }
         catch (error) {
             console.error('Error deleting order:', error);
-            res.status(500).json({ error: 'Failed to delete order' });
+            res.status(500).json({ error: error.message || 'Failed to delete order' });
         }
     }
 
