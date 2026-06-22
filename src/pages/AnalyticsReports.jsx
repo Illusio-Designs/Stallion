@@ -159,12 +159,16 @@ const AnalyticsReports = () => {
   }), [targets, salesmen]);
 
   const checkinColumns = useMemo(() => ([
+    { key: 'type', label: 'TYPE', render: (v) => (
+      <StatusBadge status={v === 'ordered' ? 'completed' : 'processing'}>{v === 'ordered' ? 'Order' : 'Visit'}</StatusBadge>
+    ) },
     { key: 'salesman', label: 'SALESMAN' },
     { key: 'party', label: 'PARTY' },
     { key: 'date', label: 'DATE' },
     { key: 'location', label: 'LOCATION', render: (v) => (v && v.lat && v.lng)
       ? <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
       : <span className="text-text-subtle">—</span> },
+    { key: 'value', label: 'VALUE' },
     { key: 'remarks', label: 'REMARKS' },
   ]), []);
 
@@ -172,11 +176,14 @@ const AnalyticsReports = () => {
     .sort((a, b) => new Date(b.check_in_date || 0) - new Date(a.check_in_date || 0))
     .map((c, i) => ({
       id: c.id || i,
+      type: c.type || 'visit',
       salesman: salesmanName(c.salesman_id),
-      party: partyName(c.party_id),
+      party: c.party_name || partyName(c.party_id),
       date: fmtDate(c.check_in_date),
       location: { lat: c.latitude, lng: c.longitude },
-      remarks: c.check_in_remarks || '—',
+      value: c.type === 'ordered' && c.order_total != null ? money(c.order_total) : '—',
+      // Ordered check-ins carry the order remark (order_notes); visits use check_in_remarks.
+      remarks: (c.type === 'ordered' ? (c.order_notes || c.check_in_remarks) : c.check_in_remarks) || '—',
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [checkins, salesmen, parties]);
