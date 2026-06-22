@@ -367,8 +367,7 @@ const Dashboard = () => {
           <div className="dash-card side equal col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-[10px]">Quick Actions</h4>
             <div className="btn-col flex flex-1 flex-col justify-center gap-3">
-              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/products'; }}>Add New Product</button>
-              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/orders'; }}>Create Bulk Order</button>
+              <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/orders'; }}>View All Order</button>
               <button className="ui-btn ui-btn--primary" onClick={() => { window.location.href = '/dashboard/analytics'; }}>View Report</button>
               {/* Display only — offers feature not built yet. */}
               <button className="ui-btn ui-btn--secondary" onClick={() => showInfo('Offers — coming soon')}>Create Offer</button>
