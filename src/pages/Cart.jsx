@@ -26,6 +26,8 @@ import {
   getDistributors,
   createOrder,
   createParty,
+  getAvailableOffers,
+  quoteOrder,
 } from "../services/apiService";
 
 // Re-point any product image URL (legacy host, absolute server path, or
@@ -66,6 +68,12 @@ const Cart = ({ onPageChange = null }) => {
   const [selectedEvent, setSelectedEvent] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("");
   const [orderNote, setOrderNote] = useState("");
+
+  // Offers: available offers for the current cart + the one the user selected,
+  // plus the server-computed price quote (subtotal/discount/total).
+  const [availableOffers, setAvailableOffers] = useState([]);
+  const [selectedOffer, setSelectedOffer] = useState("");
+  const [quote, setQuote] = useState(null);
 
   // Inline "Add Party" (salesman + distributor can create a party from here)
   const [addPartyOpen, setAddPartyOpen] = useState(false);
@@ -458,6 +466,53 @@ const Cart = ({ onPageChange = null }) => {
   const calculateTotal = () => {
     return calculateSubtotal();
   };
+
+  // Items (with effective quantities) shaped for the offer quote/available calls.
+  const getQuoteItems = () => cartItems.map((item) => ({
+    product_id: item.id,
+    quantity: editingQuantities[item.id] !== undefined
+      ? (parseInt(editingQuantities[item.id], 10) || item.quantity)
+      : item.quantity,
+  }));
+  const quoteKey = JSON.stringify(getQuoteItems());
+
+  // Fetch the offers available for the current cart (debounced on cart changes).
+  useEffect(() => {
+    const items = getQuoteItems();
+    if (items.length === 0) { setAvailableOffers([]); setSelectedOffer(""); setQuote(null); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const offers = await getAvailableOffers(items);
+        if (cancelled) return;
+        const list = Array.isArray(offers) ? offers : [];
+        setAvailableOffers(list);
+        // Drop the selection if it's no longer offered for this cart.
+        setSelectedOffer((cur) => (cur && list.some((o) => o.offer_id === cur)) ? cur : "");
+      } catch {
+        if (!cancelled) setAvailableOffers([]);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteKey]);
+
+  // Live price quote (subtotal/discount/total) for the cart + selected offer.
+  useEffect(() => {
+    const items = getQuoteItems();
+    if (items.length === 0) { setQuote(null); return; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const q = await quoteOrder(items, selectedOffer || null);
+        if (!cancelled) setQuote(q);
+      } catch {
+        if (!cancelled) setQuote(null);
+      }
+    }, 300);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteKey, selectedOffer]);
 
   const formatPrice = (amount) => {
     return `₹${amount.toLocaleString("en-IN")}`;
@@ -897,6 +952,11 @@ const Cart = ({ onPageChange = null }) => {
       // Add optional order_notes — use the note the user typed, else a default.
       orderData.order_notes = (orderNote && orderNote.trim()) || orderData.order_notes || 'Order placed from cart';
 
+      // Attach the selected offer (the server re-validates + recomputes it).
+      if (selectedOffer) {
+        orderData.offer_id = selectedOffer;
+      }
+
       // Safety check: Ensure latitude and longitude are set for visit_order (in case they weren't set earlier)
       if (orderData.order_type === 'visit_order') {
         if (orderData.latitude === undefined || orderData.latitude === null) {
@@ -1309,19 +1369,50 @@ const Cart = ({ onPageChange = null }) => {
                   rows={2}
                 />
               </div>
+
+              {/* Offer selector — pick one active offer for this cart. The
+                  discount amount is shown per option and applied live below. */}
+              {availableOffers.length > 0 && (
+                <div className="form-group flex flex-col gap-2">
+                  <label htmlFor="offer" className="form-label text-[length:var(--text-sm)] font-medium text-text">Offer <span className="text-text-subtle font-normal">(optional)</span></label>
+                  <DropdownSelector
+                    className="ui-dropdown-custom--full-width"
+                    placeholder="No offer"
+                    options={[
+                      { value: '', label: 'No offer' },
+                      ...availableOffers.map((o) => ({
+                        value: o.offer_id,
+                        label: `${o.title} — ₹${Number(o.discount_amount || 0).toLocaleString('en-IN')} off`,
+                      })),
+                    ]}
+                    value={selectedOffer}
+                    onChange={(v) => setSelectedOffer(v)}
+                  />
+                </div>
+              )}
             </div>
 
             <div className={`summary-breakdown flex flex-col gap-5 mb-8 ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'pt-6 mt-6 border-t border-border' : 'pt-3 mt-0'}`}>
               <div className="breakdown-item flex justify-between items-baseline gap-4">
                 <span className="breakdown-label text-[length:var(--text-base)] text-text-muted font-normal">Subtotal:</span>
                 <span className="breakdown-value text-[length:var(--text-base)] text-text font-semibold [font-variant-numeric:tabular-nums]">
-                  {formatPrice(calculateSubtotal())}
+                  {formatPrice(quote && quote.subtotal != null ? quote.subtotal : calculateSubtotal())}
                 </span>
               </div>
+              {quote && Number(quote.discount_total) > 0 && (
+                <div className="breakdown-item flex justify-between items-baseline gap-4">
+                  <span className="breakdown-label text-[length:var(--text-base)] text-success font-normal">
+                    {quote.applied_offer?.title || 'Discount'}:
+                  </span>
+                  <span className="breakdown-value text-[length:var(--text-base)] text-success font-semibold [font-variant-numeric:tabular-nums]">
+                    − {formatPrice(Number(quote.discount_total))}
+                  </span>
+                </div>
+              )}
               <div className="breakdown-item total flex justify-between items-baseline gap-4 pt-5 border-t border-border">
                 <span className="breakdown-label text-[length:var(--text-md)] text-text font-semibold">Total:</span>
                 <span className="breakdown-value text-[length:var(--text-lg)] text-text font-bold [font-variant-numeric:tabular-nums]">
-                  {formatPrice(calculateTotal())}
+                  {formatPrice(quote && quote.order_total != null ? quote.order_total : calculateTotal())}
                 </span>
               </div>
             </div>
