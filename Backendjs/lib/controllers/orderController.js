@@ -10,6 +10,8 @@ const { generateUniqueOrderNumber } = require('../services/order_number_generato
 const Event = require('../models/event');
 const OrderOperation = require('../models/OrderOperation');
 const SalesmanCheckIns = require('../models/SalesmanCheckIns');
+const Offer = require('../models/Offer');
+const { isOfferActive, offerScopeMatches, applyOfferToItems } = require('../utils/offerPricing');
 const Zone = require('../models/Zone');
 const User = require('../models/User');
 const sequelize = require('../constants/database');
@@ -262,7 +264,7 @@ class OrderController {
     async createOrder(req, res) {
         try {
             // latitude, logitude for visit order
-            const { order_date, order_type, order_items, order_notes, event_id, party_id, latitude, longitude, zone_id } = req.body;
+            const { order_date, order_type, order_items, order_notes, event_id, party_id, latitude, longitude, zone_id, offer_id } = req.body;
             let distributor_id = req.body.distributor_id;
             let salesman_id = req.body.salesman_id;
             if (!order_date || !order_type || !order_items) {
@@ -599,13 +601,29 @@ class OrderController {
                     });
                 }
 
+                // Apply the user-selected offer (if any) off the resolved WHP
+                // prices. Re-validate server-side: an inactive / expired / out-of-
+                // scope offer is simply not applied (order places at full price).
+                let appliedOfferModel = null;
+                if (offer_id) {
+                    const candidate = await Offer.findOne({ where: { offer_id }, transaction });
+                    const offerLines = resolvedOrderItems.map(i => ({ product_id: i.product_id, qty: i.quantity, unit_price: i.price }));
+                    if (candidate && isOfferActive(candidate) && offerScopeMatches(candidate, offerLines)) {
+                        appliedOfferModel = candidate;
+                    }
+                }
+                const priced = applyOfferToItems(appliedOfferModel, resolvedOrderItems);
+
                 const orderNumber = generateUniqueOrderNumber();
                 const orderData = {
                     order_number: orderNumber,
                     order_date,
                     order_type,
-                    order_total: orderTotal,
-                    order_items: resolvedOrderItems,
+                    order_total: priced.orderTotal,
+                    subtotal: priced.subtotal,
+                    discount_total: priced.discountTotal,
+                    applied_offer: priced.appliedOffer,
+                    order_items: priced.pricedItems,
                     order_notes,
                     created_at: new Date(),
                     updated_at: new Date(),
@@ -771,6 +789,50 @@ class OrderController {
         catch (error) {
             console.error('Error deleting order:', error);
             res.status(500).json({ error: error.message || 'Failed to delete order' });
+        }
+    }
+
+    /**
+     * Price preview for the cart. Body: { order_items:[{product_id, quantity}],
+     * offer_id? }. Computes subtotal/discount/total off WHP using the SAME
+     * pricing as createOrder, without creating an order or touching stock.
+     */
+    async quoteOrder(req, res) {
+        try {
+            const { order_items, offer_id } = req.body;
+            if (!Array.isArray(order_items) || order_items.length === 0) {
+                return res.status(400).json({ error: 'order_items are required' });
+            }
+            const ids = [...new Set(order_items.map(i => String(i.product_id)).filter(Boolean))];
+            const products = ids.length ? await Product.findAll({ where: { product_id: ids } }) : [];
+            const priceById = new Map(products.map(p => [String(p.product_id), parseFloat(p.whp) || 0]));
+
+            const resolvedItems = order_items
+                .filter(i => priceById.has(String(i.product_id)))
+                .map(i => ({
+                    product_id: String(i.product_id),
+                    quantity: Number(i.quantity) || 0,
+                    price: priceById.get(String(i.product_id)),
+                }));
+
+            let offer = null;
+            if (offer_id) {
+                const candidate = await Offer.findOne({ where: { offer_id } });
+                const offerLines = resolvedItems.map(i => ({ product_id: i.product_id, qty: i.quantity, unit_price: i.price }));
+                if (candidate && isOfferActive(candidate) && offerScopeMatches(candidate, offerLines)) {
+                    offer = candidate;
+                }
+            }
+            const priced = applyOfferToItems(offer, resolvedItems);
+            res.status(200).json({
+                subtotal: priced.subtotal,
+                discount_total: priced.discountTotal,
+                order_total: priced.orderTotal,
+                applied_offer: priced.appliedOffer,
+                lines: priced.pricedItems,
+            });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
         }
     }
 
