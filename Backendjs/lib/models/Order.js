@@ -60,6 +60,22 @@ const Order = sequelize.define('Order', {
         type: DataTypes.DECIMAL(10, 2),
         allowNull: false
     },
+    // Offer/discount breakdown. order_total stays the final payable amount;
+    // subtotal is the pre-discount gross and applied_offer is a snapshot of the
+    // offer used (kept even if the offer is later edited/deleted).
+    subtotal: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true
+    },
+    discount_total: {
+        type: DataTypes.DECIMAL(10, 2),
+        allowNull: true,
+        defaultValue: 0
+    },
+    applied_offer: {
+        type: DataTypes.JSON,
+        allowNull: true
+    },
     order_items: {
         type: DataTypes.JSON,
         allowNull: false

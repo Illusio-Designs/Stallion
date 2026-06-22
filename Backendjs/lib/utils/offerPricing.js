@@ -134,6 +134,46 @@ function validateOfferConfig(offer_type, config) {
     return 'offer_type must be one of: flat, product, bogo';
 }
 
+/**
+ * Apply a (possibly null) offer to resolved order items and produce the full
+ * money breakdown. `items` are [{ product_id, quantity, price }] where price is
+ * the unit WHP. Returns subtotal (gross), discountTotal, orderTotal (payable),
+ * appliedOffer snapshot (or null) and pricedItems carrying per-line discount.
+ * For flat offers the discount is order-level, so per-line discount stays 0.
+ */
+function applyOfferToItems(offer, items) {
+    const lines = items.map((i) => ({
+        product_id: i.product_id,
+        qty: Number(i.quantity) || 0,
+        unit_price: Number(i.price) || 0,
+    }));
+    const subtotal = round2(lines.reduce((s, l) => s + l.qty * l.unit_price, 0));
+
+    let discountTotal = 0;
+    let lineDiscounts = {};
+    let appliedOffer = null;
+    if (offer) {
+        const r = computeOfferDiscount(offer, lines);
+        discountTotal = r.discountTotal;
+        lineDiscounts = r.lineDiscounts || {};
+        appliedOffer = {
+            offer_id: offer.offer_id,
+            offer_type: offer.offer_type,
+            title: offer.title,
+            amount: discountTotal,
+        };
+    }
+
+    const pricedItems = items.map((i) => {
+        const d = round2(lineDiscounts[i.product_id] || 0);
+        const lineGross = round2((Number(i.price) || 0) * (Number(i.quantity) || 0));
+        return { ...i, discount: d, final_price: round2(Math.max(0, lineGross - d)) };
+    });
+
+    const orderTotal = round2(Math.max(0, subtotal - discountTotal));
+    return { subtotal, discountTotal, orderTotal, appliedOffer, pricedItems };
+}
+
 module.exports = {
     round2,
     isOfferActive,
@@ -141,4 +181,5 @@ module.exports = {
     offerScopeMatches,
     computeOfferDiscount,
     validateOfferConfig,
+    applyOfferToItems,
 };
