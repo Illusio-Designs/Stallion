@@ -121,10 +121,16 @@ class ProductController {
             }
             const pageNum = parseInt(page, 10);
             const limitNum = parseInt(limit, 10);
-            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody } = req.body;
+            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody, product_ids } = req.body;
             const { name: nameQuery } = getListSearchParams(req);
             const search = (searchQuery || searchBody || nameQuery || '').trim();
             const conditions = [];
+
+            // Resolve a specific set of products by id in a single query (used by
+            // the order-view item lookup) instead of paging the whole catalogue.
+            if (Array.isArray(product_ids) && product_ids.length > 0) {
+                conditions.push({ product_id: { [Op.in]: product_ids } });
+            }
 
             if (collection_id) {
                 conditions.push({ collection_id });
