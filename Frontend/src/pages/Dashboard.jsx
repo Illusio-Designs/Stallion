@@ -30,10 +30,8 @@ const QuickActionCard = ({ icon: Icon, label, desc, onClick, primary }) => (
       <Icon size={20} aria-hidden="true" />
     </span>
     <span className="min-w-0 flex-1">
-      {/* truncate so the card degrades to a clean single line in narrow
-          containers (e.g. the admin side column) instead of wrapping. */}
-      <span className={`block truncate font-semibold leading-tight text-[var(--text-sm)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
-      {desc && <span className={`block truncate text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>}
+      <span className={`block font-semibold leading-snug text-[var(--text-base)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
+      {desc && <span className={`mt-0.5 block text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>}
     </span>
     <FiChevronRight
       size={18}
