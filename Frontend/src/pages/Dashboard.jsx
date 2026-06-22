@@ -18,25 +18,25 @@ const QuickActionCard = ({ icon: Icon, label, desc, onClick, primary }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`group flex h-full w-full items-center gap-3 rounded-lg border p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
+    className={`group flex h-full w-full items-center gap-4 rounded-2xl border p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 outline-none focus-visible:shadow-[0_0_0_3px_var(--color-primary-soft),0_0_0_4px_var(--color-primary)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
       primary
-        ? 'border-transparent bg-primary hover:bg-primary/90'
-        : 'border-border bg-surface hover:border-primary hover:bg-primary-soft'
+        ? 'border-transparent bg-primary shadow-[0_10px_28px_-14px_var(--color-primary)] hover:shadow-[0_16px_32px_-12px_var(--color-primary)]'
+        : 'border-grey-100 bg-surface shadow-[0_1px_2px_rgba(16,18,38,0.05)] hover:border-primary/30 hover:shadow-[0_8px_22px_-12px_rgba(16,18,38,0.18)]'
     }`}
   >
-    <span className={`inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md transition-colors duration-150 ${
-      primary ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary group-hover:bg-white'
+    <span className={`inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
+      primary ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary group-hover:bg-primary group-hover:text-white'
     }`}>
       <Icon size={20} aria-hidden="true" />
     </span>
     <span className="min-w-0 flex-1">
-      <span className={`block font-semibold leading-snug text-[var(--text-base)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
-      {desc && <span className={`mt-0.5 block text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>}
+      <span className={`block font-semibold leading-snug tracking-[-0.01em] text-[var(--text-base)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
+      {desc && <span className={`mt-0.5 block text-[var(--text-sm)] leading-snug ${primary ? 'text-white/70' : 'text-text-muted'}`}>{desc}</span>}
     </span>
     <FiChevronRight
       size={18}
       aria-hidden="true"
-      className={`flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none ${primary ? 'text-white/70' : 'text-text-subtle'}`}
+      className={`flex-shrink-0 transition-[transform,color] duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none ${primary ? 'text-white/80' : 'text-text-subtle group-hover:text-primary'}`}
     />
   </button>
 );
