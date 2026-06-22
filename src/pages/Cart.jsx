@@ -1122,12 +1122,12 @@ const Cart = ({ onPageChange = null }) => {
   };
 
   return (
-    <div className="cart-page bg-bg px-[5%] py-8 min-h-[60vh] max-md:px-4 max-md:py-6">
+    <div className="cart-page bg-surface-muted px-[5%] py-10 min-h-[70vh] max-md:px-4 max-md:py-6">
       <div className="cart-container max-w-[1200px] mx-auto">
         <div className="cart-content grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 items-start">
           {/* Shopping Cart Section */}
-          <div className="shopping-cart-section bg-surface border border-border rounded-lg p-7 shadow-sm max-md:p-5">
-            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.01em] font-bold text-text m-0 mb-6">Shopping Cart</h2>
+          <div className="shopping-cart-section bg-surface border border-grey-100 rounded-[20px] p-8 shadow-[0_1px_2px_rgba(16,18,38,0.04),0_18px_44px_-20px_rgba(16,18,38,0.18)] max-md:p-5 max-md:rounded-2xl">
+            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Shopping Cart</h2>
 
             {cartItems.length === 0 ? (
               <div className="empty-cart flex flex-col items-center text-center gap-3 py-10 px-5">
@@ -1162,7 +1162,7 @@ const Cart = ({ onPageChange = null }) => {
                 {cartItems.map((item) => (
                   <div key={item.id} className="cart-item grid grid-cols-[1fr_auto] [grid-template-areas:'info_remove''qty_subtotal'] sm:grid-cols-[1fr_170px_120px_40px] sm:[grid-template-areas:none] gap-3 sm:gap-4 border-b border-border last:border-b-0 items-center py-6">
                   <div className="item-info [grid-area:info] sm:[grid-area:auto] flex gap-4 items-center min-w-0">
-                    <div className="item-image w-14 h-14 sm:w-[72px] sm:h-[72px] flex-shrink-0 overflow-hidden flex items-center justify-center bg-surface-muted rounded-md border border-border p-1">
+                    <div className="item-image w-16 h-16 sm:w-[76px] sm:h-[76px] flex-shrink-0 overflow-hidden flex items-center justify-center bg-surface-muted rounded-2xl border border-grey-100 p-1.5">
                       <img
                         className="max-w-full max-h-full object-contain"
                         src={resolveCartImage(item.image)}
@@ -1248,8 +1248,8 @@ const Cart = ({ onPageChange = null }) => {
           </div>
 
           {/* Summary Section */}
-          <div className="summary-section bg-surface border border-border rounded-lg p-7 shadow-sm h-fit sticky top-[calc(var(--header-height)+1.25rem)] lg:static max-md:p-5 max-md:sticky max-md:bottom-0 max-md:top-auto">
-            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.01em] font-bold text-text m-0 mb-6">Summary</h2>
+          <div className="summary-section bg-surface border border-grey-100 rounded-[20px] p-8 shadow-[0_1px_2px_rgba(16,18,38,0.04),0_18px_44px_-20px_rgba(16,18,38,0.18)] h-fit static lg:sticky lg:top-[calc(var(--header-height)+1.25rem)] max-md:p-5 max-md:rounded-2xl max-md:sticky max-md:bottom-0 max-md:top-auto">
+            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Summary</h2>
 
             <div className="summary-form flex flex-col gap-4">
               {/* Order Type Dropdown - Only for Salesman */}
@@ -1409,9 +1409,9 @@ const Cart = ({ onPageChange = null }) => {
                   </span>
                 </div>
               )}
-              <div className="breakdown-item total flex justify-between items-baseline gap-4 pt-5 border-t border-border">
-                <span className="breakdown-label text-[length:var(--text-md)] text-text font-semibold">Total:</span>
-                <span className="breakdown-value text-[length:var(--text-lg)] text-text font-bold [font-variant-numeric:tabular-nums]">
+              <div className="breakdown-item total flex justify-between items-center gap-4 mt-1 pt-5 border-t border-grey-100">
+                <span className="breakdown-label text-[length:var(--text-md)] text-text font-semibold">Total</span>
+                <span className="breakdown-value text-[length:var(--text-2xl)] text-text font-bold tracking-[-0.02em] [font-variant-numeric:tabular-nums]">
                   {formatPrice(quote && quote.order_total != null ? quote.order_total : calculateTotal())}
                 </span>
               </div>
@@ -1419,7 +1419,7 @@ const Cart = ({ onPageChange = null }) => {
 
             <button
               type="button"
-              className="checkout-btn w-full min-h-12 bg-primary text-text-on-primary border border-primary px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed"
+              className="checkout-btn mt-6 w-full min-h-[52px] bg-primary text-text-on-primary border border-primary px-6 py-3.5 rounded-xl text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_-8px_var(--color-primary)] hover:enabled:bg-primary-hover hover:enabled:border-primary-hover hover:enabled:-translate-y-px focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:translate-y-0 active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
               onClick={handleCheckout}
               disabled={loading}
               aria-busy={loading}
