@@ -126,9 +126,12 @@ const Dashboard = () => {
     fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch salesman targets — runs once on mount if salesman
+  // Fetch salesman targets — runs once on mount if salesman.
+  // Key off the RAW userRole, not the mounted-gated `isSalesman`: this effect
+  // runs once on mount when the gated role is still null, so using `isSalesman`
+  // here would always bail and the targets would never load.
   useEffect(() => {
-    if (!isSalesman) { setTargetsLoading(false); return; }
+    if (userRole !== 'salesman') { setTargetsLoading(false); return; }
     const fetchTargets = async () => {
       try {
         setTargetsLoading(true);
