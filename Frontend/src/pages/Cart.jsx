@@ -32,6 +32,9 @@ import {
 // relative) to the configured image host — the same base the Media gallery and
 // product pages use — so cart thumbnails always resolve.
 const CART_IMAGE_BASE = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/+$/, '');
+
+// Sentinel value for the "+ Add New Party" item inside the party dropdown.
+const ADD_PARTY_OPTION = '__add_party__';
 const resolveCartImage = (img) => {
   if (!img || typeof img !== 'string') return '/images/products/spac1.webp';
   const m = img.match(/\/uploads\/products\/([^/?#"\\\]]+)/);
@@ -1269,34 +1272,27 @@ const Cart = ({ onPageChange = null }) => {
               {/* Party Dropdown - For Distributor and Salesman (after order type selected) */}
               {shouldShowPartyDropdown() && (
                 <div className="form-group flex flex-col gap-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <label htmlFor="party" className="form-label text-[length:var(--text-sm)] font-medium text-text">Party</label>
-                    {(isSalesman || isDistributor) && (
-                      <button
-                        type="button"
-                        onClick={openAddParty}
-                        className="inline-flex items-center gap-1 text-[length:var(--text-sm)] font-semibold text-primary transition hover:text-primary-hover"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <line x1="12" y1="5" x2="12" y2="19" />
-                          <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                        Add Party
-                      </button>
-                    )}
-                  </div>
+                  <label htmlFor="party" className="form-label text-[length:var(--text-sm)] font-medium text-text">Party</label>
                   <DropdownSelector
                     className="ui-dropdown-custom--full-width"
                     placeholder="Select Party"
                     options={[
                       { value: '', label: 'Select Party' },
+                      // Field roles can add a new party right from the dropdown.
+                      ...((isSalesman || isDistributor) ? [{ value: ADD_PARTY_OPTION, label: '+ Add New Party' }] : []),
                       ...parties.map(party => ({
                         value: party.id || party.party_id,
                         label: party.party_name || party.name,
                       })),
                     ]}
                     value={selectedParty}
-                    onChange={(value) => setSelectedParty(value)}
+                    onChange={(value) => {
+                      if (value === ADD_PARTY_OPTION) {
+                        openAddParty();
+                        return; // don't change the selected party
+                      }
+                      setSelectedParty(value);
+                    }}
                   />
                 </div>
               )}
