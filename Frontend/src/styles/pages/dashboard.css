@@ -168,45 +168,10 @@
   flex-direction: column;
   gap: var(--space-2);
 }
-/* Legacy quick-action button — restyled to indigo token system */
-.primary {
-  background: var(--color-primary);
-  color: var(--color-text-on-primary);
-  border: none;
-  border-radius: var(--radius-md);
-  padding: var(--space-2) var(--space-3);
-  min-height: 40px;
-  cursor: pointer;
-  font-family: "Spoof Trial", sans-serif;
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-  transition: background var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
-}
-.primary:hover {
-  background: var(--color-primary-hover);
-}
-.primary:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-.primary:active {
-  background: var(--color-primary-active);
-  transform: scale(0.985);
-}
-.primary:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
-/* Quick Action buttons centered text with Spoof Trial */
-.btn-col .ui-btn.ui-btn--primary {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 40px;
-  font-family: "Spoof Trial", sans-serif;
-  font-weight: var(--font-weight-semibold);
-  font-size: var(--text-sm);
-}
+/* Removed: legacy `.primary` and `.btn-col .ui-btn--primary` quick-action rules.
+   `.primary` is a dangerously generic, unlayered class name that would override
+   Tailwind on any element with a `primary` class; both were dead (the Quick
+   Action cards are pure-Tailwind <QuickActionCard> now). */
 
 .page-title {
   font-size: var(--text-lg);
