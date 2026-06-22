@@ -17,7 +17,7 @@ const DANGER = `${BASE} ui-badge--danger`;
 const MAP = {
   pending: WARNING,
   processing: INFO,
-  'hold-by-trey': WARNING,
+  'hold-by-sample': WARNING,
   'partially-dispatch': INFO,
   'partially-dispatched': INFO,
   dispatch: INFO,

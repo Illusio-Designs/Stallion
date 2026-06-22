@@ -30,7 +30,7 @@ const mapApiStatusToUI = (apiStatus) => {
   const statusMap = {
     'pending': 'PENDING',
     'processed': 'PROCESSING',
-    'hold_by_tray': 'HOLD BY TREY',
+    'hold_by_tray': 'HOLD BY SAMPLE',
     'partially_dispatched': 'PARTIALLY DISPATCH',
     'dispatched': 'DISPATCH',
     'completed': 'COMPLETED',
@@ -44,7 +44,7 @@ const mapUITabToApiStatus = (tab) => {
   const tabMap = {
     'Pending': 'pending',
     'Processing': 'processed',
-    'Hold by Trey': 'hold_by_tray',
+    'Hold by Sample': 'hold_by_tray',
     'Partially Dispatch': 'partially_dispatched',
     'Dispatch': 'dispatched',
     'Completed': 'completed',
@@ -58,7 +58,7 @@ const mapUITabToApiStatus = (tab) => {
 const UI_TO_API_STATUS = {
   'PENDING': 'pending',
   'PROCESSING': 'processed',
-  'HOLD BY TREY': 'hold_by_tray',
+  'HOLD BY SAMPLE': 'hold_by_tray',
   'PARTIALLY DISPATCH': 'partially_dispatched',
   'DISPATCH': 'dispatched',
   'COMPLETED': 'completed',
@@ -1177,8 +1177,8 @@ const DashboardOrders = () => {
     { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase().replace(/\s+/g, '-')}>{v}</StatusBadge> },
     { key: 'value', label: 'VALUE' },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
-      <RowActions 
-        onView={() => setViewRow(row)} 
+      <RowActions
+        onView={() => setViewRow(row)}
         onEdit={() => openEditPanel(row)}
         onDownload={() => handleDownload(row)}
       />
@@ -1212,7 +1212,7 @@ const DashboardOrders = () => {
         {/* Order Status Tabs */}
         <div className="dash-row">
           <div className="order-tabs-container col-[1/-1] flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm">
-            {['All', 'Pending', 'Processing', 'Hold by Trey', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].map(tab => (
+            {['All', 'Pending', 'Processing', 'Hold by Sample', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].map(tab => (
               <button
                 key={tab}
                 className={`order-tab inline-flex min-h-10 flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-4 py-2 text-[length:var(--text-base)] font-semibold leading-[var(--leading-snug)] transition-[background,color,box-shadow] duration-[0.12s] ease-out focus-visible:outline-none active:scale-[0.98] ${activeTab === tab ? 'active bg-primary text-text-on-primary' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}

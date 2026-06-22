@@ -97,7 +97,7 @@ const PartyDashboard = () => {
     const statusMap = {
       'pending': 'PENDING',
       'processed': 'PROCESSING',
-      'hold_by_tray': 'HOLD BY TREY',
+      'hold_by_tray': 'HOLD BY SAMPLE',
       'partially_dispatched': 'PARTIALLY DISPATCH',
       'dispatched': 'DISPATCH',
       'completed': 'COMPLETED',
