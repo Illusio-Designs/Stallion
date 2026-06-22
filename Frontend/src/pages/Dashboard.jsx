@@ -393,40 +393,47 @@ const Dashboard = () => {
             (localStorage). Show a calm skeleton in that gap so the dashboard
             reads as loading-with-content rather than a blank flash. */}
         {!mounted && (
-          <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3" aria-hidden="true">
-            <div className="col-span-9 max-[900px]:col-span-full min-h-[300px] rounded-lg border border-border bg-surface shadow-sm animate-pulse motion-reduce:animate-none" />
-            <div className="col-span-3 max-[900px]:col-span-full min-h-[300px] rounded-lg border border-border bg-surface shadow-sm animate-pulse motion-reduce:animate-none" />
+          <div className="dash-row grid grid-cols-12 gap-4" aria-hidden="true">
+            <div className="col-span-full min-h-[320px] rounded-2xl border border-border bg-surface shadow-sm animate-pulse motion-reduce:animate-none" />
+            <div className="col-span-full min-h-[120px] rounded-2xl border border-border bg-surface shadow-sm animate-pulse motion-reduce:animate-none" />
           </div>
         )}
 
         {mounted && !isSalesman && (
-        <div className="dash-row grid grid-cols-12 items-start gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
-          <div className="dash-card tall col-span-9 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
-            <div className="chart-header flex items-center justify-between mb-[10px]">
-              <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] m-0">Sales &amp; Revenue</h4>
-              <DropdownSelector
-                options={[
-                  { value: 'Monthly', label: 'Monthly' },
-                  { value: 'Weekly', label: 'Weekly' },
-                  { value: 'Yearly', label: 'Yearly' },
-                ]}
-                value={period}
-                onChange={(value) => setPeriod(value)}
-                searchable={false}
-              />
-            </div>
-            <SalesRevenueChart data={chartData} height={210} />
-          </div>
-          <div className="dash-card side col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-[10px]">Quick Actions</h4>
-            <div className="flex flex-1 flex-col justify-center gap-3">
-              <QuickActionCard icon={FiShoppingCart} label="View All Orders" desc="All orders" primary onClick={() => { window.location.href = '/dashboard/orders'; }} />
-              <QuickActionCard icon={FiBarChart2} label="View Report" desc="Sales analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
-              {/* Display only — offers feature not built yet. */}
-              <QuickActionCard icon={FiTag} label="Create Offer" desc="Coming soon" onClick={() => showInfo('Offers — coming soon')} />
+        <>
+          {/* Sales & Revenue — full width */}
+          <div className="dash-row grid grid-cols-12 gap-4">
+            <div className="col-span-full min-h-[320px] flex flex-col bg-surface border border-border rounded-2xl shadow-sm p-5">
+              <div className="chart-header flex items-center justify-between mb-[10px]">
+                <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] m-0">Sales &amp; Revenue</h4>
+                <DropdownSelector
+                  options={[
+                    { value: 'Monthly', label: 'Monthly' },
+                    { value: 'Weekly', label: 'Weekly' },
+                    { value: 'Yearly', label: 'Yearly' },
+                  ]}
+                  value={period}
+                  onChange={(value) => setPeriod(value)}
+                  searchable={false}
+                />
+              </div>
+              <SalesRevenueChart data={chartData} height={240} />
             </div>
           </div>
-        </div>
+
+          {/* Quick Actions — full-width row, 3 cards side by side */}
+          <div className="dash-row grid grid-cols-12 gap-4 mt-4">
+            <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5">
+              <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
+              <div className="grid grid-cols-3 items-stretch gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
+                <QuickActionCard icon={FiShoppingCart} label="View All Orders" desc="All orders" primary onClick={() => { window.location.href = '/dashboard/orders'; }} />
+                <QuickActionCard icon={FiBarChart2} label="View Report" desc="Sales analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
+                {/* Display only — offers feature not built yet. */}
+                <QuickActionCard icon={FiTag} label="Create Offer" desc="Coming soon" onClick={() => showInfo('Offers — coming soon')} />
+              </div>
+            </div>
+          </div>
+        </>
         )}
 
         {mounted && !isSalesman && (
