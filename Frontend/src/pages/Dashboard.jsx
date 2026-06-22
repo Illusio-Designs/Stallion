@@ -391,7 +391,7 @@ const Dashboard = () => {
 
         {mounted && !isSalesman && (
         <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
-          <div className="dash-card tall equal col-span-9 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
+          <div className="dash-card tall col-span-9 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
             <div className="chart-header flex items-center justify-between mb-[10px]">
               <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] m-0">Sales &amp; Revenue</h4>
               <DropdownSelector
@@ -407,7 +407,7 @@ const Dashboard = () => {
             </div>
             <SalesRevenueChart data={chartData} height={210} />
           </div>
-          <div className="dash-card side equal col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
+          <div className="dash-card side col-span-3 max-[900px]:col-span-full max-[560px]:col-span-full min-h-[300px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-[10px]">Quick Actions</h4>
             <div className="flex flex-1 flex-col justify-center gap-3">
               <QuickActionCard icon={FiShoppingCart} label="View All Orders" desc="All orders" primary onClick={() => { window.location.href = '/dashboard/orders'; }} />
