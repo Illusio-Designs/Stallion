@@ -43,11 +43,18 @@ async function reverseOrderOperation(orderId, transaction) {
         product.tray_qty = product.tray_qty + trayReducedQty;
         product.total_qty = product.total_qty + totalReducedQty;
         await product.save({ transaction });
-        const trayIds = orderOperation.tray_ids;
+        const trayIds = Array.isArray(orderOperation.tray_ids) ? orderOperation.tray_ids : [];
         for (let j = 0; j < trayIds.length; j++) {
-            const trayId = trayIds[j].tray_id;
-            const qty = trayIds[j].qty;
-            const status = trayIds[j].status;
+            const entry = trayIds[j] || {};
+            const trayId = entry.tray_id;
+            const qty = entry.qty;
+            const status = entry.status;
+            // Skip malformed/legacy entries without a tray id — querying with an
+            // undefined tray_id throws ("WHERE parameter tray_id has invalid
+            // undefined value") and aborts the whole reversal/delete.
+            if (!trayId) {
+                continue;
+            }
             const trayProduct = await TrayProducts.findOne({
                 where: { tray_id: trayId, product_id: orderOperation.product_id },
                 transaction,
@@ -55,8 +62,10 @@ async function reverseOrderOperation(orderId, transaction) {
             if (!trayProduct) {
                 continue;
             }
-            trayProduct.qty = trayProduct.qty + qty;
-            trayProduct.status = status;
+            trayProduct.qty = trayProduct.qty + (qty || 0);
+            if (status) {
+                trayProduct.status = status;
+            }
             await trayProduct.save({ transaction });
         }
         await orderOperation.destroy({ transaction });
