@@ -2,6 +2,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Role = require('../models/Role');
 const UserRole = require('../models/UserRole');
+const Party = require('../models/Party');
 const msg91Service = require('../services/msg91Service');
 const { allowedNumbers } = require('../constants/constants');
 const { markPhoneVerified, consumePhoneVerification, normalizePhone } = require('../services/otpSession');
@@ -94,7 +95,6 @@ class AuthController {
             const user = await User.findOne({
                 where: {
                     phone: phoneNumber,
-                    is_active: true,
                 },
             });
             if (!user) {
@@ -109,6 +109,13 @@ class AuthController {
             const role = await Role.findOne({ where: { role_id: userRole.role_id } });
             if (!role) {
                 return res.status(400).json({ error: 'Role not found' });
+            }
+
+            if (role.role_name.toLowerCase() === 'party') {
+                const party = await Party.findOne({ where: { user_id: user.user_id } });
+                if (!party || !party.is_active) {
+                    return res.status(403).json({ error: 'Party account is deactivated' });
+                }
             }
 
             const token = jwt.sign(

@@ -57,6 +57,18 @@ function canManageUsers(roleName) {
     return hasRole(roleName, USER_ADMIN_ROLES);
 }
 
+function isAdmin(roleName) {
+    return hasRole(roleName, ['admin']);
+}
+
+function partyActiveFilter(roleName) {
+    return isAdmin(roleName) ? {} : { is_active: true };
+}
+
+function denyInactiveParty(party, roleName) {
+    return !party || (!party.is_active && !isAdmin(roleName));
+}
+
 function isFieldRole(roleName) {
     const normalized = normalizeRole(roleName);
     return normalized === 'party' || normalized === 'distributor' || normalized === 'salesman';
@@ -75,5 +87,8 @@ module.exports = {
     canCreateParty,
     canManageProducts,
     canManageUsers,
+    isAdmin,
+    partyActiveFilter,
+    denyInactiveParty,
     isFieldRole,
 };

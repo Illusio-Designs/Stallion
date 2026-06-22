@@ -20,6 +20,28 @@ const { canManageOrders, normalizeRole } = require('../utils/roleHelpers');
 const { resolveUserScope, canViewAllOrders } = require('../utils/scopeHelpers');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
+const orderPartyInclude = {
+    model: Party,
+    as: 'party',
+    attributes: ['party_name', 'address', 'billing_address', 'billing_same_as_shipping'],
+    required: false,
+};
+
+function mapOrdersWithPartyName(orders) {
+    return orders.map((order) => {
+        const plain = order.get({ plain: true });
+        const { party, ...rest } = plain;
+        return {
+            ...rest,
+            party_name: party ? party.party_name : null,
+            party_address: party ? party.address : null,
+            party_billing_address: party
+                ? (party.billing_same_as_shipping ? party.address : party.billing_address)
+                : null,
+        };
+    });
+}
+
 // Helper function to reverse an order operation (does not depend on controller instance)
 async function reverseOrderOperation(orderId, transaction) {
     const orderOperations = await OrderOperation.findAll({
@@ -184,11 +206,12 @@ class OrderController {
             }
             const { count, rows: orders } = await Order.findAndCountAll({
                 where,
+                include: [orderPartyInclude],
                 limit: pagination.limit,
                 offset: pagination.offset,
                 order: [['order_date', 'DESC']],
             });
-            res.status(200).json(buildPaginatedResponse(orders, pagination, count));
+            res.status(200).json(buildPaginatedResponse(mapOrdersWithPartyName(orders), pagination, count));
         } catch (error) {
             console.error('Error fetching orders:', error);
             res.status(500).json({ error: 'Failed to fetch orders' });
@@ -225,11 +248,12 @@ class OrderController {
             const where = mergeWhere(baseFilter, searchFilter);
             const { count, rows: orders } = await Order.findAndCountAll({
                 where,
+                include: [orderPartyInclude],
                 limit: pagination.limit,
                 offset: pagination.offset,
                 order: [['order_date', 'DESC']],
             });
-            res.status(200).json(buildPaginatedResponse(orders, pagination, count));
+            res.status(200).json(buildPaginatedResponse(mapOrdersWithPartyName(orders), pagination, count));
         } catch (error) {
             console.error('Error fetching orders:', error);
             res.status(500).json({ error: 'Failed to fetch orders' });
@@ -288,6 +312,9 @@ class OrderController {
                 if (!party) {
                     console.log("Party not found");
                     return res.status(404).json({ error: 'Party not found' });
+                }
+                if (!party.is_active) {
+                    return res.status(400).json({ error: 'Party is inactive' });
                 }
                 const distributor = await Distributor.findOne({ where: { distributor_id: party.distributor_id } });
                 if (distributor) {
@@ -397,6 +424,9 @@ class OrderController {
                 if (!party) {
                     console.log("party", party);
                     return res.status(404).json({ error: 'Party not found' });
+                }
+                if (!party.is_active) {
+                    return res.status(400).json({ error: 'Party is inactive' });
                 }
             }
             if (isSalesmanRequired) {
