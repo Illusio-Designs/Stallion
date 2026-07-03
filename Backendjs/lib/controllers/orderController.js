@@ -583,6 +583,12 @@ class OrderController {
 
                     const resolvedItem = {
                         product_id: item.product_id,
+                        // Snapshot the model number at order time so dashboards can
+                        // label the item even after the product row is later deleted
+                        // (deletes are hard, so a live lookup would return nothing →
+                        // "Unknown Product"). Extra fields are preserved by
+                        // applyOfferToItems (it spreads each item).
+                        model_no: product.model_no,
                         quantity: item.quantity,
                         price: unitPrice,
                     };
