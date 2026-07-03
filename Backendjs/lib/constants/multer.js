@@ -30,16 +30,40 @@ const createUploadDirs = () => {
 
 createUploadDirs();
 
-// Image compression function
+// Largest dimension we keep for stored product/profile images. Anything bigger
+// is scaled down (aspect preserved) BEFORE re-encoding, which is what actually
+// caps sharp's working memory — a 12MP phone photo decoded at full size is the
+// main driver of the OOM/503 on the shared host.
+const MAX_IMAGE_DIMENSION = 1600;
+
+// Image compression function.
+//
+// IMPORTANT: chaining .jpeg().png().webp() on one pipeline (the old code) is a
+// bug — sharp only emits the LAST format, but still pays to decode/re-encode,
+// and never bounds the dimensions. We now:
+//   1. resize down to MAX_IMAGE_DIMENSION (the real memory saver),
+//   2. re-encode ONCE, in a format matching the source extension.
 const compressImage = async (file, quality = 80) => {
   try {
-    const compressedBuffer = await sharp(file.buffer)
-      .jpeg({ quality: quality })
-      .png({ quality: quality })
-      .webp({ quality: quality })
-      .toBuffer();
+    const ext = path.extname(file.originalname || '').toLowerCase();
 
-    return compressedBuffer;
+    let pipeline = sharp(file.buffer)
+      .rotate() // respect EXIF orientation before we drop the metadata
+      .resize(MAX_IMAGE_DIMENSION, MAX_IMAGE_DIMENSION, {
+        fit: 'inside',
+        withoutEnlargement: true,
+      });
+
+    if (ext === '.png') {
+      pipeline = pipeline.png({ quality, compressionLevel: 9 });
+    } else if (ext === '.webp') {
+      pipeline = pipeline.webp({ quality });
+    } else {
+      // jpg/jpeg/gif and anything else collapse to a well-compressed JPEG
+      pipeline = pipeline.jpeg({ quality, mozjpeg: true });
+    }
+
+    return await pipeline.toBuffer();
   } catch (error) {
     console.error('Image compression error:', error);
     return file.buffer; // Return original if compression fails
@@ -80,14 +104,20 @@ const profileUpload = multer({
   fileFilter: fileFilter
 }).single('profile_image');
 
+// How many images one request may carry. memoryStorage buffers EVERY file in
+// RAM at once, so an uncapped .array() let a single request pin ~100MB+ and
+// take down the worker (the 503). 10 images/request is plenty for the UI.
+const MAX_PRODUCT_IMAGES = 10;
+
 // Product image upload with compression
 const productUpload = multer({
   storage: storage,
   limits: {
-    fileSize: 5 * 1024 * 1024 // 5MB limit
+    fileSize: 5 * 1024 * 1024, // 5MB per file
+    files: MAX_PRODUCT_IMAGES  // hard cap on files per request
   },
   fileFilter: fileFilter
-}).array('product_image');
+}).array('product_image', MAX_PRODUCT_IMAGES);
 
 // Slider image upload with compression
 const sliderUpload = multer({
@@ -102,7 +132,8 @@ const sliderUpload = multer({
 const billUpload = multer({
   storage: storage,
   limits: {
-    fileSize: 10 * 1024 * 1024 // 10MB limit
+    fileSize: 10 * 1024 * 1024, // 10MB per file
+    files: 10                   // cap files per request (memoryStorage buffers all)
   },
   fileFilter: (req, file, cb) => {
     const allowedTypes = /pdf|jpeg|jpg|png/;
@@ -115,7 +146,7 @@ const billUpload = multer({
       cb(new Error('Only PDF and image files are allowed for bills!'), false);
     }
   }
-}).array('bill_file');
+}).array('bill_file', 10);
 
 // General upload for other files
 const generalUpload = multer({
@@ -282,9 +313,19 @@ const processAndSaveImage = (uploadType = 'general') => {
 
       uploadMiddleware(req, res, async (err) => {
         if (err) {
+          // Give the common multer limit errors a friendly, actionable message
+          // instead of the raw "LIMIT_FILE_SIZE"/"LIMIT_FILE_COUNT" code.
+          let message = err.message;
+          if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+              message = 'One or more images are too large. Maximum size is 5MB each.';
+            } else if (err.code === 'LIMIT_FILE_COUNT') {
+              message = 'Too many images in one upload. Please upload 10 or fewer at a time.';
+            }
+          }
           return res.status(400).json({
             success: false,
-            message: err.message
+            message
           });
         }
 
@@ -341,9 +382,11 @@ const processAndSaveImage = (uploadType = 'general') => {
                 uploadPath = path.join(rootDir, 'uploads', 'general');
             }
 
-            // Save file
+            // Save file. Async write so we never block the event loop while a
+            // batch of images is being flushed to disk (a synchronous write per
+            // file stalls every other request on this single-threaded worker).
             const fullPath = path.join(uploadPath, fileName);
-            fs.writeFileSync(fullPath, processedBuffer);
+            await fs.promises.writeFile(fullPath, processedBuffer);
 
             fileInfo.push({
               filename: fileName,
