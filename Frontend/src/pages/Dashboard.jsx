@@ -6,7 +6,7 @@ import { showError, showInfo } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import { getOrdersForRole, getProducts, getProductById, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
+import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
 import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight } from 'react-icons/fi';
 
@@ -267,44 +267,60 @@ const Dashboard = () => {
       return [];
     };
     const qtyByProduct = {};
+    // Name snapshot captured from order_items at order time (model_no). This
+    // survives a later product deletion, so we can label the row without any
+    // live lookup — the main reason rows used to show "Unknown Product".
+    const nameByProduct = {};
     orders.forEach(o => {
       asItems(o.order_items).forEach(it => {
         const pid = it.product_id;
         if (pid == null) return;
-        qtyByProduct[pid] = (qtyByProduct[pid] || 0) + (Number(it.quantity) || 0);
+        const key = String(pid);
+        qtyByProduct[key] = (qtyByProduct[key] || 0) + (Number(it.quantity) || 0);
+        if (!nameByProduct[key] && it.model_no) nameByProduct[key] = it.model_no;
       });
     });
     return Object.entries(qtyByProduct)
       .filter(([, qty]) => qty > 0)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
-      .map(([pid, qty]) => ({ pid: String(pid), qty }));
+      .map(([pid, qty]) => ({ pid: String(pid), qty, name: nameByProduct[pid] || null }));
   }, [orders]);
 
-  // Resolve names for top-selling product ids that aren't in the loaded list
-  // (limit 20) via an on-demand by-id lookup.
+  // Fallback name resolution for top-selling ids that have NO snapshot name and
+  // aren't in the loaded list (kept at limit 20). One batched by-id request for
+  // all missing ids (at most 3) instead of a 1000-row fetch per id — far less
+  // likely to time out, and no big payloads.
   const [extraNames, setExtraNames] = useState({});
   useEffect(() => {
     const missing = topProductRaw
+      .filter(t => !t.name) // already labelled from the order_items snapshot
       .map(t => t.pid)
       .filter(pid => !extraNames[pid] && !products.find(p => String(p.product_id ?? p.id) === pid));
     if (missing.length === 0) return;
     let cancelled = false;
     (async () => {
-      const map = {};
-      await Promise.all(missing.map(async (pid) => {
-        try { const p = await getProductById(pid); if (p) map[pid] = p.model_no || p.product_name || p.name; } catch { /* ignore */ }
-      }));
-      if (!cancelled && Object.keys(map).length) setExtraNames(prev => ({ ...prev, ...map }));
+      try {
+        const list = await getProductsByIds(missing);
+        const map = {};
+        (list || []).forEach((p) => {
+          const pid = String(p.product_id ?? p.id);
+          const nm = p.model_no || p.product_name || p.name;
+          if (nm) map[pid] = nm;
+        });
+        if (!cancelled && Object.keys(map).length) setExtraNames(prev => ({ ...prev, ...map }));
+      } catch { /* ignore — row falls back to "Unknown Product" */ }
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topProductRaw, products]);
 
-  const topProducts = useMemo(() => topProductRaw.map(({ pid, qty }) => {
+  const topProducts = useMemo(() => topProductRaw.map(({ pid, qty, name }) => {
     const product = products.find(p => String(p.product_id ?? p.id) === pid);
     return {
-      name: product?.model_no || product?.product_name || extraNames[pid] || 'Unknown Product',
+      // Prefer the live product's current model_no; fall back to the order-time
+      // snapshot (survives deletes), then the batched lookup, then Unknown.
+      name: product?.model_no || product?.product_name || name || extraNames[pid] || 'Unknown Product',
       units: `${qty} Units`,
     };
   }), [topProductRaw, products, extraNames]);
