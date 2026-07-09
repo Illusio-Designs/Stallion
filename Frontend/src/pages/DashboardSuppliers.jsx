@@ -2026,6 +2026,32 @@ const DashboardSuppliers = () => {
               placeholder="Joining date"
             />
           </div>
+          {/* KYC documents — optional on edit (upload only to replace an existing one) */}
+          <div className="form-group form-group--full">
+            <label className="ui-label">KYC Documents <span className="text-text-muted font-normal">(upload only to replace)</span></label>
+            <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { key: 'pan_card', label: 'PAN Card', accept: 'image/*,application/pdf' },
+                { key: 'aadhar_card', label: 'Aadhar Card', accept: 'image/*,application/pdf' },
+                { key: 'cancel_cheque', label: 'Cancel Cheque', accept: 'image/*,application/pdf' },
+                { key: 'photo', label: 'Photo', accept: 'image/*' },
+              ].map((doc) => (
+                <div key={doc.key} className="flex flex-col gap-1">
+                  <label className="ui-label">{doc.label}</label>
+                  <input
+                    type="file"
+                    accept={doc.accept}
+                    className="ui-input file:mr-3 file:rounded-md file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-primary file:font-medium file:cursor-pointer text-[length:var(--text-sm)] text-text-muted"
+                    onChange={(e) => handleInputChange(doc.key, e.target.files?.[0] || null)}
+                  />
+                  {formData[doc.key] && (
+                    <span className="text-[length:var(--text-xs)] text-success truncate">{formData[doc.key].name}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
         </form>
       </AsidePanel>
 

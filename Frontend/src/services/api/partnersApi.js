@@ -1466,10 +1466,31 @@ export const updateSalesman = async (salesmanId, salesmanData) => {
     throw new Error('User ID is required in request body');
   }
   
-  console.log('[Update Salesman] Updating salesman with ID:', cleanSalesmanId);
-  console.log('[Update Salesman] Request body:', JSON.stringify(requestBody, null, 2));
-  console.log('[Update Salesman] reporting_manager value:', requestBody.reporting_manager, 'type:', typeof requestBody.reporting_manager);
-  
+  // If any KYC document was (re)selected, send multipart so the new files
+  // upload; otherwise a plain JSON PUT (back-compat — e.g. the activate/
+  // deactivate toggle sends no files).
+  const { pan_card, aadhar_card, cancel_cheque, photo } = salesmanData;
+  const hasFiles = pan_card || aadhar_card || cancel_cheque || photo;
+  if (hasFiles) {
+    const formData = new FormData();
+    Object.entries(requestBody).forEach(([k, v]) => {
+      if (v === null || v === undefined) return;
+      formData.append(k, Array.isArray(v) ? JSON.stringify(v) : String(v));
+    });
+    if (pan_card) formData.append('pan_card', pan_card);
+    if (aadhar_card) formData.append('aadhar_card', aadhar_card);
+    if (cancel_cheque) formData.append('cancel_cheque', cancel_cheque);
+    if (photo) formData.append('photo', photo);
+    const baseUrl = getBaseURL();
+    const token = getAuthToken();
+    const headers = { Accept: 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const response = await fetch(`${baseUrl}/salesmen/${cleanSalesmanId}`, {
+      method: 'PUT', headers, credentials: 'omit', body: formData,
+    });
+    return await handleResponse(response);
+  }
+
   return apiRequest(`/salesmen/${cleanSalesmanId}`, {
     method: 'PUT',
     body: requestBody,
