@@ -29,6 +29,7 @@ import {
   createParty,
   getAvailableOffers,
   quoteOrder,
+  getProductsByIds,
 } from "../services/apiService";
 
 // Re-point any product image URL (legacy host, absolute server path, or
@@ -55,6 +56,10 @@ const Cart = ({ onPageChange = null }) => {
   };
   const [cartItems, setCartItems] = useState([]);
   const [editingQuantities, setEditingQuantities] = useState({});
+  // Live available stock per product_id, fetched from the backend. Source of
+  // truth for the per-item quantity cap so a user can't order more than we hold
+  // (the order endpoint rejects it anyway, but this stops it at the UI).
+  const [stockById, setStockById] = useState({});
   
   // Get user role and user info
   const userRole = getUserRole();
@@ -422,10 +427,52 @@ const Cart = ({ onPageChange = null }) => {
     showRemoveFromCartSuccess(itemName);
   };
 
+  // Fetch live backend stock for everything in the cart, and clamp any line that
+  // already exceeds it (e.g. stock dropped after the item was added).
+  const cartIdsKey = cartItems.map((i) => i.id).filter(Boolean).sort().join(',');
+  useEffect(() => {
+    const ids = cartItems.map((i) => i.id).filter(Boolean);
+    if (ids.length === 0) { setStockById({}); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await getProductsByIds(ids);
+        if (cancelled) return;
+        const map = {};
+        (list || []).forEach((p) => {
+          const pid = String(p.product_id ?? p.id);
+          map[pid] = Number(p.total_qty ?? p.warehouse_qty ?? 0);
+        });
+        setStockById(map);
+        // Pull any line that now exceeds available stock back down to the max.
+        cartItems.forEach((it) => {
+          const max = map[String(it.id)];
+          if (max != null && max >= 1 && it.quantity > max) {
+            updateCartQuantity(it.id, max);
+          }
+        });
+      } catch { /* ignore — leave caps open if the lookup fails */ }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartIdsKey]);
+
+  // Available stock for a product id; Infinity when unknown so we never wrongly
+  // block (the order endpoint still enforces the real limit server-side).
+  const maxFor = (productId) => {
+    const s = stockById[String(productId)];
+    return (s == null) ? Infinity : s;
+  };
+
   const handleQuantityIncrease = (productId) => {
     const currentItems = getCartItems();
     const item = currentItems.find((item) => item.id === productId);
     if (item) {
+      const max = maxFor(productId);
+      if (item.quantity >= max) {
+        showError(max <= 0 ? 'This product is out of stock' : `Only ${max} in stock`);
+        return;
+      }
       const newQuantity = item.quantity + 1;
       updateCartQuantity(productId, newQuantity);
       const itemName = `${item.name} (${item.lenseColour})`;
@@ -450,10 +497,14 @@ const Cart = ({ onPageChange = null }) => {
     if (!item) return;
 
     const parsed = parseInt(value, 10);
-    const newQuantity = Number.isNaN(parsed) ? 1 : Math.max(1, parsed);
+    let newQuantity = Number.isNaN(parsed) ? 1 : Math.max(1, parsed);
+    const max = maxFor(productId);
+    let capped = false;
+    if (newQuantity > max) { newQuantity = Math.max(1, max); capped = true; }
     updateCartQuantity(productId, newQuantity);
     const itemName = `${item.name} (${item.lenseColour})`;
-    showCartUpdateSuccess(itemName, newQuantity);
+    if (capped) showError(`Only ${max} in stock — quantity set to ${newQuantity}`);
+    else showCartUpdateSuccess(itemName, newQuantity);
   };
 
   const calculateSubtotal = () => {
@@ -1222,11 +1273,19 @@ const Cart = ({ onPageChange = null }) => {
                           type="button"
                           className="qty-btn-cart plus bg-primary rounded-sm border border-primary cursor-pointer text-[length:var(--text-md)] leading-none text-text-on-primary w-8 h-8 flex items-center justify-center transition duration-[120ms] p-0 hover:enabled:bg-primary-hover hover:enabled:border-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:scale-[0.96] disabled:opacity-45 disabled:cursor-not-allowed"
                           onClick={() => handleQuantityIncrease(item.id)}
+                          disabled={item.quantity >= maxFor(item.id)}
                           aria-label="Increase quantity"
                         >
                           +
                         </button>
                       </div>
+                      {stockById[String(item.id)] != null && (
+                        stockById[String(item.id)] <= 0 ? (
+                          <p className="item-stock-note mt-1 m-0 text-[length:var(--text-xs)] font-semibold text-error">Out of stock</p>
+                        ) : item.quantity >= stockById[String(item.id)] ? (
+                          <p className="item-stock-note mt-1 m-0 text-[length:var(--text-xs)] text-text-muted">Only {stockById[String(item.id)]} in stock</p>
+                        ) : null
+                      )}
                     </div>
                     <div className="item-subtotal [grid-area:subtotal] sm:[grid-area:auto] self-center sm:self-auto text-right text-[length:var(--text-md)] font-semibold text-text [font-variant-numeric:tabular-nums]">
                       {formatPrice(parseFloat(String(item.whp || item.mrp || 0).replace(/[₹,]/g, '')) * (parseInt(editingQuantities[item.id], 10) > 0 ? parseInt(editingQuantities[item.id], 10) : item.quantity))}
