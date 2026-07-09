@@ -1,0 +1,110 @@
+name: Sync main → deploy branches
+
+# main is the SOURCE OF TRUTH. On push to main, mirror:
+#   main/Frontend/  -> the `frontend` branch (app at root)
+#   main/Backendjs/ -> the `backend`  branch (Backendjs/ at the same path)
+# Each deploy branch keeps its own .github/ (CI + deploy workflows), so those
+# are excluded from the mirror. The push to each deploy branch then triggers
+# that branch's own deploy (backend-deploy.yml / the frontend host).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Frontend/**"
+      - "Backendjs/**"
+      - ".github/workflows/sync-from-main.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Never run two mirrors at once.
+concurrency:
+  group: sync-from-main
+  cancel-in-progress: false
+
+jobs:
+  sync-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          path: main-repo
+      - name: Checkout frontend
+        uses: actions/checkout@v4
+        with:
+          ref: frontend
+          path: branch-repo
+      - name: Mirror main/Frontend -> frontend (app at root; keep its .github)
+        run: |
+          rsync -a --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            main-repo/Frontend/ branch-repo/
+      - name: Commit & push to frontend
+        working-directory: branch-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to sync."
+            exit 0
+          fi
+          git commit -m "chore(sync): main/Frontend -> frontend (${GITHUB_SHA::7})"
+          for i in 1 2 3 4 5; do
+            if git push origin frontend; then
+              echo "Pushed to frontend."
+              exit 0
+            fi
+            echo "Push rejected (frontend moved), rebasing and retrying..."
+            git pull --rebase origin frontend
+          done
+          echo "Failed to push to frontend after retries." >&2
+          exit 1
+
+  sync-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          path: main-repo
+      - name: Checkout backend
+        uses: actions/checkout@v4
+        with:
+          ref: backend
+          path: branch-repo
+      - name: Mirror main/Backendjs -> backend/Backendjs
+        run: |
+          mkdir -p branch-repo/Backendjs
+          rsync -a --delete \
+            --exclude='.git' \
+            main-repo/Backendjs/ branch-repo/Backendjs/
+      - name: Commit & push to backend
+        working-directory: branch-repo
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to sync."
+            exit 0
+          fi
+          git commit -m "chore(sync): main/Backendjs -> backend (${GITHUB_SHA::7})"
+          for i in 1 2 3 4 5; do
+            if git push origin backend; then
+              echo "Pushed to backend."
+              exit 0
+            fi
+            echo "Push rejected (backend moved), rebasing and retrying..."
+            git pull --rebase origin backend
+          done
+          echo "Failed to push to backend after retries." >&2
+          exit 1
