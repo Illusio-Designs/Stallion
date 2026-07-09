@@ -11,8 +11,8 @@
 
 const GEOCODER_URL = process.env.GEOCODER_URL || 'https://nominatim.openstreetmap.org/search';
 const GEOCODER_KEY = process.env.GEOCODER_KEY || '';
-// Nominatim asks for an identifying User-Agent / contact.
-const GEOCODER_UA = process.env.GEOCODER_UA || 'StallionEyewear/1.0 (geofence)';
+// Nominatim asks for an identifying User-Agent with a contact address.
+const GEOCODER_UA = process.env.GEOCODER_UA || 'StallionEyewear/1.0 (illusiodesigns@gmail.com)';
 
 /**
  * Geocode a free-text address to { latitude, longitude }, or null if it can't
