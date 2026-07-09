@@ -303,6 +303,11 @@ const DashboardSuppliers = () => {
     zones: [],
     state_ids: [],
     joining_date: '',
+    // KYC documents (File objects) — compulsory on create.
+    pan_card: null,
+    aadhar_card: null,
+    cancel_cheque: null,
+    photo: null,
   });
 
   const isInitializingEditRef = useRef(false);
@@ -648,10 +653,22 @@ const DashboardSuppliers = () => {
     { key: 'full_name', label: 'NAME' },
     { key: 'phone', label: 'PHONE' },
     { key: 'email', label: 'EMAIL' },
+    { key: 'status', label: 'STATUS', render: (_v, row) => (
+      <button
+        type="button"
+        onClick={() => handleToggleActive(row)}
+        title={row.isActive ? 'Active — click to deactivate' : 'Inactive — click to activate'}
+        className="cursor-pointer border-0 bg-transparent p-0"
+      >
+        <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>
+          {row.isActive ? 'Active' : 'Inactive'}
+        </StatusBadge>
+      </button>
+    ) },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
-      <RowActions 
-        onEdit={() => handleEdit(row)} 
-        onDelete={() => handleDelete(row)} 
+      <RowActions
+        onEdit={() => handleEdit(row)}
+        onDelete={() => handleDelete(row)}
       />
     ) },
   ]), []);
@@ -698,6 +715,10 @@ const DashboardSuppliers = () => {
       zones: [],
       state_ids: [],
       joining_date: '',
+      pan_card: null,
+      aadhar_card: null,
+      cancel_cheque: null,
+      photo: null,
     });
     setStates([]);
     setCities([]);
@@ -747,6 +768,11 @@ const DashboardSuppliers = () => {
           .filter(Boolean);
       })(),
       joining_date: row.joining_date ? row.joining_date.split('T')[0] : '',
+      // Editing doesn't re-upload documents; leave the file inputs empty.
+      pan_card: null,
+      aadhar_card: null,
+      cancel_cheque: null,
+      photo: null,
     });
     setEditRow(row);
     // Zones are optional — loaded only when the user opens the Zones dropdown.
@@ -763,6 +789,50 @@ const DashboardSuppliers = () => {
     setTimeout(() => {
       isInitializingEditRef.current = false;
     }, 100);
+  };
+
+  // Activate / deactivate a salesman. Deactivating a salesman who has left
+  // blocks their login and data access (the backend mirrors is_active onto the
+  // linked user account, and auth rejects inactive users).
+  const handleToggleActive = async (row) => {
+    const salesmanId = row.id || row.salesman_id || row.salesmanId;
+    if (!salesmanId) {
+      showError('Invalid salesman data: missing ID.');
+      return;
+    }
+    const next = !row.isActive;
+    const msg = next
+      ? 'Reactivate this salesman? They will regain login and data access.'
+      : 'Deactivate this salesman? This blocks their login and data access until reactivated.';
+    if (!(await confirm(msg))) return;
+
+    // Optimistic update.
+    setSalesmen(prev => prev.map(s => {
+      const id = s.id || s.salesman_id || s.salesmanId;
+      return id === salesmanId ? { ...s, is_active: next } : s;
+    }));
+    try {
+      await updateSalesman(salesmanId, {
+        user_id: row.user_id,
+        employee_code: row.employee_code,
+        full_name: row.full_name,
+        phone: row.phone,
+        email: row.email,
+        address: row.address,
+        country_id: row.country_id,
+        state_id: row.state_id || null,
+        city_id: row.city_id || null,
+        is_active: next,
+      });
+      showSuccess(next ? 'Salesman activated' : 'Salesman deactivated');
+    } catch (e) {
+      // Revert on failure.
+      setSalesmen(prev => prev.map(s => {
+        const id = s.id || s.salesman_id || s.salesmanId;
+        return id === salesmanId ? { ...s, is_active: !next } : s;
+      }));
+      showError(e?.message || 'Failed to update salesman status');
+    }
   };
 
   const handleDelete = async (row) => {
@@ -988,6 +1058,11 @@ const DashboardSuppliers = () => {
             }).filter(Boolean).join(', ')
           : '',
         joining_date: formData.joining_date ? new Date(formData.joining_date).toISOString() : new Date().toISOString(),
+        // KYC document File objects (used by createSalesman; ignored on update).
+        pan_card: formData.pan_card,
+        aadhar_card: formData.aadhar_card,
+        cancel_cheque: formData.cancel_cheque,
+        photo: formData.photo,
       };
 
       if (editRow) {
@@ -1650,10 +1725,11 @@ const DashboardSuppliers = () => {
             />
           </div>
           <div className="form-group form-group--full">
-            <label className="ui-label">Address</label>
+            <label className="ui-label">Address *</label>
             <input
               className="ui-input"
               placeholder="Address"
+              required
               value={formData.address}
               onChange={(e) => handleInputChange('address', e.target.value)}
             />
@@ -1741,6 +1817,32 @@ const DashboardSuppliers = () => {
               onChange={(v) => handleInputChange('joining_date', v)}
               placeholder="Joining date"
             />
+          </div>
+          {/* KYC documents — all compulsory on create */}
+          <div className="form-group form-group--full">
+            <label className="ui-label">KYC Documents *</label>
+            <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {[
+                { key: 'pan_card', label: 'PAN Card *', accept: 'image/*,application/pdf' },
+                { key: 'aadhar_card', label: 'Aadhar Card *', accept: 'image/*,application/pdf' },
+                { key: 'cancel_cheque', label: 'Cancel Cheque *', accept: 'image/*,application/pdf' },
+                { key: 'photo', label: 'Photo *', accept: 'image/*' },
+              ].map((doc) => (
+                <div key={doc.key} className="flex flex-col gap-1">
+                  <label className="ui-label">{doc.label}</label>
+                  <input
+                    type="file"
+                    accept={doc.accept}
+                    className="ui-input file:mr-3 file:rounded-md file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-primary file:font-medium file:cursor-pointer text-[length:var(--text-sm)] text-text-muted"
+                    onChange={(e) => handleInputChange(doc.key, e.target.files?.[0] || null)}
+                  />
+                  {formData[doc.key] && (
+                    <span className="text-[length:var(--text-xs)] text-success truncate">{formData[doc.key].name}</span>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </form>
       </AsidePanel>
@@ -1831,10 +1933,11 @@ const DashboardSuppliers = () => {
             />
           </div>
           <div className="form-group form-group--full">
-            <label className="ui-label">Address</label>
+            <label className="ui-label">Address *</label>
             <input
               className="ui-input"
               placeholder="Address"
+              required
               value={formData.address}
               onChange={(e) => handleInputChange('address', e.target.value)}
             />

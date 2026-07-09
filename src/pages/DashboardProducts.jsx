@@ -135,18 +135,20 @@ const hasValidImageUrls = (product) => {
 // Build a full, encoded thumbnail URL for a product's first image (or null).
 // Uses the same image host as the Media gallery; handles "[]"/string/array.
 const PRODUCT_IMG_BASE = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/+$/, '');
-const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
 const getProductThumbUrl = (product) => {
   const urls = parseImageUrls(product);
   if (!urls || urls.length === 0) return null;
-  // Find the first entry that's actually an image file. Rows can be dirty (stray
-  // "[" / "]", absolute paths, relative paths, bare filenames), so take each
-  // entry's last path segment and require an image extension.
+  // Mirror the product page (ProductDetail.getImageUrl / extractFilename): take
+  // the first entry, strip query/fragment and trailing JSON junk, and use its
+  // last path segment as the filename. Accept ANY filename that has an
+  // extension (contains "."), not a fixed allow-list — otherwise images the
+  // product page happily shows (e.g. .avif/.jfif, or odd casing) render as a
+  // "—" placeholder here. This is what was hiding dashboard product images.
   for (const u of urls) {
     if (typeof u !== 'string') continue;
     const clean = u.split('?')[0].split('#')[0].replace(/([\]"\\])+$/, '').trim();
-    const filename = clean.split('/').pop().split('\\').pop();
-    if (filename && IMAGE_EXT_RE.test(filename)) {
+    const filename = clean.split('/').pop().split('\\').pop().replace(/([\]"\\])+$/, '');
+    if (filename && filename.includes('.')) {
       return `${PRODUCT_IMG_BASE}/uploads/products/${encodeUploadName(filename)}`;
     }
   }
