@@ -31,7 +31,7 @@ class TrayProductsController {
 
     async addProductToTray(req, res) {
         try {
-            const { tray_id, product_id, status } = req.body;
+            const { tray_id, product_id, status, bag_no } = req.body;
             if (!tray_id || !product_id || !status) {
                 return res.status(400).json({ error: 'All fields are required' });
             }
@@ -40,6 +40,15 @@ class TrayProductsController {
             }
             if (status !== TrayProductStatus.ALLOTED) {
                 return res.status(400).json({ error: 'New tray products must start as alloted' });
+            }
+            // Bag number is optional; when provided it must be an integer 1-10.
+            let bagNo = 1;
+            if (bag_no !== undefined && bag_no !== null && bag_no !== '') {
+                const n = Number(bag_no);
+                if (!Number.isInteger(n) || n < 1 || n > 10) {
+                    return res.status(400).json({ error: 'bag_no must be an integer between 1 and 10' });
+                }
+                bagNo = n;
             }
 
             const alreadyInTray = await TrayProducts.findOne({ where: { tray_id, product_id } });
@@ -52,9 +61,11 @@ class TrayProductsController {
                 const oldSnapshot = alreadyInTray.toJSON();
                 const payload = {
                     status,
+                    bag_no: bagNo,
                     updated_at: new Date(),
                 };
                 alreadyInTray.status = status;
+                alreadyInTray.bag_no = bagNo;
                 alreadyInTray.updated_at = new Date();
                 const updatedTrayProduct = await alreadyInTray.save();
                 await logAudit({
@@ -81,6 +92,7 @@ class TrayProductsController {
                 tray_id,
                 product_id,
                 qty: 1,
+                bag_no: bagNo,
                 status,
                 created_at: new Date(),
                 updated_at: new Date(),
