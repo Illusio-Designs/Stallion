@@ -110,6 +110,17 @@ const Party = sequelize.define('Party', {
         type: DataTypes.STRING(10),
         allowNull: true
     },
+    // Geocoded from `address` (see utils/geocode) — the anchor for the visit /
+    // check-in 50m geofence. Nullable; filled on create/update and lazily
+    // backfilled for existing parties.
+    latitude: {
+        type: DataTypes.DECIMAL(10, 7),
+        allowNull: true
+    },
+    longitude: {
+        type: DataTypes.DECIMAL(10, 7),
+        allowNull: true
+    },
     is_active: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

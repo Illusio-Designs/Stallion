@@ -1,6 +1,8 @@
 const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const Party = require('../models/Party');
+const { checkGeofence } = require('../utils/geo');
+const { ensurePartyCoords } = require('../utils/geocode');
 const Distributor = require('../models/distributor');
 const Salesman = require('../models/Salesman');
 const Product = require('../models/Product');
@@ -382,6 +384,21 @@ class OrderController {
                 isDistributorRequired = false;
                 isPartyRequired = true;
                 isSalesmanRequired = true;
+                // Geofence: the salesman must be within 50m of the party. For older
+                // parties with no stored coordinates, geocode the address on the
+                // spot (ensurePartyCoords) and then enforce.
+                if (!party_id) {
+                    return res.status(400).json({ error: 'Party ID is required for visit orders' });
+                }
+                const visitParty = await Party.findOne({ where: { party_id } });
+                if (!visitParty) {
+                    return res.status(404).json({ error: 'Party not found' });
+                }
+                await ensurePartyCoords(visitParty);
+                const geo = checkGeofence({ deviceLat: latitude, deviceLng: longitude, party: visitParty, action: 'place a visit order' });
+                if (!geo.ok) {
+                    return res.status(403).json({ error: geo.reason });
+                }
             }
             else {
                 isDistributorRequired = false;
