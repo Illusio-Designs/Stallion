@@ -18,27 +18,25 @@ const QuickActionCard = ({ icon: Icon, label, desc, onClick, primary }) => (
   <button
     type="button"
     onClick={onClick}
-    className={`group flex h-full w-full items-center gap-3 rounded-lg border p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-150 outline-none focus-visible:shadow-[0_0_0_2px_var(--color-primary)] hover:-translate-y-0.5 hover:shadow-md active:translate-y-0 active:scale-[0.99] motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
+    className={`group flex h-full w-full items-center gap-4 rounded-2xl border p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 outline-none focus-visible:shadow-[0_0_0_3px_var(--color-primary-soft),0_0_0_4px_var(--color-primary)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
       primary
-        ? 'border-transparent bg-primary hover:bg-primary/90'
-        : 'border-border bg-surface hover:border-primary hover:bg-primary-soft'
+        ? 'border-transparent bg-primary shadow-[0_10px_28px_-14px_var(--color-primary)] hover:shadow-[0_16px_32px_-12px_var(--color-primary)]'
+        : 'border-border-strong bg-surface shadow-[0_1px_3px_rgba(16,18,38,0.06)] hover:border-primary/40 hover:shadow-[0_12px_26px_-12px_rgba(16,18,38,0.22)]'
     }`}
   >
-    <span className={`inline-flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-md transition-colors duration-150 ${
-      primary ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary group-hover:bg-white'
+    <span className={`inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
+      primary ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary group-hover:bg-primary group-hover:text-white'
     }`}>
       <Icon size={20} aria-hidden="true" />
     </span>
     <span className="min-w-0 flex-1">
-      {/* truncate so the card degrades to a clean single line in narrow
-          containers (e.g. the admin side column) instead of wrapping. */}
-      <span className={`block truncate font-semibold leading-tight text-[var(--text-sm)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
-      {desc && <span className={`block truncate text-[var(--text-xs)] leading-snug ${primary ? 'text-white/75' : 'text-text-muted'}`}>{desc}</span>}
+      <span className={`block font-semibold leading-snug tracking-[-0.01em] text-[var(--text-base)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
+      {desc && <span className={`mt-0.5 block text-[var(--text-sm)] leading-snug ${primary ? 'text-white/70' : 'text-text-muted'}`}>{desc}</span>}
     </span>
     <FiChevronRight
       size={18}
       aria-hidden="true"
-      className={`flex-shrink-0 transition-transform duration-150 group-hover:translate-x-0.5 motion-reduce:transition-none ${primary ? 'text-white/70' : 'text-text-subtle'}`}
+      className={`flex-shrink-0 transition-[transform,color] duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none ${primary ? 'text-white/80' : 'text-text-subtle group-hover:text-primary'}`}
     />
   </button>
 );
@@ -411,7 +409,7 @@ const Dashboard = () => {
         <>
           {/* Quick Actions — full-width row of 3 cards (2-up / 1-up on smaller screens) */}
           <div className="dash-row grid grid-cols-12 gap-4">
-            <div className="col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
+            <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5 max-md:p-4">
               <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
               <div className="grid grid-cols-3 items-stretch gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
                 <QuickActionCard icon={FiShoppingCart} label="View All Orders" desc="All orders" primary onClick={() => { window.location.href = '/dashboard/orders'; }} />
@@ -503,7 +501,7 @@ const Dashboard = () => {
       {/* Quick Actions (salesman) */}
       {isSalesman && (
         <div className="dash-row mt-4">
-          <div className="dash-card full bg-surface border border-border rounded-lg shadow-sm p-5">
+          <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5 max-md:p-4">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
             <div className="grid grid-cols-3 items-stretch gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
               <QuickActionCard icon={FiMapPin} label="Add Visit" desc="Log a party visit" primary onClick={() => { window.location.href = '/dashboard/salesmen'; }} />
