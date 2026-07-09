@@ -10,7 +10,7 @@ const State = require('../models/State');
 const Cities = require('../models/Cities');
 const Zone = require('../models/Zone');
 const { Op } = require('sequelize');
-const { geocodeAddress } = require('../utils/geocode');
+const { geocodeAddress, geocodeDiagnostic } = require('../utils/geocode');
 const DistributorZones = require('../models/DistributorZones');
 const SalesmanStates = require('../models/SalesmanStates');
 const DistributorStates = require('../models/DistributorStates');
@@ -746,6 +746,18 @@ class PartyController {
             res.status(200).json(parties);
         } catch (error) {
             res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    }
+
+    // Diagnostic: geocode a test address (or ?q=...) and return the raw result +
+    // failure reason, so we can tell whether the SERVER can reach the geocoder.
+    async geocodeTest(req, res) {
+        try {
+            const q = (req.query && req.query.q) || 'Seawoods Grand Central Mall, Navi Mumbai, Maharashtra';
+            const result = await geocodeDiagnostic(q);
+            res.status(200).json(result);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
         }
     }
 
