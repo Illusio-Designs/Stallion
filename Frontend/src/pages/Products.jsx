@@ -914,6 +914,7 @@ const Products = ({ onPageChange }) => {
                     productImage={productImage}
                     whp={product.whp}
                     mrp={product.mrp}
+                    stock={Number(product.total_qty ?? product.warehouse_qty ?? 0)}
                     onViewMore={handleViewMore}
                   />
                 );

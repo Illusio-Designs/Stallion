@@ -176,8 +176,16 @@ const ProductDetail = ({ productId: propProductId = null }) => {
     return quantities[variationId] || 1;
   };
 
+  // Available stock for a variation id (0 when unknown/out of stock).
+  const getStock = (variationId) => {
+    const v = productVariations.find((pv) => pv.id === variationId);
+    return v ? Number(v.stock ?? 0) : 0;
+  };
+
   const updateQuantity = (variationId, newQuantity) => {
     if (newQuantity < 1) newQuantity = 1; // Minimum quantity is 1
+    const stock = getStock(variationId);
+    if (stock > 0 && newQuantity > stock) newQuantity = stock; // never exceed stock
     setQuantities((prev) => ({
       ...prev,
       [variationId]: newQuantity,
@@ -187,6 +195,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   const handleQuantityIncrease = (variationId, e) => {
     e.stopPropagation(); // Prevent card click when clicking button
     const currentQty = getQuantity(variationId);
+    const stock = getStock(variationId);
+    if (stock > 0 && currentQty >= stock) return; // at the stock cap
     updateQuantity(variationId, currentQty + 1);
   };
 
@@ -209,7 +219,9 @@ const ProductDetail = ({ productId: propProductId = null }) => {
     if (e) {
       e.stopPropagation(); // Prevent card click when clicking button
     }
-    const quantity = getQuantity(variation.id);
+    const stock = Number(variation.stock ?? 0);
+    if (stock <= 0) return; // out of stock — button is disabled, guard anyway
+    const quantity = Math.min(getQuantity(variation.id), stock);
     addToCart({
       id: variation.id,
       name: variation.name,
@@ -217,6 +229,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
       lenseColour: variation.lenseColour,
       whp: variation.whp,
       quantity: quantity,
+      stock, // snapshot so the cart has an immediate cap before its live refresh
     });
     // Show success notification
     showAddToCartSuccess(
@@ -381,6 +394,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
         lenseMaterial: model.lens_material?.lens_material || model.lens_material_name || lensMaterial?.lens_material || lensMaterial?.name || 'N/A',
         size: model.size_mm || 'N/A',
         qty: formatQty(model.total_qty || model.warehouse_qty || 0),
+        // Raw available stock (number) — drives the qty cap and out-of-stock UI.
+        stock: Number(model.total_qty ?? model.warehouse_qty ?? 0),
         image: getImageUrl(model.image_urls, model.image_url),
         mrp: formatPrice(model.mrp),
         whp: formatPrice(model.whp),
@@ -781,19 +796,24 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                         className="qty-btn plus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
                         aria-label={`Increase quantity for ${variation.name}`}
                         onClick={(e) => handleQuantityIncrease(variation.id, e)}
+                        disabled={variation.stock <= 0 || getQuantity(variation.id) >= variation.stock}
                       >
                         <span aria-hidden="true">+</span>
                       </button>
                     </div>
                   </div>
                   {/* Add to Cart button in 6th column */}
-                  <div className="add-to-cart-wrapper flex items-end">
+                  <div className="add-to-cart-wrapper flex flex-col items-stretch justify-end gap-1">
+                    {variation.stock <= 0 && (
+                      <span className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-error">Out of stock</span>
+                    )}
                     <button
                       type="button"
-                      className={`add-to-cart-btn-list w-full min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${addedIds[variation.id] ? "is-added bg-success border-success text-text-on-primary" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active"}`}
+                      disabled={variation.stock <= 0}
+                      className={`add-to-cart-btn-list w-full min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-55 ${variation.stock <= 0 ? "cursor-not-allowed bg-surface-muted border-border text-text-subtle" : addedIds[variation.id] ? "is-added bg-success border-success text-text-on-primary cursor-pointer" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active cursor-pointer"}`}
                       onClick={(e) => handleAddToCart(variation, e)}
                     >
-                      {addedIds[variation.id] ? "Added ✓" : "Add to Cart"}
+                      {variation.stock <= 0 ? "Out of Stock" : addedIds[variation.id] ? "Added ✓" : "Add to Cart"}
                     </button>
                   </div>
                 </div>
@@ -958,16 +978,21 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                                 onClick={(e) =>
                                   handleQuantityIncrease(variation.id, e)
                                 }
+                                disabled={variation.stock <= 0 || getQuantity(variation.id) >= variation.stock}
                               >
                                 <span aria-hidden="true">+</span>
                               </button>
                             </div>
+                            {variation.stock <= 0 && (
+                              <span className="block mb-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-error">Out of stock</span>
+                            )}
                             <button
                               type="button"
-                              className={`add-to-cart-btn-small w-full min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${addedIds[variation.id] ? "is-added bg-success border-success text-text-on-primary" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active"}`}
+                              disabled={variation.stock <= 0}
+                              className={`add-to-cart-btn-small w-full min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-55 ${variation.stock <= 0 ? "cursor-not-allowed bg-surface-muted border-border text-text-subtle" : addedIds[variation.id] ? "is-added bg-success border-success text-text-on-primary cursor-pointer" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active cursor-pointer"}`}
                               onClick={(e) => handleAddToCart(variation, e)}
                             >
-                              {addedIds[variation.id] ? "Added ✓" : "Add to Cart"}
+                              {variation.stock <= 0 ? "Out of Stock" : addedIds[variation.id] ? "Added ✓" : "Add to Cart"}
                             </button>
                           </div>
                         </div>
@@ -1102,16 +1127,18 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                       onClick={(e) =>
                         handleQuantityIncrease(currentProduct.id, e)
                       }
+                      disabled={currentProduct.stock <= 0 || getQuantity(currentProduct.id) >= currentProduct.stock}
                     >
                       <span aria-hidden="true">+</span>
                     </button>
                   </div>
                   <button
                     type="button"
-                    className={`add-to-cart-btn-small w-full sm:w-auto sm:flex-1 min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold cursor-pointer border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${addedIds[currentProduct.id] ? "is-added bg-success border-success text-text-on-primary" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active"}`}
+                    disabled={currentProduct.stock <= 0}
+                    className={`add-to-cart-btn-small w-full sm:w-auto sm:flex-1 min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-55 ${currentProduct.stock <= 0 ? "cursor-not-allowed bg-surface-muted border-border text-text-subtle" : addedIds[currentProduct.id] ? "is-added bg-success border-success text-text-on-primary cursor-pointer" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active cursor-pointer"}`}
                     onClick={(e) => handleAddToCart(currentProduct, e)}
                   >
-                    {addedIds[currentProduct.id] ? "Added ✓" : "Add to Cart"}
+                    {currentProduct.stock <= 0 ? "Out of Stock" : addedIds[currentProduct.id] ? "Added ✓" : "Add to Cart"}
                   </button>
                 </div>
               </div>

@@ -30,6 +30,7 @@ const ProductCard = ({
   productImage,
   whp,
   mrp,
+  stock,
   colors = [
     { color: '#000000', name: 'Black' },
     { color: '#E5E5E5', name: 'Grey' },
@@ -39,6 +40,10 @@ const ProductCard = ({
 }) => {
   const [activeColor, setActiveColor] = useState(0);
   const [qty, setQty] = useState(1);
+  // Available stock (number). undefined => unknown, treat as available.
+  const stockNum = stock == null ? null : Number(stock);
+  const outOfStock = stockNum != null && stockNum <= 0;
+  const atMax = stockNum != null && qty >= stockNum;
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgBroken, setImgBroken] = useState(false);
 
@@ -54,6 +59,8 @@ const ProductCard = ({
   };
 
   const handleAddToCart = () => {
+    if (outOfStock) return; // guard — button is disabled too
+    const quantity = stockNum != null ? Math.min(qty, stockNum) : qty;
     addToCart({
       id: productId,
       name: productName,
@@ -61,9 +68,10 @@ const ProductCard = ({
       lenseColour: colors[activeColor]?.name || '',
       whp: whp != null ? whp : 0,
       mrp: mrp != null ? mrp : 0,
-      quantity: qty,
+      quantity: quantity,
+      ...(stockNum != null ? { stock: stockNum } : {}),
     });
-    showAddToCartSuccess(productName, qty);
+    showAddToCartSuccess(productName, quantity);
   };
 
   // Construct image URL - extract filename from path and use the specified format
@@ -134,6 +142,11 @@ const ProductCard = ({
   return (
     <div className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
       <div className={`product-image relative overflow-hidden rounded-md${imgBroken ? ' aspect-square' : ''}`}>
+        {outOfStock && (
+          <span className="pc-oos-badge absolute left-2 top-2 z-[2] rounded-md bg-error px-2 py-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-on-primary">
+            Out of Stock
+          </span>
+        )}
         {!imgLoaded && !imgBroken && <span className="pc-image-placeholder absolute inset-0" aria-hidden="true" />}
         {imgBroken ? (
           <div
@@ -198,13 +211,14 @@ const ProductCard = ({
           <button
             type="button"
             className="pc-qty-btn h-full w-9 cursor-pointer border-none bg-primary-soft text-primary text-[length:var(--text-lg)] leading-none transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-soft-hover active:not-disabled:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle focus-visible:relative focus-visible:z-[1] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
-            onClick={() => setQty(q => q + 1)}
+            onClick={() => setQty(q => (stockNum != null ? Math.min(stockNum, q + 1) : q + 1))}
+            disabled={outOfStock || atMax}
             aria-label="Increase quantity"
           >+</button>
         </div>
 
-        <button type="button" className="pc-add-btn flex-[1_1_120px] min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary text-[length:var(--text-sm)] font-semibold tracking-[var(--tracking-label)] transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-primary disabled:opacity-55 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]" onClick={handleAddToCart}>
-          ADD TO CART
+        <button type="button" disabled={outOfStock} className="pc-add-btn flex-[1_1_120px] min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary text-[length:var(--text-sm)] font-semibold tracking-[var(--tracking-label)] transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle disabled:opacity-100 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]" onClick={handleAddToCart}>
+          {outOfStock ? 'OUT OF STOCK' : 'ADD TO CART'}
         </button>
       </div>
     </div>
