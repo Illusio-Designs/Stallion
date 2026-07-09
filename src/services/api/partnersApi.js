@@ -947,6 +947,19 @@ export const deleteParty = async (partyId) => {
 };
 
 /**
+ * Bulk-geocode parties missing coordinates (admin). Backfills lat/lng from each
+ * party's address so the visit/check-in geofence can enforce.
+ * @returns {Promise<{message, scanned, updated, unresolved}>}
+ */
+export const bulkUpdatePartyCoords = async () => {
+  return apiRequest('/parties/backfill-coords', {
+    method: 'POST',
+    body: { limit: 500 },
+    includeAuth: true,
+  });
+};
+
+/**
  * Bulk upload parties from Excel/CSV file
  * @param {File} file - Excel or CSV file
  * @returns {Promise<Object>} Response with created/updated counts
