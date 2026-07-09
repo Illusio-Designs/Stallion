@@ -104,6 +104,25 @@ const Salesman = sequelize.define('Salesman', {
         type: DataTypes.TEXT,
         allowNull: true
     },
+    // KYC / onboarding documents — stored as /uploads/salesman/<file> paths.
+    // Nullable at the DB level (so the column adds cleanly to existing rows);
+    // required is enforced in the controller on create.
+    pan_card_url: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    aadhar_card_url: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    cancel_cheque_url: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    photo_url: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
     joining_date: {
         type: DataTypes.DATE,
         allowNull: true

@@ -1291,11 +1291,41 @@ export const createSalesman = async (salesmanData) => {
   console.log('[Create Salesman] Request body:', JSON.stringify(requestBody, null, 2));
   console.log('[Create Salesman] reporting_manager value:', requestBody.reporting_manager, 'type:', typeof requestBody.reporting_manager);
   
-  return apiRequest('/salesmen', {
-    method: 'POST',
-    body: requestBody,
-    includeAuth: true,
+  // Address + the four KYC documents are compulsory.
+  if (!requestBody.address || !String(requestBody.address).trim()) {
+    throw new Error('Address is required');
+  }
+  const { pan_card, aadhar_card, cancel_cheque, photo } = salesmanData;
+  if (!pan_card) throw new Error('PAN card file is required');
+  if (!aadhar_card) throw new Error('Aadhar card file is required');
+  if (!cancel_cheque) throw new Error('Cancel cheque file is required');
+  if (!photo) throw new Error('Photo is required');
+
+  // The create endpoint now accepts multipart (the KYC file uploads), so send
+  // FormData instead of JSON. Arrays (zones/state_ids) go as JSON strings; the
+  // backend parses them back. null/undefined fields are omitted.
+  const formData = new FormData();
+  Object.entries(requestBody).forEach(([k, v]) => {
+    if (v === null || v === undefined) return;
+    formData.append(k, Array.isArray(v) ? JSON.stringify(v) : String(v));
   });
+  formData.append('pan_card', pan_card);
+  formData.append('aadhar_card', aadhar_card);
+  formData.append('cancel_cheque', cancel_cheque);
+  formData.append('photo', photo);
+
+  const baseUrl = getBaseURL();
+  const token = getAuthToken();
+  const headers = { Accept: 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  // Don't set Content-Type — the browser adds the multipart boundary.
+  const response = await fetch(`${baseUrl}/salesmen`, {
+    method: 'POST',
+    headers,
+    credentials: 'omit',
+    body: formData,
+  });
+  return await handleResponse(response);
 };
 
 /**
