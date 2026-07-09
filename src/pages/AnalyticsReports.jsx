@@ -3,6 +3,7 @@ import '../styles/pages/dashboard-analytics.css';
 import TableWithControls from '../components/ui/TableWithControls';
 import StatusBadge from '../components/ui/StatusBadge';
 import Skeleton from '../components/ui/Skeleton';
+import MatchMeter from '../components/ui/MatchMeter';
 import {
   getAllSalesmanTargets,
   getSalesmanTargets,
@@ -219,20 +220,17 @@ const AnalyticsReports = () => {
     { key: 'date', label: 'DATE' },
     { key: 'location', label: 'LOCATION', render: (v) => {
       if (!v || v.lat == null || v.lng == null) return <span className="text-text-subtle">—</span>;
-      const mapLink = (
-        <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
-      );
+      const href = `https://www.google.com/maps?q=${v.lat},${v.lng}`;
       if (!v.party) {
-        return <span className="inline-flex items-center gap-2">{mapLink}<span className="text-text-subtle text-xs">(party location not set)</span></span>;
+        return (
+          <span className="inline-flex items-center gap-2">
+            <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
+            <span className="text-text-subtle text-xs">(party location not set)</span>
+          </span>
+        );
       }
-      const dist = Math.round(distanceMeters(v.lat, v.lng, v.party.lat, v.party.lng));
-      const ok = dist <= GEOFENCE_RADIUS_M;
-      return (
-        <span className="inline-flex items-center gap-2">
-          <StatusBadge status={ok ? 'completed' : 'cancelled'}>{ok ? `Matched · ${dist}m` : `Off by ${dist}m`}</StatusBadge>
-          {mapLink}
-        </span>
-      );
+      const dist = distanceMeters(v.lat, v.lng, v.party.lat, v.party.lng);
+      return <MatchMeter distance={dist} radius={GEOFENCE_RADIUS_M} href={href} />;
     } },
     { key: 'qty', label: 'QTY' },
     { key: 'amount', label: 'AMOUNT' },
