@@ -2,11 +2,11 @@ import React, { useMemo, useState, useEffect } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
-import { showError, showInfo } from '../services/notificationService';
+import { showError, showInfo, showSuccess } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
+import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, apiRequest } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
 import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight } from 'react-icons/fi';
 
@@ -327,6 +327,27 @@ const Dashboard = () => {
     };
   }), [topProductRaw, products, extraNames]);
 
+  // Diagnostic: hit the backend geocoder and report whether it works — lets us
+  // confirm the visit/check-in geofence can resolve party addresses.
+  const [geoChecking, setGeoChecking] = useState(false);
+  const handleGeoCheck = async () => {
+    if (geoChecking) return;
+    setGeoChecking(true);
+    showInfo('Checking geocoder…');
+    try {
+      const r = await apiRequest('/parties/geocode-test', { method: 'GET', includeAuth: true });
+      if (r && r.ok && r.coords) {
+        showSuccess(`Geocoder OK — resolved to ${Number(r.coords.latitude).toFixed(4)}, ${Number(r.coords.longitude).toFixed(4)}`);
+      } else {
+        showError(`Geocoder not working: ${(r && r.error) || 'unknown error'}`);
+      }
+    } catch (e) {
+      showError(`Geo check failed: ${e?.message || 'request error'}`);
+    } finally {
+      setGeoChecking(false);
+    }
+  };
+
   // Inventory alerts — out-of-stock first, then low stock, derived from products
   const inventoryAlerts = useMemo(() => {
     if (!products.length) return [];
@@ -509,6 +530,7 @@ const Dashboard = () => {
               <QuickActionCard icon={FiMapPin} label="Add Visit" desc="Log a party visit" primary onClick={() => { window.location.href = '/dashboard/salesmen'; }} />
               <QuickActionCard icon={FiShoppingBag} label="My Orders" desc="View your orders" onClick={() => { window.location.href = '/dashboard/orders'; }} />
               <QuickActionCard icon={FiBarChart2} label="View Report" desc="Targets & analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
+              <QuickActionCard icon={FiMapPin} label={geoChecking ? 'Checking…' : 'Geo Check'} desc="Test location service" onClick={handleGeoCheck} />
             </div>
           </div>
         </div>
