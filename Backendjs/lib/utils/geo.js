@@ -34,11 +34,20 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
  *   ok:true when the party has no coordinates yet (can't enforce — don't block),
  *   or when within radius. ok:false with a reason when out of range.
  */
+// When true, an order/check-in is BLOCKED if the party's location can't be
+// determined (fail-closed). Default false (fail-open) so a geocoder outage
+// can't block every visit at once. Turn on once geocoding is confirmed working.
+const GEOFENCE_REQUIRE_COORDS = String(process.env.GEOFENCE_REQUIRE_COORDS || '').toLowerCase() === 'true';
+
 function checkGeofence({ deviceLat, deviceLng, party, action = 'perform this action' }) {
   const pLat = party && (party.latitude ?? party.lat);
   const pLng = party && (party.longitude ?? party.lng);
-  // No party coordinates on record → we can't enforce; allow (backfill handles it).
+  // No party coordinates on record — either allow (default) or, in strict mode,
+  // block because we can't verify the salesman is actually on-site.
   if (pLat == null || pLng == null || pLat === '' || pLng === '') {
+    if (GEOFENCE_REQUIRE_COORDS) {
+      return { ok: false, distance: null, reason: `Could not verify the party's location from its address, so this visit can't be confirmed. Please correct the party address.` };
+    }
     return { ok: true, distance: null };
   }
   const distance = distanceMeters(deviceLat, deviceLng, pLat, pLng);

@@ -18,11 +18,14 @@ const GEOCODER_UA = process.env.GEOCODER_UA || 'StallionEyewear/1.0 (illusiodesi
  * Geocode a free-text address to { latitude, longitude }, or null if it can't
  * be resolved. Extra locality parts (pincode, "India") improve the hit rate.
  * @param {string} address
- * @param {{ pincode?: string, country?: string }} [opts]
+ * @param {{ city?: string, state?: string, pincode?: string, country?: string }} [opts]
  * @returns {Promise<{latitude:number, longitude:number}|null>}
  */
 async function geocodeAddress(address, opts = {}) {
-  const parts = [address, opts.pincode, opts.country || 'India'].filter(Boolean);
+  // City + state hugely improve the hit rate for informal / mall addresses
+  // (e.g. "Seawoods Grand Central Mall" alone is ambiguous, but adding
+  // "Mumbai, Maharashtra" resolves it).
+  const parts = [address, opts.city, opts.state, opts.pincode, opts.country || 'India'].filter(Boolean);
   const q = parts.join(', ').trim();
   if (!q) return null;
 
@@ -66,7 +69,15 @@ async function ensurePartyCoords(party) {
   if (!party) return party;
   if (party.latitude != null && party.longitude != null) return party;
   if (!party.address) return party;
-  const coords = await geocodeAddress(party.address, { pincode: party.pincode });
+  // Resolve the party's city/state names (stored as ids) to enrich the query.
+  let city, state;
+  try {
+    const Cities = require('../models/Cities');
+    const State = require('../models/State');
+    if (party.city_id) { const c = await Cities.findByPk(party.city_id); city = c && c.name; }
+    if (party.state_id) { const s = await State.findByPk(party.state_id); state = s && s.name; }
+  } catch (_) { /* models unavailable — geocode with the address alone */ }
+  const coords = await geocodeAddress(party.address, { city, state, pincode: party.pincode });
   if (coords) {
     party.latitude = coords.latitude;
     party.longitude = coords.longitude;
