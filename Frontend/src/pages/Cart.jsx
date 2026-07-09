@@ -1234,7 +1234,7 @@ const Cart = ({ onPageChange = null }) => {
                       </p>
                     </div>
                   </div>
-                    <div className="item-qty [grid-area:qty] sm:[grid-area:auto] flex justify-start sm:justify-center">
+                    <div className="item-qty [grid-area:qty] sm:[grid-area:auto] flex flex-col items-start sm:items-center gap-1.5">
                       <div className="quantity-selector-cart inline-flex items-center gap-1 bg-surface border border-border-strong rounded-md p-1 w-fit transition duration-[120ms] focus-within:border-primary focus-within:shadow-[var(--focus-ring)]">
                         <button
                           type="button"
@@ -1281,10 +1281,16 @@ const Cart = ({ onPageChange = null }) => {
                       </div>
                       {stockById[String(item.id)] != null && (
                         stockById[String(item.id)] <= 0 ? (
-                          <p className="item-stock-note mt-1 m-0 text-[length:var(--text-xs)] font-semibold text-error">Out of stock</p>
-                        ) : item.quantity >= stockById[String(item.id)] ? (
-                          <p className="item-stock-note mt-1 m-0 text-[length:var(--text-xs)] text-text-muted">Only {stockById[String(item.id)]} in stock</p>
-                        ) : null
+                          <span className="item-stock-note m-0 whitespace-nowrap text-[length:var(--text-xs)] font-semibold text-error">Out of stock</span>
+                        ) : (
+                          <span
+                            className={`item-stock-note m-0 whitespace-nowrap text-[length:var(--text-xs)] [font-variant-numeric:tabular-nums] ${
+                              item.quantity >= stockById[String(item.id)] ? 'font-semibold text-text-subtle' : 'text-text-muted'
+                            }`}
+                          >
+                            {item.quantity >= stockById[String(item.id)] ? 'Max · ' : ''}{stockById[String(item.id)]} in stock
+                          </span>
+                        )
                       )}
                     </div>
                     <div className="item-subtotal [grid-area:subtotal] sm:[grid-area:auto] self-center sm:self-auto text-right text-[length:var(--text-md)] font-semibold text-text [font-variant-numeric:tabular-nums]">
