@@ -1211,8 +1211,8 @@ const Cart = ({ onPageChange = null }) => {
                 </div>
 
                 {cartItems.map((item) => (
-                  <div key={item.id} className="cart-item grid grid-cols-[1fr_auto] [grid-template-areas:'info_remove''qty_subtotal'] sm:grid-cols-[1fr_170px_120px_40px] sm:[grid-template-areas:none] gap-3 sm:gap-4 border-b border-border last:border-b-0 items-center py-6">
-                  <div className="item-info [grid-area:info] sm:[grid-area:auto] flex gap-4 items-center min-w-0">
+                  <div key={item.id} className="cart-item grid grid-cols-[1fr_auto] grid-rows-[auto_auto] sm:grid-cols-[1fr_170px_120px_40px] sm:grid-rows-1 gap-x-3 gap-y-4 sm:gap-4 border-b border-border last:border-b-0 items-center py-6">
+                  <div className="item-info col-start-1 row-start-1 sm:col-start-1 sm:row-start-1 flex gap-4 items-center min-w-0">
                     <div className="item-image w-16 h-16 sm:w-[76px] sm:h-[76px] flex-shrink-0 overflow-hidden flex items-center justify-center bg-surface-muted rounded-2xl border border-grey-100 p-1.5">
                       <img
                         className="max-w-full max-h-full object-contain"
@@ -1233,7 +1233,7 @@ const Cart = ({ onPageChange = null }) => {
                       </p>
                     </div>
                   </div>
-                    <div className="item-qty [grid-area:qty] sm:[grid-area:auto] flex flex-col items-start sm:items-center gap-1.5">
+                    <div className="item-qty col-start-1 row-start-2 sm:col-start-2 sm:row-start-1 sm:justify-self-center flex flex-col items-start sm:items-center gap-1.5">
                       <div className="quantity-selector-cart inline-flex items-center gap-1 bg-surface border border-border-strong rounded-md p-1 w-fit transition duration-[120ms] focus-within:border-primary focus-within:shadow-[var(--focus-ring)]">
                         <button
                           type="button"
@@ -1292,10 +1292,10 @@ const Cart = ({ onPageChange = null }) => {
                         )
                       )}
                     </div>
-                    <div className="item-subtotal [grid-area:subtotal] sm:[grid-area:auto] self-center sm:self-auto text-right text-[length:var(--text-md)] font-semibold text-text [font-variant-numeric:tabular-nums]">
+                    <div className="item-subtotal col-start-2 row-start-2 sm:col-start-3 sm:row-start-1 self-center sm:self-auto text-right text-[length:var(--text-md)] font-semibold text-text [font-variant-numeric:tabular-nums]">
                       {formatPrice(parseFloat(String(item.whp || item.mrp || 0).replace(/[₹,]/g, '')) * (parseInt(editingQuantities[item.id], 10) > 0 ? parseInt(editingQuantities[item.id], 10) : item.quantity))}
                     </div>
-                    <div className="item-remove [grid-area:remove] sm:[grid-area:auto] self-start sm:self-auto w-8 flex justify-end sm:justify-center">
+                    <div className="item-remove col-start-2 row-start-1 sm:col-start-4 sm:row-start-1 self-start sm:self-auto w-8 flex justify-end sm:justify-center">
                       <button
                         type="button"
                         className="remove-btn bg-none border-none text-text-subtle text-[length:var(--text-xl)] leading-none cursor-pointer w-8 h-8 flex items-center justify-center transition duration-[120ms] rounded-pill hover:bg-error-soft hover:text-error focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] focus-visible:text-error active:scale-[0.94]"
