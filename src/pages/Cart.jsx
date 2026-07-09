@@ -1313,7 +1313,7 @@ const Cart = ({ onPageChange = null }) => {
           </div>
 
           {/* Summary Section */}
-          <div className="summary-section bg-surface border border-grey-100 rounded-[20px] p-8 shadow-[0_1px_2px_rgba(16,18,38,0.04),0_18px_44px_-20px_rgba(16,18,38,0.18)] h-fit static lg:sticky lg:top-[calc(var(--header-height)+1.25rem)] max-md:p-5 max-md:rounded-2xl max-md:sticky max-md:bottom-0 max-md:top-auto">
+          <div className="summary-section bg-surface border border-grey-100 rounded-[20px] p-8 shadow-[0_1px_2px_rgba(16,18,38,0.04),0_18px_44px_-20px_rgba(16,18,38,0.18)] h-fit static lg:sticky lg:top-[calc(var(--header-height)+1.25rem)] max-md:p-5 max-md:rounded-2xl">
             <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Summary</h2>
 
             <div className="summary-form flex flex-col gap-4">
