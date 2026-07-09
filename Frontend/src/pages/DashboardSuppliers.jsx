@@ -1636,6 +1636,9 @@ const DashboardSuppliers = () => {
                 { key: 'order_qty', label: 'QTY', render: (v, row) => (row.type === 'ordered' && v != null) ? Number(v).toLocaleString('en-IN') : '-' },
                 { key: 'order_total', label: 'AMOUNT', render: (v, row) => (row.type === 'ordered' && v != null) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
                 { key: 'check_in_remarks', label: 'REASON', render: (v, row) => (row.type === 'ordered' ? (row.order_notes || v) : v) || '-' },
+                { key: 'location', label: 'LOCATION', render: (_v, row) => (row.latitude && row.longitude)
+                  ? <a href={`https://www.google.com/maps?q=${row.latitude},${row.longitude}`} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
+                  : <span className="text-text-subtle">—</span> },
               ]}
               rows={checkins}
               onAddNew={isSalesman ? () => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); } : undefined}
