@@ -142,10 +142,13 @@ export const getProductsInTray = async (trayId) => {
  * @returns {Promise<Object>} Created tray product record
  */
 export const addProductToTray = async (trayProductData) => {
-  const { tray_id, product_id, qty, status } = trayProductData;
+  const { tray_id, product_id, qty, status, bag_no } = trayProductData;
   const body = { tray_id, product_id, status };
   if (qty !== undefined) {
     body.qty = qty;
+  }
+  if (bag_no !== undefined && bag_no !== null && bag_no !== '') {
+    body.bag_no = bag_no;
   }
   return apiRequest('/tray_products', {
     method: 'POST',
