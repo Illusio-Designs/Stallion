@@ -48,21 +48,33 @@ async function geocodeQuery(q) {
 }
 
 /**
- * Geocode an address to { latitude, longitude } or null. Tries the full address
- * first, then a coarse "city, state" query as a fallback (enough to reject
- * far-away visits even if the exact address can't be pinned).
+ * Geocode an address to { latitude, longitude } or null. Tries progressively
+ * coarser queries and returns the first hit. The PINCODE is prioritised right
+ * after the full address because an Indian pincode pins a locality far better
+ * than "city, state" (which falls back to the state centroid — e.g. a Vapi
+ * address geocoding to the middle of Gujarat).
  */
 async function geocodeAddress(address, opts = {}) {
   const country = opts.country || 'India';
-  const full = [address, opts.city, opts.state, opts.pincode, country].filter(Boolean).join(', ');
-  let r = await geocodeQuery(full);
-  if (!r.ok && (opts.city || opts.state)) {
-    const coarse = [opts.city, opts.state, opts.pincode, country].filter(Boolean).join(', ');
-    const r2 = await geocodeQuery(coarse);
-    if (r2.ok) { console.warn('[geocode] used coarse city/state fallback for:', full); r = r2; }
+  const pin = opts.pincode && String(opts.pincode).trim();
+  const attempts = [
+    [address, opts.city, opts.state, pin, country],   // full, most specific
+    [pin, opts.city, opts.state, country],            // pincode + locality
+    [pin, country],                                   // pincode alone -> the postal area
+    [opts.city, opts.state, country],                 // city + state
+    [opts.state, country],                            // state centroid (last resort)
+  ];
+  for (const parts of attempts) {
+    const q = parts.filter(Boolean).join(', ').trim();
+    if (!q) continue;
+    const r = await geocodeQuery(q);
+    if (r.ok) {
+      console.log('[geocode] resolved via:', q, '->', r.coords.latitude, r.coords.longitude);
+      return r.coords;
+    }
   }
-  if (!r.ok) console.warn('[geocode] FAILED for:', full, '->', r.error);
-  return r.ok ? r.coords : null;
+  console.warn('[geocode] FAILED for address:', address, 'pin:', pin);
+  return null;
 }
 
 /**
