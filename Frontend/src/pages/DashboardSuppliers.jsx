@@ -253,20 +253,9 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
 
 const DashboardSuppliers = () => {
   const confirm = useConfirm();
-  // Role comes from localStorage (empty on the server), so reading it during
-  // render mismatches hydration AND flashes the admin tabs to a salesman.
-  // Resolve it only after mount.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => { setMounted(true); }, []);
-  const isSalesman = mounted && getUserRole() === 'salesman';
+  const isSalesman = getUserRole() === 'salesman';
   const [activeTab, setActiveTab] = useState('All');
-  const [mainTab, setMainTab] = useState('Salesmen');
-  // Once mounted, default a salesman to their Visit Report tab.
-  useEffect(() => {
-    if (mounted && getUserRole() === 'salesman') {
-      setMainTab((t) => (t === 'Salesmen' ? 'Visit Report' : t));
-    }
-  }, [mounted]);
+  const [mainTab, setMainTab] = useState(isSalesman ? 'Visit Report' : 'Salesmen');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -513,11 +502,21 @@ const DashboardSuppliers = () => {
       // Store all parties for name lookup in the table
       setAllPartiesLookup(partiesArr);
 
-      // Use the parties from /parties/my as-is: the backend already scopes them
-      // to this salesman. The previous zone filter dropped valid parties whose
-      // zone_id didn't match the salesman's zones, leaving the check-in party
-      // list empty — so the Add Visit dropdown showed nothing.
-      setZoneParties(partiesArr);
+      // Step 5: filter by zone — if no zones assigned, show all parties for the country
+      const filtered = zoneIds.length > 0
+        ? partiesArr.filter(p => {
+            const partyZoneId = String(p.zone_id || p.zoneId || '').trim();
+            return zoneIds.includes(partyZoneId);
+          })
+        : partiesArr;
+
+      console.log('[fetchZoneParties] Filtered parties:', filtered.length);
+      if (partiesArr.length > 0 && filtered.length === 0 && zoneIds.length > 0) {
+        console.warn('[fetchZoneParties] No match — sample party zone_ids:',
+          partiesArr.slice(0, 5).map(p => ({ name: p.party_name, zone_id: p.zone_id || p.zoneId }))
+        );
+      }
+      setZoneParties(filtered);
     } catch (error) {
       console.error('Failed to load zone parties:', error);
       setZoneParties([]);
@@ -1410,7 +1409,7 @@ const DashboardSuppliers = () => {
         {/* Main tabs */}
         <div className="dash-row">
           <div className="order-tabs-container">
-            {mounted && (isSalesman
+            {(isSalesman
               ? ['Visit Report']
               : ['Salesmen', 'Visit Report', 'Targets']
             ).map(tab => (
@@ -1428,7 +1427,7 @@ const DashboardSuppliers = () => {
         {/* Sub-tabs for Salesmen tab removed - show all salesmen by default */}
 
         {/* Salesmen Table - admin only */}
-        {mounted && !isSalesman && mainTab === 'Salesmen' && (
+        {!isSalesman && mainTab === 'Salesmen' && (
         <div className="dash-row">
           <div className="dash-card full">
             {error ? (
@@ -2073,7 +2072,7 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
-            <DatePicker value={checkinForm.next_visit_date} onChange={(v) => setCheckinForm(prev => ({ ...prev, next_visit_date: v }))} />
+            <input type="date" className="ui-input" value={checkinForm.next_visit_date} onChange={(e) => setCheckinForm(prev => ({ ...prev, next_visit_date: e.target.value }))} />
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Remarks</label>

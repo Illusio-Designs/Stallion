@@ -33,10 +33,8 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
   // Role comes from localStorage, which doesn't exist during SSR. Reading it
   // directly makes the server render the full menu and the client render the
   // role-filtered menu → hydration mismatch. Defer the role lookup until after
-  // mount so the server and first client render agree (both show NO items),
-  // then the role-filtered menu appears once mounted. Showing the full menu as
-  // the fallback flashed the admin menu to non-admin users (e.g. a salesman saw
-  // every item for a frame before it narrowed) — an empty list avoids that.
+  // mount so the server and first client render agree (both show the full menu),
+  // then the filtered menu appears once mounted.
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   const userRole = mounted ? getUserRole() : null;
@@ -62,7 +60,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
   
   // Filter menu items based on user role
   const menuItems = useMemo(() => {
-    if (!userRole) return []; // before mount / no role: render nothing, not the admin menu
+    if (!userRole) return allMenuItems; // If no role, show all (fallback)
     return filterMenuItemsByRole(allMenuItems, userRole);
   }, [userRole]);
 
