@@ -25,6 +25,19 @@ const TABS = [
 const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const fmtDate = (d) =>
   d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+// Geofence radius (mirror of backend GEOFENCE_RADIUS_M) + Haversine distance in
+// metres, used to verify a recorded visit's GPS against the party's address.
+const GEOFENCE_RADIUS_M = 250;
+const distanceMeters = (lat1, lng1, lat2, lng2) => {
+  const toRad = (d) => (Number(d) * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+};
 const titleCase = (s) =>
   s ? String(s).split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') : '—';
 
@@ -154,6 +167,13 @@ const AnalyticsReports = () => {
     const p = parties.find((x) => String(x.party_id || x.id) === String(id));
     return p?.party_name || p?.name || `Party ${String(id).slice(0, 8)}`;
   };
+  // The party's geocoded address coordinates (for verifying a recorded visit).
+  const partyCoords = (id) => {
+    if (!id) return null;
+    const p = parties.find((x) => String(x.party_id || x.id) === String(id));
+    if (p && p.latitude != null && p.longitude != null) return { lat: Number(p.latitude), lng: Number(p.longitude) };
+    return null;
+  };
 
   // ---- Target summary (real data) ----
   const summary = useMemo(() => {
@@ -197,9 +217,23 @@ const AnalyticsReports = () => {
     { key: 'salesman', label: 'SALESMAN' },
     { key: 'party', label: 'PARTY' },
     { key: 'date', label: 'DATE' },
-    { key: 'location', label: 'LOCATION', render: (v) => (v && v.lat && v.lng)
-      ? <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
-      : <span className="text-text-subtle">—</span> },
+    { key: 'location', label: 'LOCATION', render: (v) => {
+      if (!v || v.lat == null || v.lng == null) return <span className="text-text-subtle">—</span>;
+      const mapLink = (
+        <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
+      );
+      if (!v.party) {
+        return <span className="inline-flex items-center gap-2">{mapLink}<span className="text-text-subtle text-xs">(party location not set)</span></span>;
+      }
+      const dist = Math.round(distanceMeters(v.lat, v.lng, v.party.lat, v.party.lng));
+      const ok = dist <= GEOFENCE_RADIUS_M;
+      return (
+        <span className="inline-flex items-center gap-2">
+          <StatusBadge status={ok ? 'completed' : 'cancelled'}>{ok ? `Matched · ${dist}m` : `Off by ${dist}m`}</StatusBadge>
+          {mapLink}
+        </span>
+      );
+    } },
     { key: 'qty', label: 'QTY' },
     { key: 'amount', label: 'AMOUNT' },
     { key: 'reason', label: 'REASON' },
@@ -213,7 +247,7 @@ const AnalyticsReports = () => {
       salesman: salesmanName(c.salesman_id),
       party: c.party_name || partyName(c.party_id),
       date: fmtDate(c.check_in_date),
-      location: { lat: c.latitude, lng: c.longitude },
+      location: { lat: c.latitude, lng: c.longitude, party: partyCoords(c.party_id) },
       qty: c.type === 'ordered' && c.order_qty != null ? Number(c.order_qty).toLocaleString('en-IN') : '—',
       amount: c.type === 'ordered' && c.order_total != null ? money(c.order_total) : '—',
       // Ordered rows carry the order note (order_notes); visits use check_in_remarks.
