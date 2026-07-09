@@ -336,8 +336,18 @@ const Dashboard = () => {
     setGeoChecking(true);
     setGeoResult(null);
     try {
-      const r = await apiRequest('/parties/geocode-test', { method: 'GET', includeAuth: true });
-      setGeoResult(r || { ok: false, error: 'empty response' });
+      // Test against one of THIS salesman's real parties so we see the exact
+      // query built from its address/city/state and store the coordinates.
+      const parties = await apiRequest('/parties/my', { method: 'GET', includeAuth: true });
+      const list = Array.isArray(parties) ? parties : (parties?.data || []);
+      const target = list.find((p) => p.latitude == null) || list[0];
+      if (target) {
+        const r = await apiRequest(`/parties/geocode-test?party_id=${encodeURIComponent(target.party_id)}`, { method: 'GET', includeAuth: true });
+        setGeoResult({ party_name: target.party_name, ...(r || {}) });
+      } else {
+        const r = await apiRequest('/parties/geocode-test', { method: 'GET', includeAuth: true });
+        setGeoResult(r || { ok: false, error: 'empty response' });
+      }
     } catch (e) {
       setGeoResult({ ok: false, error: e?.message || 'request error', statusCode: e?.statusCode });
     } finally {
@@ -532,16 +542,22 @@ const Dashboard = () => {
             {geoResult && (
               <div className={`mt-4 rounded-lg border p-4 text-[length:var(--text-sm)] ${geoResult.ok ? 'border-success bg-success-soft' : 'border-error bg-error-soft'}`}>
                 <div className={`font-semibold mb-1 ${geoResult.ok ? 'text-success' : 'text-error'}`}>
-                  {geoResult.ok ? '✓ Geocoder is working' : '✕ Geocoder not working'}
+                  {geoResult.ok ? (geoResult.stored ? '✓ Location found & saved' : '✓ Geocoder is working') : '✕ Could not get location'}
                 </div>
+                {geoResult.party_name && (
+                  <div className="text-text-muted break-words"><span className="font-medium text-text">Party:</span> {geoResult.party_name}</div>
+                )}
+                {(geoResult.resolved_city || geoResult.resolved_state) && (
+                  <div className="text-text-muted break-words"><span className="font-medium text-text">City / State:</span> {geoResult.resolved_city || '—'} / {geoResult.resolved_state || '—'}</div>
+                )}
                 {geoResult.query && (
                   <div className="text-text-muted break-words"><span className="font-medium text-text">Query:</span> {geoResult.query}</div>
                 )}
                 {geoResult.ok && geoResult.coords && (
-                  <div className="text-text-muted [font-variant-numeric:tabular-nums]"><span className="font-medium text-text">Coordinates:</span> {Number(geoResult.coords.latitude).toFixed(6)}, {Number(geoResult.coords.longitude).toFixed(6)}</div>
+                  <div className="text-text-muted [font-variant-numeric:tabular-nums]"><span className="font-medium text-text">Coordinates:</span> {Number(geoResult.coords.latitude).toFixed(6)}, {Number(geoResult.coords.longitude).toFixed(6)}{geoResult.stored ? ' (saved to party)' : ''}</div>
                 )}
                 {!geoResult.ok && (
-                  <div className="text-text-muted break-words"><span className="font-medium text-text">Reason:</span> {geoResult.error || 'unknown'}{geoResult.status ? ` (HTTP ${geoResult.status})` : ''}</div>
+                  <div className="text-text-muted break-words"><span className="font-medium text-text">Reason:</span> {(geoResult.detail && geoResult.detail.error) || geoResult.error || 'unknown'}{(geoResult.detail && geoResult.detail.status) ? ` (HTTP ${geoResult.detail.status})` : ''}</div>
                 )}
                 <pre className="mt-2 max-h-40 overflow-auto rounded bg-surface-muted p-2 text-[length:var(--text-xs)] text-text-subtle whitespace-pre-wrap break-words">{JSON.stringify(geoResult, null, 2)}</pre>
               </div>

@@ -749,10 +749,42 @@ class PartyController {
         }
     }
 
-    // Diagnostic: geocode a test address (or ?q=...) and return the raw result +
-    // failure reason, so we can tell whether the SERVER can reach the geocoder.
+    // Diagnostic. Two modes:
+    //  - ?q=<address>        → geocode that free text.
+    //  - ?party_id=<uuid>    → build the SAME query ensurePartyCoords builds for
+    //    that real party (address + resolved city/state + pincode), geocode it,
+    //    and (if found) STORE the coordinates on the party. This shows exactly
+    //    what data we send for a party and whether it resolves.
     async geocodeTest(req, res) {
         try {
+            const partyId = req.query && req.query.party_id;
+            if (partyId) {
+                const party = await Party.findOne({ where: { party_id: partyId } });
+                if (!party) return res.status(404).json({ error: 'Party not found' });
+                let city = null, state = null;
+                if (party.city_id) { const c = await Cities.findByPk(party.city_id); city = c && c.name; }
+                if (party.state_id) { const s = await State.findByPk(party.state_id); state = s && s.name; }
+                // Full address + fallback (city/state) — the same path ensurePartyCoords uses.
+                const coords = await geocodeAddress(party.address, { city, state, pincode: party.pincode });
+                let stored = false;
+                if (coords) {
+                    await party.update({ latitude: coords.latitude, longitude: coords.longitude });
+                    stored = true;
+                }
+                // If it couldn't resolve, include the raw failure detail for the full query.
+                const detail = coords ? null : await geocodeDiagnostic(party.address, { city, state, pincode: party.pincode });
+                return res.status(200).json({
+                    party_id: partyId,
+                    address: party.address,
+                    resolved_city: city,
+                    resolved_state: state,
+                    pincode: party.pincode || null,
+                    ok: !!coords,
+                    coords: coords || null,
+                    stored,
+                    detail,
+                });
+            }
             const q = (req.query && req.query.q) || 'Seawoods Grand Central Mall, Navi Mumbai, Maharashtra';
             const result = await geocodeDiagnostic(q);
             res.status(200).json(result);
