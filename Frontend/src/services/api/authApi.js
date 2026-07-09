@@ -154,7 +154,7 @@ export const getMyRole = async () => {
 export const createUser = async (userData) => {
   const {
     name, phone, phoneNumber, email, address,
-    country_id, state_id, city_id, role_id, is_active, image_url,
+    country_id, state_id, city_id, role_id, role_ids, is_active, image_url,
   } = userData;
   return apiRequest('/users', {
     method: 'POST',
@@ -167,6 +167,8 @@ export const createUser = async (userData) => {
       state_id: state_id || null,
       city_id: city_id || null,
       role_id,
+      // Multi-role: send the full set; the backend uses the first as primary.
+      ...(Array.isArray(role_ids) ? { role_ids } : {}),
       is_active: is_active !== undefined ? is_active : true,
       image_url: image_url || '',
     },
@@ -186,7 +188,7 @@ export const updateUserById = async (userId, userData) => {
   if (!id) throw new Error('User ID is required');
   const {
     name, phone, phoneNumber, email, address,
-    country_id, state_id, city_id, role_id, is_active, image_url,
+    country_id, state_id, city_id, role_id, role_ids, is_active, image_url,
   } = userData;
   return apiRequest(`/users/${id}`, {
     method: 'PUT',
@@ -199,6 +201,8 @@ export const updateUserById = async (userId, userData) => {
       state_id: state_id || null,
       city_id: city_id || null,
       role_id,
+      // Multi-role: send the full set; the backend uses the first as primary.
+      ...(Array.isArray(role_ids) ? { role_ids } : {}),
       is_active,
       image_url: image_url || '',
     },
