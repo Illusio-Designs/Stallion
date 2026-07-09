@@ -1172,11 +1172,17 @@ textarea.ui-input {
 .ui-aside-panel__backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(26, 27, 35, 0.25);
+  background: rgba(26, 27, 35, 0.5);
   /* Above all dashboard chrome (header z-100, sidebar z-1000/10000) so the
      panel is never clipped by them, but below the toast layer (z-99998). */
   z-index: 10050;
-  backdrop-filter: blur(2px);
+  /* Lay the panel out with flex (pinned to the right) instead of positioning
+     it `fixed`. A `backdrop-filter`/`filter` ancestor becomes the containing
+     block for fixed descendants, which on mobile Safari/Chrome mis-stacks or
+     hides the panel (the page shows through). Flex layout side-steps that, so
+     the panel stays fully opaque and on top on every device. */
+  display: flex;
+  justify-content: flex-end;
   /* Fade the scrim in/out; .is-open is toggled by the component. */
   opacity: 0;
   transition: opacity 240ms ease;
@@ -1187,9 +1193,7 @@ textarea.ui-input {
 }
 
 .ui-aside-panel {
-  position: fixed;
-  top: 0;
-  right: 0;
+  position: relative;
   height: 100dvh;
   width: 100%;
   max-width: 520px;

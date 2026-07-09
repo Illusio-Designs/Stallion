@@ -525,11 +525,34 @@ const DashboardSuppliers = () => {
     }
   };
 
+  // Resolve the logged-in salesman's own salesman_id (from state, else the
+  // role-scoped profile). Salesman-role users must only ever see THEIR OWN
+  // check-ins/targets — the "all" endpoints are admin-only and either leak
+  // every salesman's data or fail for a non-admin token (-> empty report).
+  const ensureMySalesmanId = async () => {
+    if (mySalesmanId) return mySalesmanId;
+    try {
+      const profile = await getSalesmanProfile();
+      const rec = profile?.data || profile || null;
+      const id = rec?.salesman_id || rec?.id || '';
+      if (id) setMySalesmanId(id);
+      return id;
+    } catch {
+      return '';
+    }
+  };
+
   const fetchCheckins = async () => {
     setCheckinsLoading(true);
     try {
-      const data = await getAllSalesmanCheckins();
-      setCheckins(Array.isArray(data) ? data : []);
+      let data;
+      if (isSalesman) {
+        const sid = await ensureMySalesmanId();
+        data = sid ? await getSalesmanCheckins(sid) : [];
+      } else {
+        data = await getAllSalesmanCheckins();
+      }
+      setCheckins(Array.isArray(data) ? data : (data?.data || []));
     } catch (error) {
       console.error('Failed to load check-ins:', error);
       setCheckins([]);
@@ -541,8 +564,14 @@ const DashboardSuppliers = () => {
   const fetchTargets = async () => {
     setTargetsLoading(true);
     try {
-      const data = await getAllSalesmanTargets();
-      setTargets(Array.isArray(data) ? data : []);
+      let data;
+      if (isSalesman) {
+        const sid = await ensureMySalesmanId();
+        data = sid ? await getSalesmanTargets(sid) : [];
+      } else {
+        data = await getAllSalesmanTargets();
+      }
+      setTargets(Array.isArray(data) ? data : (data?.data || []));
     } catch (error) {
       console.error('Failed to load targets:', error);
       setTargets([]);
