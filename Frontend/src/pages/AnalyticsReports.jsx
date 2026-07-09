@@ -11,6 +11,8 @@ import {
   getSalesmanById,
   getSalesmanProfile,
   getPartyById,
+  getMyOrders,
+  getOrders,
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
 import { showError } from '../services/notificationService';
@@ -93,6 +95,36 @@ const AnalyticsReports = () => {
     if (cRes.status === 'fulfilled') c = asArray(cRes.value);
     else if (!isNotFound(cRes.reason)) { realError = true; console.error('check-ins load failed:', cRes.reason); }
 
+    // Visit ORDERS live in the orders table and don't create a check-in, so they
+    // would be missing from the Visit Report. Merge them in as "ordered" rows,
+    // skipping any order already linked by a check-in (order_id).
+    try {
+      const ordersRes = isSalesman ? await getMyOrders() : await getOrders();
+      const orders = asArray(ordersRes);
+      const linked = new Set(c.map((x) => x.order_id).filter(Boolean));
+      const orderRows = orders
+        .filter((o) => o.order_type === 'visit_order' && !linked.has(o.order_id || o.id))
+        .map((o) => {
+          const items = Array.isArray(o.order_items) ? o.order_items : [];
+          const qty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+          return {
+            id: `order-${o.order_id || o.id}`,
+            type: 'ordered',
+            salesman_id: o.salesman_id,
+            party_id: o.party_id,
+            party_name: o.party_name,
+            order_id: o.order_id || o.id,
+            order_total: o.order_total,
+            order_qty: qty,
+            order_notes: o.order_notes,
+            check_in_date: o.order_date || o.created_at || o.createdAt,
+            latitude: o.latitude,
+            longitude: o.longitude,
+          };
+        });
+      c = [...c, ...orderRows];
+    } catch (e) { console.error('Failed to merge visit orders:', e); }
+
     setTargets(t);
     setCheckins(c);
     setLoadError(realError);
@@ -168,8 +200,9 @@ const AnalyticsReports = () => {
     { key: 'location', label: 'LOCATION', render: (v) => (v && v.lat && v.lng)
       ? <a href={`https://www.google.com/maps?q=${v.lat},${v.lng}`} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
       : <span className="text-text-subtle">—</span> },
-    { key: 'value', label: 'VALUE' },
-    { key: 'remarks', label: 'REMARKS' },
+    { key: 'qty', label: 'QTY' },
+    { key: 'amount', label: 'AMOUNT' },
+    { key: 'reason', label: 'REASON' },
   ]), []);
 
   const checkinRows = useMemo(() => [...checkins]
@@ -181,9 +214,10 @@ const AnalyticsReports = () => {
       party: c.party_name || partyName(c.party_id),
       date: fmtDate(c.check_in_date),
       location: { lat: c.latitude, lng: c.longitude },
-      value: c.type === 'ordered' && c.order_total != null ? money(c.order_total) : '—',
-      // Ordered check-ins carry the order remark (order_notes); visits use check_in_remarks.
-      remarks: (c.type === 'ordered' ? (c.order_notes || c.check_in_remarks) : c.check_in_remarks) || '—',
+      qty: c.type === 'ordered' && c.order_qty != null ? Number(c.order_qty).toLocaleString('en-IN') : '—',
+      amount: c.type === 'ordered' && c.order_total != null ? money(c.order_total) : '—',
+      // Ordered rows carry the order note (order_notes); visits use check_in_remarks.
+      reason: (c.type === 'ordered' ? (c.order_notes || c.check_in_remarks) : c.check_in_remarks) || '—',
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [checkins, salesmen, parties]);
