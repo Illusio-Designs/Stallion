@@ -312,8 +312,16 @@ class PartyController {
             }
             const user = req.user;
             const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
+            // address, city, state and pincode are required so the party can be
+            // geocoded accurately for the visit/check-in geofence.
             if (!party_name || !phone || !address) {
                 return res.status(400).json({ error: 'Party name, phone, and address are required' });
+            }
+            if (!city_id) {
+                return res.status(400).json({ error: 'City is required' });
+            }
+            if (!pincode || String(pincode).trim() === '') {
+                return res.status(400).json({ error: 'Pincode is required' });
             }
             const billingSameAsShipping = billing_same_as_shipping !== false;
             const billing = billingSameAsShipping ? null : (billing_address || null);

@@ -19,9 +19,10 @@ import {
   getZones,
   register,
   updateParty,
+  bulkUpdatePartyCoords,
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
-import { showError, showSuccess } from '../services/notificationService';
+import { showError, showSuccess, showInfo } from '../services/notificationService';
 
 const DashboardClients = () => {
   const confirm = useConfirm();
@@ -477,6 +478,24 @@ const DashboardClients = () => {
     }
   };
 
+  // Geocode every party missing coordinates (for the visit/check-in geofence).
+  const [geoUpdating, setGeoUpdating] = useState(false);
+  const handleBulkUpdateLocations = async () => {
+    if (geoUpdating) return;
+    if (!(await confirm('Find & save GPS coordinates for all parties that are missing them? This reads each address and may take a minute.'))) return;
+    try {
+      setGeoUpdating(true);
+      showInfo('Updating party locations…');
+      const r = await bulkUpdatePartyCoords();
+      showSuccess(`Locations updated: ${r?.updated ?? 0} of ${r?.scanned ?? 0}${r?.unresolved ? ` (${r.unresolved} could not be resolved)` : ''}.`);
+      if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter);
+    } catch (err) {
+      showError(`Location update failed: ${err.message}`);
+    } finally {
+      setGeoUpdating(false);
+    }
+  };
+
   const handleEdit = async (row) => {
     // Ensure we have the full row object with ID
     if (!row) {
@@ -687,6 +706,24 @@ const DashboardClients = () => {
     // State is required for a party.
     if (!formData.state_id || !isValidUUID(formData.state_id)) {
       setError('Please select a state');
+      setLoading(false);
+      return;
+    }
+
+    // Address, city and pincode are required so the party location can be
+    // geocoded accurately for the visit/check-in geofence.
+    if (!formData.address || formData.address.trim() === '') {
+      setError('Please enter the address');
+      setLoading(false);
+      return;
+    }
+    if (!formData.city_id || !isValidUUID(formData.city_id)) {
+      setError('Please select a city');
+      setLoading(false);
+      return;
+    }
+    if (!formData.pincode || String(formData.pincode).trim() === '') {
+      setError('Please enter the pincode');
       setLoading(false);
       return;
     }
@@ -1442,10 +1479,16 @@ const DashboardClients = () => {
               addNewText="Add New Party"
               onImport={() => setOpenBulkUpload(true)}
               importText="Bulk Upload"
-              secondaryActions={[{
-                label: 'Refresh',
-                onClick: () => { setError(null); if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter); }
-              }]}
+              secondaryActions={[
+                {
+                  label: 'Refresh',
+                  onClick: () => { setError(null); if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter); }
+                },
+                {
+                  label: geoUpdating ? 'Updating Locations…' : 'Update Locations',
+                  onClick: handleBulkUpdateLocations
+                }
+              ]}
               showFilter={true}
               filterContent={
                 <div>
