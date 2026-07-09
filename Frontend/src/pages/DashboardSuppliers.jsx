@@ -1834,11 +1834,14 @@ const DashboardSuppliers = () => {
                   <input
                     type="file"
                     accept={doc.accept}
-                    className="ui-input file:mr-3 file:rounded-md file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-primary file:font-medium file:cursor-pointer text-[length:var(--text-sm)] text-text-muted"
+                    className="block w-full cursor-pointer rounded-md border border-border-strong bg-surface text-[length:var(--text-sm)] text-text-muted file:mr-3 file:cursor-pointer file:border-0 file:border-r file:border-border file:bg-primary-soft file:px-4 file:py-2.5 file:font-semibold file:text-primary hover:file:bg-primary-soft-hover focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)]"
                     onChange={(e) => handleInputChange(doc.key, e.target.files?.[0] || null)}
                   />
                   {formData[doc.key] && (
-                    <span className="text-[length:var(--text-xs)] text-success truncate">{formData[doc.key].name}</span>
+                    <span className="inline-flex max-w-full items-center gap-1 text-[length:var(--text-xs)] font-medium text-success">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+                      <span className="truncate">{formData[doc.key].name}</span>
+                    </span>
                   )}
                 </div>
               ))}
@@ -2042,11 +2045,14 @@ const DashboardSuppliers = () => {
                   <input
                     type="file"
                     accept={doc.accept}
-                    className="ui-input file:mr-3 file:rounded-md file:border-0 file:bg-primary-soft file:px-3 file:py-1.5 file:text-primary file:font-medium file:cursor-pointer text-[length:var(--text-sm)] text-text-muted"
+                    className="block w-full cursor-pointer rounded-md border border-border-strong bg-surface text-[length:var(--text-sm)] text-text-muted file:mr-3 file:cursor-pointer file:border-0 file:border-r file:border-border file:bg-primary-soft file:px-4 file:py-2.5 file:font-semibold file:text-primary hover:file:bg-primary-soft-hover focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)]"
                     onChange={(e) => handleInputChange(doc.key, e.target.files?.[0] || null)}
                   />
                   {formData[doc.key] && (
-                    <span className="text-[length:var(--text-xs)] text-success truncate">{formData[doc.key].name}</span>
+                    <span className="inline-flex max-w-full items-center gap-1 text-[length:var(--text-xs)] font-medium text-success">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
+                      <span className="truncate">{formData[doc.key].name}</span>
+                    </span>
                   )}
                 </div>
               ))}
