@@ -18,6 +18,7 @@ on:
 
 permissions:
   contents: write
+  actions: write   # needed to dispatch backend-deploy after syncing
 
 # Never run two mirrors at once.
 concurrency:
@@ -89,6 +90,8 @@ jobs:
             main-repo/Backendjs/ branch-repo/Backendjs/
       - name: Commit & push to backend
         working-directory: branch-repo
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -101,6 +104,11 @@ jobs:
           for i in 1 2 3 4 5; do
             if git push origin backend; then
               echo "Pushed to backend."
+              # A bot (GITHUB_TOKEN) push does NOT trigger backend-deploy on its
+              # own, so dispatch it explicitly (workflow_dispatch IS exempt).
+              gh workflow run backend-deploy.yml --ref backend \
+                && echo "Dispatched backend-deploy." \
+                || echo "::warning::Could not dispatch backend-deploy; deploy the backend branch manually."
               exit 0
             fi
             echo "Push rejected (backend moved), rebasing and retrying..."
