@@ -21,14 +21,21 @@ class UserController {
                 }
             );
             const roleIds = roles.map(role => role.role_id);
-            console.log("roleIds", roleIds);
             const users = await User.findAll(
                 {
                     where: {
                         role_id: {
                             [Op.in]: roleIds
                         }
-                    }
+                    },
+                    // Include every assigned role (multi-role) so the office-team
+                    // UI can show/edit all of a member's roles, not just primary.
+                    include: [{
+                        model: Role,
+                        as: 'roles',
+                        attributes: ['role_id', 'role_name'],
+                        through: { attributes: [] },
+                    }],
                 }
             );
             res.status(200).json(users);
@@ -66,14 +73,24 @@ class UserController {
 
     async createUser(req, res) {
         try {
-            const { name, is_active, phone, role_id, email, image_url, address, country_id, state_id, city_id } = req.body;
+            const { name, is_active, phone, role_id, role_ids, email, image_url, address, country_id, state_id, city_id } = req.body;
             if (!address) {
                 return res.status(400).json({ error: 'Address is required' });
             }
-            const role = await Role.findByPk(role_id);
-            if (!role) {
-                return res.status(404).json({ error: 'Role not found' });
+            // Support multiple roles: role_ids (array) is preferred; role_id is
+            // kept for backward compatibility. The first role becomes the user's
+            // primary role_id; all of them are written to user_roles.
+            let roleIdList = Array.isArray(role_ids) ? role_ids.filter(Boolean).map(String) : [];
+            if (roleIdList.length === 0 && role_id) roleIdList = [String(role_id)];
+            roleIdList = [...new Set(roleIdList)];
+            if (roleIdList.length === 0) {
+                return res.status(400).json({ error: 'At least one role is required' });
             }
+            const foundRoles = await Role.findAll({ where: { role_id: { [Op.in]: roleIdList } } });
+            if (foundRoles.length !== roleIdList.length) {
+                return res.status(404).json({ error: 'One or more roles not found' });
+            }
+            const primaryRoleId = roleIdList[0];
             const user = await User.create({
                 full_name: name,
                 phone: phone,
@@ -82,16 +99,16 @@ class UserController {
                 country_id: country_id || null,
                 state_id: state_id || null,
                 city_id: city_id || null,
-                role_id: role_id,
+                role_id: primaryRoleId,
                 is_active: is_active,
                 profile_image: image_url,
                 created_at: new Date(),
                 updated_at: new Date()
             });
-            await UserRole.create({
+            await UserRole.bulkCreate(roleIdList.map((rid) => ({
                 user_id: user.user_id,
-                role_id: role_id
-            });
+                role_id: rid,
+            })));
             await logAudit({
                 req,
                 action: 'create',
@@ -207,10 +224,27 @@ class UserController {
             if (!id) {
                 return res.status(400).json({ error: 'User ID is required' });
             }
-            const { name, is_active, phone, role_id, email, image_url, address, country_id, state_id, city_id } = req.body;
+            const { name, is_active, phone, role_id, role_ids, email, image_url, address, country_id, state_id, city_id } = req.body;
             const user = await User.findByPk(id);
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
+            }
+
+            // Multi-role: role_ids (array) preferred, role_id kept for back-compat.
+            // null => roles not being changed in this request.
+            let roleIdList = Array.isArray(role_ids) ? role_ids.filter(Boolean).map(String) : null;
+            if (roleIdList === null && role_id !== undefined && role_id !== null && role_id !== '') {
+                roleIdList = [String(role_id)];
+            }
+            if (roleIdList) {
+                roleIdList = [...new Set(roleIdList)];
+                if (roleIdList.length === 0) {
+                    return res.status(400).json({ error: 'At least one role is required' });
+                }
+                const foundRoles = await Role.findAll({ where: { role_id: { [Op.in]: roleIdList } } });
+                if (foundRoles.length !== roleIdList.length) {
+                    return res.status(404).json({ error: 'One or more roles not found' });
+                }
             }
 
             const updates = {
@@ -231,21 +265,20 @@ class UserController {
             if (is_active !== undefined) {
                 updates.is_active = is_active;
             }
-            if (role_id !== undefined) {
-                const role = await Role.findByPk(role_id);
-                if (!role) {
-                    return res.status(404).json({ error: 'Role not found' });
-                }
-                updates.role_id = role_id;
+            if (roleIdList) {
+                updates.role_id = roleIdList[0]; // first is the primary role
             }
 
             const oldSnapshot = user.toJSON();
             await user.update(updates);
 
-            // Keep the role mapping table in sync when the role changes.
-            if (role_id !== undefined && role_id !== oldSnapshot.role_id) {
+            // Replace the role mapping table with the new set when roles change.
+            if (roleIdList) {
                 await UserRole.destroy({ where: { user_id: user.user_id } });
-                await UserRole.create({ user_id: user.user_id, role_id });
+                await UserRole.bulkCreate(roleIdList.map((rid) => ({
+                    user_id: user.user_id,
+                    role_id: rid,
+                })));
             }
 
             await logAudit({

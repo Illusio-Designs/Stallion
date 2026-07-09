@@ -654,10 +654,22 @@ const DashboardSuppliers = () => {
     { key: 'full_name', label: 'NAME' },
     { key: 'phone', label: 'PHONE' },
     { key: 'email', label: 'EMAIL' },
+    { key: 'status', label: 'STATUS', render: (_v, row) => (
+      <button
+        type="button"
+        onClick={() => handleToggleActive(row)}
+        title={row.isActive ? 'Active — click to deactivate' : 'Inactive — click to activate'}
+        className="cursor-pointer border-0 bg-transparent p-0"
+      >
+        <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>
+          {row.isActive ? 'Active' : 'Inactive'}
+        </StatusBadge>
+      </button>
+    ) },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
-      <RowActions 
-        onEdit={() => handleEdit(row)} 
-        onDelete={() => handleDelete(row)} 
+      <RowActions
+        onEdit={() => handleEdit(row)}
+        onDelete={() => handleDelete(row)}
       />
     ) },
   ]), []);
@@ -778,6 +790,50 @@ const DashboardSuppliers = () => {
     setTimeout(() => {
       isInitializingEditRef.current = false;
     }, 100);
+  };
+
+  // Activate / deactivate a salesman. Deactivating a salesman who has left
+  // blocks their login and data access (the backend mirrors is_active onto the
+  // linked user account, and auth rejects inactive users).
+  const handleToggleActive = async (row) => {
+    const salesmanId = row.id || row.salesman_id || row.salesmanId;
+    if (!salesmanId) {
+      showError('Invalid salesman data: missing ID.');
+      return;
+    }
+    const next = !row.isActive;
+    const msg = next
+      ? 'Reactivate this salesman? They will regain login and data access.'
+      : 'Deactivate this salesman? This blocks their login and data access until reactivated.';
+    if (!(await confirm(msg))) return;
+
+    // Optimistic update.
+    setSalesmen(prev => prev.map(s => {
+      const id = s.id || s.salesman_id || s.salesmanId;
+      return id === salesmanId ? { ...s, is_active: next } : s;
+    }));
+    try {
+      await updateSalesman(salesmanId, {
+        user_id: row.user_id,
+        employee_code: row.employee_code,
+        full_name: row.full_name,
+        phone: row.phone,
+        email: row.email,
+        address: row.address,
+        country_id: row.country_id,
+        state_id: row.state_id || null,
+        city_id: row.city_id || null,
+        is_active: next,
+      });
+      showSuccess(next ? 'Salesman activated' : 'Salesman deactivated');
+    } catch (e) {
+      // Revert on failure.
+      setSalesmen(prev => prev.map(s => {
+        const id = s.id || s.salesman_id || s.salesmanId;
+        return id === salesmanId ? { ...s, is_active: !next } : s;
+      }));
+      showError(e?.message || 'Failed to update salesman status');
+    }
   };
 
   const handleDelete = async (row) => {

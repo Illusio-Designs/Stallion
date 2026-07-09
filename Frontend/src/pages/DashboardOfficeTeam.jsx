@@ -5,6 +5,7 @@ import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
+import PagedMultiSelect from '../components/ui/PagedMultiSelect';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import { createUser, updateUserById, getRoles, getUsers, deleteUser, getCountries, getStates, getCities } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
@@ -23,7 +24,7 @@ const DashboardOfficeTeam = () => {
   const [formData, setFormData] = useState({
     fullName: '',
     phoneNumber: '',
-    roleId: '',
+    roleIds: [],
     email: '',
     address: '',
     country_id: '',
@@ -33,7 +34,7 @@ const DashboardOfficeTeam = () => {
   const [editFormData, setEditFormData] = useState({
     fullName: '',
     phoneNumber: '',
-    roleId: '',
+    roleIds: [],
     isActive: true,
     email: '',
     address: '',
@@ -106,7 +107,9 @@ const DashboardOfficeTeam = () => {
       setEditFormData({
         fullName: editRow.fullName || '',
         phoneNumber: editRow.phoneNumber || '',
-        roleId: editRow.roleId || '',
+        roleIds: Array.isArray(editRow.roleIds) && editRow.roleIds.length
+          ? editRow.roleIds
+          : (editRow.roleId ? [editRow.roleId] : []),
         isActive: editRow.isActive !== undefined ? editRow.isActive : true,
         email: editRow.email || '',
         address: editRow.address || '',
@@ -136,16 +139,28 @@ const DashboardOfficeTeam = () => {
         const roleId = r.role_id || r.id || r.roleId || r._id || r.uuid || r.ID;
         return roleId === user.role_id;
       });
-      const roleName = userRole 
+      const roleName = userRole
         ? formatRoleName(userRole.role_name || userRole.name || userRole.roleName || userRole.title || userRole.role || userRole.Name || userRole.RoleName)
         : 'Unknown Role';
-      
+
+      // Multi-role: the backend now returns each user's full roles array. Build
+      // the list of role ids + a display string; fall back to the primary role.
+      const roleList = Array.isArray(user.roles) && user.roles.length
+        ? user.roles.map(r => ({
+            id: r.role_id || r.id,
+            label: formatRoleName(r.role_name || r.name || '') || (r.role_id || r.id),
+          }))
+        : (user.role_id ? [{ id: user.role_id, label: roleName }] : []);
+      const roleIds = roleList.map(r => r.id);
+      const rolesDisplay = roleList.map(r => r.label).join(', ') || roleName;
+
       return {
         id: user.user_id || user.id,
         fullName: user.full_name || user.fullName || user.name || '',
         phoneNumber: user.phone || user.phoneNumber || '',
-        role: roleName,
+        role: rolesDisplay,
         roleId: user.role_id || user.roleId,
+        roleIds,
         status: user.is_active ? 'Active' : 'Inactive',
         isActive: user.is_active || false,
         profile_image: user.profile_image || '',
@@ -194,6 +209,33 @@ const DashboardOfficeTeam = () => {
     console.log('Role options:', options); // Debug log
     return options;
   }, [roles]);
+
+  // --- Roles multi-select (uses our PagedMultiSelect widget) ---------------
+  // Roles is a small static list, so "fetch a page" just filters + slices the
+  // in-memory roleOptions. This lets us reuse the same widget as zones/states.
+  const roleFetchPage = (page, search) => {
+    const term = String(search || '').trim().toLowerCase();
+    const filtered = term
+      ? roleOptions.filter((o) => o.label.toLowerCase().includes(term))
+      : roleOptions;
+    const start = (page - 1) * 20;
+    return Promise.resolve(filtered.slice(start, start + 20));
+  };
+  const roleMapItem = (o) => ({ value: o.value, label: o.label });
+  // roleIds -> [{ id, label }] chips for the widget's `selected` prop.
+  const selectedRoleChips = (ids) =>
+    (ids || []).map((id) => {
+      const opt = roleOptions.find((o) => String(o.value) === String(id));
+      return { id, label: opt ? opt.label : id };
+    });
+  // Toggle a role id on/off in an ids array and hand the result to `setNext`.
+  const toggleRoleId = (ids, opt, setNext) => {
+    const list = ids || [];
+    const exists = list.some((id) => String(id) === String(opt.value));
+    setNext(exists
+      ? list.filter((id) => String(id) !== String(opt.value))
+      : [...list, opt.value]);
+  };
 
   const [rows, setRows] = useState([]);
   const [users, setUsers] = useState([]);
@@ -302,7 +344,7 @@ const DashboardOfficeTeam = () => {
         country_id: formData.country_id || null,
         state_id: formData.state_id || null,
         city_id: formData.city_id || null,
-        role_id: formData.roleId,
+        role_ids: formData.roleIds,
         is_active: true,
       };
 
@@ -312,7 +354,7 @@ const DashboardOfficeTeam = () => {
       setFormData({
         fullName: '',
         phoneNumber: '',
-        roleId: '',
+        roleIds: [],
         email: '',
         address: '',
         country_id: '',
@@ -370,7 +412,7 @@ const DashboardOfficeTeam = () => {
         state_id: editFormData.state_id || null,
         city_id: editFormData.city_id || null,
         is_active: editFormData.isActive,
-        role_id: editFormData.roleId,
+        role_ids: editFormData.roleIds,
       });
       
       // Refresh users list
@@ -605,7 +647,7 @@ const DashboardOfficeTeam = () => {
           setFormData({
             fullName: '',
             phoneNumber: '',
-            roleId: '',
+            roleIds: [],
             email: '',
             address: '',
             country_id: '',
@@ -623,7 +665,7 @@ const DashboardOfficeTeam = () => {
                 setFormData({
                   fullName: '',
                   phoneNumber: '',
-                  roleId: '',
+                  roleIds: [],
                   email: '',
                   address: '',
                   country_id: '',
@@ -638,7 +680,7 @@ const DashboardOfficeTeam = () => {
             <button
               className="ui-btn ui-btn--primary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text-on-primary shadow-xs transition-colors hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
               onClick={handleSubmit}
-              disabled={loading || !formData.fullName || !formData.phoneNumber || !formData.roleId || !formData.address}
+              disabled={loading || !formData.fullName || !formData.phoneNumber || !formData.roleIds.length || !formData.address}
             >
               {loading ? 'Saving...' : 'Save'}
             </button>
@@ -689,12 +731,15 @@ const DashboardOfficeTeam = () => {
             />
           </div>
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Role *</label>
-            <DropdownSelector
-              options={roleOptions}
-              value={formData.roleId}
-              onChange={(value) => handleInputChange('roleId', value)}
-              placeholder="Select a role"
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Roles * <span className="text-text-muted font-normal">(select one or more)</span></label>
+            <PagedMultiSelect
+              fetchPage={roleFetchPage}
+              mapItem={roleMapItem}
+              selected={selectedRoleChips(formData.roleIds)}
+              onToggle={(opt) => toggleRoleId(formData.roleIds, opt, (next) => handleInputChange('roleIds', next))}
+              onRemove={(id) => handleInputChange('roleIds', formData.roleIds.filter((rid) => String(rid) !== String(id)))}
+              placeholder="Select roles"
+              searchPlaceholder="Search roles…"
             />
           </div>
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
@@ -757,7 +802,7 @@ const DashboardOfficeTeam = () => {
           setEditFormData({
             fullName: '',
             phoneNumber: '',
-            roleId: '',
+            roleIds: [],
             isActive: true,
             email: '',
             address: '',
@@ -776,7 +821,7 @@ const DashboardOfficeTeam = () => {
                 setEditFormData({
                   fullName: '',
                   phoneNumber: '',
-                  roleId: '',
+                  roleIds: [],
                   isActive: true,
                   email: '',
                   address: '',
@@ -792,7 +837,7 @@ const DashboardOfficeTeam = () => {
             <button
               className="ui-btn ui-btn--primary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text-on-primary shadow-xs transition-colors hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
               onClick={handleEditSubmit}
-              disabled={loading || !editFormData.fullName || !editFormData.phoneNumber || !editFormData.roleId || !editFormData.address}
+              disabled={loading || !editFormData.fullName || !editFormData.phoneNumber || !editFormData.roleIds.length || !editFormData.address}
             >
               {loading ? 'Updating...' : 'Update'}
             </button>
@@ -843,12 +888,15 @@ const DashboardOfficeTeam = () => {
             />
           </div>
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Role *</label>
-            <DropdownSelector
-              options={roleOptions}
-              value={editFormData.roleId}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, roleId: value }))}
-              placeholder="Select a role"
+            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Roles * <span className="text-text-muted font-normal">(select one or more)</span></label>
+            <PagedMultiSelect
+              fetchPage={roleFetchPage}
+              mapItem={roleMapItem}
+              selected={selectedRoleChips(editFormData.roleIds)}
+              onToggle={(opt) => toggleRoleId(editFormData.roleIds, opt, (next) => setEditFormData((prev) => ({ ...prev, roleIds: next })))}
+              onRemove={(id) => setEditFormData((prev) => ({ ...prev, roleIds: prev.roleIds.filter((rid) => String(rid) !== String(id)) }))}
+              placeholder="Select roles"
+              searchPlaceholder="Search roles…"
             />
           </div>
           <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">

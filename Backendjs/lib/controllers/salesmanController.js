@@ -268,6 +268,10 @@ class SalesmanController {
                 if (phone !== undefined && phone !== null && String(phone).trim() !== '') userUpdate.phone = toE164(phone);
                 if (email !== undefined && email !== null && String(email).trim() !== '') userUpdate.email = email;
                 if (full_name !== undefined && full_name !== null && String(full_name).trim() !== '') userUpdate.full_name = full_name;
+                // Mirror active/inactive onto the login account so deactivating a
+                // salesman who has left actually BLOCKS their access — the auth
+                // middleware rejects any user whose is_active is false.
+                if (is_active !== undefined && is_active !== null) userUpdate.is_active = is_active;
                 if (Object.keys(userUpdate).length > 1) {
                     await User.update(userUpdate, { where: { user_id: salesman.user_id } });
                 }
