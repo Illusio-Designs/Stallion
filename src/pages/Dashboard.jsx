@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
-import { showError, showInfo, showSuccess } from '../services/notificationService';
+import { showError, showInfo } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
 import DropdownSelector from '../components/ui/DropdownSelector';
@@ -330,19 +330,16 @@ const Dashboard = () => {
   // Diagnostic: hit the backend geocoder and report whether it works — lets us
   // confirm the visit/check-in geofence can resolve party addresses.
   const [geoChecking, setGeoChecking] = useState(false);
+  const [geoResult, setGeoResult] = useState(null); // full response shown inline
   const handleGeoCheck = async () => {
     if (geoChecking) return;
     setGeoChecking(true);
-    showInfo('Checking geocoder…');
+    setGeoResult(null);
     try {
       const r = await apiRequest('/parties/geocode-test', { method: 'GET', includeAuth: true });
-      if (r && r.ok && r.coords) {
-        showSuccess(`Geocoder OK — resolved to ${Number(r.coords.latitude).toFixed(4)}, ${Number(r.coords.longitude).toFixed(4)}`);
-      } else {
-        showError(`Geocoder not working: ${(r && r.error) || 'unknown error'}`);
-      }
+      setGeoResult(r || { ok: false, error: 'empty response' });
     } catch (e) {
-      showError(`Geo check failed: ${e?.message || 'request error'}`);
+      setGeoResult({ ok: false, error: e?.message || 'request error', statusCode: e?.statusCode });
     } finally {
       setGeoChecking(false);
     }
@@ -532,6 +529,23 @@ const Dashboard = () => {
               <QuickActionCard icon={FiBarChart2} label="View Report" desc="Targets & analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
               <QuickActionCard icon={FiMapPin} label={geoChecking ? 'Checking…' : 'Geo Check'} desc="Test location service" onClick={handleGeoCheck} />
             </div>
+            {geoResult && (
+              <div className={`mt-4 rounded-lg border p-4 text-[length:var(--text-sm)] ${geoResult.ok ? 'border-success bg-success-soft' : 'border-error bg-error-soft'}`}>
+                <div className={`font-semibold mb-1 ${geoResult.ok ? 'text-success' : 'text-error'}`}>
+                  {geoResult.ok ? '✓ Geocoder is working' : '✕ Geocoder not working'}
+                </div>
+                {geoResult.query && (
+                  <div className="text-text-muted break-words"><span className="font-medium text-text">Query:</span> {geoResult.query}</div>
+                )}
+                {geoResult.ok && geoResult.coords && (
+                  <div className="text-text-muted [font-variant-numeric:tabular-nums]"><span className="font-medium text-text">Coordinates:</span> {Number(geoResult.coords.latitude).toFixed(6)}, {Number(geoResult.coords.longitude).toFixed(6)}</div>
+                )}
+                {!geoResult.ok && (
+                  <div className="text-text-muted break-words"><span className="font-medium text-text">Reason:</span> {geoResult.error || 'unknown'}{geoResult.status ? ` (HTTP ${geoResult.status})` : ''}</div>
+                )}
+                <pre className="mt-2 max-h-40 overflow-auto rounded bg-surface-muted p-2 text-[length:var(--text-xs)] text-text-subtle whitespace-pre-wrap break-words">{JSON.stringify(geoResult, null, 2)}</pre>
+              </div>
+            )}
           </div>
         </div>
       )}
