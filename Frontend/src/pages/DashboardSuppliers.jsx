@@ -7,6 +7,7 @@ import DropdownSelector from '../components/ui/DropdownSelector';
 import DatePicker from '../components/ui/DatePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
 import FileUpload from '../components/ui/FileUpload';
+import MatchMeter from '../components/ui/MatchMeter';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
@@ -1668,22 +1669,19 @@ const DashboardSuppliers = () => {
                 { key: 'location', label: 'LOCATION', render: (_v, row) => {
                   const hasDev = row.latitude != null && row.longitude != null;
                   if (!hasDev) return <span className="text-text-subtle">—</span>;
+                  const href = `https://www.google.com/maps?q=${row.latitude},${row.longitude}`;
                   const pc = partyCoordsMap[row.party_id];
-                  const mapLink = (
-                    <a href={`https://www.google.com/maps?q=${row.latitude},${row.longitude}`} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
-                  );
                   if (!pc) {
                     // Party address not geocoded yet — can't verify against it.
-                    return <span className="inline-flex items-center gap-2">{mapLink}<span className="text-text-subtle text-[var(--text-xs)]">(party location not set)</span></span>;
+                    return (
+                      <span className="inline-flex items-center gap-2">
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
+                        <span className="text-text-subtle text-[var(--text-xs)]">(party location not set)</span>
+                      </span>
+                    );
                   }
-                  const dist = Math.round(distanceMeters(row.latitude, row.longitude, pc.lat, pc.lng));
-                  const ok = dist <= GEOFENCE_RADIUS_M;
-                  return (
-                    <span className="inline-flex items-center gap-2">
-                      <StatusBadge status={ok ? 'completed' : 'cancelled'}>{ok ? `Matched · ${dist}m` : `Off by ${dist}m`}</StatusBadge>
-                      {mapLink}
-                    </span>
-                  );
+                  const dist = distanceMeters(row.latitude, row.longitude, pc.lat, pc.lng);
+                  return <MatchMeter distance={dist} radius={GEOFENCE_RADIUS_M} href={href} />;
                 } },
               ]}
               rows={checkins}
