@@ -1371,35 +1371,6 @@ const DashboardSuppliers = () => {
     }
   };
 
-  const handleCheckinEdit = (row) => {
-    setEditCheckin(row);
-    setCheckinForm({
-      salesman_id: row.salesman_id || '',
-      check_in_date: row.check_in_date ? row.check_in_date.split('T')[0] : '',
-      party_id: row.party_id || '',
-      contact_person: row.contact_person || '',
-      // DATE columns come back as ISO; slice to the datetime-local / date shapes.
-      in_time: row.in_time ? String(row.in_time).slice(0, 16) : '',
-      out_time: row.out_time ? String(row.out_time).slice(0, 16) : '',
-      next_visit_date: row.next_visit_date ? String(row.next_visit_date).split('T')[0] : '',
-      latitude: row.latitude || '',
-      longitude: row.longitude || '',
-      check_in_remarks: row.check_in_remarks || '',
-    });
-    setOpenCheckinModal(true);
-  };
-
-  const handleCheckinDelete = async (row) => {
-    if (!(await confirm('Delete this check-in?'))) return;
-    try {
-      await deleteSalesmanCheckin(row.id);
-      showSuccess('Visit report deleted successfully');
-      setCheckins(prev => prev.filter(c => c.id !== row.id));
-    } catch (error) {
-      showError(`Failed to delete check-in: ${error.message}`);
-    }
-  };
-
   // ---- Target handlers ----
   const resetTargetForm = () => setTargetForm({ salesman_id: '', target_amount: '', start_date: '', end_date: '', order_type: '', target_description: '', target_remarks: '' });
 
@@ -1625,9 +1596,6 @@ const DashboardSuppliers = () => {
                 { key: 'party_id', label: 'PARTY', render: (_v, row) => row.party_name || partyNameMap[row.party_id] || row.party_id || '-' },
                 { key: 'order_total', label: 'VALUE', render: (v, row) => (row.type === 'ordered' && v != null) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
                 { key: 'check_in_remarks', label: 'REMARKS', render: (v, row) => (row.type === 'ordered' ? (row.order_notes || v) : v) || '-' },
-                ...(isSalesman ? [{ key: 'action', label: 'ACTION', render: (_v, row) => (
-                  <RowActions onEdit={() => handleCheckinEdit(row)} onDelete={() => handleCheckinDelete(row)} />
-                )}] : []),
               ]}
               rows={checkins}
               onAddNew={isSalesman ? () => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); } : undefined}
