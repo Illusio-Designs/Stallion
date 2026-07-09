@@ -9,6 +9,7 @@ const rootDir = path.join(__dirname, '..', '..');
 const PRODUCT_UPLOAD_DIR = 'product_uploads';
 const PRODUCT_IMAGE_UPLOAD_DIR = 'products';
 const PARTY_UPLOAD_DIR = 'party_uploads';
+const SALESMAN_UPLOAD_DIR = 'salesman';
 
 // Create upload directories if they don't exist
 const createUploadDirs = () => {
@@ -18,7 +19,8 @@ const createUploadDirs = () => {
     path.join(rootDir, 'uploads', 'bills'),
     path.join(rootDir, 'uploads', 'sliders'),
     path.join(rootDir, 'uploads', PRODUCT_UPLOAD_DIR),
-    path.join(rootDir, 'uploads', PARTY_UPLOAD_DIR)
+    path.join(rootDir, 'uploads', PARTY_UPLOAD_DIR),
+    path.join(rootDir, 'uploads', SALESMAN_UPLOAD_DIR)
   ];
 
   dirs.forEach(dir => {
@@ -424,8 +426,66 @@ const processAndSaveImage = (uploadType = 'general') => {
   };
 };
 
+// ---- Salesman KYC documents (PAN, Aadhar, cancel cheque, photo) ----
+// Disk storage (not memory) because these accept PDFs too, which sharp can't
+// process — we store the file as-is. One file per field.
+const SALESMAN_DOC_FIELDS = [
+  { name: 'pan_card', maxCount: 1 },
+  { name: 'aadhar_card', maxCount: 1 },
+  { name: 'cancel_cheque', maxCount: 1 },
+  { name: 'photo', maxCount: 1 },
+];
+
+const salesmanDocStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(rootDir, 'uploads', SALESMAN_UPLOAD_DIR));
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const base = path.basename(file.originalname, ext).replace(/[^a-z0-9_-]+/gi, '_');
+    cb(null, `${file.fieldname}-${base}-${Date.now()}${ext}`);
+  },
+});
+
+const salesmanDocsUploadBase = multer({
+  storage: salesmanDocStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB per file
+    files: SALESMAN_DOC_FIELDS.length,
+  },
+  fileFilter: (req, file, cb) => {
+    // Photo must be an image; the other three accept image or PDF.
+    const imageTypes = /jpeg|jpg|png|webp/;
+    const docTypes = /jpeg|jpg|png|webp|pdf/;
+    const allowed = file.fieldname === 'photo' ? imageTypes : docTypes;
+    const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
+    const mimeOk = allowed.test(file.mimetype);
+    if (extOk && mimeOk) return cb(null, true);
+    cb(new Error(
+      file.fieldname === 'photo'
+        ? 'Photo must be an image (jpg, png, webp).'
+        : 'Documents must be an image or PDF.'
+    ), false);
+  },
+}).fields(SALESMAN_DOC_FIELDS);
+
+// Wrapper: normalize multer errors to JSON 400s (matches productFileUpload).
+const salesmanDocsUpload = (req, res, next) => {
+  salesmanDocsUploadBase(req, res, (err) => {
+    if (err) {
+      if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'File too large. Maximum size is 5MB per document.' });
+      }
+      return res.status(400).json({ error: err.message });
+    }
+    next();
+  });
+};
+
 module.exports = {
   upload,
+  salesmanDocsUpload,
+  SALESMAN_UPLOAD_DIR,
   profileUpload: processAndSaveImage('profile'),
   productImageUpload: processAndSaveImage('product'),
   sliderUpload: processAndSaveImage('slider'),

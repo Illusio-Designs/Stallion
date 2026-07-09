@@ -11,6 +11,8 @@ const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const User = require('../models/User');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
+const { SALESMAN_UPLOAD_DIR } = require('../constants/multer');
+const fs = require('fs');
 
 class SalesmanController {
 
@@ -79,7 +81,46 @@ class SalesmanController {
     async createSalesman(req, res) {
         try {
             const user = req.user;
-            const { zones, state_ids, user_id, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date } = req.body;
+            const { user_id, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date } = req.body;
+
+            // zones / state_ids arrive as JSON strings over multipart (the form now
+            // sends files), or as real arrays over JSON — normalize both.
+            const toArray = (v) => {
+                if (Array.isArray(v)) return v;
+                if (typeof v === 'string' && v.trim()) {
+                    try { const p = JSON.parse(v); return Array.isArray(p) ? p : [v]; }
+                    catch { return v.split(',').map((s) => s.trim()).filter(Boolean); }
+                }
+                return [];
+            };
+            const zones = toArray(req.body.zones);
+            const state_ids = toArray(req.body.state_ids);
+
+            // KYC documents (multer .fields -> req.files keyed by field name).
+            const files = req.files || {};
+            const docPath = (field) => files[field] && files[field][0]
+                ? `/uploads/${SALESMAN_UPLOAD_DIR}/${files[field][0].filename}`
+                : null;
+            const pan_card_url = docPath('pan_card');
+            const aadhar_card_url = docPath('aadhar_card');
+            const cancel_cheque_url = docPath('cancel_cheque');
+            const photo_url = docPath('photo');
+
+            // All four documents and the address are compulsory.
+            const missing = [];
+            if (!pan_card_url) missing.push('PAN card');
+            if (!aadhar_card_url) missing.push('Aadhar card');
+            if (!cancel_cheque_url) missing.push('cancel cheque');
+            if (!photo_url) missing.push('photo');
+            if (!address || !String(address).trim()) missing.push('address');
+            if (missing.length) {
+                // Remove any files that did upload so we don't leave orphans.
+                Object.values(files).flat().forEach((f) => {
+                    try { if (f && f.path && fs.existsSync(f.path)) fs.unlinkSync(f.path); } catch (_) { /* ignore */ }
+                });
+                return res.status(400).json({ error: `Required: ${missing.join(', ')}.` });
+            }
+
             const existingSalesman = await Salesman.findOne({ where: { employee_code: employee_code } });
             if (existingSalesman) {
                 return res.status(400).json({ error: 'Salesman with this employee code already exists' });
@@ -121,6 +162,10 @@ class SalesmanController {
                 city_id,
                 zone_preference,
                 joining_date,
+                pan_card_url,
+                aadhar_card_url,
+                cancel_cheque_url,
+                photo_url,
                 created_by: user.user_id,
                 created_at: new Date(),
                 updated_at: new Date(),
