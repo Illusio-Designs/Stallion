@@ -338,7 +338,7 @@ const Dashboard = () => {
     try {
       // Test against one of THIS salesman's real parties so we see the exact
       // query built from its address/city/state and store the coordinates.
-      const parties = await apiRequest('/parties/my', { method: 'GET', includeAuth: true });
+      const parties = await apiRequest('/parties/my?page=1&limit=200', { method: 'GET', includeAuth: true });
       const list = Array.isArray(parties) ? parties : (parties?.data || []);
       const target = list.find((p) => p.latitude == null) || list[0];
       if (target) {
