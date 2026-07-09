@@ -230,6 +230,27 @@ class SalesmanController {
                 return res.status(404).json({ error: 'Salesman not found' });
             }
             const oldSnapshot = salesman.toJSON();
+
+            // zones / state_ids may arrive as arrays (JSON body) or JSON strings
+            // (multipart, when documents are re-uploaded) — normalize both.
+            const toArr = (v) => {
+                if (Array.isArray(v)) return v;
+                if (typeof v === 'string' && v.trim()) {
+                    try { const p = JSON.parse(v); return Array.isArray(p) ? p : [v]; }
+                    catch { return v.split(',').map((s) => s.trim()).filter(Boolean); }
+                }
+                return undefined;
+            };
+            const zonesArr = toArr(zones);
+            const stateIdsArr = toArr(state_ids);
+
+            // Re-uploaded KYC documents (optional on update — only replace the ones
+            // a new file was provided for).
+            const files = req.files || {};
+            const docUrl = (field) => (files[field] && files[field][0]
+                ? `/uploads/${SALESMAN_UPLOAD_DIR}/${files[field][0].filename}`
+                : undefined);
+
             const payload = {
                 employee_code,
                 phone,
@@ -247,6 +268,10 @@ class SalesmanController {
                 updated_by: user.user_id,
                 is_active: is_active,
             };
+            if (docUrl('pan_card')) payload.pan_card_url = docUrl('pan_card');
+            if (docUrl('aadhar_card')) payload.aadhar_card_url = docUrl('aadhar_card');
+            if (docUrl('cancel_cheque')) payload.cancel_cheque_url = docUrl('cancel_cheque');
+            if (docUrl('photo')) payload.photo_url = docUrl('photo');
             await Salesman.update(payload, { where: { salesman_id: id } });
             // Keep the linked login account (users table) in sync. Login (OTP)
             // matches users.phone EXACTLY against the E.164 form (+91XXXXXXXXXX),
@@ -277,9 +302,9 @@ class SalesmanController {
                 }
             }
             // Replace zone mappings only when `zones` is provided (kept for back-compat)
-            if (Array.isArray(zones)) {
+            if (Array.isArray(zonesArr)) {
                 await SalesmanZones.destroy({ where: { salesman_id: id } });
-                for (const zone of zones) {
+                for (const zone of zonesArr) {
                     const existingZone = await Zone.findOne({ where: { id: zone } });
                     if (!existingZone) {
                         return res.status(404).json({ error: 'Zone not found' });
@@ -288,9 +313,9 @@ class SalesmanController {
                 }
             }
             // Replace working states only when `state_ids` is provided
-            if (Array.isArray(state_ids)) {
+            if (Array.isArray(stateIdsArr)) {
                 await SalesmanStates.destroy({ where: { salesman_id: id } });
-                for (const stId of await resolveStateIds(state_ids)) {
+                for (const stId of await resolveStateIds(stateIdsArr)) {
                     await SalesmanStates.create({ salesman_id: id, state_id: stId });
                 }
             }
