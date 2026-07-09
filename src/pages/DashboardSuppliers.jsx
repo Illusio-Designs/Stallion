@@ -34,6 +34,7 @@ import {
   deleteSalesmanTarget,
   getParties,
   getMyParties,
+  getMyOrders,
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 import { getUser, getUserRole } from '../services/authService';
@@ -552,7 +553,45 @@ const DashboardSuppliers = () => {
       } else {
         data = await getAllSalesmanCheckins();
       }
-      setCheckins(Array.isArray(data) ? data : (data?.data || []));
+      let rows = Array.isArray(data) ? data : (data?.data || []);
+
+      // Visit ORDERS are placed from the cart and live in the orders table —
+      // they don't create a check-in row, so they'd otherwise be missing from
+      // the Visit Report. Merge the salesman's own visit orders in as "ordered"
+      // rows, skipping any order already represented by a check-in (order_id).
+      if (isSalesman) {
+        try {
+          const orders = await getMyOrders();
+          const linked = new Set(rows.map((c) => c.order_id).filter(Boolean));
+          const visitRows = (Array.isArray(orders) ? orders : [])
+            .filter((o) => (o.order_type === 'visit_order') && !linked.has(o.order_id || o.id))
+            .map((o) => {
+              const items = Array.isArray(o.order_items) ? o.order_items : [];
+              const qty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+              return {
+                id: `order-${o.order_id || o.id}`,
+                type: 'ordered',
+                salesman_id: o.salesman_id,
+                party_id: o.party_id,
+                party_name: o.party_name,
+                order_id: o.order_id || o.id,
+                order_total: o.order_total,
+                order_qty: qty,
+                order_notes: o.order_notes,
+                check_in_date: o.order_date || o.created_at || o.createdAt,
+                latitude: o.latitude,
+                longitude: o.longitude,
+              };
+            });
+          rows = [...rows, ...visitRows];
+        } catch (e) {
+          console.error('Failed to merge visit orders into Visit Report:', e);
+        }
+      }
+
+      // Newest first (works for both check-ins and merged orders).
+      rows.sort((a, b) => new Date(b.check_in_date || 0) - new Date(a.check_in_date || 0));
+      setCheckins(rows);
     } catch (error) {
       console.error('Failed to load check-ins:', error);
       setCheckins([]);
@@ -1594,8 +1633,9 @@ const DashboardSuppliers = () => {
                 ) },
                 { key: 'check_in_date', label: 'DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
                 { key: 'party_id', label: 'PARTY', render: (_v, row) => row.party_name || partyNameMap[row.party_id] || row.party_id || '-' },
-                { key: 'order_total', label: 'VALUE', render: (v, row) => (row.type === 'ordered' && v != null) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
-                { key: 'check_in_remarks', label: 'REMARKS', render: (v, row) => (row.type === 'ordered' ? (row.order_notes || v) : v) || '-' },
+                { key: 'order_qty', label: 'QTY', render: (v, row) => (row.type === 'ordered' && v != null) ? Number(v).toLocaleString('en-IN') : '-' },
+                { key: 'order_total', label: 'AMOUNT', render: (v, row) => (row.type === 'ordered' && v != null) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
+                { key: 'check_in_remarks', label: 'REASON', render: (v, row) => (row.type === 'ordered' ? (row.order_notes || v) : v) || '-' },
               ]}
               rows={checkins}
               onAddNew={isSalesman ? () => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); } : undefined}
