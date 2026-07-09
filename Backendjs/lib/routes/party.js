@@ -8,6 +8,9 @@ const parsePartyFile = require('../middleware/party_parser');
 
 router.get('/', authenticateToken, (req, res) => partyController.getPartiesRoot(req, res));
 router.get('/my', authenticateToken, partyController.getMyParties);
+// Diagnostic: does the server's geocoder work? GET /parties/geocode-test?q=...
+// (declared before '/:id' so it isn't captured as an id)
+router.get('/geocode-test', authenticateToken, partyController.geocodeTest);
 router.get('/salesman/:salesman_id', authenticateToken, partyController.getPartiesBySalesmanId);
 router.get('/:id', authenticateToken, partyController.getPartyById);
 router.post('/get', authenticateToken, isPartyManager, partyController.getParties);

@@ -1,34 +1,22 @@
 // Address -> coordinates (geocoding) for the party geofence.
 //
-// The geofence compares the salesman's device GPS against the party's location.
-// That location is derived from the party's ADDRESS via geocoding (no manual GPS
-// capture). We use OpenStreetMap Nominatim by default (free, no API key); set
-// GEOCODER_URL / GEOCODER_KEY to point at another provider if needed.
+// The geofence compares the salesman's device GPS against the party's location,
+// derived from the party's ADDRESS via geocoding (OpenStreetMap Nominatim by
+// default; set GEOCODER_URL / GEOCODER_KEY to switch providers).
 //
-// Geocoding is best-effort: callers must treat a null result as "unknown
-// location" (the geofence then can't enforce and won't block) — never fail the
-// surrounding request because geocoding failed.
+// Geocoding is best-effort: callers treat a null result as "unknown location".
+// The functions log the failure reason so server logs reveal whether the
+// address didn't resolve or the server can't reach the geocoder at all.
 
 const GEOCODER_URL = process.env.GEOCODER_URL || 'https://nominatim.openstreetmap.org/search';
 const GEOCODER_KEY = process.env.GEOCODER_KEY || '';
-// Nominatim asks for an identifying User-Agent with a contact address.
 const GEOCODER_UA = process.env.GEOCODER_UA || 'StallionEyewear/1.0 (illusiodesigns@gmail.com)';
 
-/**
- * Geocode a free-text address to { latitude, longitude }, or null if it can't
- * be resolved. Extra locality parts (pincode, "India") improve the hit rate.
- * @param {string} address
- * @param {{ city?: string, state?: string, pincode?: string, country?: string }} [opts]
- * @returns {Promise<{latitude:number, longitude:number}|null>}
- */
-async function geocodeAddress(address, opts = {}) {
-  // City + state hugely improve the hit rate for informal / mall addresses
-  // (e.g. "Seawoods Grand Central Mall" alone is ambiguous, but adding
-  // "Mumbai, Maharashtra" resolves it).
-  const parts = [address, opts.city, opts.state, opts.pincode, opts.country || 'India'].filter(Boolean);
-  const q = parts.join(', ').trim();
-  if (!q) return null;
-
+// Run a single geocoder query. Returns a detailed result so callers (and the
+// diagnostic endpoint) can tell WHY it failed.
+// -> { ok, status?, coords?, error? }
+async function geocodeQuery(q) {
+  if (!q || !String(q).trim()) return { ok: false, error: 'empty query' };
   const url = new URL(GEOCODER_URL);
   url.searchParams.set('q', q);
   url.searchParams.set('format', 'json');
@@ -42,34 +30,59 @@ async function geocodeAddress(address, opts = {}) {
       headers: { 'User-Agent': GEOCODER_UA, Accept: 'application/json' },
       signal: controller.signal,
     });
-    if (!res.ok) return null;
+    if (!res.ok) return { ok: false, status: res.status, error: `geocoder returned HTTP ${res.status}` };
     const data = await res.json();
-    const hit = Array.isArray(data) ? data[0] : (data.results && data.results[0]);
-    if (!hit) return null;
-    const lat = Number(hit.lat ?? hit.latitude ?? hit.geometry?.location?.lat);
-    const lon = Number(hit.lon ?? hit.lng ?? hit.longitude ?? hit.geometry?.location?.lng);
-    if (Number.isNaN(lat) || Number.isNaN(lon)) return null;
-    return { latitude: lat, longitude: lon };
-  } catch (_) {
-    return null; // network/timeout/parse — treat as unknown
+    const hit = Array.isArray(data) ? data[0] : (data && data.results && data.results[0]);
+    if (!hit) return { ok: false, status: res.status, error: 'no match for this address' };
+    const lat = Number(hit.lat ?? hit.latitude ?? (hit.geometry && hit.geometry.location && hit.geometry.location.lat));
+    const lon = Number(hit.lon ?? hit.lng ?? (hit.geometry && hit.geometry.location && hit.geometry.location.lng));
+    if (Number.isNaN(lat) || Number.isNaN(lon)) return { ok: false, error: 'match had no coordinates' };
+    return { ok: true, coords: { latitude: lat, longitude: lon } };
+  } catch (e) {
+    const reason = e && e.name === 'AbortError' ? 'timeout (server could not reach the geocoder in 8s)'
+      : (e && e.message) || 'network error';
+    return { ok: false, error: `request failed: ${reason}` };
   } finally {
     clearTimeout(timer);
   }
 }
 
 /**
- * Ensure a Party instance has coordinates, geocoding its address on demand and
- * persisting them if missing. This is how EXISTING parties auto-collect their
- * location the first time they're used in a geofence check — no manual step.
- * Best-effort: returns the (possibly unchanged) party; never throws.
- * @param {object} party - a Sequelize Party instance (has .save())
- * @returns {Promise<object>} the party
+ * Geocode an address to { latitude, longitude } or null. Tries the full address
+ * first, then a coarse "city, state" query as a fallback (enough to reject
+ * far-away visits even if the exact address can't be pinned).
+ */
+async function geocodeAddress(address, opts = {}) {
+  const country = opts.country || 'India';
+  const full = [address, opts.city, opts.state, opts.pincode, country].filter(Boolean).join(', ');
+  let r = await geocodeQuery(full);
+  if (!r.ok && (opts.city || opts.state)) {
+    const coarse = [opts.city, opts.state, opts.pincode, country].filter(Boolean).join(', ');
+    const r2 = await geocodeQuery(coarse);
+    if (r2.ok) { console.warn('[geocode] used coarse city/state fallback for:', full); r = r2; }
+  }
+  if (!r.ok) console.warn('[geocode] FAILED for:', full, '->', r.error);
+  return r.ok ? r.coords : null;
+}
+
+/**
+ * Detailed geocode for the diagnostic endpoint — returns the query, result and
+ * the exact failure reason so we can see if the server can reach the geocoder.
+ */
+async function geocodeDiagnostic(address, opts = {}) {
+  const full = [address, opts.city, opts.state, opts.pincode, opts.country || 'India'].filter(Boolean).join(', ');
+  const r = await geocodeQuery(full);
+  return { geocoderUrl: GEOCODER_URL, query: full, ...r };
+}
+
+/**
+ * Ensure a Party instance has coordinates, geocoding its address (enriched with
+ * city/state) on demand and persisting them if missing. Best-effort.
  */
 async function ensurePartyCoords(party) {
   if (!party) return party;
   if (party.latitude != null && party.longitude != null) return party;
   if (!party.address) return party;
-  // Resolve the party's city/state names (stored as ids) to enrich the query.
   let city, state;
   try {
     const Cities = require('../models/Cities');
@@ -86,4 +99,4 @@ async function ensurePartyCoords(party) {
   return party;
 }
 
-module.exports = { geocodeAddress, ensurePartyCoords };
+module.exports = { geocodeAddress, geocodeDiagnostic, ensurePartyCoords };
