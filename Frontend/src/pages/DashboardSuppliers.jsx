@@ -6,6 +6,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import DatePicker from '../components/ui/DatePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
+import FileUpload from '../components/ui/FileUpload';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
@@ -303,6 +304,7 @@ const DashboardSuppliers = () => {
     zones: [],
     state_ids: [],
     joining_date: '',
+    is_active: true, // account active/inactive (admin toggle in the form)
     // KYC documents (File objects) — compulsory on create.
     pan_card: null,
     aadhar_card: null,
@@ -715,6 +717,7 @@ const DashboardSuppliers = () => {
       zones: [],
       state_ids: [],
       joining_date: '',
+      is_active: true,
       pan_card: null,
       aadhar_card: null,
       cancel_cheque: null,
@@ -768,6 +771,7 @@ const DashboardSuppliers = () => {
           .filter(Boolean);
       })(),
       joining_date: row.joining_date ? row.joining_date.split('T')[0] : '',
+      is_active: row.is_active !== undefined ? row.is_active : (row.isActive !== undefined ? row.isActive : true),
       // Editing doesn't re-upload documents; leave the file inputs empty.
       pan_card: null,
       aadhar_card: null,
@@ -833,6 +837,31 @@ const DashboardSuppliers = () => {
       }));
       showError(e?.message || 'Failed to update salesman status');
     }
+  };
+
+  // Active/Inactive switch for the Add/Edit salesman form. Inactive blocks the
+  // salesman's login + data access (backend mirrors is_active onto the user).
+  const renderActiveToggle = () => {
+    const active = formData.is_active !== false;
+    return (
+      <div className="form-group form-group--full">
+        <label className="ui-label">Account Status</label>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={active}
+          onClick={() => handleInputChange('is_active', !active)}
+          className="inline-flex items-center gap-3 cursor-pointer select-none border-0 bg-transparent p-0"
+        >
+          <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${active ? 'bg-success' : 'bg-border-strong'}`}>
+            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${active ? 'translate-x-5' : 'translate-x-0.5'}`} />
+          </span>
+          <span className={`text-[length:var(--text-sm)] font-semibold ${active ? 'text-success' : 'text-text-muted'}`}>
+            {active ? 'Active' : 'Inactive'}
+          </span>
+        </button>
+      </div>
+    );
   };
 
   const handleDelete = async (row) => {
@@ -1058,6 +1087,7 @@ const DashboardSuppliers = () => {
             }).filter(Boolean).join(', ')
           : '',
         joining_date: formData.joining_date ? new Date(formData.joining_date).toISOString() : new Date().toISOString(),
+        is_active: formData.is_active !== false, // account active/inactive
         // KYC document File objects (used by createSalesman; ignored on update).
         pan_card: formData.pan_card,
         aadhar_card: formData.aadhar_card,
@@ -1818,32 +1848,27 @@ const DashboardSuppliers = () => {
               placeholder="Joining date"
             />
           </div>
+          {renderActiveToggle()}
           {/* KYC documents — all compulsory on create */}
           <div className="form-group form-group--full">
             <label className="ui-label">KYC Documents *</label>
             <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
-                { key: 'pan_card', label: 'PAN Card *', accept: 'image/*,application/pdf' },
-                { key: 'aadhar_card', label: 'Aadhar Card *', accept: 'image/*,application/pdf' },
-                { key: 'cancel_cheque', label: 'Cancel Cheque *', accept: 'image/*,application/pdf' },
-                { key: 'photo', label: 'Photo *', accept: 'image/*' },
+                { key: 'pan_card', label: 'PAN Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+                { key: 'aadhar_card', label: 'Aadhar Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+                { key: 'cancel_cheque', label: 'Cancel Cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+                { key: 'photo', label: 'Photo', accept: 'image/*', hint: 'Image only' },
               ].map((doc) => (
-                <div key={doc.key} className="flex flex-col gap-1">
-                  <label className="ui-label">{doc.label}</label>
-                  <input
-                    type="file"
-                    accept={doc.accept}
-                    className="block w-full cursor-pointer rounded-md border border-border-strong bg-surface text-[length:var(--text-sm)] text-text-muted file:mr-3 file:cursor-pointer file:border-0 file:border-r file:border-border file:bg-primary-soft file:px-4 file:py-2.5 file:font-semibold file:text-primary hover:file:bg-primary-soft-hover focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)]"
-                    onChange={(e) => handleInputChange(doc.key, e.target.files?.[0] || null)}
-                  />
-                  {formData[doc.key] && (
-                    <span className="inline-flex max-w-full items-center gap-1 text-[length:var(--text-xs)] font-medium text-success">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
-                      <span className="truncate">{formData[doc.key].name}</span>
-                    </span>
-                  )}
-                </div>
+                <FileUpload
+                  key={doc.key}
+                  label={doc.label}
+                  accept={doc.accept}
+                  hint={doc.hint}
+                  required
+                  file={formData[doc.key]}
+                  onChange={(f) => handleInputChange(doc.key, f)}
+                />
               ))}
             </div>
           </div>
@@ -2029,32 +2054,26 @@ const DashboardSuppliers = () => {
               placeholder="Joining date"
             />
           </div>
+          {renderActiveToggle()}
           {/* KYC documents — optional on edit (upload only to replace an existing one) */}
           <div className="form-group form-group--full">
             <label className="ui-label">KYC Documents <span className="text-text-muted font-normal">(upload only to replace)</span></label>
             <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
-                { key: 'pan_card', label: 'PAN Card', accept: 'image/*,application/pdf' },
-                { key: 'aadhar_card', label: 'Aadhar Card', accept: 'image/*,application/pdf' },
-                { key: 'cancel_cheque', label: 'Cancel Cheque', accept: 'image/*,application/pdf' },
-                { key: 'photo', label: 'Photo', accept: 'image/*' },
+                { key: 'pan_card', label: 'PAN Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+                { key: 'aadhar_card', label: 'Aadhar Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+                { key: 'cancel_cheque', label: 'Cancel Cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+                { key: 'photo', label: 'Photo', accept: 'image/*', hint: 'Image only' },
               ].map((doc) => (
-                <div key={doc.key} className="flex flex-col gap-1">
-                  <label className="ui-label">{doc.label}</label>
-                  <input
-                    type="file"
-                    accept={doc.accept}
-                    className="block w-full cursor-pointer rounded-md border border-border-strong bg-surface text-[length:var(--text-sm)] text-text-muted file:mr-3 file:cursor-pointer file:border-0 file:border-r file:border-border file:bg-primary-soft file:px-4 file:py-2.5 file:font-semibold file:text-primary hover:file:bg-primary-soft-hover focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)]"
-                    onChange={(e) => handleInputChange(doc.key, e.target.files?.[0] || null)}
-                  />
-                  {formData[doc.key] && (
-                    <span className="inline-flex max-w-full items-center gap-1 text-[length:var(--text-xs)] font-medium text-success">
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12" /></svg>
-                      <span className="truncate">{formData[doc.key].name}</span>
-                    </span>
-                  )}
-                </div>
+                <FileUpload
+                  key={doc.key}
+                  label={doc.label}
+                  accept={doc.accept}
+                  hint={doc.hint}
+                  file={formData[doc.key]}
+                  onChange={(f) => handleInputChange(doc.key, f)}
+                />
               ))}
             </div>
           </div>

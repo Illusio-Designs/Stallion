@@ -4,9 +4,11 @@
 // check in. We compare the device GPS (sent from the app) against the party's
 // stored coordinates and require the distance to be within GEOFENCE_RADIUS_M.
 
-// Radius of the geofence in metres. Overridable via env so ops can widen it
-// (e.g. for GPS drift) without a redeploy.
-const GEOFENCE_RADIUS_M = Number(process.env.GEOFENCE_RADIUS_M) || 50;
+// Radius of the geofence in metres. 250m by default: coordinates come from
+// GEOCODING the party's address, which is rarely accurate to 50m (especially
+// for Indian addresses), so a tighter fence would wrongly reject real visits.
+// Overridable via env (GEOFENCE_RADIUS_M) without a redeploy.
+const GEOFENCE_RADIUS_M = Number(process.env.GEOFENCE_RADIUS_M) || 250;
 
 const toRad = (deg) => (Number(deg) * Math.PI) / 180;
 
