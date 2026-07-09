@@ -10,6 +10,7 @@ const State = require('../models/State');
 const Cities = require('../models/Cities');
 const Zone = require('../models/Zone');
 const { Op } = require('sequelize');
+const { geocodeAddress } = require('../utils/geocode');
 const DistributorZones = require('../models/DistributorZones');
 const SalesmanStates = require('../models/SalesmanStates');
 const DistributorStates = require('../models/DistributorStates');
@@ -347,6 +348,10 @@ class PartyController {
                 address,
             });
 
+            // Geocode the address to anchor the visit/check-in geofence.
+            // Best-effort: if it fails, coords stay null and get backfilled later.
+            const geo = await geocodeAddress(address, { pincode });
+
             const party = await Party.create({
                 distributor_id: finalDistributorId,
                 salesman_id: finalSalesmanId,
@@ -366,6 +371,8 @@ class PartyController {
                 pincode,
                 gstin,
                 pan,
+                latitude: geo ? geo.latitude : null,
+                longitude: geo ? geo.longitude : null,
                 created_by: user.user_id,
                 created_at: new Date(),
                 updated_at: new Date(),
@@ -459,6 +466,12 @@ class PartyController {
             };
             if (is_active !== undefined) {
                 payload.is_active = is_active;
+            }
+            // Re-geocode when the address changes so the geofence anchor stays
+            // correct (best-effort; leaves coords as-is on failure).
+            if (address !== undefined && address && address !== party.address) {
+                const geo = await geocodeAddress(address, { pincode: pincode !== undefined ? pincode : party.pincode });
+                if (geo) { payload.latitude = geo.latitude; payload.longitude = geo.longitude; }
             }
             await Party.update(payload, { where: { party_id: id } });
 
@@ -733,6 +746,44 @@ class PartyController {
             res.status(200).json(parties);
         } catch (error) {
             res.status(error.statusCode || 500).json({ error: error.message });
+        }
+    }
+
+    // Proactively geocode every party that has an address but no coordinates yet
+    // (the geofence anchor). Processes sequentially with a small delay to respect
+    // the geocoder's rate limit. Also happens lazily on the first visit/check-in,
+    // so this is just for filling them all up front.
+    async backfillPartyCoords(req, res) {
+        try {
+            const limit = Math.min(Number(req.body?.limit) || 200, 500);
+            const parties = await Party.findAll({
+                where: {
+                    latitude: { [Op.is]: null },
+                    address: { [Op.and]: [{ [Op.ne]: null }, { [Op.ne]: '' }] },
+                },
+                limit,
+            });
+            let updated = 0;
+            const failed = [];
+            for (const party of parties) {
+                const geo = await geocodeAddress(party.address, { pincode: party.pincode });
+                if (geo) {
+                    await party.update({ latitude: geo.latitude, longitude: geo.longitude });
+                    updated += 1;
+                } else {
+                    failed.push(party.party_id);
+                }
+                // Be polite to the geocoder (Nominatim ~1 req/sec).
+                await new Promise((r) => setTimeout(r, 1100));
+            }
+            res.status(200).json({
+                message: `Backfilled coordinates for ${updated} of ${parties.length} parties`,
+                scanned: parties.length,
+                updated,
+                unresolved: failed.length,
+            });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
         }
     }
 }

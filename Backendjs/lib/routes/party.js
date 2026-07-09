@@ -16,6 +16,8 @@ router.put('/:id', authenticateToken, partyController.updateParty);
 router.delete('/:id', authenticateToken, isPartyManager, partyController.deleteParty);
 router.post('/byZoneId', authenticateToken, partyController.getPartiesByZoneId);
 router.post('/byStateId', authenticateToken, partyController.getPartiesByStateId);
+// Proactively geocode parties that have an address but no coordinates yet.
+router.post('/backfill-coords', authenticateToken, isPartyManager, partyController.backfillPartyCoords);
 router.post('/bulk-upload', authenticateToken, isPartyManager, partyFileUpload, parsePartyFile);
 
 module.exports = router;

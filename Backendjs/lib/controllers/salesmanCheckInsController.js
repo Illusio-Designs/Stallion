@@ -4,6 +4,8 @@ const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 const { SalesmanCheckInType } = require('../constants/enums');
+const { checkGeofence } = require('../utils/geo');
+const { ensurePartyCoords } = require('../utils/geocode');
 
 // Enrich check-ins for the Visit Report: add party_name, and for ORDERED
 // check-ins (type='ordered', which carry an order_id) the linked order's
@@ -108,6 +110,24 @@ class SalesmanCheckInsController {
             const validationError = validateCheckInFields(fields);
             if (validationError) {
                 return res.status(400).json({ error: validationError });
+            }
+
+            // Geofence: when a device location is provided (the salesman app sends
+            // it), the salesman must be within 50m of the party to check in. Older
+            // parties get their coordinates geocoded from the address on the spot
+            // (ensurePartyCoords). Check-ins created without a device location
+            // (e.g. an admin entering one manually) are not geofenced.
+            const hasDeviceLoc = fields.latitude != null && fields.latitude !== '' && fields.longitude != null && fields.longitude !== '';
+            if (hasDeviceLoc) {
+                const checkinParty = await Party.findOne({ where: { party_id: fields.party_id } });
+                if (!checkinParty) {
+                    return res.status(404).json({ error: 'Party not found' });
+                }
+                await ensurePartyCoords(checkinParty);
+                const geo = checkGeofence({ deviceLat: fields.latitude, deviceLng: fields.longitude, party: checkinParty, action: 'check in' });
+                if (!geo.ok) {
+                    return res.status(403).json({ error: geo.reason });
+                }
             }
 
             const salesmanCheckIn = await SalesmanCheckIns.create({
