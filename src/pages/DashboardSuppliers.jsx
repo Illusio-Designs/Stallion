@@ -39,6 +39,22 @@ import {
 import { showSuccess, showError } from '../services/notificationService';
 import { getUser, getUserRole } from '../services/authService';
 
+// Geofence radius used when a visit/order is recorded (mirror of the backend
+// GEOFENCE_RADIUS_M). A recorded location within this distance of the party's
+// geocoded address counts as a verified, on-site visit.
+const GEOFENCE_RADIUS_M = 250;
+
+// Haversine distance in metres between two lat/lng points.
+const distanceMeters = (lat1, lng1, lat2, lng2) => {
+  const toRad = (d) => (Number(d) * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+};
+
 // Multi-select zones dropdown (same design as distributor page)
 const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled = false, onOpen }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -705,6 +721,19 @@ const DashboardSuppliers = () => {
     allPartiesLookup.forEach(p => {
       const id = p.party_id || p.id;
       if (id) map[id] = p.party_name || p.name || id;
+    });
+    return map;
+  }, [allPartiesLookup]);
+
+  // party_id -> the party's geocoded address coordinates, so a recorded visit's
+  // GPS can be checked against where the party actually is.
+  const partyCoordsMap = useMemo(() => {
+    const map = {};
+    allPartiesLookup.forEach(p => {
+      const id = p.party_id || p.id;
+      if (id && p.latitude != null && p.longitude != null) {
+        map[id] = { lat: Number(p.latitude), lng: Number(p.longitude) };
+      }
     });
     return map;
   }, [allPartiesLookup]);
@@ -1636,9 +1665,26 @@ const DashboardSuppliers = () => {
                 { key: 'order_qty', label: 'QTY', render: (v, row) => (row.type === 'ordered' && v != null) ? Number(v).toLocaleString('en-IN') : '-' },
                 { key: 'order_total', label: 'AMOUNT', render: (v, row) => (row.type === 'ordered' && v != null) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
                 { key: 'check_in_remarks', label: 'REASON', render: (v, row) => (row.type === 'ordered' ? (row.order_notes || v) : v) || '-' },
-                { key: 'location', label: 'LOCATION', render: (_v, row) => (row.latitude && row.longitude)
-                  ? <a href={`https://www.google.com/maps?q=${row.latitude},${row.longitude}`} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
-                  : <span className="text-text-subtle">—</span> },
+                { key: 'location', label: 'LOCATION', render: (_v, row) => {
+                  const hasDev = row.latitude != null && row.longitude != null;
+                  if (!hasDev) return <span className="text-text-subtle">—</span>;
+                  const pc = partyCoordsMap[row.party_id];
+                  const mapLink = (
+                    <a href={`https://www.google.com/maps?q=${row.latitude},${row.longitude}`} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
+                  );
+                  if (!pc) {
+                    // Party address not geocoded yet — can't verify against it.
+                    return <span className="inline-flex items-center gap-2">{mapLink}<span className="text-text-subtle text-[var(--text-xs)]">(party location not set)</span></span>;
+                  }
+                  const dist = Math.round(distanceMeters(row.latitude, row.longitude, pc.lat, pc.lng));
+                  const ok = dist <= GEOFENCE_RADIUS_M;
+                  return (
+                    <span className="inline-flex items-center gap-2">
+                      <StatusBadge status={ok ? 'completed' : 'cancelled'}>{ok ? `Matched · ${dist}m` : `Off by ${dist}m`}</StatusBadge>
+                      {mapLink}
+                    </span>
+                  );
+                } },
               ]}
               rows={checkins}
               onAddNew={isSalesman ? () => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); } : undefined}
