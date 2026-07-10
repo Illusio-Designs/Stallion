@@ -88,8 +88,6 @@ const DashboardTray = () => {
   const [brands, setBrands] = useState([]);
   const [collections, setCollections] = useState([]);
   const [selectedProducts, setSelectedProducts] = useState([]);
-  // productId -> chosen bag number (1-10) for this allotment.
-  const [bagNoByProduct, setBagNoByProduct] = useState({});
   const [productDropdownOpen, setProductDropdownOpen] = useState(false);
   const [productSearch, setProductSearch] = useState('');
   const [editingProduct, setEditingProduct] = useState(null);
@@ -310,13 +308,12 @@ const DashboardTray = () => {
     setSaving(true);
     setError(null);
     try {
-      // Add all selected products to the tray, each with its chosen bag number.
+      // Add all selected products to the tray
       const addPromises = selectedProducts.map(productId =>
         addProductToTray({
           tray_id: selectedTray,
           product_id: productId,
           qty: 1,
-          bag_no: bagNoByProduct[productId] || 1,
           status: TrayProductStatus.ALLOTED,
         })
       );
@@ -327,7 +324,6 @@ const DashboardTray = () => {
       setTrayProducts(Array.isArray(items) ? items : []);
       await fetchTrays(); // Refresh tray list to update product count
       setSelectedProducts([]);
-      setBagNoByProduct({});
       setProductDropdownOpen(false);
       setProductSearch('');
     } catch (err) {
@@ -585,14 +581,14 @@ const DashboardTray = () => {
                                         const productIdStr = String(productId);
                                         const isSelected = selectedProducts.includes(productIdStr);
                                         return (
-                                          <div
+                                          <label
                                             key={productId}
                                             style={{
                                               display: 'flex',
                                               alignItems: 'center',
-                                              gap: '8px',
                                               padding: '9px 10px',
                                               borderRadius: '6px',
+                                              cursor: 'pointer',
                                               backgroundColor: isSelected ? '#eff6ff' : 'transparent',
                                               borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
                                               marginBottom: '2px',
@@ -601,43 +597,27 @@ const DashboardTray = () => {
                                             onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#f5f5f5'; }}
                                             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? '#eff6ff' : 'transparent'; }}
                                           >
-                                            <label className="flex min-w-0 flex-1 cursor-pointer items-center">
-                                              <input
-                                                type="checkbox"
-                                                checked={isSelected}
-                                                onChange={(e) => {
-                                                  if (e.target.checked) {
-                                                    setSelectedProducts(prev => [...prev, productIdStr]);
-                                                  } else {
-                                                    setSelectedProducts(prev => prev.filter(id => id !== productIdStr));
-                                                  }
-                                                }}
-                                                className="mr-[10px] h-4 w-4 shrink-0 cursor-pointer accent-[#3b82f6]"
-                                              />
-                                              <span className="min-w-0 truncate text-[13px] leading-[1.4] text-[#333]">
-                                                <strong className="text-[#111]">{p.model_no || 'N/A'}</strong>
-                                                {(p.brand_name || p.collection_name) && (
-                                                  <span className="ml-[6px] text-[#888]">
-                                                    {[p.brand_name, p.collection_name].filter(Boolean).join(' · ')}
-                                                  </span>
-                                                )}
-                                              </span>
-                                            </label>
-                                            {/* Bag number picker — only for a selected product. */}
-                                            {isSelected && (
-                                              <select
-                                                value={bagNoByProduct[productIdStr] || 1}
-                                                onClick={(e) => e.stopPropagation()}
-                                                onChange={(e) => setBagNoByProduct(prev => ({ ...prev, [productIdStr]: Number(e.target.value) }))}
-                                                className="shrink-0 cursor-pointer rounded-md border border-[#cbd5e1] bg-white px-2 py-1 text-[12px] font-semibold text-[#111] outline-none"
-                                                title="Bag number"
-                                              >
-                                                {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
-                                                  <option key={n} value={n}>Bag {n}</option>
-                                                ))}
-                                              </select>
-                                            )}
-                                          </div>
+                                            <input
+                                              type="checkbox"
+                                              checked={isSelected}
+                                              onChange={(e) => {
+                                                if (e.target.checked) {
+                                                  setSelectedProducts(prev => [...prev, productIdStr]);
+                                                } else {
+                                                  setSelectedProducts(prev => prev.filter(id => id !== productIdStr));
+                                                }
+                                              }}
+                                              className="mr-[10px] h-4 w-4 shrink-0 cursor-pointer accent-[#3b82f6]"
+                                            />
+                                            <span className="text-[13px] leading-[1.4] text-[#333]">
+                                              <strong className="text-[#111]">{p.model_no || 'N/A'}</strong>
+                                              {(p.brand_name || p.collection_name) && (
+                                                <span className="ml-[6px] text-[#888]">
+                                                  {[p.brand_name, p.collection_name].filter(Boolean).join(' · ')}
+                                                </span>
+                                              )}
+                                            </span>
+                                          </label>
                                         );
                                       });
                                     })()}
@@ -699,7 +679,6 @@ const DashboardTray = () => {
                             <th className="border-b-2 border-[#ddd] p-3 text-left">MRP</th>
                             <th className="border-b-2 border-[#ddd] p-3 text-left">WHP</th>
                             <th className="border-b-2 border-[#ddd] p-3 text-left">QUANTITY</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">BAG NO</th>
                             <th className="border-b-2 border-[#ddd] p-3 text-left">STATUS</th>
                             <th className="border-b-2 border-[#ddd] p-3 text-left">ACTIONS</th>
                           </tr>
@@ -708,16 +687,16 @@ const DashboardTray = () => {
                           {loadingProducts ? (
                             Array.from({ length: 4 }).map((_, i) => (
                               <tr key={`sk-${i}`} className="border-b border-[#eee]">
-                                {Array.from({ length: 9 }).map((__, c) => (
+                                {Array.from({ length: 8 }).map((__, c) => (
                                   <td key={c} className="p-3">
-                                    <span className="ui-skeleton" style={{ display: 'block', height: '14px', width: c === 8 ? '60px' : '100%', borderRadius: '6px' }} />
+                                    <span className="ui-skeleton" style={{ display: 'block', height: '14px', width: c === 7 ? '60px' : '100%', borderRadius: '6px' }} />
                                   </td>
                                 ))}
                               </tr>
                             ))
                           ) : error && selectedTray ? (
                             <tr>
-                              <td colSpan="9" className="p-0">
+                              <td colSpan="8" className="p-0">
                                 <div className="ui-state ui-state--error">
                                   <div className="ui-state__icon">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -734,7 +713,7 @@ const DashboardTray = () => {
                             </tr>
                           ) : trayProducts.length === 0 ? (
                             <tr>
-                              <td colSpan="9" className="p-0">
+                              <td colSpan="8" className="p-0">
                                 <div className="ui-state ui-state--empty">
                                   <div className="ui-state__icon">
                                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -800,9 +779,6 @@ const DashboardTray = () => {
                                   </td>
                                   <td className="p-3">
                                     1
-                                  </td>
-                                  <td className="p-3">
-                                    {tp.bag_no != null ? `Bag ${tp.bag_no}` : '—'}
                                   </td>
                                   <td className="p-3">
                                     <span style={{
