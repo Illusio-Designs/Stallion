@@ -1908,7 +1908,7 @@ const DashboardSuppliers = () => {
             />
           </div>
           <div className="form-group form-group--full">
-            <label className="ui-label">Working States <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
+            <label className="ui-label">Working States * <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
             <StatesMultiDropdown
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
@@ -2114,7 +2114,7 @@ const DashboardSuppliers = () => {
             />
           </div>
           <div className="form-group form-group--full">
-            <label className="ui-label">Working States <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
+            <label className="ui-label">Working States * <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
             <StatesMultiDropdown
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}

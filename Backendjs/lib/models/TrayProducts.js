@@ -37,13 +37,6 @@ const TrayProducts = sequelize.define('TrayProducts', {
         allowNull: false,
         defaultValue: 1
     },
-    // Physical bag/pouch number (1-10) the sample sits in within the tray,
-    // chosen at allotment. Nullable so pre-existing rows stay valid.
-    bag_no: {
-        type: DataTypes.INTEGER,
-        allowNull: true,
-        defaultValue: 1
-    },
     status: {
         type: DataTypes.STRING(20),
         allowNull: false,

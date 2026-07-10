@@ -2064,19 +2064,22 @@ const DashboardProducts = () => {
 
     try {
       setLoading(true);
+      // These attribute FKs are optional now — send null (not 0) when blank so
+      // the backend stores null instead of violating the foreign key.
+      const optInt = (v) => { const n = parseInt(v, 10); return Number.isInteger(n) && n > 0 ? n : null; };
       const dataToSend = {
         model_no: formData.model_no,
-        gender_id: parseInt(formData.gender_id) || 0,
-        color_code_id: parseInt(formData.color_code_id) || 0,
-        shape_id: parseInt(formData.shape_id) || 0,
-        lens_color_id: parseInt(formData.lens_color_id) || 0,
-        frame_color_id: parseInt(formData.frame_color_id) || 0,
-        frame_type_id: parseInt(formData.frame_type_id) || 0,
-        lens_material_id: parseInt(formData.lens_material_id) || 0,
-        frame_material_id: parseInt(formData.frame_material_id) || 0,
+        gender_id: optInt(formData.gender_id),
+        color_code_id: optInt(formData.color_code_id),
+        shape_id: optInt(formData.shape_id),
+        lens_color_id: optInt(formData.lens_color_id),
+        frame_color_id: optInt(formData.frame_color_id),
+        frame_type_id: optInt(formData.frame_type_id),
+        lens_material_id: optInt(formData.lens_material_id),
+        frame_material_id: optInt(formData.frame_material_id),
         mrp: parseFloat(formData.mrp) || 0,
         whp: parseFloat(formData.whp) || 0,
-        size_mm: formData.size_mm,
+        size_mm: formData.size_mm || null,
         brand_id: formData.brand_id,
         collection_id: formData.collection_id,
         warehouse_qty: parseInt(formData.warehouse_qty) || 0,
@@ -2667,7 +2670,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Gender *</label>
+            <label className="ui-label">Gender</label>
             <DropdownSelector
               options={genders.map(g => ({
                 value: g.gender_id || g.id,
@@ -2680,7 +2683,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Color Code *</label>
+            <label className="ui-label">Color Code</label>
             <DropdownSelector
               options={colorCodes.map(c => ({
                 value: c.color_code_id || c.id,
@@ -2693,7 +2696,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Shape *</label>
+            <label className="ui-label">Shape</label>
             <DropdownSelector
               options={shapes.map(s => ({
                 value: s.shape_id || s.id,
@@ -2706,7 +2709,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Lens Color *</label>
+            <label className="ui-label">Lens Color</label>
             <DropdownSelector
               options={lensColors.map(l => ({
                 value: l.lens_color_id || l.id,
@@ -2719,7 +2722,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Frame Color *</label>
+            <label className="ui-label">Frame Color</label>
             <DropdownSelector
               options={frameColors.map(f => ({
                 value: f.frame_color_id || f.id,
@@ -2732,7 +2735,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Frame Type *</label>
+            <label className="ui-label">Frame Type</label>
             <DropdownSelector
               options={frameTypes.map(f => ({
                 value: f.frame_type_id || f.id,
@@ -2745,7 +2748,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Lens Material *</label>
+            <label className="ui-label">Lens Material</label>
             <DropdownSelector
               options={lensMaterials.map(l => ({
                 value: l.lens_material_id || l.id,
@@ -2758,7 +2761,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Frame Material *</label>
+            <label className="ui-label">Frame Material</label>
             <DropdownSelector
               options={frameMaterials.map(f => ({
                 value: f.frame_material_id || f.id,
@@ -2795,13 +2798,12 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Size (mm) *</label>
+            <label className="ui-label">Size (mm)</label>
             <input
               className="ui-input"
               placeholder="Enter size in mm"
               value={formData.size_mm}
               onChange={(e) => handleInputChange('size_mm', e.target.value)}
-              required
             />
           </div>
           <div className="form-group">
@@ -2897,7 +2899,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Gender *</label>
+            <label className="ui-label">Gender</label>
             <DropdownSelector
               options={genders.map(g => ({
                 value: g.gender_id || g.id,
@@ -2910,7 +2912,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Color Code *</label>
+            <label className="ui-label">Color Code</label>
             <DropdownSelector
               options={colorCodes.map(c => ({
                 value: c.color_code_id || c.id,
@@ -2923,7 +2925,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Shape *</label>
+            <label className="ui-label">Shape</label>
             <DropdownSelector
               options={shapes.map(s => ({
                 value: s.shape_id || s.id,
@@ -2936,7 +2938,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Lens Color *</label>
+            <label className="ui-label">Lens Color</label>
             <DropdownSelector
               options={lensColors.map(l => ({
                 value: l.lens_color_id || l.id,
@@ -2949,7 +2951,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Frame Color *</label>
+            <label className="ui-label">Frame Color</label>
             <DropdownSelector
               options={frameColors.map(f => ({
                 value: f.frame_color_id || f.id,
@@ -2962,7 +2964,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Frame Type *</label>
+            <label className="ui-label">Frame Type</label>
             <DropdownSelector
               options={frameTypes.map(f => ({
                 value: f.frame_type_id || f.id,
@@ -2975,7 +2977,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Lens Material *</label>
+            <label className="ui-label">Lens Material</label>
             <DropdownSelector
               options={lensMaterials.map(l => ({
                 value: l.lens_material_id || l.id,
@@ -2988,7 +2990,7 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Frame Material *</label>
+            <label className="ui-label">Frame Material</label>
             <DropdownSelector
               options={frameMaterials.map(f => ({
                 value: f.frame_material_id || f.id,
@@ -3025,13 +3027,12 @@ const DashboardProducts = () => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Size (mm) *</label>
+            <label className="ui-label">Size (mm)</label>
             <input
               className="ui-input"
               placeholder="Enter size in mm"
               value={formData.size_mm}
               onChange={(e) => handleInputChange('size_mm', e.target.value)}
-              required
             />
           </div>
           <div className="form-group">
