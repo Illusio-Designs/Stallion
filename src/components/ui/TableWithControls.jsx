@@ -95,12 +95,25 @@ export default function TableWithControls({
     return () => document.removeEventListener('mousedown', handleOutsideClick);
   }, [filterOpen]);
 
-  // Server-side search: debounce the query and let the parent re-fetch.
+  // Keep the latest onServerSearch in a ref so the debounce effect below does
+  // NOT depend on its identity. Parents pass an inline arrow (new identity every
+  // render), so depending on it would re-run this effect after every re-render —
+  // including the re-render caused by changing pages — and fire onServerSearch
+  // with the current query, snapping the list back to page 1. (This is what made
+  // pagination appear broken.)
+  const onServerSearchRef = useRef(onServerSearch);
+  useEffect(() => { onServerSearchRef.current = onServerSearch; }, [onServerSearch]);
+
+  // Server-side search: debounce the query and let the parent re-fetch. Fire
+  // only when the QUERY actually changes (user typing / global search) — skip
+  // the initial mount, where the parent already loads page 1.
+  const didMountSearchRef = useRef(false);
   useEffect(() => {
-    if (!serverPagination || !onServerSearch) return;
-    const t = setTimeout(() => onServerSearch(query.trim()), 300);
+    if (!serverPagination) return;
+    if (!didMountSearchRef.current) { didMountSearchRef.current = true; return; }
+    const t = setTimeout(() => onServerSearchRef.current?.(query.trim()), 300);
     return () => clearTimeout(t);
-  }, [query, serverPagination, onServerSearch]);
+  }, [query, serverPagination]);
 
   const filteredRows = useMemo(() => {
     // In server-search mode the rows are already the filtered current page.
