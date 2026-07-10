@@ -407,6 +407,27 @@ class DatabaseManager {
             require('../models/DistributorStates');
             require('../models/Offer');
 
+            // Register the User <-> Role many-to-many association. The model files
+            // declare it inside an `associate(models)` hook that nothing ever
+            // calls, so `User.findAll({ include: [{ model: Role, as: 'roles' }] })`
+            // (office-team multi-role listing) failed with the Sequelize error
+            // "Role is not associated to User!". Register it here, once, guarded so
+            // it is never defined twice.
+            try {
+                const User = require('../models/User');
+                const Role = require('../models/Role');
+                const UserRole = require('../models/UserRole');
+                if (!User.associations || !User.associations.roles) {
+                    User.belongsToMany(Role, { through: UserRole, foreignKey: 'user_id', otherKey: 'role_id', as: 'roles' });
+                }
+                if (!Role.associations || !Role.associations.users) {
+                    Role.belongsToMany(User, { through: UserRole, foreignKey: 'role_id', otherKey: 'user_id', as: 'users' });
+                }
+                console.log('✅ Registered User<->Role associations');
+            } catch (assocErr) {
+                console.log('⚠️ Could not register User<->Role associations:', assocErr.message);
+            }
+
             // List of tables that are manually managed (should not be auto-synced)
             const manuallyManagedTables = ['users', 'roles', 'user_roles', 'audit_logs'];
 

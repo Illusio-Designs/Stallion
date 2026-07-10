@@ -208,12 +208,15 @@ class ProductController {
             const { model_no, gender_id, color_code_id, shape_id, lens_color_id,
                 frame_color_id, frame_type_id, lens_material_id, frame_material_id,
                 mrp, whp, size_mm, warehouse_qty, status, brand_id, collection_id, image_urls } = req.body;
-            if (!model_no || !gender_id || !color_code_id || !shape_id || !lens_color_id
-                || !frame_color_id || !frame_type_id || !lens_material_id || !frame_material_id
-                || !mrp || !whp || !size_mm || !warehouse_qty
-                || !status || !brand_id || !collection_id) {
-                return res.status(400).json({ error: 'All fields are required' });
+            // The attribute FKs (gender/shape/lens color/color code/frame color/
+            // frame type/lens material/frame material) and size_mm are OPTIONAL.
+            // Only these core fields are required.
+            if (!model_no || !mrp || !whp || !warehouse_qty || !status || !brand_id || !collection_id) {
+                return res.status(400).json({ error: 'model_no, mrp, whp, warehouse_qty, status, brand and collection are required' });
             }
+            // Normalise optional integer FKs: empty/0/invalid -> null (0 is not a
+            // valid foreign key and would violate the constraint).
+            const optInt = (v) => { const n = parseInt(v, 10); return Number.isInteger(n) && n > 0 ? n : null; };
             const brand = await Brand.findOne({ where: { brand_id: brand_id } });
             if (!brand) {
                 return res.status(404).json({ error: 'Brand not found' });
@@ -222,24 +225,24 @@ class ProductController {
             if (!collection) {
                 return res.status(404).json({ error: 'Collection not found' });
             }
-            const existingProduct = await Product.findOne({ where: { model_no: model_no, color_code_id: color_code_id } });
+            const existingProduct = await Product.findOne({ where: { model_no: model_no, color_code_id: optInt(color_code_id) } });
             if (existingProduct) {
                 return res.status(400).json({ error: 'Product already exists' });
             }
             const product = await Product.create({
                 model_no,
-                gender_id,
-                color_code_id,
-                shape_id,
-                lens_color_id,
-                frame_color_id,
-                frame_type_id,
-                lens_material_id,
-                frame_material_id,
+                gender_id: optInt(gender_id),
+                color_code_id: optInt(color_code_id),
+                shape_id: optInt(shape_id),
+                lens_color_id: optInt(lens_color_id),
+                frame_color_id: optInt(frame_color_id),
+                frame_type_id: optInt(frame_type_id),
+                lens_material_id: optInt(lens_material_id),
+                frame_material_id: optInt(frame_material_id),
                 image_urls,
                 mrp,
                 whp,
-                size_mm,
+                size_mm: size_mm || null,
                 warehouse_qty,
                 tray_qty: 0,
                 total_qty: warehouse_qty,
@@ -287,20 +290,22 @@ class ProductController {
                 return res.status(404).json({ error: 'Collection not found' });
             }
             const oldSnapshot = product.toJSON();
+            // Optional integer FKs: empty/0/invalid -> null (0 is not a valid FK).
+            const optInt = (v) => { const n = parseInt(v, 10); return Number.isInteger(n) && n > 0 ? n : null; };
             const updatePayload = {
                 model_no: model_no !== undefined ? model_no : product.model_no,
-                gender_id: gender_id !== undefined ? gender_id : product.gender_id,
-                color_code_id: color_code_id !== undefined ? color_code_id : product.color_code_id,
-                shape_id: shape_id !== undefined ? shape_id : product.shape_id,
-                lens_color_id: lens_color_id !== undefined ? lens_color_id : product.lens_color_id,
-                frame_color_id: frame_color_id !== undefined ? frame_color_id : product.frame_color_id,
-                frame_type_id: frame_type_id !== undefined ? frame_type_id : product.frame_type_id,
-                lens_material_id: lens_material_id !== undefined ? lens_material_id : product.lens_material_id,
-                frame_material_id: frame_material_id !== undefined ? frame_material_id : product.frame_material_id,
+                gender_id: gender_id !== undefined ? optInt(gender_id) : product.gender_id,
+                color_code_id: color_code_id !== undefined ? optInt(color_code_id) : product.color_code_id,
+                shape_id: shape_id !== undefined ? optInt(shape_id) : product.shape_id,
+                lens_color_id: lens_color_id !== undefined ? optInt(lens_color_id) : product.lens_color_id,
+                frame_color_id: frame_color_id !== undefined ? optInt(frame_color_id) : product.frame_color_id,
+                frame_type_id: frame_type_id !== undefined ? optInt(frame_type_id) : product.frame_type_id,
+                lens_material_id: lens_material_id !== undefined ? optInt(lens_material_id) : product.lens_material_id,
+                frame_material_id: frame_material_id !== undefined ? optInt(frame_material_id) : product.frame_material_id,
                 image_urls: image_urls !== undefined ? image_urls : product.image_urls,
                 mrp: mrp !== undefined ? mrp : product.mrp,
                 whp: whp !== undefined ? whp : product.whp,
-                size_mm: size_mm !== undefined ? size_mm : product.size_mm,
+                size_mm: size_mm !== undefined ? (size_mm || null) : product.size_mm,
                 status: status !== undefined ? status : product.status,
                 brand_id: brand_id !== undefined ? brand_id : product.brand_id,
                 collection_id: collection_id !== undefined ? collection_id : product.collection_id,
