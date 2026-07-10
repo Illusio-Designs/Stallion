@@ -32,7 +32,7 @@ import {
 } from '../services/apiService';
 import { showError, showSuccess } from '../services/notificationService';
 import { invalidateCache } from '../services/cacheService';
-import { encodeUploadName } from '../utils/imageUrl';
+import { getProductImageUrl, PRODUCT_IMAGE_PLACEHOLDER } from '../utils/imageUrl';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard-products.css';
 
@@ -132,44 +132,21 @@ const hasValidImageUrls = (product) => {
   return imageUrls.length > 0;
 };
 
-// Build a full, encoded thumbnail URL for a product's first image (or null).
-// Uses the same image host as the Media gallery; handles "[]"/string/array.
-const PRODUCT_IMG_BASE = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/+$/, '');
-const getProductThumbUrl = (product) => {
-  const urls = parseImageUrls(product);
-  if (!urls || urls.length === 0) return null;
-  // Mirror the product page (ProductDetail.getImageUrl / extractFilename): take
-  // the first entry, strip query/fragment and trailing JSON junk, and use its
-  // last path segment as the filename. Accept ANY filename that has an
-  // extension (contains "."), not a fixed allow-list — otherwise images the
-  // product page happily shows (e.g. .avif/.jfif, or odd casing) render as a
-  // "—" placeholder here. This is what was hiding dashboard product images.
-  for (const u of urls) {
-    if (typeof u !== 'string') continue;
-    const clean = u.split('?')[0].split('#')[0].replace(/([\]"\\])+$/, '').trim();
-    const filename = clean.split('/').pop().split('\\').pop().replace(/([\]"\\])+$/, '');
-    if (filename && filename.includes('.')) {
-      return `${PRODUCT_IMG_BASE}/uploads/products/${encodeUploadName(filename)}`;
-    }
-  }
-  return null;
-};
-
-// Small table-cell thumbnail with a graceful placeholder on missing/broken image.
+// Small table-cell thumbnail. Resolves the image exactly like the storefront /
+// product-detail pages (getProductImageUrl) and, on a broken remote image,
+// falls back to the SAME local placeholder they use — so an image always shows.
 const ProductThumb = ({ product, alt }) => {
-  const src = getProductThumbUrl(product);
-  const [broken, setBroken] = useState(false);
-  useEffect(() => { setBroken(false); }, [src]);
-  if (!src || broken) {
-    return <span className="product-thumb-ph" title="No image" aria-label="No image">—</span>;
-  }
+  const src = getProductImageUrl(product);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => { setFailed(false); }, [src]);
+  const finalSrc = failed ? PRODUCT_IMAGE_PLACEHOLDER : src;
   return (
     <img
-      src={src}
+      src={finalSrc}
       alt={alt || 'Product image'}
       className="product-thumb--sm"
       loading="lazy"
-      onError={() => setBroken(true)}
+      onError={() => { if (finalSrc !== PRODUCT_IMAGE_PLACEHOLDER) setFailed(true); }}
     />
   );
 };
