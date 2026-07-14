@@ -960,6 +960,20 @@ export const bulkUpdatePartyCoords = async () => {
 };
 
 /**
+ * Admin-only: set a party's exact GPS location (marks it trusted so the strict
+ * visit geofence applies). Used by the "Update location" button.
+ * @param {string} partyId
+ * @param {{latitude:number, longitude:number}} coords
+ */
+export const setPartyLocation = async (partyId, { latitude, longitude }) => {
+  return apiRequest(`/parties/${partyId}/location`, {
+    method: 'PUT',
+    body: { latitude, longitude },
+    includeAuth: true,
+  });
+};
+
+/**
  * Bulk upload parties from Excel/CSV file
  * @param {File} file - Excel or CSV file
  * @returns {Promise<Object>} Response with created/updated counts

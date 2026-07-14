@@ -394,10 +394,22 @@ class OrderController {
                 if (!visitParty) {
                     return res.status(404).json({ error: 'Party not found' });
                 }
-                await ensurePartyCoords(visitParty);
-                const geo = checkGeofence({ deviceLat: latitude, deviceLng: longitude, party: visitParty, action: 'place a visit order' });
-                if (!geo.ok) {
-                    return res.status(403).json({ error: geo.reason });
+                // Geofence, with first-visit auto-capture:
+                //  - If the party already has a TRUSTED GPS location, enforce the
+                //    strict radius against it.
+                //  - If not (never visited, or only a geocoded/pincode anchor),
+                //    adopt the salesman's current GPS as the party's real location
+                //    and let the order through. Subsequent visits are then strict.
+                if (visitParty.location_source === 'gps' && visitParty.latitude != null && visitParty.longitude != null) {
+                    const geo = checkGeofence({ deviceLat: latitude, deviceLng: longitude, party: visitParty, action: 'place a visit order' });
+                    if (!geo.ok) {
+                        return res.status(403).json({ error: geo.reason });
+                    }
+                } else {
+                    visitParty.latitude = Number(latitude);
+                    visitParty.longitude = Number(longitude);
+                    visitParty.location_source = 'gps';
+                    try { await visitParty.save(); } catch (_) { /* best-effort */ }
                 }
             }
             else {

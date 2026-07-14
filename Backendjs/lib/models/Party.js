@@ -121,6 +121,15 @@ const Party = sequelize.define('Party', {
         type: DataTypes.DECIMAL(10, 7),
         allowNull: true
     },
+    // How latitude/longitude were set:
+    //   'gps'      -> captured from a real device on-site (salesman add / first
+    //                 visit / admin override). Trusted -> enforce the strict geofence.
+    //   'geocoded' -> derived from the typed address (pincode-accurate at best).
+    //                 Not trusted -> the first on-site visit overwrites it with GPS.
+    location_source: {
+        type: DataTypes.STRING(20),
+        allowNull: true
+    },
     is_active: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

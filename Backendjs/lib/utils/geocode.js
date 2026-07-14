@@ -56,7 +56,10 @@ async function geocodeQuery(q) {
  */
 async function geocodeAddress(address, opts = {}) {
   const country = opts.country || 'India';
-  const pin = opts.pincode && String(opts.pincode).trim();
+  // Indian pincodes are 6 digits; strip spaces/other characters ("400 092" ->
+  // "400092") so the geocoder resolves the postal area instead of failing and
+  // falling back to a far-off city centroid.
+  const pin = opts.pincode ? String(opts.pincode).replace(/\D/g, '') : '';
   const attempts = [
     [address, opts.city, opts.state, pin, country],   // full, most specific
     [pin, opts.city, opts.state, country],            // pincode + locality
