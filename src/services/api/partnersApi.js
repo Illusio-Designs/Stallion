@@ -960,28 +960,20 @@ export const bulkUpdatePartyCoords = async () => {
 };
 
 /**
- * Admin-only: set a party's exact GPS location (marks it trusted so the strict
- * visit geofence applies). Used by the "Update location" button.
+ * Admin-only: set a party's location (the visit-geofence anchor).
+ *  - Pass { latitude, longitude } to store those exact coordinates.
+ *  - Pass nothing to derive coordinates from the party's address.
  * @param {string} partyId
- * @param {{latitude:number, longitude:number}} coords
- */
-export const setPartyLocation = async (partyId, { latitude, longitude }) => {
-  return apiRequest(`/parties/${partyId}/location`, {
-    method: 'PUT',
-    body: { latitude, longitude },
-    includeAuth: true,
-  });
-};
-
-/**
- * Admin-only: (re)derive a party's coordinates from its own address/city/state/
- * pincode and store them. Used by the "Get coordinates from address" button.
- * @param {string} partyId
+ * @param {{latitude:number, longitude:number}} [coords]
  * @returns {Promise<{latitude:number, longitude:number, location_source:string}>}
  */
-export const geocodePartyFromAddress = async (partyId) => {
-  return apiRequest(`/parties/${partyId}/geocode`, {
+export const setPartyLocation = async (partyId, coords) => {
+  const body = (coords && coords.latitude != null && coords.longitude != null)
+    ? { latitude: coords.latitude, longitude: coords.longitude }
+    : {};
+  return apiRequest(`/parties/${partyId}/location`, {
     method: 'PUT',
+    body,
     includeAuth: true,
   });
 };
