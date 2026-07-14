@@ -461,6 +461,57 @@ class PartyController {
         }
     }
 
+    // Admin-only: (re)derive a party's coordinates from its own address data
+    // (address + city + state + pincode) and store them. Best-effort geocode.
+    async geocodePartyLocation(req, res) {
+        try {
+            if (!isAdmin(req.userRoleName)) {
+                return res.status(403).json({ error: 'Only admin can set a party location' });
+            }
+            const id = req.params.id;
+            if (!id) {
+                return res.status(400).json({ error: 'Party ID is required' });
+            }
+            const party = await Party.findOne({ where: { party_id: id } });
+            if (!party) {
+                return res.status(404).json({ error: 'Party not found' });
+            }
+            if (!party.address) {
+                return res.status(400).json({ error: 'Party has no address to geocode' });
+            }
+            // Resolve city/state names to enrich the query (ids -> names).
+            let city, state;
+            try {
+                const Cities = require('../models/Cities');
+                const State = require('../models/State');
+                if (party.city_id) { const c = await Cities.findByPk(party.city_id); city = c && c.name; }
+                if (party.state_id) { const s = await State.findByPk(party.state_id); state = s && s.name; }
+            } catch (_) { /* geocode with the address alone */ }
+            const coords = await geocodeAddress(party.address, { city, state, pincode: party.pincode });
+            if (!coords) {
+                return res.status(422).json({ error: 'Could not resolve coordinates from this address.' });
+            }
+            const oldSnapshot = party.toJSON();
+            party.latitude = coords.latitude;
+            party.longitude = coords.longitude;
+            party.location_source = 'geocoded';
+            party.updated_at = new Date();
+            await party.save();
+            await logAudit({
+                req,
+                action: 'update',
+                description: 'Party location geocoded from address by admin',
+                tableName: 'parties',
+                recordId: party.party_id,
+                oldValues: oldSnapshot,
+                newValues: party,
+            });
+            return res.status(200).json({ message: 'Party location set from address', latitude: coords.latitude, longitude: coords.longitude, location_source: 'geocoded' });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
     async updateParty(req, res) {
         try {
             const id = req.params.id;
