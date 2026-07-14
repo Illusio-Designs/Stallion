@@ -3239,17 +3239,17 @@ const DashboardProducts = () => {
                     <div
                       key={item.id}
                       style={{
-                        border: isSelected ? '3px solid #3b82f6' : '2px solid #e5e7eb',
+                        border: isSelected ? '3px solid #16171d' : '2px solid #e5e7eb',
                         borderRadius: '8px',
                         overflow: 'hidden',
-                        background: isSelected ? '#eff6ff' : '#fff',
+                        background: isSelected ? '#f3f4f5' : '#fff',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         position: 'relative'
                       }}
                       onMouseEnter={(e) => {
                         if (!isSelected) {
-                          e.currentTarget.style.borderColor = '#3b82f6';
+                          e.currentTarget.style.borderColor = '#16171d';
                           e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
                         }
                       }}
@@ -3278,8 +3278,8 @@ const DashboardProducts = () => {
                         top: '8px',
                         left: '8px',
                         zIndex: 3,
-                        background: isSelected ? '#3b82f6' : 'rgba(255, 255, 255, 0.9)',
-                        border: '2px solid #3b82f6',
+                        background: isSelected ? '#16171d' : 'rgba(255, 255, 255, 0.9)',
+                        border: '2px solid #16171d',
                         borderRadius: '4px',
                         width: '24px',
                         height: '24px',

@@ -36,7 +36,7 @@
   inset: 0;
   background: linear-gradient(
     180deg,
-    rgba(18, 14, 77, 0) 0%,
+    rgba(0, 0, 0, 0) 0%,
     var(--color-primary-active) 92%
   );
   z-index: 1;

@@ -53,13 +53,13 @@ const getStatusLabel = (status) => {
 const getStatusColor = (status) => {
   switch (status) {
     case TrayProductStatus.ALLOTED:
-      return { bg: '#e3f2fd', text: '#1976d2' };
+      return { bg: '#f3f4f5', text: '#16171d' };
     case TrayProductStatus.PRIORITY_BOOKED:
-      return { bg: '#fff3e0', text: '#e65100' };
+      return { bg: '#e9eaeb', text: '#16171d' };
     case TrayProductStatus.PARTIALLY_BOOKED:
-      return { bg: '#f3e5f5', text: '#6a1b9a' };
+      return { bg: '#e9eaeb', text: '#48494d' };
     case TrayProductStatus.RETURNED:
-      return { bg: '#ffebee', text: '#c62828' };
+      return { bg: '#e9eaeb', text: '#6a6b6f' };
     default:
       return { bg: '#f5f5f5', text: '#666' };
   }
@@ -524,7 +524,7 @@ const DashboardTray = () => {
                               style={{
                                 width: '100%',
                                 padding: '10px 12px',
-                                border: `1px solid ${productDropdownOpen ? '#3b82f6' : '#e5e7eb'}`,
+                                border: `1px solid ${productDropdownOpen ? '#16171d' : '#e5e7eb'}`,
                                 borderRadius: '8px',
                                 backgroundColor: '#fff',
                                 cursor: 'pointer',
@@ -589,13 +589,13 @@ const DashboardTray = () => {
                                               padding: '9px 10px',
                                               borderRadius: '6px',
                                               cursor: 'pointer',
-                                              backgroundColor: isSelected ? '#eff6ff' : 'transparent',
-                                              borderLeft: isSelected ? '3px solid #3b82f6' : '3px solid transparent',
+                                              backgroundColor: isSelected ? '#f3f4f5' : 'transparent',
+                                              borderLeft: isSelected ? '3px solid #16171d' : '3px solid transparent',
                                               marginBottom: '2px',
                                               transition: 'all 0.15s'
                                             }}
                                             onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#f5f5f5'; }}
-                                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? '#eff6ff' : 'transparent'; }}
+                                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? '#f3f4f5' : 'transparent'; }}
                                           >
                                             <input
                                               type="checkbox"
@@ -607,7 +607,7 @@ const DashboardTray = () => {
                                                   setSelectedProducts(prev => prev.filter(id => id !== productIdStr));
                                                 }
                                               }}
-                                              className="mr-[10px] h-4 w-4 shrink-0 cursor-pointer accent-[#3b82f6]"
+                                              className="mr-[10px] h-4 w-4 shrink-0 cursor-pointer accent-[#16171d]"
                                             />
                                             <span className="text-[13px] leading-[1.4] text-[#333]">
                                               <strong className="text-[#111]">{p.model_no || 'N/A'}</strong>

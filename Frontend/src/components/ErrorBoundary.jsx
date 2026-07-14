@@ -50,7 +50,7 @@ class ErrorBoundary extends React.Component {
             border: '1px solid #ebecf0',
             borderRadius: '12px',
             padding: '32px',
-            boxShadow: '0 8px 24px rgba(24, 18, 101, 0.10)',
+            boxShadow: '0 8px 24px rgba(0, 0, 0, 0.10)',
           }}
         >
           <h1 style={{ fontSize: '20px', margin: '0 0 8px', color: '#1a1b23' }}>
@@ -65,7 +65,7 @@ class ErrorBoundary extends React.Component {
             style={{
               minHeight: '40px',
               padding: '0 20px',
-              background: '#181265',
+              background: '#16171d',
               color: '#ffffff',
               border: 'none',
               borderRadius: '8px',
