@@ -19,7 +19,6 @@ import {
   getZones,
   register,
   updateParty,
-  bulkUpdatePartyCoords,
   setPartyLocation,
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
@@ -483,41 +482,46 @@ const DashboardClients = () => {
   };
 
   // Geocode every party missing coordinates (for the visit/check-in geofence).
-  const [geoUpdating, setGeoUpdating] = useState(false);
-  const handleBulkUpdateLocations = async () => {
-    if (geoUpdating) return;
-    if (!(await confirm('Find & save GPS coordinates for all parties that are missing them? This reads each address and may take a minute.'))) return;
-    try {
-      setGeoUpdating(true);
-      showInfo('Updating party locations…');
-      const r = await bulkUpdatePartyCoords();
-      showSuccess(`Locations updated: ${r?.updated ?? 0} of ${r?.scanned ?? 0}${r?.unresolved ? ` (${r.unresolved} could not be resolved)` : ''}.`);
-      if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter);
-    } catch (err) {
-      showError(`Location update failed: ${err.message}`);
-    } finally {
-      setGeoUpdating(false);
-    }
-  };
-
   // Admin: derive the party's coordinates from its address/city/state/pincode
   // and store them (no device GPS needed — works from the office).
   const handleCaptureLocation = async () => {
     const partyId = editRow?.id || editRow?.party_id;
     if (!partyId) return;
+
+    // Coordinates are looked up from the party's SAVED address data. Make sure
+    // the key parts exist and tell the user clearly what's missing.
+    const missing = [];
+    if (!editRow?.address || String(editRow.address).trim() === '') missing.push('address');
+    if (!editRow?.pincode || String(editRow.pincode).trim() === '') missing.push('pincode');
+    if (missing.length) {
+      showError(`Can't find coordinates — the party's ${missing.join(' and ')} is missing. Please fill it in, save the party, then try again.`);
+      return;
+    }
+
     try {
       setSavingLoc(true);
       const res = await setPartyLocation(partyId); // no coords -> geocode from address
-      const lat = res?.latitude;
-      const lng = res?.longitude;
-      showSuccess('Coordinates set from the party address.');
+      const lat = Number(res?.latitude);
+      const lng = Number(res?.longitude);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        showError('Could not determine coordinates from this address. Please double-check the address and pincode.');
+        return;
+      }
+      showSuccess(`Coordinates saved: ${lat.toFixed(5)}, ${lng.toFixed(5)}.`);
       setParties(prev => prev.map(p => {
         const id = p.id || p.party_id;
         return id === partyId ? { ...p, latitude: lat, longitude: lng, location_source: 'geocoded' } : p;
       }));
       setEditRow(prev => (prev ? { ...prev, latitude: lat, longitude: lng, location_source: 'geocoded' } : prev));
     } catch (err) {
-      showError(err?.message || 'Could not resolve coordinates from this address.');
+      const msg = String(err?.message || '').toLowerCase();
+      if (err?.statusCode === 422 || msg.includes('resolve')) {
+        showError('Could not find this address on the map. Check the address/pincode, or set the location manually.');
+      } else if (msg.includes('no address')) {
+        showError('This party has no saved address to look up. Add an address and save first.');
+      } else {
+        showError(`Failed to get coordinates: ${err?.message || 'please try again.'}`);
+      }
     } finally {
       setSavingLoc(false);
     }
@@ -723,41 +727,50 @@ const DashboardClients = () => {
       return uuidRegex.test(str.trim());
     };
 
-    // Validate country_id is selected and is a valid UUID
+    // Required fields — block the save with a clear toast if any is empty, so a
+    // half-filled party can't slip through. Text inputs first, then the
+    // dropdowns (which need a valid selected id).
+    const requiredText = [
+      ['party_name', 'Party Name'],
+      ['trade_name', 'Trade Name'],
+      ['contact_person', 'Contact Person'],
+      ['email', 'Email'],
+      ['phone', 'Phone'],
+      ['address', 'Address'],
+      ['pincode', 'Pincode'],
+    ];
+    for (const [key, label] of requiredText) {
+      if (!formData[key] || String(formData[key]).trim() === '') {
+        showError(`${label} is required.`);
+        setLoading(false);
+        return;
+      }
+    }
+    // Basic email sanity check.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(formData.email).trim())) {
+      showError('Please enter a valid email address.');
+      setLoading(false);
+      return;
+    }
+    // Required dropdowns (must have a valid selected id).
     if (!formData.country_id || !isValidUUID(formData.country_id)) {
-      setError('Please select a valid country');
+      showError('Please select a country.');
       setLoading(false);
       return;
     }
-
-    // State is required for a party.
     if (!formData.state_id || !isValidUUID(formData.state_id)) {
-      setError('Please select a state');
-      setLoading(false);
-      return;
-    }
-
-    // Address, city and pincode are required so the party location can be
-    // geocoded accurately for the visit/check-in geofence.
-    if (!formData.address || formData.address.trim() === '') {
-      setError('Please enter the address');
+      showError('Please select a state.');
       setLoading(false);
       return;
     }
     if (!formData.city_id || !isValidUUID(formData.city_id)) {
-      setError('Please select a city');
+      showError('Please select a city.');
       setLoading(false);
       return;
     }
-    if (!formData.pincode || String(formData.pincode).trim() === '') {
-      setError('Please enter the pincode');
-      setLoading(false);
-      return;
-    }
-
     // Preferred courier is required when creating a party.
     if (!editRow && (!formData.prefered_courier || formData.prefered_courier.trim() === '')) {
-      setError('Please enter a preferred courier');
+      showError('Preferred Courier is required.');
       setLoading(false);
       return;
     }
@@ -1280,7 +1293,7 @@ const DashboardClients = () => {
         />
       </div>
       <div className="form-group">
-        <label className="ui-label">Address</label>
+        <label className="ui-label">Address *</label>
         <input
           className="ui-input"
           placeholder="Address"
@@ -1348,7 +1361,7 @@ const DashboardClients = () => {
         )}
       </div>
       <div className="form-group">
-        <label className="ui-label">City</label>
+        <label className="ui-label">City *</label>
         <DropdownSelector
           options={[
             { value: '', label: 'Select City' },
@@ -1388,7 +1401,7 @@ const DashboardClients = () => {
         )}
       </div>
       <div className="form-group">
-        <label className="ui-label">Pincode</label>
+        <label className="ui-label">Pincode *</label>
         <input
           className="ui-input"
           placeholder="Pincode"
@@ -1543,10 +1556,6 @@ const DashboardClients = () => {
                 {
                   label: 'Refresh',
                   onClick: () => { setError(null); if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter); }
-                },
-                {
-                  label: geoUpdating ? 'Updating Locations…' : 'Update Locations',
-                  onClick: handleBulkUpdateLocations
                 }
               ]}
               showFilter={true}
