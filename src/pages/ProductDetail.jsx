@@ -382,7 +382,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
 
       return {
         id: model.product_id || model.id || index + 1,
-        name: model.model_no || 'Safety Goggles',
+        name: model.model_no || 'Eyewear',
         brand: model.brand?.brand_name || model.brand_name || brand?.brand_name || brand?.name || 'N/A',
         model: model.model_no || 'Model',
         type: model.frame_type?.frame_type || model.frame_type_name || frameType?.frame_type || frameType?.name || 'N/A',
