@@ -20,7 +20,7 @@ import {
   register,
   updateParty,
   bulkUpdatePartyCoords,
-  setPartyLocation,
+  geocodePartyFromAddress,
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
 import { showError, showSuccess, showInfo } from '../services/notificationService';
@@ -500,37 +500,27 @@ const DashboardClients = () => {
     }
   };
 
-  // Admin: capture the device's current GPS and save it as the party's trusted
-  // location in one step (use when the admin is on-site at the party).
-  const handleCaptureLocation = () => {
+  // Admin: derive the party's coordinates from its address/city/state/pincode
+  // and store them (no device GPS needed — works from the office).
+  const handleCaptureLocation = async () => {
     const partyId = editRow?.id || editRow?.party_id;
     if (!partyId) return;
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      showError('Location is not available on this device/browser.');
-      return;
+    try {
+      setSavingLoc(true);
+      const res = await geocodePartyFromAddress(partyId);
+      const lat = res?.latitude;
+      const lng = res?.longitude;
+      showSuccess('Coordinates set from the party address.');
+      setParties(prev => prev.map(p => {
+        const id = p.id || p.party_id;
+        return id === partyId ? { ...p, latitude: lat, longitude: lng, location_source: 'geocoded' } : p;
+      }));
+      setEditRow(prev => (prev ? { ...prev, latitude: lat, longitude: lng, location_source: 'geocoded' } : prev));
+    } catch (err) {
+      showError(err?.message || 'Could not resolve coordinates from this address.');
+    } finally {
+      setSavingLoc(false);
     }
-    setSavingLoc(true);
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
-        try {
-          await setPartyLocation(partyId, { latitude: lat, longitude: lng });
-          showSuccess('Party location updated to your current position.');
-          setParties(prev => prev.map(p => {
-            const id = p.id || p.party_id;
-            return id === partyId ? { ...p, latitude: lat, longitude: lng, location_source: 'gps' } : p;
-          }));
-          setEditRow(prev => (prev ? { ...prev, latitude: lat, longitude: lng, location_source: 'gps' } : prev));
-        } catch (err) {
-          showError(`Failed to update location: ${err.message}`);
-        } finally {
-          setSavingLoc(false);
-        }
-      },
-      () => { setSavingLoc(false); showError('Could not get your current location (permission denied?).'); },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
   };
 
   const handleEdit = async (row) => {
@@ -1461,11 +1451,11 @@ const DashboardClients = () => {
         <div className="form-group form-group--full rounded-lg border border-border bg-surface-muted p-3">
           <label className="ui-label">Party Location (visit geofence)</label>
           <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
-            Salesmen must be within 250&nbsp;m of this point to place a visit order.
-            {editRow.location_source ? ` Current source: ${editRow.location_source}.` : ' Not set from GPS yet.'}
+            Derive the party's coordinates from its address, city, state and pincode.
+            {editRow.location_source ? ` Current source: ${editRow.location_source}.` : ' Not set yet.'}
           </p>
           <button type="button" className="ui-btn ui-btn--primary" onClick={handleCaptureLocation} disabled={savingLoc}>
-            {savingLoc ? 'Updating…' : 'Get current location'}
+            {savingLoc ? 'Getting…' : 'Get coordinates from address'}
           </button>
         </div>
       )}
