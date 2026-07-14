@@ -123,16 +123,16 @@ const Home = ({ onPageChange }) => {
 
   return (
     <div className="home-page">
-      <div className="hero-section relative flex min-h-[calc(100vh+200px)] flex-col items-center justify-center overflow-hidden bg-primary-active pb-16 pt-[var(--header-height)] mt-[calc(var(--header-height)*-1)]">
-        <div className="hero-background absolute inset-0 z-[1]">
+      <div className="hero-section relative flex min-h-[calc(100vh+200px)] flex-col items-center justify-center overflow-hidden bg-surface pb-16 pt-[var(--header-height)] mt-[calc(var(--header-height)*-1)]">
+        <div className="hero-background hidden">
           <img src="/images/banners/hero background.webp" alt="Hero Background" className="hero-bg-image block h-full w-full object-cover" />
         </div>
-        <div className="hero-left-image pointer-events-none absolute left-0 top-2/5 z-[2] -translate-y-1/2">
+        <div className="hero-left-image hidden pointer-events-none absolute left-0 top-2/5 z-[2] -translate-y-1/2">
           <img src="/images/banners/spacs.webp" alt="Eyewear" className="hero-side-image relative left-[-33px] h-auto w-[200px] rotate-[-20deg] object-contain opacity-[0.18] lg:w-[160px] lg:left-[-16px] max-[426px]:w-[140px]" />
         </div>
-        <div className="hero-content relative z-[2] box-border w-full max-w-[900px] px-5 pb-16 pt-[calc(var(--header-height)+var(--space-8))] text-center text-text-on-primary lg:max-w-[760px] lg:px-5 lg:pb-12 lg:pt-16">
-          <h1 className="mb-5 text-[length:clamp(2rem,5vw,3.5rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text-on-primary">Bulk Safety Goggles Supply For Industries &amp; Enterprises</h1>
-          <p className="mx-auto mb-8 max-w-[680px] text-[length:clamp(1rem,2vw,1.25rem)] leading-[1.5] text-white/80">Certified eye protection solutions for businesses, delivered at scale with competitive pricing and reliable supply chain support.</p>
+        <div className="hero-content relative z-[2] box-border w-full max-w-[900px] px-5 pb-16 pt-[calc(var(--header-height)+var(--space-8))] text-center text-text lg:max-w-[760px] lg:px-5 lg:pb-12 lg:pt-16">
+          <h1 className="mb-5 text-[length:clamp(2rem,5vw,3.5rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text">Bulk Safety Goggles Supply For Industries &amp; Enterprises</h1>
+          <p className="mx-auto mb-8 max-w-[680px] text-[length:clamp(1rem,2vw,1.25rem)] leading-[1.5] text-text-muted">Certified eye protection solutions for businesses, delivered at scale with competitive pricing and reliable supply chain support.</p>
           <button
             type="button"
             className="cta-button inline-flex min-h-[48px] cursor-pointer items-center justify-center rounded-md bg-accent px-8 py-3 text-[length:var(--text-md)] font-semibold tracking-[0.02em] text-text-on-accent shadow-sm transition duration-200 ease-[ease] hover:bg-accent-hover hover:shadow-md focus-visible:shadow-[var(--focus-ring)] focus-visible:outline-none active:scale-[0.98]"
@@ -141,7 +141,7 @@ const Home = ({ onPageChange }) => {
             Shop Now
           </button>
         </div>
-        <div className="banner-slider relative w-full overflow-hidden bg-primary-active pb-10">
+        <div className="banner-slider relative w-full overflow-hidden bg-surface pb-10">
         <div className="infinite-slider relative z-[2] w-full overflow-hidden">
           <div className="slider-track flex gap-5">
             <img src="/images/banners/hero1.webp" alt="Eyewear Collection 1" className="slider-image" />
@@ -161,10 +161,10 @@ const Home = ({ onPageChange }) => {
       </div>
 
       {/* Our Collection Section */}
-      <section className="collection-section bg-primary-active px-[6%] py-16 max-[426px]:px-5">
+      <section className="collection-section bg-surface px-[6%] py-16 max-[426px]:px-5">
         <div className="collection-header mx-auto mb-10 flex max-w-[1400px] items-center justify-between gap-5 max-[426px]:flex-col max-[426px]:items-start">
-          <h2 className="m-0 text-[length:clamp(2rem,4vw,3rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text-on-primary">Our Collection</h2>
-          <button type="button" className="view-all-button group inline-flex cursor-pointer items-center gap-3 whitespace-nowrap rounded-md border-none bg-transparent px-2 py-2 text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-on-primary transition duration-200 ease-[ease] hover:text-accent focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.35)] focus-visible:outline-none active:scale-[0.98] max-[384px]:gap-2" onClick={() => onPageChange ? onPageChange('products') : (window.location.href = '/products')}>
+          <h2 className="m-0 text-[length:clamp(2rem,4vw,3rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text">Our Collection</h2>
+          <button type="button" className="view-all-button group inline-flex cursor-pointer items-center gap-3 whitespace-nowrap rounded-md border-none bg-transparent px-2 py-2 text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text transition duration-200 ease-[ease] hover:text-accent focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] focus-visible:outline-none active:scale-[0.98] max-[384px]:gap-2" onClick={() => onPageChange ? onPageChange('products') : (window.location.href = '/products')}>
             VIEW ALL
             <div className="arrow-with-star flex h-10 w-10 items-center justify-center transition duration-200 ease-[ease] group-hover:translate-x-[3px] max-[384px]:h-9 max-[384px]:w-9">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="relative z-[2] text-accent">
@@ -184,7 +184,7 @@ const Home = ({ onPageChange }) => {
               <button
                 type="button"
                 key={filter.id}
-                className={`filter-btn relative min-h-[40px] cursor-pointer whitespace-nowrap border-b-2 border-transparent bg-transparent px-1 py-2 text-[length:var(--text-md)] font-normal transition duration-200 ease-[ease] hover:text-text-on-primary focus-visible:rounded-sm focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] focus-visible:outline-none ${activeFilter === filter.id ? 'active border-accent font-medium text-accent' : 'text-white/70'}`}
+                className={`filter-btn relative min-h-[40px] cursor-pointer whitespace-nowrap border-b-2 border-transparent bg-transparent px-1 py-2 text-[length:var(--text-md)] font-normal transition duration-200 ease-[ease] hover:text-text focus-visible:rounded-sm focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] focus-visible:outline-none ${activeFilter === filter.id ? 'active border-accent font-medium text-accent' : 'text-text-muted'}`}
                 aria-pressed={activeFilter === filter.id}
                 onClick={() => handleFilterClick(filter.id)}
               >
@@ -290,7 +290,7 @@ const Home = ({ onPageChange }) => {
               );
             })
           ) : (
-            <div className="ui-state ui-state--empty home-products-empty col-[1/-1] mx-auto my-6 text-white/80">
+            <div className="ui-state ui-state--empty home-products-empty col-[1/-1] mx-auto my-6 text-text-muted">
               <div className="ui-state__icon" aria-hidden="true">
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <path d="M3 7l9-4 9 4v10l-9 4-9-4V7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/>
@@ -305,21 +305,21 @@ const Home = ({ onPageChange }) => {
       </section>
 
       {/* About Us Section */}
-      <section className="about-section overflow-hidden bg-primary-active p-0">
+      <section className="about-section overflow-hidden bg-surface p-0">
         <div className="about-container grid min-h-[360px] grid-cols-2">
-          <div className="about-image relative w-[130%] overflow-hidden bg-primary-active max-md:w-[200%]">
+          <div className="about-image relative w-[130%] overflow-hidden bg-surface max-md:w-[200%]">
             <img src="/images/banners/hero3.webp" alt="About Us" className="h-full w-full object-cover opacity-50 lg:w-[85%] max-md:w-full" />
-            <div className="about-image-overlay absolute inset-0 z-[1] bg-[linear-gradient(304.14deg,var(--color-primary-active)_21.59%,rgba(18,14,77,0.4)_72.31%,var(--color-primary-active)_89.86%)]"></div>
+            <div className="about-image-overlay absolute inset-0 z-[1] bg-[linear-gradient(304.14deg,var(--color-surface)_21.59%,rgba(255,255,255,0.35)_72.31%,var(--color-surface)_89.86%)]"></div>
           </div>
-          <div className="about-content relative z-[2] flex flex-col justify-center py-10 pl-0 pr-16 text-text-on-primary max-md:-ml-[90%] max-md:py-8 max-md:pr-6">
+          <div className="about-content relative z-[2] flex flex-col justify-center py-10 pl-0 pr-16 text-text max-md:-ml-[90%] max-md:py-8 max-md:pr-6">
             <div className="about-goggles-icon pointer-events-none absolute right-16 top-10 z-10 opacity-[0.13] max-md:hidden">
               <img src="/images/banners/spacs.webp" alt="Goggles" className="relative right-[-115px] top-5 h-auto w-[300px] rotate-[-13deg] brightness-0 invert" />
             </div>
-            <h2 className="m-0 mb-5 text-[length:clamp(1.5rem,3vw,2rem)] font-medium tracking-[-0.02em] text-text-on-primary">About Us</h2>
-            <p className="mb-5 text-[length:var(--text-md)] font-normal leading-[1.5] text-white/80">
+            <h2 className="m-0 mb-5 text-[length:clamp(1.5rem,3vw,2rem)] font-medium tracking-[-0.02em] text-text">About Us</h2>
+            <p className="mb-5 text-[length:var(--text-md)] font-normal leading-[1.5] text-text-muted">
               At Stallion, we specialize in providing high-quality safety goggles designed for industrial, corporate, and institutional use. Our focus is not retail sales, but long-term B2B partnerships with organizations that prioritize workforce safety and compliance.
             </p>
-            <p className="mb-0 text-[length:var(--text-md)] font-normal leading-[1.5] text-white/80">
+            <p className="mb-0 text-[length:var(--text-md)] font-normal leading-[1.5] text-text-muted">
               With years of expertise in manufacturing and global distribution, we supply goggles that meet international safety standards such as ANSI, EN166, and ISI. From manufacturing plants and construction sites to laboratories and healthcare facilities, our products are trusted by industries worldwide.
             </p>
           </div>
@@ -327,54 +327,54 @@ const Home = ({ onPageChange }) => {
       </section>
 
       {/* Our B2B Advantage Section */}
-      <section className="b2b-advantage-section bg-primary-active px-[6%] py-16 max-[426px]:px-5">
-        <h2 className="b2b-advantage-title mb-12 text-center text-[length:clamp(2rem,4vw,3rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text-on-primary">Our B2B Advantage</h2>
-        <div className="b2b-advantage-container mx-auto grid max-w-[1400px] grid-cols-3 gap-10 rounded-lg border border-white/10 bg-white/[0.04] p-10 lg:gap-6 lg:p-6 max-md:gap-6 max-[426px]:grid-cols-1">
-          <div className="b2b-advantage-card flex flex-col items-center text-center text-text-on-primary">
-            <div className="b2b-icon relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-pill border border-white/[0.16] bg-white/[0.08] max-md:h-[60px] max-md:w-[60px]">
+      <section className="b2b-advantage-section bg-surface px-[6%] py-16 max-[426px]:px-5">
+        <h2 className="b2b-advantage-title mb-12 text-center text-[length:clamp(2rem,4vw,3rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text">Our B2B Advantage</h2>
+        <div className="b2b-advantage-container mx-auto grid max-w-[1400px] grid-cols-3 gap-10 rounded-lg border border-border bg-grey-50 p-10 lg:gap-6 lg:p-6 max-md:gap-6 max-[426px]:grid-cols-1">
+          <div className="b2b-advantage-card flex flex-col items-center text-center text-text">
+            <div className="b2b-icon relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-pill border border-border bg-grey-100 max-md:h-[60px] max-md:w-[60px]">
               <FiPackage aria-hidden="true" className="relative z-[1] h-[50px] w-[50px] max-md:h-[30px] max-md:w-[30px]" />
             </div>
-            <h3 className="m-0 text-[length:var(--text-lg)] font-medium text-text-on-primary lg:text-[length:var(--text-md)] max-[384px]:text-[length:var(--text-base)]">Bulk Order Fulfilment</h3>
+            <h3 className="m-0 text-[length:var(--text-lg)] font-medium text-text lg:text-[length:var(--text-md)] max-[384px]:text-[length:var(--text-base)]">Bulk Order Fulfilment</h3>
           </div>
-          <div className="b2b-advantage-card flex flex-col items-center text-center text-text-on-primary">
-            <div className="b2b-icon relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-pill border border-white/[0.16] bg-white/[0.08] max-md:h-[60px] max-md:w-[60px]">
+          <div className="b2b-advantage-card flex flex-col items-center text-center text-text">
+            <div className="b2b-icon relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-pill border border-border bg-grey-100 max-md:h-[60px] max-md:w-[60px]">
               <FiCreditCard aria-hidden="true" className="relative z-[1] h-[50px] w-[50px] max-md:h-[30px] max-md:w-[30px]" />
             </div>
-            <h3 className="m-0 text-[length:var(--text-lg)] font-medium text-text-on-primary lg:text-[length:var(--text-md)] max-[384px]:text-[length:var(--text-base)]">Competitive Pricing</h3>
+            <h3 className="m-0 text-[length:var(--text-lg)] font-medium text-text lg:text-[length:var(--text-md)] max-[384px]:text-[length:var(--text-base)]">Competitive Pricing</h3>
           </div>
-          <div className="b2b-advantage-card flex flex-col items-center text-center text-text-on-primary">
-            <div className="b2b-icon relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-pill border border-white/[0.16] bg-white/[0.08] max-md:h-[60px] max-md:w-[60px]">
+          <div className="b2b-advantage-card flex flex-col items-center text-center text-text">
+            <div className="b2b-icon relative mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-pill border border-border bg-grey-100 max-md:h-[60px] max-md:w-[60px]">
               <FiGlobe aria-hidden="true" className="relative z-[1] h-[50px] w-[50px] max-md:h-[30px] max-md:w-[30px]" />
             </div>
-            <h3 className="m-0 text-[length:var(--text-lg)] font-medium text-text-on-primary lg:text-[length:var(--text-md)] max-[384px]:text-[length:var(--text-base)]">Global Shipping</h3>
+            <h3 className="m-0 text-[length:var(--text-lg)] font-medium text-text lg:text-[length:var(--text-md)] max-[384px]:text-[length:var(--text-base)]">Global Shipping</h3>
           </div>
         </div>
       </section>
 
       {/* FAQ Section */}
-      <section className="faq-section bg-primary-active px-[6%] pb-16 pt-0 max-[426px]:px-5" id="faq-section">
-        <h2 className="faq-title mb-12 text-center text-[length:clamp(2rem,4vw,3rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text-on-primary">FAQs</h2>
+      <section className="faq-section bg-surface px-[6%] pb-16 pt-0 max-[426px]:px-5" id="faq-section">
+        <h2 className="faq-title mb-12 text-center text-[length:clamp(2rem,4vw,3rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text">FAQs</h2>
         <div className="faq-container mx-auto max-w-[1000px]">
           {faqs.map((faq, index) => (
-            <div key={index} className="faq-item border-b border-white/[0.14]">
+            <div key={index} className="faq-item border-b border-border">
               <button
                 type="button"
-                className="faq-question group flex w-full cursor-pointer items-center justify-between gap-5 rounded-sm border-none bg-transparent py-6 text-left transition duration-200 ease-[ease] hover:bg-white/[0.03] focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.3)] focus-visible:outline-none"
+                className="faq-question group flex w-full cursor-pointer items-center justify-between gap-5 rounded-sm border-none bg-transparent py-6 text-left transition duration-200 ease-[ease] hover:bg-grey-100 focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] focus-visible:outline-none"
                 aria-expanded={expandedFaq === index}
                 aria-controls={`faq-answer-${index}`}
                 onClick={() => toggleFaq(index)}
               >
                 <span className="faq-question-content flex min-w-0 flex-1 items-center gap-8 max-[426px]:gap-3">
-                  <span className="faq-number min-w-[40px] text-[length:var(--text-md)] font-normal text-white/50">{String(index + 1).padStart(2, '0')}</span>
-                  <span className="faq-question-text text-[length:var(--text-lg)] font-medium text-text-on-primary max-[426px]:text-[length:var(--text-md)]">{faq.question}</span>
+                  <span className="faq-number min-w-[40px] text-[length:var(--text-md)] font-normal text-text-subtle">{String(index + 1).padStart(2, '0')}</span>
+                  <span className="faq-question-text text-[length:var(--text-lg)] font-medium text-text max-[426px]:text-[length:var(--text-md)]">{faq.question}</span>
                 </span>
-                <span className={`faq-toggle flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-pill border text-[length:var(--text-xl)] leading-none transition duration-200 ease-[ease] ${expandedFaq === index ? 'border-accent bg-accent text-text-on-accent' : 'border-white/40 bg-transparent text-text-on-primary group-hover:border-white/60 group-hover:bg-white/10'}`} aria-hidden="true">
+                <span className={`faq-toggle flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-pill border text-[length:var(--text-xl)] leading-none transition duration-200 ease-[ease] ${expandedFaq === index ? 'border-accent bg-accent text-text-on-accent' : 'border-border-strong bg-transparent text-text group-hover:border-border-strong group-hover:bg-grey-100'}`} aria-hidden="true">
                   {expandedFaq === index ? '−' : '+'}
                 </span>
               </button>
               {expandedFaq === index && (
                 <div className="faq-answer pb-6 pl-[calc(40px+var(--space-8))] pr-0 pt-0 max-[426px]:pl-2" id={`faq-answer-${index}`} role="region">
-                  <p className="m-0 text-[length:var(--text-md)] font-normal leading-[1.5] text-white/70 max-[426px]:text-[length:var(--text-base)]">{faq.answer}</p>
+                  <p className="m-0 text-[length:var(--text-md)] font-normal leading-[1.5] text-text-muted max-[426px]:text-[length:var(--text-base)]">{faq.answer}</p>
                 </div>
               )}
             </div>
