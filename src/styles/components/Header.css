@@ -399,7 +399,7 @@
 .mobile-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(18, 14, 77, 0);
+  background: rgba(0, 0, 0, 0);
   backdrop-filter: blur(0px);
   transition: background var(--transition-slow), backdrop-filter var(--transition-slow);
   z-index: 1002;
@@ -407,7 +407,7 @@
 }
 
 .mobile-backdrop.open {
-  background: rgba(18, 14, 77, 0.45);
+  background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(3px) saturate(0.9);
   pointer-events: auto;
 }
