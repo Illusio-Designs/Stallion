@@ -974,6 +974,19 @@ export const setPartyLocation = async (partyId, { latitude, longitude }) => {
 };
 
 /**
+ * Admin-only: (re)derive a party's coordinates from its own address/city/state/
+ * pincode and store them. Used by the "Get coordinates from address" button.
+ * @param {string} partyId
+ * @returns {Promise<{latitude:number, longitude:number, location_source:string}>}
+ */
+export const geocodePartyFromAddress = async (partyId) => {
+  return apiRequest(`/parties/${partyId}/geocode`, {
+    method: 'PUT',
+    includeAuth: true,
+  });
+};
+
+/**
  * Bulk upload parties from Excel/CSV file
  * @param {File} file - Excel or CSV file
  * @returns {Promise<Object>} Response with created/updated counts
