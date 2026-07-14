@@ -1071,14 +1071,14 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                 })()}
               </div>
               <div className="main-product-info flex flex-col gap-6">
-                <h2 className="product-title text-[length:var(--text-2xl)] text-text-on-primary m-0 font-semibold leading-[var(--leading-tight)] tracking-[-0.02em]">{display(currentProduct.name)}</h2>
+                <h2 className="product-title text-[length:var(--text-2xl)] text-text m-0 font-semibold leading-[var(--leading-tight)] tracking-[-0.02em]">{display(currentProduct.name)}</h2>
                 <div className="price-info flex flex-col gap-2">
                   <div className="price-item flex items-baseline gap-4">
-                    <span className="price-label text-[length:var(--text-sm)] text-[rgba(255,255,255,0.7)] font-normal uppercase tracking-[var(--tracking-label)] min-w-[44px]">MRP</span>
-                    <span className="price-value text-[length:var(--text-xl)] text-text-on-primary font-semibold">{display(currentProduct.mrp)}</span>
+                    <span className="price-label text-[length:var(--text-sm)] text-text-muted font-normal uppercase tracking-[var(--tracking-label)] min-w-[44px]">MRP</span>
+                    <span className="price-value text-[length:var(--text-xl)] text-text font-semibold">{display(currentProduct.mrp)}</span>
                   </div>
                   <div className="price-item flex items-baseline gap-4">
-                    <span className="price-label text-[length:var(--text-sm)] text-[rgba(255,255,255,0.7)] font-normal uppercase tracking-[var(--tracking-label)] min-w-[44px]">WHP</span>
+                    <span className="price-label text-[length:var(--text-sm)] text-text-muted font-normal uppercase tracking-[var(--tracking-label)] min-w-[44px]">WHP</span>
                     <span className="price-value text-[length:var(--text-lg)] text-accent font-semibold">{display(currentProduct.whp)}</span>
                   </div>
                 </div>
@@ -1156,7 +1156,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                   ref={(node) => {
                     thumbnailRefs.current[index] = node;
                   }}
-                  className={`thumbnail w-[88px] h-[88px] rounded-md overflow-hidden cursor-pointer border transition duration-200 bg-surface flex items-center justify-center p-2 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.45)] motion-reduce:transition-none ${
+                  className={`thumbnail w-[88px] h-[88px] rounded-md overflow-hidden cursor-pointer border transition duration-200 bg-surface flex items-center justify-center p-2 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.2)] motion-reduce:transition-none ${
                     selectedVariation === index ? "active border-accent shadow-[0_0_0_2px_var(--color-accent),var(--shadow-md)]" : "border-transparent"
                   }`}
                   role="option"
