@@ -20,7 +20,7 @@ import {
   register,
   updateParty,
   bulkUpdatePartyCoords,
-  geocodePartyFromAddress,
+  setPartyLocation,
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
 import { showError, showSuccess, showInfo } from '../services/notificationService';
@@ -507,7 +507,7 @@ const DashboardClients = () => {
     if (!partyId) return;
     try {
       setSavingLoc(true);
-      const res = await geocodePartyFromAddress(partyId);
+      const res = await setPartyLocation(partyId); // no coords -> geocode from address
       const lat = res?.latitude;
       const lng = res?.longitude;
       showSuccess('Coordinates set from the party address.');

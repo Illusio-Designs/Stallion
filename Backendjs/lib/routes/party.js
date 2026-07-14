@@ -15,10 +15,10 @@ router.get('/salesman/:salesman_id', authenticateToken, partyController.getParti
 router.get('/:id', authenticateToken, partyController.getPartyById);
 router.post('/get', authenticateToken, isPartyManager, partyController.getParties);
 router.post('/', authenticateToken, isPartyCreator, partyController.createParty);
-// Admin-only: set a party's exact GPS location, or (re)derive coordinates from
-// its address. Declared before '/:id' so the suffix isn't swallowed.
+// Admin-only: set a party's location. With { latitude, longitude } it uses those
+// exact coordinates; with no body it geocodes from the party's address. Declared
+// before '/:id' so the '/location' suffix isn't swallowed.
 router.put('/:id/location', authenticateToken, partyController.setPartyLocation);
-router.put('/:id/geocode', authenticateToken, partyController.geocodePartyLocation);
 router.put('/:id', authenticateToken, partyController.updateParty);
 router.delete('/:id', authenticateToken, isPartyManager, partyController.deleteParty);
 router.post('/byZoneId', authenticateToken, partyController.getPartiesByZoneId);
