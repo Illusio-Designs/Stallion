@@ -311,7 +311,7 @@ class PartyController {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const user = req.user;
-            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier } = req.body;
+            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, latitude, longitude } = req.body;
             // address, city, state and pincode are required so the party can be
             // geocoded accurately for the visit/check-in geofence.
             if (!party_name || !phone || !address) {
@@ -356,9 +356,23 @@ class PartyController {
                 address,
             });
 
-            // Geocode the address to anchor the visit/check-in geofence.
-            // Best-effort: if it fails, coords stay null and get backfilled later.
-            const geo = await geocodeAddress(address, { pincode });
+            // Location for the visit/check-in geofence.
+            //  - When a SALESMAN registers the party they are physically at the
+            //    shop, so their captured device GPS is the party's TRUE location
+            //    (trusted -> location_source 'gps').
+            //  - Otherwise (admin/party manager in the office) geocode the address
+            //    as a best-effort anchor ('geocoded'); the first on-site visit
+            //    later overwrites it with real GPS.
+            const creatorRole = normalizeRole(req.userRoleName);
+            const devLat = latitude != null && latitude !== '' ? Number(latitude) : null;
+            const devLng = longitude != null && longitude !== '' ? Number(longitude) : null;
+            let finalLat = null, finalLng = null, locationSource = null;
+            if (creatorRole === 'salesman' && Number.isFinite(devLat) && Number.isFinite(devLng)) {
+                finalLat = devLat; finalLng = devLng; locationSource = 'gps';
+            } else {
+                const geo = await geocodeAddress(address, { pincode });
+                if (geo) { finalLat = geo.latitude; finalLng = geo.longitude; locationSource = 'geocoded'; }
+            }
 
             const party = await Party.create({
                 distributor_id: finalDistributorId,
@@ -379,8 +393,9 @@ class PartyController {
                 pincode,
                 gstin,
                 pan,
-                latitude: geo ? geo.latitude : null,
-                longitude: geo ? geo.longitude : null,
+                latitude: finalLat,
+                longitude: finalLng,
+                location_source: locationSource,
                 created_by: user.user_id,
                 created_at: new Date(),
                 updated_at: new Date(),
@@ -402,6 +417,50 @@ class PartyController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    // Admin-only: set a party's exact location from real coordinates (e.g. the
+    // admin captured GPS on-site, or picked the point). Marks it as trusted
+    // 'gps' so the strict visit geofence applies from then on.
+    async setPartyLocation(req, res) {
+        try {
+            if (!isAdmin(req.userRoleName)) {
+                return res.status(403).json({ error: 'Only admin can set a party location' });
+            }
+            const id = req.params.id;
+            if (!id) {
+                return res.status(400).json({ error: 'Party ID is required' });
+            }
+            const { latitude, longitude } = req.body;
+            const lat = Number(latitude);
+            const lng = Number(longitude);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                return res.status(400).json({ error: 'Valid latitude and longitude are required' });
+            }
+            const party = await Party.findOne({ where: { party_id: id } });
+            if (!party) {
+                return res.status(404).json({ error: 'Party not found' });
+            }
+            const oldSnapshot = party.toJSON();
+            party.latitude = lat;
+            party.longitude = lng;
+            party.location_source = 'gps';
+            party.updated_at = new Date();
+            await party.save();
+            await logAudit({
+                req,
+                action: 'update',
+                description: 'Party location set by admin',
+                tableName: 'parties',
+                recordId: party.party_id,
+                oldValues: oldSnapshot,
+                newValues: party,
+            });
+            return res.status(200).json({ message: 'Party location updated', latitude: lat, longitude: lng, location_source: 'gps' });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
     async updateParty(req, res) {
         try {
             const id = req.params.id;

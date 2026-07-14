@@ -123,10 +123,18 @@ class SalesmanCheckInsController {
                 if (!checkinParty) {
                     return res.status(404).json({ error: 'Party not found' });
                 }
-                await ensurePartyCoords(checkinParty);
-                const geo = checkGeofence({ deviceLat: fields.latitude, deviceLng: fields.longitude, party: checkinParty, action: 'check in' });
-                if (!geo.ok) {
-                    return res.status(403).json({ error: geo.reason });
+                // First on-site visit auto-captures the party's real location; once
+                // a trusted GPS location exists, the strict geofence is enforced.
+                if (checkinParty.location_source === 'gps' && checkinParty.latitude != null && checkinParty.longitude != null) {
+                    const geo = checkGeofence({ deviceLat: fields.latitude, deviceLng: fields.longitude, party: checkinParty, action: 'check in' });
+                    if (!geo.ok) {
+                        return res.status(403).json({ error: geo.reason });
+                    }
+                } else {
+                    checkinParty.latitude = Number(fields.latitude);
+                    checkinParty.longitude = Number(fields.longitude);
+                    checkinParty.location_source = 'gps';
+                    try { await checkinParty.save(); } catch (_) { /* best-effort */ }
                 }
             }
 
