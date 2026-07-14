@@ -20,6 +20,7 @@ import {
   register,
   updateParty,
   bulkUpdatePartyCoords,
+  setPartyLocation,
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
 import { showError, showSuccess, showInfo } from '../services/notificationService';
@@ -31,6 +32,11 @@ const DashboardClients = () => {
   const user = useMemo(() => getUser(), []);
   const isSalesman = useMemo(() => userRole === 'salesman', [userRole]);
   const isDistributor = useMemo(() => userRole === 'distributor', [userRole]);
+  const isAdmin = useMemo(() => userRole === 'admin', [userRole]);
+  // Admin-only party-location editor (geofence anchor).
+  const [locLat, setLocLat] = useState('');
+  const [locLng, setLocLng] = useState('');
+  const [savingLoc, setSavingLoc] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -496,6 +502,44 @@ const DashboardClients = () => {
     }
   };
 
+  // Admin: fill the location fields from the device's current GPS.
+  const handleUseCurrentPosition = () => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      showError('Location is not available on this device/browser.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => { setLocLat(String(pos.coords.latitude)); setLocLng(String(pos.coords.longitude)); showInfo('Filled with your current position.'); },
+      () => showError('Could not get your current location (permission denied?).'),
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
+
+  // Admin: save the entered coordinates as the party's trusted location.
+  const handleSaveLocation = async () => {
+    const partyId = editRow?.id || editRow?.party_id;
+    const lat = Number(locLat);
+    const lng = Number(locLng);
+    if (!partyId) return;
+    if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      showError('Enter valid latitude and longitude.');
+      return;
+    }
+    try {
+      setSavingLoc(true);
+      await setPartyLocation(partyId, { latitude: lat, longitude: lng });
+      showSuccess('Party location updated. The visit geofence will use this point.');
+      setParties(prev => prev.map(p => {
+        const id = p.id || p.party_id;
+        return id === partyId ? { ...p, latitude: lat, longitude: lng, location_source: 'gps' } : p;
+      }));
+    } catch (err) {
+      showError(`Failed to update location: ${err.message}`);
+    } finally {
+      setSavingLoc(false);
+    }
+  };
+
   const handleEdit = async (row) => {
     // Ensure we have the full row object with ID
     if (!row) {
@@ -555,6 +599,10 @@ const DashboardClients = () => {
         prefered_courier: row.prefered_courier || row.preferred_courier || '',
         is_active: row.is_active !== false,
       });
+
+      // Pre-fill the admin location editor with the party's current coords.
+      setLocLat(row.latitude != null ? String(row.latitude) : '');
+      setLocLng(row.longitude != null ? String(row.longitude) : '');
 
       // Store the complete row object with ensured ID
       setEditRow({ ...row, id: partyId });
@@ -830,6 +878,27 @@ const DashboardClients = () => {
       console.log('[DashboardClients] Data keys:', Object.keys(dataToSend));
       console.log('[DashboardClients] Has undefined:', Object.values(dataToSend).some(v => v === undefined));
       console.log('[DashboardClients] All fields present:', allFields.every(f => dataToSend.hasOwnProperty(f)));
+
+      // A SALESMAN registering a new party is physically at the shop, so capture
+      // their device GPS and send it — the backend saves it as the party's true
+      // location (trusted) for the visit geofence. Salesman + create only;
+      // best-effort (proceed without it if permission is denied/unavailable).
+      if (isSalesman && !editRow) {
+        try {
+          const coords = await new Promise((resolve) => {
+            if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null);
+            navigator.geolocation.getCurrentPosition(
+              (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+              () => resolve(null),
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            );
+          });
+          if (coords) {
+            dataToSend.latitude = coords.latitude;
+            dataToSend.longitude = coords.longitude;
+          }
+        } catch (_) { /* fall back to address geocoding on the backend */ }
+      }
 
       if (editRow) {
         // Validate that editRow has an ID (check multiple possible field names)
@@ -1397,6 +1466,38 @@ const DashboardClients = () => {
             />
             <span className="ui-label m-0">Active (uncheck to deactivate)</span>
           </label>
+        </div>
+      )}
+      {editRow && isAdmin && (
+        <div className="form-group form-group--full rounded-lg border border-border bg-surface-muted p-3">
+          <label className="ui-label">Party Location (visit geofence)</label>
+          <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
+            Salesmen must be within 250&nbsp;m of this point to place a visit order.
+            Paste coordinates from Google Maps, or use your current position if you're on-site.
+            {editRow.location_source ? ` Current source: ${editRow.location_source}.` : ' Not set from GPS yet.'}
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <input
+              className="ui-input"
+              placeholder="Latitude (e.g. 19.2307)"
+              value={locLat}
+              onChange={(e) => setLocLat(e.target.value)}
+            />
+            <input
+              className="ui-input"
+              placeholder="Longitude (e.g. 72.8567)"
+              value={locLng}
+              onChange={(e) => setLocLng(e.target.value)}
+            />
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button type="button" className="ui-btn ui-btn--secondary" onClick={handleUseCurrentPosition} disabled={savingLoc}>
+              Use my current position
+            </button>
+            <button type="button" className="ui-btn ui-btn--primary" onClick={handleSaveLocation} disabled={savingLoc}>
+              {savingLoc ? 'Saving…' : 'Save location'}
+            </button>
+          </div>
         </div>
       )}
     </>
