@@ -602,7 +602,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   // Show loading state (shimmer placeholder mimicking the detail layout)
   if (loading) {
     return (
-      <div className="product-detail-page bg-primary-active px-[5%] py-8 min-h-[calc(100vh-200px)]">
+      <div className="product-detail-page bg-bg px-[5%] py-8 min-h-[calc(100vh-200px)]">
         <div className="pd-skeleton grid grid-cols-1 md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] gap-6 md:gap-8 p-6 bg-surface rounded-lg shadow-sm" aria-busy="true" aria-live="polite">
           <Skeleton className="pd-skeleton__media block min-h-[240px] md:min-h-[340px]" height="100%" radius={12} />
           <div className="pd-skeleton__panel flex flex-col gap-3">
@@ -627,7 +627,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   // Show error state
   if (error) {
     return (
-      <div className="product-detail-page bg-primary-active px-[5%] py-8 min-h-[calc(100vh-200px)]">
+      <div className="product-detail-page bg-bg px-[5%] py-8 min-h-[calc(100vh-200px)]">
         <div className="ui-state ui-state--error bg-surface rounded-lg shadow-sm my-4 mx-auto max-w-[560px]" role="alert">
           <div className="ui-state__icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -657,7 +657,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   // Show empty state
   if (productVariations.length === 0) {
     return (
-      <div className="product-detail-page bg-primary-active px-[5%] py-8 min-h-[calc(100vh-200px)]">
+      <div className="product-detail-page bg-bg px-[5%] py-8 min-h-[calc(100vh-200px)]">
         <div className="ui-state ui-state--empty bg-surface rounded-lg shadow-sm my-4 mx-auto max-w-[560px]">
           <div className="ui-state__icon" aria-hidden="true">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -673,7 +673,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   }
 
   return (
-    <div className="product-detail-page bg-primary-active px-[3%] py-3 sm:px-[4%] sm:py-5 md:py-6 lg:py-7 xl:px-[5%] xl:py-8 min-h-[calc(100vh-200px)]">
+    <div className="product-detail-page bg-bg px-[3%] py-3 sm:px-[4%] sm:py-5 md:py-6 lg:py-7 xl:px-[5%] xl:py-8 min-h-[calc(100vh-200px)]">
       {/* List View */}
       {viewMode === "list" && (
         <div className="list-view-container flex flex-col gap-5">

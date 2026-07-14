@@ -1,6 +1,6 @@
 import React from 'react';
 
-const LoadingSpinner = ({ size = 40, color = '#181265' }) => {
+const LoadingSpinner = ({ size = 40, color = '#16171d' }) => {
   return (
     <div className="flex items-center justify-center w-full min-h-[200px] p-10">
       <style>{`
