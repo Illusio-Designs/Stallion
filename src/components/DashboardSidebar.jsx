@@ -68,7 +68,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     <aside
       className={`dashboard-sidebar ${isCollapsed ? 'collapsed' : 'expanded'} ${
         isMobileOpen ? 'mobile-open max-md:translate-x-0' : 'max-md:-translate-x-full'
-      } fixed left-0 top-0 z-[1000] flex h-screen flex-col overflow-visible bg-primary text-text-on-primary transition-transform duration-200 ease-[ease] motion-reduce:transition-none md:translate-x-0 ${
+      } fixed left-0 top-0 z-[1000] flex h-screen flex-col overflow-visible bg-surface text-text border-r border-border transition-transform duration-200 ease-[ease] motion-reduce:transition-none md:translate-x-0 ${
         isCollapsed ? 'w-16 md:w-16' : 'w-60'
       }`}
     >
@@ -95,7 +95,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
         {/* Close (mobile drawer only) */}
         <button
           type="button"
-          className="sidebar-mobile-close ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-white/80 transition-colors hover:bg-white/[0.08] hover:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_rgba(255,255,255,0.7)] md:hidden"
+          className="sidebar-mobile-close ml-auto inline-flex h-9 w-9 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-grey-100 hover:text-text focus-visible:outline-none focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] md:hidden"
           onClick={onMobileClose}
           aria-label="Close menu"
         >
@@ -113,7 +113,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
             <li key={item.id} className="relative mb-1 overflow-visible">
               <a
                 href="#"
-                className={`group relative flex items-center overflow-visible rounded-md text-white/80 no-underline transition-[background-color,color] duration-200 ease-[ease] outline-none hover:bg-white/[0.08] hover:text-text-on-primary focus-visible:shadow-[0_0_0_2px_rgba(255,255,255,0.7)] active:scale-[0.98] motion-reduce:transition-none ${
+                className={`group relative flex items-center overflow-visible rounded-md text-text-muted no-underline transition-[background-color,color] duration-200 ease-[ease] outline-none hover:bg-grey-100 hover:text-text focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] active:scale-[0.98] motion-reduce:transition-none ${
                   isCollapsed
                     ? 'mx-auto h-11 w-11 justify-center p-0'
                     : 'min-h-10 gap-3 px-3 py-2'
@@ -121,7 +121,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
                   currentPage === item.id
                     ? isCollapsed
                       ? 'active bg-accent text-text-on-primary font-semibold'
-                      : "active bg-white/[0.12] text-text-on-primary font-semibold before:absolute before:left-[-12px] before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-pill before:bg-accent before:content-['']"
+                      : "active bg-primary text-text-on-primary font-semibold before:absolute before:left-[-12px] before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-pill before:bg-accent before:content-['']"
                     : ''
                 }`}
                 onClick={(e) => {
@@ -174,7 +174,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
             <a
               href="/products"
               style={{ color: 'var(--color-primary)' }}
-              className="flex min-h-10 items-center justify-center gap-2 rounded-md bg-white px-4 py-2.5 text-[length:var(--text-sm)] font-semibold no-underline shadow-sm outline-none transition-[background-color,transform] duration-200 ease-[ease] hover:bg-white/90 focus-visible:shadow-[0_0_0_2px_rgba(255,255,255,0.7)] active:scale-[0.98] motion-reduce:transition-none"
+              className="flex min-h-10 items-center justify-center gap-2 rounded-md bg-primary text-text-on-primary px-4 py-2.5 text-[length:var(--text-sm)] font-semibold no-underline shadow-sm outline-none transition-[background-color,transform] duration-200 ease-[ease] hover:bg-primary-hover focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] active:scale-[0.98] motion-reduce:transition-none"
               onClick={() => onMobileClose?.()}
               aria-label="Back to Shop"
             >
@@ -185,12 +185,12 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
         </ul>
       </nav>
       <div
-        className={`dashboard-sidebar-footer border-t border-white/10 max-md:hidden ${
+        className={`dashboard-sidebar-footer border-t border-border max-md:hidden ${
           isCollapsed ? 'px-2 py-3 text-center' : 'p-3'
         }`}
       >
         <button
-          className={`sidebar-toggle flex min-h-10 w-full cursor-pointer items-center rounded-md border-none bg-transparent text-[length:var(--text-xs)] font-medium text-white/80 outline-none transition-[background-color,color] duration-200 ease-[ease] hover:bg-white/[0.08] hover:text-text-on-primary focus-visible:shadow-[0_0_0_2px_rgba(255,255,255,0.7)] active:scale-[0.98] motion-reduce:transition-none ${
+          className={`sidebar-toggle flex min-h-10 w-full cursor-pointer items-center rounded-md border-none bg-transparent text-[length:var(--text-xs)] font-medium text-text-muted outline-none transition-[background-color,color] duration-200 ease-[ease] hover:bg-grey-100 hover:text-text focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] active:scale-[0.98] motion-reduce:transition-none ${
             isCollapsed ? 'justify-center gap-0 p-2' : 'justify-start gap-2 px-3 py-2'
           }`}
           onClick={onToggleCollapse}

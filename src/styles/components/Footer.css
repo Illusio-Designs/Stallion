@@ -1,8 +1,9 @@
 /* Footer Styles */
 .footer {
-  /* Brand: deep indigo surface. Layered indigo tones from the brand ramp. */
-  background: var(--color-primary-active);
-  color: var(--color-text-on-primary);
+  /* Monochrome: light surface, dark text. */
+  background: var(--color-grey-50);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text);
   /* More top padding, tight bottom so the copyright/social bar sits near the base. */
   padding: var(--space-12) 0 var(--space-5);
   position: relative;
@@ -105,7 +106,7 @@
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
   /* Muted-on-dark heading: section label, not loud */
-  color: rgba(255, 255, 255, 0.6);
+  color: var(--color-text-subtle);
 }
 
 .footer-links {
@@ -121,7 +122,7 @@
   display: inline-flex;
   align-items: center;
   min-height: 32px;
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--color-text-muted);
   text-decoration: none;
   font-size: var(--text-base);
   line-height: var(--leading-normal);
@@ -130,34 +131,34 @@
 }
 
 .footer-link:hover {
-  color: var(--color-text-on-primary);
+  color: var(--color-text);
 }
 
 .footer-link:focus-visible {
   outline: none;
-  color: var(--color-text-on-primary);
+  color: var(--color-text);
   /* Visible ring against the dark surface */
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.35);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25);
 }
 
 .footer-link:active {
-  color: rgba(255, 255, 255, 0.72);
+  color: var(--color-text-muted);
 }
 
 .footer-link--inline {
   min-height: 0;
   text-decoration: underline;
   text-underline-offset: 2px;
-  text-decoration-color: rgba(255, 255, 255, 0.4);
+  text-decoration-color: var(--color-grey-400);
 }
 
 .footer-link--inline:hover,
 .footer-link--inline:focus-visible {
-  text-decoration-color: var(--color-text-on-primary);
+  text-decoration-color: var(--color-text);
 }
 
 .footer-text {
-  color: rgba(255, 255, 255, 0.82);
+  color: var(--color-text-muted);
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   margin: 0;
@@ -175,11 +176,11 @@
 /* Social icon buttons in the bottom bar — force light icon color (the icon SVG
    inherits currentColor) so they're visible over the dark footer. */
 .footer-social a {
-  color: rgba(255, 255, 255, 0.75);
+  color: var(--color-text-muted);
 }
 .footer-social a:hover,
 .footer-social a:focus-visible {
-  color: var(--color-text-on-primary);
+  color: var(--color-text);
 }
 
 @media (max-width: 1024px) {

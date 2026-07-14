@@ -226,7 +226,7 @@ const Header = ({ onPageChange, currentPage }) => {
   ];
 
   return (
-    <header className={`header fixed top-0 left-0 right-0 z-[1000] h-[var(--header-height)] text-text-on-primary transition-[background,box-shadow] duration-300 ease-[ease] ${isScrolled ? 'scrolled bg-primary shadow-md' : 'bg-transparent'}`}>
+    <header className={`header fixed top-0 left-0 right-0 z-[1000] h-[var(--header-height)] text-text transition-[background,box-shadow] duration-300 ease-[ease] ${isScrolled ? 'scrolled bg-surface shadow-sm' : 'bg-surface'}`}>
       <div className="header-content relative mx-auto flex h-full items-center justify-between px-[4%] sm:px-[5%]">
         {/* mobile backdrop */}
         <div className={`mobile-backdrop fixed inset-0 z-[1002] transition-[background,backdrop-filter] duration-300 ease-[ease] motion-reduce:transition-none ${isMenuOpen ? 'open pointer-events-auto' : 'pointer-events-none'}`} onClick={() => setIsMenuOpen(false)} aria-hidden="true" />
@@ -239,11 +239,11 @@ const Header = ({ onPageChange, currentPage }) => {
         >
           {/* mobile drawer header (logo + close) */}
           {isMenuOpen && (
-            <div className="mobile-drawer-header mb-2 flex items-center justify-between gap-3 border-b border-white/12 pb-4">
+            <div className="mobile-drawer-header mb-2 flex items-center justify-between gap-3 border-b border-border pb-4">
               <div className="mobile-logo cursor-pointer rounded-sm" onClick={() => { setIsMenuOpen(false); if (onPageChange) onPageChange(''); else window.location.href = '/'; }}>
                 <img src="/images/logo/logo.webp" alt="Stallion" className="logo-image" />
               </div>
-              <button type="button" className="icon-btn drawer-close-btn text-text-on-primary" onClick={() => setIsMenuOpen(false)} aria-label="Close menu">
+              <button type="button" className="icon-btn drawer-close-btn text-text" onClick={() => setIsMenuOpen(false)} aria-label="Close menu">
                 <FiX size={20} aria-hidden="true" />
               </button>
             </div>
@@ -267,26 +267,26 @@ const Header = ({ onPageChange, currentPage }) => {
           ))}
         </nav>
         
-        <div className="logo flex cursor-pointer items-center rounded-sm focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.5)]" onClick={() => onPageChange ? onPageChange('') : window.location.href = '/'}>
+        <div className="logo flex cursor-pointer items-center rounded-sm focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)]" onClick={() => onPageChange ? onPageChange('') : window.location.href = '/'}>
           <img src="/images/logo/logo.webp" alt="Stallion Eyewear" className="logo-image block h-11 w-[124px] object-contain" />
         </div>
 
         <div className="header-actions flex items-center gap-2 md:gap-5">
-          <div className="search-bar relative hidden items-center rounded-pill border border-white/22 bg-white/[0.06] px-4 py-2 transition-[background,border-color,box-shadow] duration-200 ease-[ease] hover:bg-white/10 focus-within:border-white/70 focus-within:bg-white/12 focus-within:shadow-[0_0_0_3px_rgba(255,255,255,0.16)] sm:flex sm:min-w-[150px] md:min-w-[220px]">
+          <div className="search-bar relative hidden items-center rounded-pill border border-border-strong bg-grey-100 px-4 py-2 transition-[background,border-color,box-shadow] duration-200 ease-[ease] hover:bg-grey-200 focus-within:border-border-strong focus-within:bg-grey-200 focus-within:shadow-[0_0_0_3px_rgba(0,0,0,0.12)] sm:flex sm:min-w-[150px] md:min-w-[220px]">
             <form onSubmit={handleSearchSubmit} role="search" className="flex w-full items-center">
-              <FiSearch size={18} className="search-icon mr-2 shrink-0 text-white/85" aria-hidden="true" />
+              <FiSearch size={18} className="search-icon mr-2 shrink-0 text-text-muted" aria-hidden="true" />
               <input
                 type="text"
                 placeholder="Search products..."
                 aria-label="Search products"
                 value={searchQuery}
                 onChange={handleSearchChange}
-                className="min-w-0 flex-1 border-none bg-none p-0 text-[length:var(--text-base)] leading-[var(--leading-normal)] text-text-on-primary outline-none placeholder:text-white/65"
+                className="min-w-0 flex-1 border-none bg-none p-0 text-[length:var(--text-base)] leading-[var(--leading-normal)] text-text outline-none placeholder:text-text-subtle"
               />
             </form>
           </div>
           <div className="action-icons flex items-center gap-2">
-            <button type="button" className="icon-btn cart-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text-on-primary transition-[background,transform] duration-200 ease-[ease] hover:bg-white/12 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.5)] active:scale-[0.94]" onClick={() => onPageChange('cart')} aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}>
+            <button type="button" className="icon-btn cart-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text transition-[background,transform] duration-200 ease-[ease] hover:bg-grey-100 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] active:scale-[0.94]" onClick={() => onPageChange('cart')} aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}>
               <FiShoppingCart size={28} aria-hidden="true" />
               {cartCount > 0 && (
                 <span className="cart-badge absolute right-0.5 top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill border-2 border-primary bg-accent px-[5px] text-[length:var(--text-xs)] font-bold leading-none text-text-on-accent" aria-hidden="true">{cartCount > 99 ? '99+' : cartCount}</span>
@@ -295,7 +295,7 @@ const Header = ({ onPageChange, currentPage }) => {
             <div className="user-menu-container relative" ref={dropdownRef}>
               <button
                 type="button"
-                className="icon-btn user-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text-on-primary transition-[background,transform] duration-200 ease-[ease] hover:bg-white/12 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.5)] active:scale-[0.94]"
+                className="icon-btn user-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text transition-[background,transform] duration-200 ease-[ease] hover:bg-grey-100 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] active:scale-[0.94]"
                 onClick={handleUserIconClick}
                 aria-label={loggedIn ? 'User menu' : 'Login'}
                 aria-haspopup={loggedIn ? 'menu' : undefined}
@@ -325,7 +325,7 @@ const Header = ({ onPageChange, currentPage }) => {
               )}
             </div>
             {!isMenuOpen && (
-              <button type="button" ref={menuBtnRef} className="icon-btn menu-btn z-[1004] inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text-on-primary transition-[background,transform] duration-200 ease-[ease] hover:bg-white/12 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(255,255,255,0.5)] active:scale-[0.94] md:hidden" aria-label="Open menu" aria-expanded={isMenuOpen} aria-haspopup="dialog" onClick={() => setIsMenuOpen(true)}>
+              <button type="button" ref={menuBtnRef} className="icon-btn menu-btn z-[1004] inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text transition-[background,transform] duration-200 ease-[ease] hover:bg-grey-100 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] active:scale-[0.94] md:hidden" aria-label="Open menu" aria-expanded={isMenuOpen} aria-haspopup="dialog" onClick={() => setIsMenuOpen(true)}>
                 <FiMenu size={28} aria-hidden="true" />
               </button>
             )}
