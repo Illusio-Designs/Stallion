@@ -108,7 +108,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
                 checked={allSelected}
                 onChange={toggleAll}
                 onClick={(e) => e.stopPropagation()}
-                className="accent-[#181265] cursor-pointer"
+                className="accent-[#16171d] cursor-pointer"
               />
               {allSelected ? 'Uncheck All' : 'Check All'}
             </span>
@@ -134,7 +134,7 @@ const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled
                       checked={isChecked}
                       onChange={() => toggleZone(zoneId)}
                       onClick={(e) => e.stopPropagation()}
-                      className="accent-[#181265] cursor-pointer"
+                      className="accent-[#16171d] cursor-pointer"
                     />
                     {zoneName}
                   </span>
@@ -200,7 +200,7 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
           </div>
           <div className="ui-dropdown-custom__option border-b border-border font-semibold" onClick={toggleAll}>
             <span className="flex items-center gap-2">
-              <input type="checkbox" checked={allSelected} onChange={toggleAll} onClick={(e) => e.stopPropagation()} className="accent-[#181265] cursor-pointer" />
+              <input type="checkbox" checked={allSelected} onChange={toggleAll} onClick={(e) => e.stopPropagation()} className="accent-[#16171d] cursor-pointer" />
               {allSelected ? 'Uncheck All' : 'Check All'}
             </span>
           </div>
@@ -212,7 +212,7 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
               return (
                 <div key={id} className={`ui-dropdown-custom__option ${isChecked ? 'ui-dropdown-custom__option--selected' : ''}`} onClick={() => toggle(id)}>
                   <span className="flex items-center gap-2">
-                    <input type="checkbox" checked={isChecked} onChange={() => toggle(id)} onClick={(e) => e.stopPropagation()} className="accent-[#181265] cursor-pointer" />
+                    <input type="checkbox" checked={isChecked} onChange={() => toggle(id)} onClick={(e) => e.stopPropagation()} className="accent-[#16171d] cursor-pointer" />
                     {nameOf(s)}
                   </span>
                 </div>
