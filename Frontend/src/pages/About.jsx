@@ -6,26 +6,17 @@ const About = () => {
   return (
     <div className="about-page bg-bg text-text">
       {/* Hero */}
-      <section className="about-hero relative overflow-hidden bg-primary py-12 px-5 md:py-16">
-        <div className="about-hero-bg absolute inset-0 z-[1]">
-          <img
-            src="/images/banners/hero1.webp"
-            alt=""
-            aria-hidden="true"
-            className="w-full h-full object-cover object-[50%_20%] opacity-[0.28]"
-          />
-          <div className="about-hero-overlay absolute inset-0 z-[2] bg-[linear-gradient(180deg,rgba(18,14,77,0.55)_0%,rgba(24,18,101,0.75)_100%)]" />
-        </div>
+      <section className="about-hero relative overflow-hidden bg-surface border-b border-border py-12 px-5 md:py-16">
         <div className="about-hero-content container relative z-[3] max-w-[760px] mx-auto text-center">
-          <p className="about-eyebrow text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-white/70 m-0 mb-3">
+          <p className="about-eyebrow text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle m-0 mb-3">
             About Stallion
           </p>
-          <h1 className="text-[length:var(--text-xl)] md:text-[length:var(--text-2xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text-on-primary m-0 mb-4">
-            Certified safety eyewear, supplied at scale
+          <h1 className="text-[length:var(--text-xl)] md:text-[length:var(--text-2xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-4">
+            Premium sunglasses &amp; frames, supplied at scale
           </h1>
-          <p className="about-hero-lede text-[length:var(--text-md)] leading-[var(--leading-normal)] text-white/[0.82] max-w-[620px] mx-auto">
-            We are a B2B-first brand supplying certified safety eyewear at scale to
-            enterprises, factories, institutions, and government bodies.
+          <p className="about-hero-lede text-[length:var(--text-md)] leading-[var(--leading-normal)] text-text-muted max-w-[620px] mx-auto">
+            We are a B2B-first eyewear brand supplying sunglasses and optical frames
+            at scale to retailers, opticians, and distributors.
           </p>
         </div>
       </section>
@@ -38,18 +29,18 @@ const About = () => {
               Our mission
             </p>
             <h2 className="text-[length:var(--text-xl)] md:text-[length:var(--text-2xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-4">
-              Built for safety. Delivered for scale.
+              Designed for style. Delivered at scale.
             </h2>
             <p className="text-[length:var(--text-md)] leading-[var(--leading-normal)] text-text-muted m-0 mb-4">
-              At Stallion, our focus is enterprise-grade safety. We design and
-              manufacture safety goggles that meet international standards like
-              ANSI, EN166, and ISI, enabling organizations to protect their
-              workforce without compromise.
+              At Stallion, our focus is premium eyewear. We design and source
+              sunglasses and optical frames from quality acetate and metal, with
+              UV-protective lenses and on-trend styling — built to sell across
+              retail.
             </p>
             <p className="text-[length:var(--text-md)] leading-[var(--leading-normal)] text-text-muted m-0">
-              From heavy industries and construction to laboratories and
-              healthcare, our eyewear is engineered for performance, comfort,
-              and reliability in demanding environments.
+              From independent opticians and boutiques to retail chains and
+              online sellers, our eyewear is crafted for style, comfort, and
+              everyday wear.
             </p>
             <div className="about-highlights flex flex-wrap gap-3 mt-6">
               <div className="highlight flex-[1_1_100%] sm:flex-none flex items-center gap-2 bg-surface border border-border py-2 px-4 rounded-pill min-h-[40px] shadow-xs">
@@ -58,7 +49,7 @@ const About = () => {
               </div>
               <div className="highlight flex-[1_1_100%] sm:flex-none flex items-center gap-2 bg-surface border border-border py-2 px-4 rounded-pill min-h-[40px] shadow-xs">
                 <FiTag className="highlight-icon w-[18px] h-[18px] text-primary shrink-0" aria-hidden="true" />
-                <span className="text-[length:var(--text-base)] text-text font-medium">Enterprise pricing</span>
+                <span className="text-[length:var(--text-base)] text-text font-medium">Wholesale pricing</span>
               </div>
               <div className="highlight flex-[1_1_100%] sm:flex-none flex items-center gap-2 bg-surface border border-border py-2 px-4 rounded-pill min-h-[40px] shadow-xs">
                 <FiGlobe className="highlight-icon w-[18px] h-[18px] text-primary shrink-0" aria-hidden="true" />
@@ -69,7 +60,7 @@ const About = () => {
           <div className="about-intro-image order-first md:order-none relative overflow-hidden rounded-lg border border-border shadow-sm aspect-[4/3]">
             <img
               src="/images/banners/hero4.webp"
-              alt="Enterprise safety eyewear in use"
+              alt="Sunglasses and frames collection"
               className="w-full h-full object-cover block"
             />
           </div>
@@ -86,13 +77,13 @@ const About = () => {
             Certifications
           </h2>
           <p className="about-section-lede text-[length:var(--text-md)] leading-[var(--leading-normal)] text-text-muted max-w-[60ch] mx-auto mb-8">
-            Our products are tested and compliant with the most widely accepted
-            safety benchmarks.
+            Our sunglasses and lenses meet widely accepted quality and
+            UV-protection standards.
           </p>
           <div className="certifications-grid flex flex-wrap gap-3 justify-center">
-            <div className="cert-badge py-3 px-6 border border-border bg-surface text-primary rounded-md text-[length:var(--text-base)] font-semibold tracking-[0.02em] shadow-xs">ANSI</div>
-            <div className="cert-badge py-3 px-6 border border-border bg-surface text-primary rounded-md text-[length:var(--text-base)] font-semibold tracking-[0.02em] shadow-xs">EN166</div>
-            <div className="cert-badge py-3 px-6 border border-border bg-surface text-primary rounded-md text-[length:var(--text-base)] font-semibold tracking-[0.02em] shadow-xs">ISI</div>
+            <div className="cert-badge py-3 px-6 border border-border bg-surface text-primary rounded-md text-[length:var(--text-base)] font-semibold tracking-[0.02em] shadow-xs">UV400</div>
+            <div className="cert-badge py-3 px-6 border border-border bg-surface text-primary rounded-md text-[length:var(--text-base)] font-semibold tracking-[0.02em] shadow-xs">CE</div>
+            <div className="cert-badge py-3 px-6 border border-border bg-surface text-primary rounded-md text-[length:var(--text-base)] font-semibold tracking-[0.02em] shadow-xs">ISO</div>
           </div>
         </div>
       </section>
@@ -104,12 +95,12 @@ const About = () => {
             Why Stallion
           </p>
           <h2 className="text-[length:var(--text-xl)] md:text-[length:var(--text-2xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-4">
-            Built for demanding environments
+            Built for retail
           </h2>
           <div className="why-grid grid grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-5 mt-8">
             <div className="why-card bg-surface rounded-lg p-6 border border-border shadow-sm">
-              <h3 className="text-[length:var(--text-md)] leading-[var(--leading-snug)] font-semibold text-text m-0 mb-2">Industrial-grade quality</h3>
-              <p className="text-[length:var(--text-base)] leading-[var(--leading-normal)] text-text-muted m-0">Impact-resistant lenses, anti-fog options, and a comfortable fit for all-day use.</p>
+              <h3 className="text-[length:var(--text-md)] leading-[var(--leading-snug)] font-semibold text-text m-0 mb-2">Premium quality</h3>
+              <p className="text-[length:var(--text-base)] leading-[var(--leading-normal)] text-text-muted m-0">Quality acetate and metal frames, UV-protective lenses, and a comfortable all-day fit.</p>
             </div>
             <div className="why-card bg-surface rounded-lg p-6 border border-border shadow-sm">
               <h3 className="text-[length:var(--text-md)] leading-[var(--leading-snug)] font-semibold text-text m-0 mb-2">Reliable supply chain</h3>
@@ -136,7 +127,7 @@ const About = () => {
             <div className="team-member text-center bg-surface py-8 px-6 rounded-lg border border-border shadow-sm">
               <div className="team-avatar w-[56px] h-[56px] rounded-pill mx-auto mb-4 bg-primary-soft flex items-center justify-center"><FiTool className="team-avatar-icon w-6 h-6 text-primary" aria-hidden="true" /></div>
               <h3 className="text-[length:var(--text-md)] leading-[var(--leading-snug)] font-semibold text-text m-0 mb-2">Manufacturing lead</h3>
-              <p className="text-[length:var(--text-base)] leading-[var(--leading-normal)] text-text-muted m-0">Oversees production quality and compliance.</p>
+              <p className="text-[length:var(--text-base)] leading-[var(--leading-normal)] text-text-muted m-0">Oversees product quality and sourcing.</p>
             </div>
             <div className="team-member text-center bg-surface py-8 px-6 rounded-lg border border-border shadow-sm">
               <div className="team-avatar w-[56px] h-[56px] rounded-pill mx-auto mb-4 bg-primary-soft flex items-center justify-center"><FiTruck className="team-avatar-icon w-6 h-6 text-primary" aria-hidden="true" /></div>

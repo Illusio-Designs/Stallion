@@ -6,7 +6,7 @@
 
 const SITE = 'Stallion Eyewear';
 const DEFAULT_DESC =
-  'Certified bulk safety eyewear for industries and enterprises — competitive pricing and reliable supply.';
+  'Wholesale sunglasses and optical frames for retailers, opticians and distributors — competitive pricing and reliable supply.';
 
 /**
  * @param {string[]|undefined} slug - catch-all path segments (e.g. ['product','MAS-MYSTIC-C2'])
@@ -23,7 +23,7 @@ export function metadataForSlug(slug) {
   switch (first) {
     case 'products':
       title = `Shop Eyewear | ${SITE}`;
-      description = 'Browse the Stallion eyewear catalogue — frames, sunglasses and safety goggles.';
+      description = 'Browse the Stallion eyewear catalogue — sunglasses and optical frames.';
       break;
     case 'product': {
       const modelNo = seg[1] ? decodeURIComponent(seg[1]) : '';
@@ -35,7 +35,7 @@ export function metadataForSlug(slug) {
     }
     case 'about':
       title = `About Us | ${SITE}`;
-      description = 'Stallion Eyewear — B2B safety eyewear manufacturing and global distribution.';
+      description = 'Stallion Eyewear — B2B sunglasses and frames, manufacturing and global distribution.';
       break;
     case 'privacy-policy':
       title = `Privacy Policy | ${SITE}`;

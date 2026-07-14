@@ -91,15 +91,15 @@ const Home = ({ onPageChange }) => {
   const faqs = [
     {
       question: "What is your minimum order quantity (MOQ)?",
-      answer: "We typically supply bulk orders starting from 500 units, but requirements may vary by product category."
+      answer: "We typically supply bulk orders starting from 500 units, though it varies by frame or collection."
     },
     {
       question: "Do you offer bulk pricing or distributor discounts?",
       answer: "Yes, we provide competitive pricing for bulk orders and special discounts for distributors."
     },
     {
-      question: "Can we customize goggles with our company logo or specific requirements?",
-      answer: "Absolutely! We offer customization services including logo printing and specific design requirements."
+      question: "Can we order private-label or custom-branded frames?",
+      answer: "Yes — we offer private labelling, custom branding and packaging on bulk orders."
     },
     {
       question: "How do you handle large-scale procurement contracts?",
@@ -131,8 +131,8 @@ const Home = ({ onPageChange }) => {
           <img src="/images/banners/spacs.webp" alt="Eyewear" className="hero-side-image relative left-[-33px] h-auto w-[200px] rotate-[-20deg] object-contain opacity-[0.18] lg:w-[160px] lg:left-[-16px] max-[426px]:w-[140px]" />
         </div>
         <div className="hero-content relative z-[2] box-border w-full max-w-[900px] px-5 pb-16 pt-[calc(var(--header-height)+var(--space-8))] text-center text-text lg:max-w-[760px] lg:px-5 lg:pb-12 lg:pt-16">
-          <h1 className="mb-5 text-[length:clamp(2rem,5vw,3.5rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text">Bulk Safety Goggles Supply For Industries &amp; Enterprises</h1>
-          <p className="mx-auto mb-8 max-w-[680px] text-[length:clamp(1rem,2vw,1.25rem)] leading-[1.5] text-text-muted">Certified eye protection solutions for businesses, delivered at scale with competitive pricing and reliable supply chain support.</p>
+          <h1 className="mb-5 text-[length:clamp(2rem,5vw,3.5rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text">Wholesale Sunglasses &amp; Frames For Retailers &amp; Opticians</h1>
+          <p className="mx-auto mb-8 max-w-[680px] text-[length:clamp(1rem,2vw,1.25rem)] leading-[1.5] text-text-muted">Premium sunglasses and optical frames, supplied in bulk to retailers, opticians and distributors — with competitive wholesale pricing and reliable supply.</p>
           <button
             type="button"
             className="cta-button inline-flex min-h-[48px] cursor-pointer items-center justify-center rounded-md bg-accent px-8 py-3 text-[length:var(--text-md)] font-semibold tracking-[0.02em] text-text-on-accent shadow-sm transition duration-200 ease-[ease] hover:bg-accent-hover hover:shadow-md focus-visible:shadow-[var(--focus-ring)] focus-visible:outline-none active:scale-[0.98]"
@@ -272,7 +272,7 @@ const Home = ({ onPageChange }) => {
               const fullImageUrl = productImage || '/images/products/spac1.webp';
 
               // Use model_no as product name, or a default name
-              const productName = product.model_no || 'Safety Goggles';
+              const productName = product.model_no || 'Eyewear';
 
               // Use product_id as the identifier
               const productId = product.product_id || product.id;
@@ -313,14 +313,14 @@ const Home = ({ onPageChange }) => {
           </div>
           <div className="about-content relative z-[2] flex flex-col justify-center py-10 pl-0 pr-16 text-text max-md:-ml-[90%] max-md:py-8 max-md:pr-6">
             <div className="about-goggles-icon pointer-events-none absolute right-16 top-10 z-10 opacity-[0.13] max-md:hidden">
-              <img src="/images/banners/spacs.webp" alt="Goggles" className="relative right-[-115px] top-5 h-auto w-[300px] rotate-[-13deg] brightness-0 invert" />
+              <img src="/images/banners/spacs.webp" alt="Eyewear" className="relative right-[-115px] top-5 h-auto w-[300px] rotate-[-13deg] brightness-0 invert" />
             </div>
             <h2 className="m-0 mb-5 text-[length:clamp(1.5rem,3vw,2rem)] font-medium tracking-[-0.02em] text-text">About Us</h2>
             <p className="mb-5 text-[length:var(--text-md)] font-normal leading-[1.5] text-text-muted">
-              At Stallion, we specialize in providing high-quality safety goggles designed for industrial, corporate, and institutional use. Our focus is not retail sales, but long-term B2B partnerships with organizations that prioritize workforce safety and compliance.
+              At Stallion, we specialize in premium sunglasses and optical frames for retailers, opticians and distributors. Our focus is long-term B2B partnerships — supplying on-trend eyewear at wholesale scale with competitive pricing and dependable service.
             </p>
             <p className="mb-0 text-[length:var(--text-md)] font-normal leading-[1.5] text-text-muted">
-              With years of expertise in manufacturing and global distribution, we supply goggles that meet international safety standards such as ANSI, EN166, and ISI. From manufacturing plants and construction sites to laboratories and healthcare facilities, our products are trusted by industries worldwide.
+              With years of expertise in eyewear manufacturing and global distribution, we supply sunglasses and frames crafted from quality acetate and metal, with UV-protective lenses and on-trend designs. From optical stores and boutiques to retail chains and online sellers, our collections are trusted by retailers worldwide.
             </p>
           </div>
         </div>
