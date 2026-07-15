@@ -9,6 +9,9 @@ const ToastContainerProvider = ({ children }) => {
       {children}
       <ToastContainer
         position="top-right"
+        // Above the AsidePanel drawer (z-10050) and its dropdowns (z-99999) so
+        // toasts/errors are never hidden behind an open panel.
+        style={{ zIndex: 100001 }}
         autoClose={4000}
         limit={3}
         hideProgressBar={false}
