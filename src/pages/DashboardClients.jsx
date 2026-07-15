@@ -734,7 +734,6 @@ const DashboardClients = () => {
       ['party_name', 'Party Name'],
       ['trade_name', 'Trade Name'],
       ['contact_person', 'Contact Person'],
-      ['email', 'Email'],
       ['phone', 'Phone'],
       ['address', 'Address'],
       ['pincode', 'Pincode'],
@@ -746,8 +745,9 @@ const DashboardClients = () => {
         return;
       }
     }
-    // Basic email sanity check.
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(formData.email).trim())) {
+    // Email is optional; only validate the format when one is entered.
+    if (String(formData.email || '').trim() !== '' &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(formData.email).trim())) {
       showError('Please enter a valid email address.');
       setLoading(false);
       return;
@@ -1269,14 +1269,13 @@ const DashboardClients = () => {
         />
       </div>
       <div className="form-group">
-        <label className="ui-label">Email *</label>
+        <label className="ui-label">Email</label>
         <input
           className="ui-input"
           type="email"
-          placeholder="Email"
+          placeholder="Email (optional)"
           value={formData.email}
           onChange={(e) => handleInputChange('email', e.target.value)}
-          required
         />
       </div>
       <div className="form-group">
