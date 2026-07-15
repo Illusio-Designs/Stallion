@@ -10,6 +10,8 @@ export const metadata = {
   description: "Your Vision, Our Passion",
   icons: {
     icon: '/favicon.png',
+    shortcut: '/favicon.png',
+    apple: '/apple-touch-icon.png',
   },
   other: {
     'color-scheme': 'light only',
