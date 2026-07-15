@@ -12,3 +12,4 @@ export * from './api/productApi';
 export * from './api/inventoryApi';
 export * from './api/salesmanApi';
 export * from './api/offerApi';
+export * from './api/adminApi';
