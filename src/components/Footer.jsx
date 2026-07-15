@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiInstagram, FiFacebook, FiLinkedin } from 'react-icons/fi';
+import { FiInstagram, FiFacebook, FiLinkedin, FiHeart } from 'react-icons/fi';
 import '../styles/components/Footer.css';
 
 const Footer = ({ onPageChange }) => {
@@ -33,6 +33,16 @@ const Footer = ({ onPageChange }) => {
       </div>
       <div className="footer-bottom relative z-[3] max-w-[1280px] mx-auto mt-20 border-t border-border px-6 pt-6 min-[385px]:px-[5%] flex flex-col items-center gap-4 sm:flex-row sm:justify-between">
         <p className="footer-copyright m-0 text-[length:var(--text-xs)] text-text-subtle text-center sm:text-left">© {new Date().getFullYear()} Stallion Eyewear LLP. All rights reserved.</p>
+        <a
+          href="https://finvera.solutions"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="footer-credit inline-flex items-center gap-1.5 text-[length:var(--text-xs)] text-text-muted no-underline transition-colors duration-[120ms] hover:text-text focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] rounded-sm"
+        >
+          Developed with
+          <FiHeart className="h-3.5 w-3.5 fill-current text-error" aria-hidden="true" />
+          by <span className="font-semibold">Finvera.Solutions</span>
+        </a>
         <div className="footer-social flex items-center gap-1">
           <a href="#" aria-label="Instagram" className="inline-flex h-9 w-9 items-center justify-center rounded-pill text-text-muted transition-colors duration-[120ms] hover:bg-grey-200 hover:text-text focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)]"><FiInstagram size={18} aria-hidden="true" /></a>
           <a href="#" aria-label="Facebook" className="inline-flex h-9 w-9 items-center justify-center rounded-pill text-text-muted transition-colors duration-[120ms] hover:bg-grey-200 hover:text-text focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)]"><FiFacebook size={18} aria-hidden="true" /></a>
