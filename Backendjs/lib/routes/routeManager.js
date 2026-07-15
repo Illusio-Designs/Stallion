@@ -32,6 +32,7 @@ const salesmanExpenseRoutes = require('./salesman_expense');
 const salesmanTargetsRoutes = require('./salesman_targets');
 const salesmanCheckInsRoutes = require('./salesman_checkins');
 const offerRoutes = require('./offer');
+const adminRoutes = require('./admin');
 
 router.use((req, res, next) => {
     const timestamp = new Date();
@@ -71,6 +72,7 @@ router.use('/salesman_expenses', salesmanExpenseRoutes);
 router.use('/salesman_targets', salesmanTargetsRoutes);
 router.use('/salesman_checkins', salesmanCheckInsRoutes);
 router.use('/offers', offerRoutes);
+router.use('/admin', adminRoutes);
 
 // API documentation route
 router.get('/docs', (req, res) => {
