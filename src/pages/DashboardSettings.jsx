@@ -3,11 +3,16 @@ import Button from '../components/ui/Button';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import { showSuccess, showError } from '../services/notificationService';
-import { updateUser, getMe } from '../services/apiService';
-import { getUser } from '../services/authService';
+import { updateUser, getMe, wipeAllData, WIPE_CONFIRM_PHRASE } from '../services/apiService';
+import { getUser, getUserRole } from '../services/authService';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import '../styles/pages/dashboard-settings.css';
 
 const DashboardSettings = () => {
+  const confirm = useConfirm();
+  const isAdmin = useMemo(() => getUserRole() === 'admin', []);
+  const [wipeConfirmText, setWipeConfirmText] = useState('');
+  const [wiping, setWiping] = useState(false);
   const [userName, setUserName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -487,6 +492,31 @@ const DashboardSettings = () => {
     setLoading(false);
   };
 
+  const handleWipeData = async () => {
+    if (wipeConfirmText !== WIPE_CONFIRM_PHRASE) return;
+
+    const ok = await confirm({
+      title: 'Wipe all data?',
+      message:
+        'This permanently deletes ALL products (and their images), parties, orders, salesmen, trays, distributors, offers, events, audit logs, and every user except admins. Master data (roles, geography, product attributes, brands, collections) and admin accounts are kept. This cannot be undone.',
+      confirmLabel: 'Wipe everything',
+      danger: true,
+    });
+    if (!ok) return;
+
+    try {
+      setWiping(true);
+      const res = await wipeAllData();
+      const files = res?.filesDeleted?.total ?? 0;
+      showSuccess(res?.message || `Data wiped. ${files} file(s) removed.`);
+      setWipeConfirmText('');
+    } catch (error) {
+      showError(`Data wipe failed: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setWiping(false);
+    }
+  };
+
   return (
     <div className="dash-page">
       <div className="dash-container">
@@ -604,6 +634,44 @@ const DashboardSettings = () => {
               </form>
             </div>
           </div>
+
+          {isAdmin && (
+            <div className="dash-card full settings p-4 min-[561px]:p-6 mt-6 border border-error/40">
+              <div className="settings-header mb-4">
+                <h4 className="settings-title m-0 text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.01em] font-semibold text-error">Danger Zone</h4>
+                <p className="settings-subtitle mt-1 mb-0 text-text-muted text-[length:var(--text-base)] leading-[var(--leading-normal)]">
+                  Wipe all test/transactional data in one go. This deletes every product (and image), party, order,
+                  salesman, tray, distributor, offer, event, audit log, and all non-admin users. Master data
+                  (roles, geography, product attributes, brands, collections) and admin accounts are kept.
+                  <strong className="text-error"> This cannot be undone.</strong>
+                </p>
+              </div>
+              <div className="settings-form ui-form grid max-w-[720px] grid-cols-1 gap-4">
+                <div className="form-group flex flex-col gap-2">
+                  <label className="ui-label">Type <span className="font-semibold text-error">{WIPE_CONFIRM_PHRASE}</span> to enable the button</label>
+                  <input
+                    className="ui-input"
+                    type="text"
+                    value={wipeConfirmText}
+                    onChange={(e) => setWipeConfirmText(e.target.value)}
+                    placeholder={WIPE_CONFIRM_PHRASE}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </div>
+                <div className="settings-actions flex items-center justify-end">
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={handleWipeData}
+                    disabled={wiping || wipeConfirmText !== WIPE_CONFIRM_PHRASE}
+                  >
+                    {wiping ? 'Wiping…' : 'Wipe all data'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
