@@ -1,7 +1,7 @@
 const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const Party = require('../models/Party');
-const { checkGeofence } = require('../utils/geo');
+const { checkAddressProximity } = require('../utils/geo');
 const { ensurePartyCoords } = require('../utils/geocode');
 const Distributor = require('../models/distributor');
 const Salesman = require('../models/Salesman');
@@ -394,22 +394,27 @@ class OrderController {
                 if (!visitParty) {
                     return res.status(404).json({ error: 'Party not found' });
                 }
-                // Geofence, with first-visit auto-capture:
-                //  - If the party already has a TRUSTED GPS location, enforce the
-                //    strict radius against it.
-                //  - If not (never visited, or only a geocoded/pincode anchor),
-                //    adopt the salesman's current GPS as the party's real location
-                //    and let the order through. Subsequent visits are then strict.
-                if (visitParty.location_source === 'gps' && visitParty.latitude != null && visitParty.longitude != null) {
-                    const geo = checkGeofence({ deviceLat: latitude, deviceLng: longitude, party: visitParty, action: 'place a visit order' });
-                    if (!geo.ok) {
-                        return res.status(403).json({ error: geo.reason });
-                    }
-                } else {
-                    visitParty.latitude = Number(latitude);
-                    visitParty.longitude = Number(longitude);
-                    visitParty.location_source = 'gps';
-                    try { await visitParty.save(); } catch (_) { /* best-effort */ }
+                // The party's coordinates ALWAYS come from its ADDRESS (geocoded),
+                // never from the salesman's device — so a party's pin can never be
+                // dragged onto wherever a salesman happens to be. We geocode the
+                // address on demand, then only VERIFY the salesman's device GPS is
+                // plausibly near it. This blocks placing (e.g.) a Navi Mumbai
+                // party's order from Rajkot; the exact distance still shows in the
+                // report's location match meter.
+                // Heal legacy parties whose coords were captured from a device (old
+                // location_source 'gps' behavior) — re-derive them from the address.
+                if (visitParty.location_source === 'gps') {
+                    visitParty.latitude = null;
+                    visitParty.longitude = null;
+                    visitParty.location_source = 'geocoded';
+                }
+                await ensurePartyCoords(visitParty); // (geocodes from address if not cached)
+                const proximity = checkAddressProximity({
+                    deviceLat: latitude, deviceLng: longitude,
+                    refLat: visitParty.latitude, refLng: visitParty.longitude,
+                });
+                if (!proximity.ok) {
+                    return res.status(403).json({ error: proximity.reason });
                 }
             }
             else {

@@ -356,23 +356,14 @@ class PartyController {
                 address,
             });
 
-            // Location for the visit/check-in geofence.
-            //  - When a SALESMAN registers the party they are physically at the
-            //    shop, so their captured device GPS is the party's TRUE location
-            //    (trusted -> location_source 'gps').
-            //  - Otherwise (admin/party manager in the office) geocode the address
-            //    as a best-effort anchor ('geocoded'); the first on-site visit
-            //    later overwrites it with real GPS.
-            const creatorRole = normalizeRole(req.userRoleName);
-            const devLat = latitude != null && latitude !== '' ? Number(latitude) : null;
-            const devLng = longitude != null && longitude !== '' ? Number(longitude) : null;
+            // Location for the visit/check-in geofence is ALWAYS derived from the
+            // party's ADDRESS (geocoded), never from the creator's device GPS — so a
+            // party's pin reflects where the shop actually is, not where whoever
+            // registered it happened to be standing. Visit orders / check-ins then
+            // only VERIFY the salesman's device against this address anchor.
             let finalLat = null, finalLng = null, locationSource = null;
-            if (creatorRole === 'salesman' && Number.isFinite(devLat) && Number.isFinite(devLng)) {
-                finalLat = devLat; finalLng = devLng; locationSource = 'gps';
-            } else {
-                const geo = await geocodeAddress(address, { pincode });
-                if (geo) { finalLat = geo.latitude; finalLng = geo.longitude; locationSource = 'geocoded'; }
-            }
+            const geo = await geocodeAddress(address, { pincode });
+            if (geo) { finalLat = geo.latitude; finalLng = geo.longitude; locationSource = 'geocoded'; }
 
             const party = await Party.create({
                 distributor_id: finalDistributorId,

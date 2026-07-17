@@ -39,6 +39,40 @@ function distanceMeters(lat1, lon1, lat2, lon2) {
 // can't block every visit at once. Turn on once geocoding is confirmed working.
 const GEOFENCE_REQUIRE_COORDS = String(process.env.GEOFENCE_REQUIRE_COORDS || '').toLowerCase() === 'true';
 
+// A party's coordinates ALWAYS come from its ADDRESS (geocoded) — never from a
+// salesman's device. On a visit order / check-in we only VERIFY that the
+// salesman's device GPS is plausibly near that address. This is deliberately
+// coarse (25 km default): address geocoding in India is only accurate to a few
+// km, so we reject gross mismatches (e.g. placing a Navi Mumbai party's order
+// from Rajkot) while never rejecting legitimate on-site visits. The precise
+// distance is still shown in the report's location match meter. Override via
+// ADDRESS_PROXIMITY_RADIUS_M.
+const ADDRESS_PROXIMITY_RADIUS_M = Number(process.env.ADDRESS_PROXIMITY_RADIUS_M) || 25000;
+
+/**
+ * Verify a salesman's device GPS is near the party's geocoded address.
+ * @returns {{ ok: boolean, distance: number|null, reason?: string }}
+ *   ok:true when there is no address reference to compare against (can't verify),
+ *   or when within the proximity radius. ok:false with a reason on a gross mismatch.
+ */
+function checkAddressProximity({ deviceLat, deviceLng, refLat, refLng }) {
+  if (refLat == null || refLng == null || refLat === '' || refLng === '') {
+    // No geocoded reference (address couldn't be located) — can't verify, allow.
+    return { ok: true, distance: null };
+  }
+  const distance = distanceMeters(deviceLat, deviceLng, refLat, refLng);
+  if (distance == null) return { ok: true, distance: null };
+  if (distance > ADDRESS_PROXIMITY_RADIUS_M) {
+    const km = Math.round(distance / 1000);
+    return {
+      ok: false,
+      distance,
+      reason: `Your current location is about ${km} km from this party's registered address. Please make sure you selected the correct party (or update the party's address if it has moved) before placing a visit order or checking in.`,
+    };
+  }
+  return { ok: true, distance };
+}
+
 function checkGeofence({ deviceLat, deviceLng, party, action = 'perform this action' }) {
   const pLat = party && (party.latitude ?? party.lat);
   const pLng = party && (party.longitude ?? party.lng);
@@ -64,4 +98,4 @@ function checkGeofence({ deviceLat, deviceLng, party, action = 'perform this act
   return { ok: true, distance };
 }
 
-module.exports = { GEOFENCE_RADIUS_M, distanceMeters, checkGeofence };
+module.exports = { GEOFENCE_RADIUS_M, ADDRESS_PROXIMITY_RADIUS_M, distanceMeters, checkGeofence, checkAddressProximity };
