@@ -69,6 +69,44 @@ const getHeaders = (includeAuth = true) => {
   return headers;
 };
 
+// A non-JSON response body is almost always an infrastructure page, NOT something
+// a user should ever read: the openresty/Imunify360 WAF "request blocked / failed"
+// challenge (a big multilingual minified JS blob), an HTML 5xx page, a proxy error,
+// etc. Detect those so we can show a clean message instead of dumping the raw blob
+// into a toast (which is what produced the wall-of-JavaScript on the login screen).
+const looksLikeServerPage = (text) => {
+  if (!text) return false;
+  const head = text.trimStart().slice(0, 500).toLowerCase();
+  return (
+    head.startsWith('<') ||            // HTML page (<!doctype, <html, <body…)
+    head.includes('<html') ||
+    head.includes('<!doctype') ||
+    head.includes('function(') ||      // minified JS bundle / WAF challenge script
+    head.includes('window.') ||
+    head.includes('document.') ||
+    /^\s*[a-z]{2,3}\s*[:=]\s*\{/.test(head) || // locale table like `de:{header:…}`
+    text.length > 300                  // any oversized non-JSON body is not a message
+  );
+};
+
+// A short, user-safe message keyed off the HTTP status when the real body is an
+// unreadable server/WAF page.
+const friendlyStatusMessage = (status) => {
+  if (status === 403 || status === 406) {
+    return 'The server temporarily blocked this request. Please wait a moment and try again.';
+  }
+  if (status === 429) {
+    return 'Too many attempts. Please wait a minute and try again.';
+  }
+  if (status === 503 || status === 502 || status === 504) {
+    return 'The server is temporarily unavailable. Please try again shortly.';
+  }
+  if (status >= 500) {
+    return 'Server error. Please try again in a moment.';
+  }
+  return 'Something went wrong. Please try again.';
+};
+
 /**
  * Handle API response
  */
@@ -90,8 +128,12 @@ const handleResponse = async (response) => {
           // Try to parse as JSON even if content-type doesn't say so
           errorData = JSON.parse(textResponse);
         } catch {
-          // If not JSON, use the text as error message
-          errorMessage = textResponse || response.statusText || `HTTP ${response.status} Error`;
+          // If not JSON: an infrastructure/WAF page (or any oversized blob) must
+          // NEVER be shown to the user — collapse it to a clean status message.
+          // Only a short, plain-text body is used verbatim.
+          errorMessage = looksLikeServerPage(textResponse)
+            ? friendlyStatusMessage(response.status)
+            : (textResponse.trim() || response.statusText || `HTTP ${response.status} Error`);
         }
       }
       
@@ -215,7 +257,16 @@ const handleResponse = async (response) => {
     }
   }
   
-  // For non-JSON responses, return the text
+  // For non-JSON responses: a plain short string is fine to return, but an HTML/JS
+  // server page delivered with a 200 (some WAF challenges do this) must not be
+  // handed back to callers as "data" — throw a clean error instead so the login /
+  // OTP flow shows a friendly retry message, never the raw blob.
+  if (looksLikeServerPage(text)) {
+    const error = new Error(friendlyStatusMessage(response.status));
+    error.statusCode = response.status;
+    error.nonJsonBody = true;
+    throw error;
+  }
   return text;
 };
 
