@@ -4,7 +4,7 @@ const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 const { SalesmanCheckInType } = require('../constants/enums');
-const { checkGeofence } = require('../utils/geo');
+const { checkAddressProximity } = require('../utils/geo');
 const { ensurePartyCoords } = require('../utils/geocode');
 
 // Enrich check-ins for the Visit Report: add party_name, and for ORDERED
@@ -112,29 +112,32 @@ class SalesmanCheckInsController {
                 return res.status(400).json({ error: validationError });
             }
 
-            // Geofence: when a device location is provided (the salesman app sends
-            // it), the salesman must be within 50m of the party to check in. Older
-            // parties get their coordinates geocoded from the address on the spot
-            // (ensurePartyCoords). Check-ins created without a device location
-            // (e.g. an admin entering one manually) are not geofenced.
+            // The party's coordinates ALWAYS come from its ADDRESS (geocoded), never
+            // from the salesman's device — so a check-in can't drag the party's pin
+            // onto wherever the salesman is. When a device location is provided (the
+            // salesman app sends it), we geocode the address on demand and only
+            // VERIFY the device is plausibly near it. Check-ins with no device
+            // location (e.g. an admin entering one manually) are not verified.
             const hasDeviceLoc = fields.latitude != null && fields.latitude !== '' && fields.longitude != null && fields.longitude !== '';
             if (hasDeviceLoc) {
                 const checkinParty = await Party.findOne({ where: { party_id: fields.party_id } });
                 if (!checkinParty) {
                     return res.status(404).json({ error: 'Party not found' });
                 }
-                // First on-site visit auto-captures the party's real location; once
-                // a trusted GPS location exists, the strict geofence is enforced.
-                if (checkinParty.location_source === 'gps' && checkinParty.latitude != null && checkinParty.longitude != null) {
-                    const geo = checkGeofence({ deviceLat: fields.latitude, deviceLng: fields.longitude, party: checkinParty, action: 'check in' });
-                    if (!geo.ok) {
-                        return res.status(403).json({ error: geo.reason });
-                    }
-                } else {
-                    checkinParty.latitude = Number(fields.latitude);
-                    checkinParty.longitude = Number(fields.longitude);
-                    checkinParty.location_source = 'gps';
-                    try { await checkinParty.save(); } catch (_) { /* best-effort */ }
+                // Heal legacy parties whose coords were captured from a device (old
+                // location_source 'gps' behavior) — re-derive them from the address.
+                if (checkinParty.location_source === 'gps') {
+                    checkinParty.latitude = null;
+                    checkinParty.longitude = null;
+                    checkinParty.location_source = 'geocoded';
+                }
+                await ensurePartyCoords(checkinParty); // (geocodes from address if not cached)
+                const proximity = checkAddressProximity({
+                    deviceLat: fields.latitude, deviceLng: fields.longitude,
+                    refLat: checkinParty.latitude, refLng: checkinParty.longitude,
+                });
+                if (!proximity.ok) {
+                    return res.status(403).json({ error: proximity.reason });
                 }
             }
 
