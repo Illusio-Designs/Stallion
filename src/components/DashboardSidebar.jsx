@@ -166,14 +166,17 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
             </li>
           ))}
           {/* Back to Shop — lives in the drawer on mobile (the header button is
-              hidden below md). A real CTA button (white fill on the indigo
-              sidebar), not a flat nav row. */}
+              hidden below md). A real CTA button (dark fill, white label), not a
+              flat nav row. */}
           <li className="mb-1 mt-3 md:hidden">
-            {/* inline color: a global white sidebar-anchor rule outranks the
-                Tailwind text-primary utility, so set the indigo text directly. */}
+            {/* inline color: the global `.dashboard-sidebar-nav a` rule forces a
+                grey/dark text colour (and its :hover flips it dark) which outranks
+                the Tailwind text-on-primary utility. Since the button fill is dark
+                (bg-primary), pin the label WHITE inline so it stays visible in
+                every state — not just on hover. */}
             <a
               href="/products"
-              style={{ color: 'var(--color-primary)' }}
+              style={{ color: 'var(--color-text-on-primary)' }}
               className="flex min-h-10 items-center justify-center gap-2 rounded-md bg-primary text-text-on-primary px-4 py-2.5 text-[length:var(--text-sm)] font-semibold no-underline shadow-sm outline-none transition-[background-color,transform] duration-200 ease-[ease] hover:bg-primary-hover focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] active:scale-[0.98] motion-reduce:transition-none"
               onClick={() => onMobileClose?.()}
               aria-label="Back to Shop"
