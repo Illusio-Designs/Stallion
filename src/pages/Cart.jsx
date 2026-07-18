@@ -29,7 +29,9 @@ import {
   getAvailableOffers,
   quoteOrder,
   getProductsByIds,
+  verifyPartyLocation,
 } from "../services/apiService";
+import { captureCurrentPosition } from "../utils/geolocation";
 
 // Re-point any product image URL (legacy host, absolute server path, or
 // relative) to the configured image host — the same base the Media gallery and
@@ -70,6 +72,7 @@ const Cart = ({ onPageChange = null }) => {
   // Role-based state
   const [orderType, setOrderType] = useState(isDistributor ? "distributor_order" : "");
   const [selectedParty, setSelectedParty] = useState("");
+  const [verifyingLoc, setVerifyingLoc] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("");
   const [orderNote, setOrderNote] = useState("");
@@ -308,6 +311,36 @@ const Cart = ({ onPageChange = null }) => {
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
       );
     });
+  };
+
+  // On-site capture ("I'm at shop") for the selected party — sets its TRUSTED
+  // verified location so the 250m visit geofence turns on. Lets a salesman verify
+  // right from the cart without opening the party editor.
+  const handleVerifyPartyLocation = async () => {
+    if (!selectedParty) return;
+    try {
+      setVerifyingLoc(true);
+      let pos;
+      try {
+        pos = await captureCurrentPosition();
+      } catch (geoErr) {
+        showError(geoErr?.message || 'Could not get your location. Please try again.');
+        return;
+      }
+      const res = await verifyPartyLocation(selectedParty, pos);
+      const acc = Number(res?.accuracy);
+      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 250m geofence is now active for this party.`);
+      setParties(prev => prev.map(p => {
+        const id = p.id || p.party_id;
+        return id === selectedParty
+          ? { ...p, latitude: Number(res?.latitude), longitude: Number(res?.longitude), location_source: 'verified', location_accuracy_m: acc }
+          : p;
+      }));
+    } catch (err) {
+      showError(err?.message || 'Could not verify location. Please try again from the shop.');
+    } finally {
+      setVerifyingLoc(false);
+    }
   };
 
   // Approximate location from the user's IP — used as a fallback when precise
@@ -1419,6 +1452,27 @@ const Cart = ({ onPageChange = null }) => {
                       setSelectedParty(value);
                     }}
                   />
+                  {isSalesman && orderType === 'visit_order' && selectedParty && (() => {
+                    const sp = parties.find(p => (p.id || p.party_id) === selectedParty);
+                    const verified = sp && sp.location_source === 'verified';
+                    return (
+                      <div className="flex flex-col gap-1.5">
+                        <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
+                          {verified
+                            ? `✅ Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 250m geofence active.`
+                            : 'Location not verified yet. Stand at the shop and tap below to enable the 250m geofence.'}
+                        </p>
+                        <button
+                          type="button"
+                          className="ui-btn ui-btn--secondary self-start"
+                          onClick={handleVerifyPartyLocation}
+                          disabled={verifyingLoc}
+                        >
+                          {verifyingLoc ? 'Capturing…' : (verified ? 'I’m at shop — re-capture' : 'I’m at shop')}
+                        </button>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
 

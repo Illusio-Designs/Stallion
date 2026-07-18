@@ -36,7 +36,9 @@ import {
   getParties,
   getMyParties,
   getMyOrders,
+  verifyPartyLocation,
 } from '../services/apiService';
+import { captureCurrentPosition } from '../utils/geolocation';
 import { showSuccess, showError } from '../services/notificationService';
 import { getUser, getUserRole } from '../services/authService';
 
@@ -287,6 +289,7 @@ const DashboardSuppliers = () => {
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
   const [zoneParties, setZoneParties] = useState([]); // parties for salesman's zones
+  const [verifyingLoc, setVerifyingLoc] = useState(false); // on-site capture in progress
   const [mySalesmanId, setMySalesmanId] = useState(''); // current salesman's own salesman_id
   const [allPartiesLookup, setAllPartiesLookup] = useState([]); // all parties for name lookup in tables
 
@@ -1362,6 +1365,35 @@ const DashboardSuppliers = () => {
   // initial state — to avoid an SSR/client hydration mismatch from new Date().
   const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: nowDatetimeLocal(), out_time: nowDatetimeLocal(), next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
 
+  // On-site capture ("I'm at shop") for the check-in's selected party — sets its
+  // TRUSTED verified location so the 250m check-in geofence turns on.
+  const handleVerifyCheckinPartyLocation = async () => {
+    if (!checkinForm.party_id) return;
+    try {
+      setVerifyingLoc(true);
+      let pos;
+      try {
+        pos = await captureCurrentPosition();
+      } catch (geoErr) {
+        showError(geoErr?.message || 'Could not get your location. Please try again.');
+        return;
+      }
+      const res = await verifyPartyLocation(checkinForm.party_id, pos);
+      const acc = Number(res?.accuracy);
+      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 250m geofence is now active for this party.`);
+      setZoneParties(prev => prev.map(p => {
+        const id = p.party_id || p.id;
+        return id === checkinForm.party_id
+          ? { ...p, latitude: Number(res?.latitude), longitude: Number(res?.longitude), location_source: 'verified', location_accuracy_m: acc }
+          : p;
+      }));
+    } catch (err) {
+      showError(err?.message || 'Could not verify location. Please try again from the shop.');
+    } finally {
+      setVerifyingLoc(false);
+    }
+  };
+
   const handleCheckinSubmit = async (e) => {
     e.preventDefault();
     if (!checkinForm.party_id) {
@@ -2192,6 +2224,27 @@ const DashboardSuppliers = () => {
               placeholder="Select Party"
               className="ui-dropdown-custom--full-width"
             />
+            {isSalesman && checkinForm.party_id && (() => {
+              const sp = zoneParties.find(p => (p.party_id || p.id) === checkinForm.party_id);
+              const verified = sp && sp.location_source === 'verified';
+              return (
+                <div className="mt-2 flex flex-col gap-1.5">
+                  <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
+                    {verified
+                      ? `✅ Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 250m geofence active.`
+                      : 'Location not verified yet. Stand at the shop and tap below to enable the 250m geofence.'}
+                  </p>
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn--secondary self-start"
+                    onClick={handleVerifyCheckinPartyLocation}
+                    disabled={verifyingLoc}
+                  >
+                    {verifyingLoc ? 'Capturing…' : (verified ? 'I’m at shop — re-capture' : 'I’m at shop')}
+                  </button>
+                </div>
+              );
+            })()}
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Contact Person <span className="text-error">*</span></label>
