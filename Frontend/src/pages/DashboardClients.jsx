@@ -14,10 +14,8 @@ import {
   getCities,
   getCountries,
   getPartiesForRole,
-  getRoles,
   getStates,
   getZones,
-  register,
   updateParty,
   verifyPartyLocation,
 } from '../services/apiService';
@@ -1005,58 +1003,13 @@ const DashboardClients = () => {
 
         setError(null);
       } else {
-        // Create new party - first create user account
+        // Create new party. The backend creates the party's login user itself
+        // (findOrCreateRoleUser by phone, and it ignores any user_id we send), so
+        // we must NOT pre-register here — that old step called admin-only
+        // endpoints (/roles, /auth/register) and returned "Access denied -
+        // insufficient permissions" for salesmen / field roles creating a party.
         try {
-          // Format phone number to E.164 format
-          let phoneNumber = formData.phone.trim();
-          if (!phoneNumber.startsWith('+')) {
-            phoneNumber = phoneNumber.replace(/^0+/, '');
-            if (!phoneNumber.startsWith('91')) {
-              phoneNumber = `91${phoneNumber}`;
-            }
-            phoneNumber = `+${phoneNumber}`;
-          }
-
-          // Get roles to find party role ID
-          const rolesResponse = await getRoles();
-          let rolesArray = [];
-          if (Array.isArray(rolesResponse)) {
-            rolesArray = rolesResponse;
-          } else if (rolesResponse && Array.isArray(rolesResponse.data)) {
-            rolesArray = rolesResponse.data;
-          } else if (rolesResponse && Array.isArray(rolesResponse.roles)) {
-            rolesArray = rolesResponse.roles;
-          }
-
-          // Find party role ID
-          const partyRole = rolesArray.find(r => {
-            const roleName = (r.role_name || r.name || r.roleName || r.title || r.role || '').toLowerCase().trim();
-            return roleName === 'party';
-          });
-
-          if (!partyRole) {
-            throw new Error('Party role not found. Please contact administrator.');
-          }
-
-          const partyRoleId = partyRole.role_id || partyRole.id || partyRole.roleId;
-
-          // Create user account first
-          const userData = {
-            phoneNumber,
-            fullName: formData.contact_person.trim() || formData.party_name.trim(),
-            roleId: partyRoleId,
-            address: formData.address ? formData.address.trim() : '',
-          };
-
-          const registeredUser = await register(userData);
-          const newUserId = registeredUser.user_id || registeredUser.id || registeredUser.user?.user_id || registeredUser.user?.id;
-
-          if (!newUserId) {
-            throw new Error('Failed to create user account. User ID not returned.');
-          }
-
-          // Create party linked to the new user account
-          const newParty = await createParty({ ...dataToSend, user_id: newUserId });
+          const newParty = await createParty(dataToSend);
           showSuccess('Party created successfully!');
 
           // Optimistically add to table if it matches the current filter
