@@ -124,29 +124,19 @@ class SalesmanCheckInsController {
                 if (!checkinParty) {
                     return res.status(404).json({ error: 'Party not found' });
                 }
-                // Heal legacy parties whose coords were captured from a device (old
-                // location_source 'gps' behavior) — re-derive them from the address.
-                if (checkinParty.location_source === 'gps') {
-                    checkinParty.latitude = null;
-                    checkinParty.longitude = null;
-                    checkinParty.location_source = 'geocoded';
-                }
-                await ensurePartyCoords(checkinParty); // (geocodes from address if not cached)
                 if (checkinParty.location_source === 'verified' && checkinParty.latitude != null && checkinParty.longitude != null) {
-                    // Trusted on-site location -> enforce the strict 250m geofence.
+                    // Trusted on-site location -> enforce the strict 250m geofence
+                    // against the EXACT captured spot.
                     const geo = checkGeofence({ deviceLat: fields.latitude, deviceLng: fields.longitude, party: checkinParty, action: 'check in' });
                     if (!geo.ok) {
                         return res.status(403).json({ error: geo.reason });
                     }
                 } else {
-                    // Not verified yet -> only block a gross mismatch (wrong city).
-                    const proximity = checkAddressProximity({
-                        deviceLat: fields.latitude, deviceLng: fields.longitude,
-                        refLat: checkinParty.latitude, refLng: checkinParty.longitude,
+                    // No trusted on-site location yet -> the 250m geofence can't be
+                    // enforced against an exact spot, so block until it's captured.
+                    return res.status(403).json({
+                        error: 'This party\'s exact location is not captured yet. Tap "I\'m at shop" to capture it here, then check in.',
                     });
-                    if (!proximity.ok) {
-                        return res.status(403).json({ error: proximity.reason });
-                    }
                 }
             }
 

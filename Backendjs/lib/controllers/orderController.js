@@ -401,30 +401,18 @@ class OrderController {
                 // plausibly near it. This blocks placing (e.g.) a Navi Mumbai
                 // party's order from Rajkot; the exact distance still shows in the
                 // report's location match meter.
-                // Heal legacy parties whose coords were captured from a device (old
-                // location_source 'gps' behavior) — re-derive them from the address.
-                if (visitParty.location_source === 'gps') {
-                    visitParty.latitude = null;
-                    visitParty.longitude = null;
-                    visitParty.location_source = 'geocoded';
-                }
-                await ensurePartyCoords(visitParty); // (geocodes from address if not cached)
                 if (visitParty.location_source === 'verified' && visitParty.latitude != null && visitParty.longitude != null) {
-                    // Trusted on-site location -> enforce the strict 250m geofence.
+                    // Trusted on-site location -> enforce the strict 250m geofence
+                    // against the EXACT captured spot.
                     const geo = checkGeofence({ deviceLat: latitude, deviceLng: longitude, party: visitParty, action: 'place a visit order' });
                     if (!geo.ok) {
                         return res.status(403).json({ error: geo.reason });
                     }
                 } else {
-                    // Not verified yet -> can't enforce 250m against an approximate
-                    // address point; only block a gross mismatch (wrong city).
-                    const proximity = checkAddressProximity({
-                        deviceLat: latitude, deviceLng: longitude,
-                        refLat: visitParty.latitude, refLng: visitParty.longitude,
+                    // No trusted on-site location yet -> block until it's captured.
+                    return res.status(403).json({
+                        error: 'This party\'s exact location is not captured yet. Tap "I\'m at shop" to capture it here, then place the visit order.',
                     });
-                    if (!proximity.ok) {
-                        return res.status(403).json({ error: proximity.reason });
-                    }
                 }
             }
             else {
