@@ -1417,9 +1417,11 @@ const DashboardClients = () => {
               : 'Not verified yet. Stand at the shop and tap “Capture location” to lock the exact spot — the 250m geofence turns on once it is verified.'}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="ui-btn ui-btn--primary" onClick={handleVerifyLocation} disabled={savingLoc}>
-              {savingLoc ? 'Capturing…' : (editRow.location_source === 'verified' ? 'I’m at shop — re-capture' : 'I’m at shop')}
-            </button>
+            {editRow.location_source !== 'verified' && (
+              <button type="button" className="ui-btn ui-btn--primary" onClick={handleVerifyLocation} disabled={savingLoc}>
+                {savingLoc ? 'Capturing…' : 'I’m at shop'}
+              </button>
+            )}
             {Number.isFinite(Number(editRow.latitude)) && Number.isFinite(Number(editRow.longitude)) && (
               <a
                 className="ui-btn ui-btn--secondary inline-flex items-center gap-1"
