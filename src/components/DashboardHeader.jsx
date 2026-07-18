@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import '../styles/components/DashboardHeader.css';
-import { FiMaximize, FiMinimize, FiBell, FiMenu } from 'react-icons/fi';
+import { FiMaximize, FiMinimize, FiBell, FiMenu, FiSearch, FiX } from 'react-icons/fi';
 import Tooltip from './ui/Tooltip';
 import { logout as authLogout, getUser } from '../services/authService';
 import { showLogoutSuccess } from '../services/notificationService';
@@ -11,7 +11,16 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const userMenuRef = useRef(null);
+
+  // Broadcast the search query — same event the desktop search bar uses, so the
+  // mobile search hooks into the exact same page-level filtering.
+  const dispatchSearch = (q) => {
+    try {
+      window.dispatchEvent(new CustomEvent('globalSearchChanged', { detail: { query: q } }));
+    } catch (_e) {}
+  };
 
   const updateUserInfo = async () => {
     try {
@@ -233,6 +242,16 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
           </div>
 
           <div className="dashboard-action-icons flex items-center gap-2">
+            {/* Mobile-only search toggle — the desktop search bar is hidden below md */}
+            <button
+              type="button"
+              className="dashboard-icon-btn md:hidden bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]"
+              onClick={() => setIsMobileSearchOpen((v) => !v)}
+              aria-label={isMobileSearchOpen ? 'Close search' : 'Search'}
+              aria-expanded={isMobileSearchOpen}
+            >
+              {isMobileSearchOpen ? <FiX size={20} aria-hidden="true" /> : <FiSearch size={20} aria-hidden="true" />}
+            </button>
             <Tooltip label="Notifications" placement="bottom">
               <button className="dashboard-icon-btn bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]" aria-label="Notifications">
                 <FiBell size={20} aria-hidden="true" />
@@ -289,6 +308,32 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
           </div>
         </div>
       </div>
+
+      {/* Mobile search row — revealed by the search icon; hidden on md+ where the
+          inline search bar is always visible. Uses the same globalSearchChanged
+          event as the desktop bar. */}
+      {isMobileSearchOpen && (
+        <div className="md:hidden px-4 pb-3">
+          <div className="flex items-center gap-2 bg-surface-muted border border-border rounded-pill px-3 py-2 transition duration-200 ease-[ease] focus-within:border-primary focus-within:shadow-[var(--focus-ring)] focus-within:bg-surface">
+            <FiSearch className="text-text-subtle shrink-0" size={18} aria-hidden="true" />
+            <input
+              autoFocus
+              type="text"
+              placeholder="Search..."
+              className="border-none outline-none bg-transparent text-text w-full text-[length:var(--text-base)] placeholder:text-text-subtle"
+              onChange={(e) => dispatchSearch(e.target.value)}
+            />
+            <button
+              type="button"
+              className="shrink-0 inline-flex items-center justify-center w-7 h-7 rounded-pill text-text-subtle hover:text-text hover:bg-surface transition"
+              onClick={() => { dispatchSearch(''); setIsMobileSearchOpen(false); }}
+              aria-label="Close search"
+            >
+              <FiX size={16} aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 };
