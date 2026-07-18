@@ -38,12 +38,13 @@ const ensureWidget = () => {
   if (!TOKEN_AUTH) return Promise.reject(new Error('NEXT_PUBLIC_MSG91_TOKEN_AUTH is not set'));
 
   widgetLoading = new Promise((resolve, reject) => {
-    const init = () => {
+    // Overall budget for the whole "load script -> initSendOTP appears -> methods
+    // exposed" sequence. Every step below shares this deadline.
+    const OVERALL_TIMEOUT_MS = 15000;
+    const startedAt = Date.now();
+
+    const doInit = () => {
       try {
-        if (typeof window.initSendOTP !== 'function') {
-          reject(new Error('MSG91 widget loaded but initSendOTP is unavailable'));
-          return;
-        }
         window.initSendOTP({
           widgetId: WIDGET_ID,
           tokenAuth: TOKEN_AUTH,
@@ -51,39 +52,52 @@ const ensureWidget = () => {
           success: () => {},
           failure: () => {},
         });
-        // exposeMethods attaches window.sendOtp/verifyOtp/retryOtp ASYNCHRONOUSLY,
-        // so wait until they actually exist before resolving.
-        const startedAt = Date.now();
-        const waitForMethods = () => {
-          if (typeof window.sendOtp === 'function' && typeof window.verifyOtp === 'function') {
-            widgetReady = true;
-            resolve();
-          } else if (Date.now() - startedAt > 10000) {
-            reject(new Error('MSG91 widget methods not exposed — check NEXT_PUBLIC_MSG91_WIDGET_ID / NEXT_PUBLIC_MSG91_TOKEN_AUTH'));
-          } else {
-            setTimeout(waitForMethods, 100);
-          }
-        };
-        waitForMethods();
       } catch (e) {
         reject(e);
+        return;
+      }
+      // exposeMethods attaches window.sendOtp/verifyOtp/retryOtp ASYNCHRONOUSLY,
+      // so wait until they actually exist before resolving.
+      const waitForMethods = () => {
+        if (typeof window.sendOtp === 'function' && typeof window.verifyOtp === 'function') {
+          widgetReady = true;
+          resolve();
+        } else if (Date.now() - startedAt > OVERALL_TIMEOUT_MS) {
+          reject(new Error('MSG91 widget methods not exposed — check NEXT_PUBLIC_MSG91_WIDGET_ID / NEXT_PUBLIC_MSG91_TOKEN_AUTH'));
+        } else {
+          setTimeout(waitForMethods, 100);
+        }
+      };
+      waitForMethods();
+    };
+
+    // The script's `load` event can fire a tick BEFORE it attaches
+    // window.initSendOTP, so don't reject on the first miss — POLL for it until
+    // it appears (or we hit the deadline). This is the intermittent
+    // "widget loaded but initSendOTP is unavailable" fix.
+    const waitForInit = () => {
+      if (typeof window.initSendOTP === 'function') {
+        doInit();
+      } else if (Date.now() - startedAt > OVERALL_TIMEOUT_MS) {
+        reject(new Error('MSG91 widget loaded but initSendOTP is unavailable. Please retry.'));
+      } else {
+        setTimeout(waitForInit, 100);
       }
     };
 
-    if (typeof window.initSendOTP === 'function') { init(); return; }
-
-    const existing = document.querySelector(`script[src="${WIDGET_SCRIPT}"]`);
-    if (existing) {
-      existing.addEventListener('load', init, { once: true });
-      existing.addEventListener('error', () => reject(new Error('Failed to load MSG91 widget')), { once: true });
-      return;
+    // Make sure the script tag exists (add it once), then poll for initSendOTP
+    // regardless of the load-event timing — covers already-loaded scripts too.
+    if (typeof window.initSendOTP !== 'function') {
+      const existing = document.querySelector(`script[src="${WIDGET_SCRIPT}"]`);
+      if (!existing) {
+        const s = document.createElement('script');
+        s.src = WIDGET_SCRIPT;
+        s.async = true;
+        s.onerror = () => reject(new Error('Failed to load MSG91 widget script'));
+        document.body.appendChild(s);
+      }
     }
-    const s = document.createElement('script');
-    s.src = WIDGET_SCRIPT;
-    s.async = true;
-    s.onload = init;
-    s.onerror = () => reject(new Error('Failed to load MSG91 widget script'));
-    document.body.appendChild(s);
+    waitForInit();
   }).catch((e) => {
     // Reset so a later attempt can retry instead of reusing a rejected promise.
     widgetLoading = null;
