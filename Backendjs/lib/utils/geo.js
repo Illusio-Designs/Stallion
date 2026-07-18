@@ -73,6 +73,53 @@ function checkAddressProximity({ deviceLat, deviceLng, refLat, refLng }) {
   return { ok: true, distance };
 }
 
+// ---- On-site capture ("I'm at the shop") validation ----------------------
+// A party's trusted location is set ONLY by an on-site capture. Before we store
+// it we require:
+//   1) a good GPS fix — reported accuracy no worse than CAPTURE_MAX_ACCURACY_M,
+//   2) the phone to be near the party's geocoded ADDRESS (within
+//      CAPTURE_MAX_ADDRESS_DISTANCE_M) so a wrong shop / wrong city can't be
+//      captured (the original Rajkot->Navi Mumbai class of error).
+const CAPTURE_MAX_ACCURACY_M = Number(process.env.CAPTURE_MAX_ACCURACY_M) || 50;
+const CAPTURE_MAX_ADDRESS_DISTANCE_M = Number(process.env.CAPTURE_MAX_ADDRESS_DISTANCE_M) || 2000;
+
+/**
+ * Validate an on-site location capture.
+ * @returns {{ ok: boolean, distance: number|null, reason?: string }}
+ */
+function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng }) {
+  const lat = Number(deviceLat), lng = Number(deviceLng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return { ok: false, distance: null, reason: 'A valid current location is required. Please enable GPS and try again.' };
+  }
+  const acc = Number(accuracy);
+  if (!Number.isFinite(acc) || acc <= 0) {
+    return { ok: false, distance: null, reason: 'Your device did not report GPS accuracy. Move outside/near a window and try again.' };
+  }
+  if (acc > CAPTURE_MAX_ACCURACY_M) {
+    return {
+      ok: false,
+      distance: null,
+      reason: `GPS signal is too weak (accurate to only ${Math.round(acc)}m). Move to open sky and try again — it must be within ${CAPTURE_MAX_ACCURACY_M}m.`,
+    };
+  }
+  // Compare to the address anchor when we have one (best-effort — if the address
+  // can't be geocoded we still allow the on-site person to set it).
+  if (refLat != null && refLng != null && refLat !== '' && refLng !== '') {
+    const distance = distanceMeters(lat, lng, refLat, refLng);
+    if (distance != null && distance > CAPTURE_MAX_ADDRESS_DISTANCE_M) {
+      const km = (distance / 1000).toFixed(distance >= 10000 ? 0 : 1);
+      return {
+        ok: false,
+        distance,
+        reason: `You are about ${km} km from this party's registered address. Make sure you selected the correct party and are standing at its shop before capturing.`,
+      };
+    }
+    return { ok: true, distance };
+  }
+  return { ok: true, distance: null };
+}
+
 function checkGeofence({ deviceLat, deviceLng, party, action = 'perform this action' }) {
   const pLat = party && (party.latitude ?? party.lat);
   const pLng = party && (party.longitude ?? party.lng);
@@ -98,4 +145,13 @@ function checkGeofence({ deviceLat, deviceLng, party, action = 'perform this act
   return { ok: true, distance };
 }
 
-module.exports = { GEOFENCE_RADIUS_M, ADDRESS_PROXIMITY_RADIUS_M, distanceMeters, checkGeofence, checkAddressProximity };
+module.exports = {
+  GEOFENCE_RADIUS_M,
+  ADDRESS_PROXIMITY_RADIUS_M,
+  CAPTURE_MAX_ACCURACY_M,
+  CAPTURE_MAX_ADDRESS_DISTANCE_M,
+  distanceMeters,
+  checkGeofence,
+  checkAddressProximity,
+  validateOnsiteCapture,
+};

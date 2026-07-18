@@ -11,6 +11,7 @@ const Cities = require('../models/Cities');
 const Zone = require('../models/Zone');
 const { Op } = require('sequelize');
 const { geocodeAddress, geocodeDiagnostic } = require('../utils/geocode');
+const { validateOnsiteCapture } = require('../utils/geo');
 const DistributorZones = require('../models/DistributorZones');
 const SalesmanStates = require('../models/SalesmanStates');
 const DistributorStates = require('../models/DistributorStates');
@@ -476,6 +477,74 @@ class PartyController {
                 newValues: party,
             });
             return res.status(200).json({ message, latitude: finalLat, longitude: finalLng, location_source: source });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
+    // On-site capture ("I'm at the shop — capture location"). Salesman/admin sends
+    // the device GPS + accuracy while physically at the party. We validate the fix
+    // (accuracy + proximity to the party's geocoded address) and, on pass, store it
+    // as the TRUSTED location_source='verified' anchor for the strict 250m geofence.
+    async verifyPartyLocation(req, res) {
+        try {
+            const id = req.params.id;
+            if (!id) {
+                return res.status(400).json({ error: 'Party ID is required' });
+            }
+            const party = await Party.findOne({ where: { party_id: id } });
+            if (!party) {
+                return res.status(404).json({ error: 'Party not found' });
+            }
+
+            const { latitude, longitude, accuracy } = req.body || {};
+
+            // Geocode the party's address as the reference to validate against.
+            let refLat = null, refLng = null;
+            try {
+                let city, state;
+                if (party.city_id) { const c = await Cities.findByPk(party.city_id); city = c && c.name; }
+                if (party.state_id) { const s = await State.findByPk(party.state_id); state = s && s.name; }
+                const ref = party.address
+                    ? await geocodeAddress(party.address, { city, state, pincode: party.pincode })
+                    : null;
+                if (ref) { refLat = ref.latitude; refLng = ref.longitude; }
+            } catch (_) { /* no reference — capture still allowed, validated on accuracy only */ }
+
+            const check = validateOnsiteCapture({
+                deviceLat: latitude, deviceLng: longitude, accuracy, refLat, refLng,
+            });
+            if (!check.ok) {
+                return res.status(422).json({ error: check.reason });
+            }
+
+            const acc = Number(accuracy);
+            const oldSnapshot = party.toJSON();
+            party.latitude = Number(latitude);
+            party.longitude = Number(longitude);
+            party.location_source = 'verified';
+            party.location_accuracy_m = Number.isFinite(acc) ? acc : null;
+            party.updated_at = new Date();
+            await party.save();
+
+            await logAudit({
+                req,
+                action: 'update',
+                description: `Party location verified on-site (±${Math.round(acc)}m)`,
+                tableName: 'parties',
+                recordId: party.party_id,
+                oldValues: oldSnapshot,
+                newValues: party,
+            });
+
+            return res.status(200).json({
+                message: 'On-site location verified and saved.',
+                latitude: party.latitude,
+                longitude: party.longitude,
+                location_source: 'verified',
+                accuracy: party.location_accuracy_m,
+                distance_from_address_m: check.distance,
+            });
         } catch (error) {
             return res.status(500).json({ error: error.message });
         }

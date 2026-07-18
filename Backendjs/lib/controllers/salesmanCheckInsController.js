@@ -4,7 +4,7 @@ const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 const { SalesmanCheckInType } = require('../constants/enums');
-const { checkAddressProximity } = require('../utils/geo');
+const { checkAddressProximity, checkGeofence } = require('../utils/geo');
 const { ensurePartyCoords } = require('../utils/geocode');
 
 // Enrich check-ins for the Visit Report: add party_name, and for ORDERED
@@ -132,12 +132,21 @@ class SalesmanCheckInsController {
                     checkinParty.location_source = 'geocoded';
                 }
                 await ensurePartyCoords(checkinParty); // (geocodes from address if not cached)
-                const proximity = checkAddressProximity({
-                    deviceLat: fields.latitude, deviceLng: fields.longitude,
-                    refLat: checkinParty.latitude, refLng: checkinParty.longitude,
-                });
-                if (!proximity.ok) {
-                    return res.status(403).json({ error: proximity.reason });
+                if (checkinParty.location_source === 'verified' && checkinParty.latitude != null && checkinParty.longitude != null) {
+                    // Trusted on-site location -> enforce the strict 250m geofence.
+                    const geo = checkGeofence({ deviceLat: fields.latitude, deviceLng: fields.longitude, party: checkinParty, action: 'check in' });
+                    if (!geo.ok) {
+                        return res.status(403).json({ error: geo.reason });
+                    }
+                } else {
+                    // Not verified yet -> only block a gross mismatch (wrong city).
+                    const proximity = checkAddressProximity({
+                        deviceLat: fields.latitude, deviceLng: fields.longitude,
+                        refLat: checkinParty.latitude, refLng: checkinParty.longitude,
+                    });
+                    if (!proximity.ok) {
+                        return res.status(403).json({ error: proximity.reason });
+                    }
                 }
             }
 

@@ -19,6 +19,9 @@ router.post('/', authenticateToken, isPartyCreator, partyController.createParty)
 // exact coordinates; with no body it geocodes from the party's address. Declared
 // before '/:id' so the '/location' suffix isn't swallowed.
 router.put('/:id/location', authenticateToken, partyController.setPartyLocation);
+// On-site capture ("I'm at the shop"): salesman/admin/party managers send device
+// GPS + accuracy to set the TRUSTED verified location. Before '/:id'.
+router.put('/:id/verify-location', authenticateToken, isPartyCreator, partyController.verifyPartyLocation);
 router.put('/:id', authenticateToken, partyController.updateParty);
 router.delete('/:id', authenticateToken, isPartyManager, partyController.deleteParty);
 router.post('/byZoneId', authenticateToken, partyController.getPartiesByZoneId);
