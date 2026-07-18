@@ -245,18 +245,6 @@ export default function TableWithControls({
                     ref={filterPopoverRef}
                     className="ui-filter-popover"
                     onMouseDown={e => e.stopPropagation()}
-                    style={{
-                      position: 'absolute',
-                      right: 0,
-                      top: 'calc(100% + 6px)',
-                      minWidth: 220,
-                      background: '#fff',
-                      border: '1px solid #E0E0E0',
-                      borderRadius: 10,
-                      boxShadow: '0 2px 12px rgba(24,18,101,.07)',
-                      padding: 16,
-                      zIndex: 50,
-                    }}
                   >
                     {filterContent}
                   </div>
