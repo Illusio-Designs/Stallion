@@ -2217,15 +2217,49 @@ input[type="number"] {
 }
 
 .ui-filter-popover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
   min-width: 220px;
-  max-width: 340px;
+  /* Never wider than the viewport (with a gutter) on small tablets. */
+  max-width: min(340px, calc(100vw - 24px));
   padding: var(--space-5);
-  margin-top: var(--space-1);
   z-index: 99;
+}
+
+/* Mobile: a proper full-width bottom sheet instead of a cramped right-anchored
+   popover that overflowed the screen edge. Outside-tap still closes it. */
+@media (max-width: 640px) {
+  .ui-filter-popover {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+    max-height: 80vh;
+    overflow-y: auto;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    padding: var(--space-5) var(--space-4) calc(var(--space-5) + env(safe-area-inset-bottom));
+    box-shadow: 0 -8px 28px rgba(0, 0, 0, 0.18);
+    z-index: 1000;
+  }
+  /* Drag-handle affordance so it reads as a bottom sheet. */
+  .ui-filter-popover::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 4px;
+    border-radius: var(--radius-pill);
+    background: var(--color-border-strong, var(--color-border));
+    margin: 0 auto var(--space-4);
+  }
 }
 
 /* ============================================================
