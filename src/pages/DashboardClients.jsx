@@ -19,8 +19,9 @@ import {
   getZones,
   register,
   updateParty,
-  setPartyLocation,
+  verifyPartyLocation,
 } from '../services/apiService';
+import { captureCurrentPosition } from '../utils/geolocation';
 import { getUser, getUserRole } from '../services/authService';
 import { showError, showSuccess, showInfo } from '../services/notificationService';
 
@@ -481,47 +482,42 @@ const DashboardClients = () => {
     }
   };
 
-  // Geocode every party missing coordinates (for the visit/check-in geofence).
-  // Admin: derive the party's coordinates from its address/city/state/pincode
-  // and store them (no device GPS needed — works from the office).
-  const handleCaptureLocation = async () => {
+  // On-site capture ("I'm at the shop — capture location"). Reads the device GPS
+  // (with accuracy) and sends it to the backend, which validates the fix and
+  // stores it as the party's TRUSTED verified location — the 250m geofence anchor
+  // used for visit orders and check-ins.
+  const handleVerifyLocation = async () => {
     const partyId = editRow?.id || editRow?.party_id;
     if (!partyId) return;
 
-    // Coordinates are looked up from the party's SAVED address data. Make sure
-    // the key parts exist and tell the user clearly what's missing.
-    const missing = [];
-    if (!editRow?.address || String(editRow.address).trim() === '') missing.push('address');
-    if (!editRow?.pincode || String(editRow.pincode).trim() === '') missing.push('pincode');
-    if (missing.length) {
-      showError(`Can't find coordinates — the party's ${missing.join(' and ')} is missing. Please fill it in, save the party, then try again.`);
-      return;
-    }
-
     try {
       setSavingLoc(true);
-      const res = await setPartyLocation(partyId); // no coords -> geocode from address
-      const lat = Number(res?.latitude);
-      const lng = Number(res?.longitude);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-        showError('Could not determine coordinates from this address. Please double-check the address and pincode.');
+      let pos;
+      try {
+        pos = await captureCurrentPosition();
+      } catch (geoErr) {
+        showError(geoErr?.message || 'Could not get your location. Please try again.');
         return;
       }
-      showSuccess(`Coordinates saved: ${lat.toFixed(5)}, ${lng.toFixed(5)}.`);
+      if (!Number.isFinite(Number(pos?.latitude)) || !Number.isFinite(Number(pos?.longitude))) {
+        showError('Could not read your GPS position. Please try again from the shop.');
+        return;
+      }
+
+      const res = await verifyPartyLocation(partyId, pos);
+      const lat = Number(res?.latitude);
+      const lng = Number(res?.longitude);
+      const acc = Number(res?.accuracy);
+      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 250m geofence is now active for this party.`);
       setParties(prev => prev.map(p => {
         const id = p.id || p.party_id;
-        return id === partyId ? { ...p, latitude: lat, longitude: lng, location_source: 'geocoded' } : p;
+        return id === partyId ? { ...p, latitude: lat, longitude: lng, location_source: 'verified', location_accuracy_m: acc } : p;
       }));
-      setEditRow(prev => (prev ? { ...prev, latitude: lat, longitude: lng, location_source: 'geocoded' } : prev));
+      setEditRow(prev => (prev ? { ...prev, latitude: lat, longitude: lng, location_source: 'verified', location_accuracy_m: acc } : prev));
     } catch (err) {
-      const msg = String(err?.message || '').toLowerCase();
-      if (err?.statusCode === 422 || msg.includes('resolve')) {
-        showError('Could not find this address on the map. Check the address/pincode, or set the location manually.');
-      } else if (msg.includes('no address')) {
-        showError('This party has no saved address to look up. Add an address and save first.');
-      } else {
-        showError(`Failed to get coordinates: ${err?.message || 'please try again.'}`);
-      }
+      // 422 -> validation failure (weak GPS or too far from the address); the
+      // backend message is already user-friendly.
+      showError(err?.message || 'Could not verify location. Please try again from the shop.');
     } finally {
       setSavingLoc(false);
     }
@@ -1459,16 +1455,17 @@ const DashboardClients = () => {
           </label>
         </div>
       )}
-      {editRow && isAdmin && (
+      {editRow && (isAdmin || isSalesman) && (
         <div className="form-group form-group--full rounded-lg border border-border bg-surface-muted p-3">
           <label className="ui-label">Party Location (visit geofence)</label>
           <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
-            Derive the party's coordinates from its address, city, state and pincode.
-            {editRow.location_source ? ` Current source: ${editRow.location_source}.` : ' Not set yet.'}
+            {editRow.location_source === 'verified'
+              ? `✅ Verified on-site${Number.isFinite(Number(editRow.location_accuracy_m)) ? ` (±${Math.round(Number(editRow.location_accuracy_m))}m)` : ''}. The strict 250m geofence is active for visit orders and check-ins.`
+              : 'Not verified yet. Stand at the shop and tap “Capture location” to lock the exact spot — the 250m geofence turns on once it is verified.'}
           </p>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" className="ui-btn ui-btn--primary" onClick={handleCaptureLocation} disabled={savingLoc}>
-              {savingLoc ? 'Getting…' : 'Get coordinates from address'}
+            <button type="button" className="ui-btn ui-btn--primary" onClick={handleVerifyLocation} disabled={savingLoc}>
+              {savingLoc ? 'Capturing…' : (editRow.location_source === 'verified' ? 'Re-capture location (at shop)' : 'I’m at the shop — capture location')}
             </button>
             {Number.isFinite(Number(editRow.latitude)) && Number.isFinite(Number(editRow.longitude)) && (
               <a
