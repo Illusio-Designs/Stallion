@@ -1466,9 +1466,26 @@ const DashboardClients = () => {
             Derive the party's coordinates from its address, city, state and pincode.
             {editRow.location_source ? ` Current source: ${editRow.location_source}.` : ' Not set yet.'}
           </p>
-          <button type="button" className="ui-btn ui-btn--primary" onClick={handleCaptureLocation} disabled={savingLoc}>
-            {savingLoc ? 'Getting…' : 'Get coordinates from address'}
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="ui-btn ui-btn--primary" onClick={handleCaptureLocation} disabled={savingLoc}>
+              {savingLoc ? 'Getting…' : 'Get coordinates from address'}
+            </button>
+            {Number.isFinite(Number(editRow.latitude)) && Number.isFinite(Number(editRow.longitude)) && (
+              <a
+                className="ui-btn ui-btn--secondary inline-flex items-center gap-1"
+                href={`https://www.google.com/maps/search/?api=1&query=${Number(editRow.latitude)},${Number(editRow.longitude)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View on map
+              </a>
+            )}
+          </div>
+          {Number.isFinite(Number(editRow.latitude)) && Number.isFinite(Number(editRow.longitude)) && (
+            <p className="mt-2 mb-0 text-[length:var(--text-xs)] text-text-subtle">
+              {Number(editRow.latitude).toFixed(5)}, {Number(editRow.longitude).toFixed(5)}
+            </p>
+          )}
         </div>
       )}
     </>
