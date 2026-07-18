@@ -623,11 +623,23 @@ class PartyController {
             if (is_active !== undefined) {
                 payload.is_active = is_active;
             }
-            // Re-geocode when the address changes so the geofence anchor stays
-            // correct (best-effort; leaves coords as-is on failure).
-            if (address !== undefined && address && address !== party.address) {
-                const geo = await geocodeAddress(address, { pincode: pincode !== undefined ? pincode : party.pincode });
-                if (geo) { payload.latitude = geo.latitude; payload.longitude = geo.longitude; }
+            // Re-derive the geocode anchor when the address OR the pincode changes
+            // (editing the pincode to correct a party's location must actually move
+            // it). NOT for on-site 'verified' parties — their captured GPS is the
+            // source of truth and must never be overwritten by an address geocode.
+            // Best-effort; leaves coords as-is on geocoder failure.
+            const addressChanged = address !== undefined && address && address !== party.address;
+            const pincodeChanged = pincode !== undefined && String(pincode).trim() !== String(party.pincode || '').trim();
+            if ((addressChanged || pincodeChanged) && party.location_source !== 'verified') {
+                const geo = await geocodeAddress(
+                    address !== undefined ? address : party.address,
+                    { pincode: pincode !== undefined ? pincode : party.pincode }
+                );
+                if (geo) {
+                    payload.latitude = geo.latitude;
+                    payload.longitude = geo.longitude;
+                    payload.location_source = 'geocoded';
+                }
             }
             await Party.update(payload, { where: { party_id: id } });
 
