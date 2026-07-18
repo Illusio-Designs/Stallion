@@ -122,12 +122,22 @@ const Party = sequelize.define('Party', {
         allowNull: true
     },
     // How latitude/longitude were set:
-    //   'gps'      -> captured from a real device on-site (salesman add / first
-    //                 visit / admin override). Trusted -> enforce the strict geofence.
+    //   'verified' -> captured ON-SITE from a real device (the "I'm at the shop"
+    //                 action), validated for GPS accuracy and address proximity.
+    //                 TRUSTED -> visit orders / check-ins enforce the strict 250m
+    //                 geofence against it.
     //   'geocoded' -> derived from the typed address (pincode-accurate at best).
-    //                 Not trusted -> the first on-site visit overwrites it with GPS.
+    //                 Approximate reference only — NOT used as the 250m anchor.
+    //   'gps'      -> legacy value from the old auto-adopt behaviour; treated as
+    //                 untrusted and re-derived from the address on next visit.
     location_source: {
         type: DataTypes.STRING(20),
+        allowNull: true
+    },
+    // Reported GPS accuracy (metres) at the moment of the on-site capture. Only
+    // set for 'verified' locations; lets us reject imprecise fixes.
+    location_accuracy_m: {
+        type: DataTypes.DECIMAL(7, 2),
         allowNull: true
     },
     is_active: {

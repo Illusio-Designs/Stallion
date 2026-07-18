@@ -1,7 +1,7 @@
 const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const Party = require('../models/Party');
-const { checkAddressProximity } = require('../utils/geo');
+const { checkAddressProximity, checkGeofence } = require('../utils/geo');
 const { ensurePartyCoords } = require('../utils/geocode');
 const Distributor = require('../models/distributor');
 const Salesman = require('../models/Salesman');
@@ -409,12 +409,22 @@ class OrderController {
                     visitParty.location_source = 'geocoded';
                 }
                 await ensurePartyCoords(visitParty); // (geocodes from address if not cached)
-                const proximity = checkAddressProximity({
-                    deviceLat: latitude, deviceLng: longitude,
-                    refLat: visitParty.latitude, refLng: visitParty.longitude,
-                });
-                if (!proximity.ok) {
-                    return res.status(403).json({ error: proximity.reason });
+                if (visitParty.location_source === 'verified' && visitParty.latitude != null && visitParty.longitude != null) {
+                    // Trusted on-site location -> enforce the strict 250m geofence.
+                    const geo = checkGeofence({ deviceLat: latitude, deviceLng: longitude, party: visitParty, action: 'place a visit order' });
+                    if (!geo.ok) {
+                        return res.status(403).json({ error: geo.reason });
+                    }
+                } else {
+                    // Not verified yet -> can't enforce 250m against an approximate
+                    // address point; only block a gross mismatch (wrong city).
+                    const proximity = checkAddressProximity({
+                        deviceLat: latitude, deviceLng: longitude,
+                        refLat: visitParty.latitude, refLng: visitParty.longitude,
+                    });
+                    if (!proximity.ok) {
+                        return res.status(403).json({ error: proximity.reason });
+                    }
                 }
             }
             else {

@@ -979,6 +979,26 @@ export const setPartyLocation = async (partyId, coords) => {
 };
 
 /**
+ * On-site capture ("I'm at the shop"): send the device GPS + accuracy to set the
+ * party's TRUSTED verified location (the 250m geofence anchor). The backend
+ * validates accuracy and proximity to the party's address before saving.
+ * @param {string} partyId
+ * @param {{latitude:number, longitude:number, accuracy:number}} pos
+ * @returns {Promise<{latitude:number, longitude:number, location_source:string, accuracy:number}>}
+ */
+export const verifyPartyLocation = async (partyId, pos) => {
+  return apiRequest(`/parties/${partyId}/verify-location`, {
+    method: 'PUT',
+    body: {
+      latitude: pos.latitude,
+      longitude: pos.longitude,
+      accuracy: pos.accuracy,
+    },
+    includeAuth: true,
+  });
+};
+
+/**
  * Bulk upload parties from Excel/CSV file
  * @param {File} file - Excel or CSV file
  * @returns {Promise<Object>} Response with created/updated counts
