@@ -1465,7 +1465,7 @@ const DashboardClients = () => {
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" className="ui-btn ui-btn--primary" onClick={handleVerifyLocation} disabled={savingLoc}>
-              {savingLoc ? 'Capturing…' : (editRow.location_source === 'verified' ? 'Re-capture location (at shop)' : 'I’m at the shop — capture location')}
+              {savingLoc ? 'Capturing…' : (editRow.location_source === 'verified' ? 'I’m at shop — re-capture' : 'I’m at shop')}
             </button>
             {Number.isFinite(Number(editRow.latitude)) && Number.isFinite(Number(editRow.longitude)) && (
               <a
