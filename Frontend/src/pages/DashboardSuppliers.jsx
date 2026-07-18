@@ -2234,14 +2234,16 @@ const DashboardSuppliers = () => {
                       ? `✅ Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 250m geofence active.`
                       : 'Location not verified yet. Stand at the shop and tap below to enable the 250m geofence.'}
                   </p>
-                  <button
-                    type="button"
-                    className="ui-btn ui-btn--secondary self-start"
-                    onClick={handleVerifyCheckinPartyLocation}
-                    disabled={verifyingLoc}
-                  >
-                    {verifyingLoc ? 'Capturing…' : (verified ? 'I’m at shop — re-capture' : 'I’m at shop')}
-                  </button>
+                  {!verified && (
+                    <button
+                      type="button"
+                      className="ui-btn ui-btn--secondary self-start"
+                      onClick={handleVerifyCheckinPartyLocation}
+                      disabled={verifyingLoc}
+                    >
+                      {verifyingLoc ? 'Capturing…' : 'I’m at shop'}
+                    </button>
+                  )}
                 </div>
               );
             })()}
