@@ -586,8 +586,17 @@ const DashboardSuppliers = () => {
           const visitRows = (Array.isArray(orders) ? orders : [])
             .filter((o) => (o.order_type === 'visit_order') && !linked.has(o.order_id || o.id))
             .map((o) => {
-              const items = Array.isArray(o.order_items) ? o.order_items : [];
-              const qty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+              // order_items may arrive as a real array OR a JSON string — parse
+              // both, otherwise the QTY column computed to 0 for every order.
+              const parseItems = (v) => {
+                if (Array.isArray(v)) return v;
+                if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; } }
+                if (v && typeof v === 'object') return Object.values(v);
+                return [];
+              };
+              const items = parseItems(o.order_items);
+              const qty = items.reduce((s, it) => s + (Number(it.quantity ?? it.qty) || 0), 0)
+                || Number(o.total_qty) || 0;
               return {
                 id: `order-${o.order_id || o.id}`,
                 type: 'ordered',
