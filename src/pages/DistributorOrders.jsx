@@ -413,11 +413,12 @@ const DistributorOrders = () => {
     { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase().replace(/\s+/g, '-')}>{v}</StatusBadge> },
     { key: 'value', label: 'VALUE' },
     {
+      // Distributors can create, view and download their orders — not delete
+      // (deleteOrder is admin/order-manager only, so the button always 403'd).
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
           onView={() => setViewRow(row)}
           onDownload={() => downloadOrderPdf(row, products)}
-          onDelete={() => handleDelete(row)}
         />
       )
     },
