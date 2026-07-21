@@ -19,7 +19,8 @@ import {
   getProductsPage,
   getProductsByIds,
   getSalesmanById,
-  getCountries
+  getCountries,
+  getAvailableOffers,
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 import { getUserRole, getUser } from '../services/authService';
@@ -135,6 +136,32 @@ const DashboardOrders = () => {
     order_items: [{ product_id: '', quantity: 1, price: 0 }],
     order_notes: ''
   });
+
+  // Offers the user can apply to this order (none auto-applied — user picks one).
+  const [availableOffers, setAvailableOffers] = useState([]);
+  const [selectedOffer, setSelectedOffer] = useState('');
+
+  // Load offers that apply to the current cart whenever the valid items change.
+  useEffect(() => {
+    const items = (createFormData.order_items || [])
+      .filter((it) => it.product_id && Number(it.quantity) > 0 && Number(it.price) >= 0)
+      .map((it) => ({ product_id: it.product_id, quantity: Number(it.quantity), price: Number(it.price) }));
+    if (items.length === 0) { setAvailableOffers([]); setSelectedOffer(''); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const offers = await getAvailableOffers(items);
+        const list = Array.isArray(offers) ? offers : [];
+        if (cancelled) return;
+        setAvailableOffers(list);
+        // Drop the selection if it no longer applies.
+        setSelectedOffer((cur) => (cur && list.some((o) => o.offer_id === cur)) ? cur : '');
+      } catch (_e) {
+        if (!cancelled) setAvailableOffers([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [createFormData.order_items]);
 
   // Fetch orders from API
   const fetchOrders = async (suppressError = false) => {
@@ -886,6 +913,8 @@ const DashboardOrders = () => {
       }
       if (createFormData.event_id) orderData.event_id = createFormData.event_id;
       if (createFormData.order_notes) orderData.order_notes = createFormData.order_notes;
+      // User-selected offer (optional). The backend re-validates and applies it.
+      if (selectedOffer) orderData.offer_id = selectedOffer;
 
       // Visit orders must carry the browser location. If we don't have it yet
       // (permission not granted on selection), request it now and wait.
@@ -932,6 +961,8 @@ const DashboardOrders = () => {
       order_items: [{ product_id: '', quantity: 1, price: 0 }],
       order_notes: ''
     });
+    setSelectedOffer('');
+    setAvailableOffers([]);
     setSelectedCountry(null);
   };
 
@@ -1819,8 +1850,8 @@ const DashboardOrders = () => {
                   </div>
                 </div>
               ))}
-              <Button 
-                variant="secondary" 
+              <Button
+                variant="secondary"
                 onClick={addOrderItem}
                 style={{ marginTop: '12px', width: '100%' }}
               >
@@ -1828,6 +1859,27 @@ const DashboardOrders = () => {
               </Button>
             </div>
           </div>
+
+          {/* Apply Offer — user-selected, optional. Only offers that apply to the
+              current items are listed; nothing is auto-applied. */}
+          {availableOffers.length > 0 && (
+            <div className="form-group">
+              <label className="ui-label">Apply Offer <span className="text-text-subtle font-normal">(optional)</span></label>
+              <DropdownSelector
+                className="ui-dropdown-custom--full-width"
+                placeholder="No offer"
+                options={[
+                  { value: '', label: 'No offer' },
+                  ...availableOffers.map((o) => ({ value: o.offer_id, label: o.title || 'Offer' })),
+                ]}
+                value={selectedOffer}
+                onChange={(v) => setSelectedOffer(v)}
+              />
+              <p className="mt-1 mb-0 text-[length:var(--text-xs)] text-text-muted">
+                The selected offer's discount is applied to this order and shown on the order view &amp; PDF.
+              </p>
+            </div>
+          )}
 
           {/* Order Notes */}
           <div className="form-group">
