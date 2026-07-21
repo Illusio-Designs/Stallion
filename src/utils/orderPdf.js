@@ -6,6 +6,7 @@
 // `products` list for product-name resolution.
 
 import { getProductsByIds } from '../services/apiService';
+import { RUPEE_FONT_BASE64 } from './rupeeFont';
 
 const parseOrderItems = (orderItems) => {
   if (!orderItems) return [];
@@ -59,10 +60,24 @@ export async function downloadOrderPdf(row, products = []) {
 
   const rawDate = order?.order_date || order?.created_at;
   const orderDate = rawDate ? new Date(rawDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
-  const money = (n) => `Rs. ${Number(n || 0).toLocaleString('en-IN')}`;
+  const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF('p', 'mm', 'a4');
+
+  // Embed a tiny DejaVu subset so the ₹ symbol renders (jsPDF's built-in
+  // Helvetica has no ₹ glyph). We use it ONLY for money strings; everything else
+  // stays Helvetica. `RUPEE` = the registered font name.
+  const RUPEE = 'DejaVuRupee';
+  doc.addFileToVFS('DejaVuRupee.ttf', RUPEE_FONT_BASE64);
+  doc.addFont('DejaVuRupee.ttf', RUPEE, 'normal');
+  // Draw a money string in the rupee font, then restore Helvetica so the rest of
+  // the document is unaffected (font size + colour persist across setFont).
+  const drawMoney = (str, x, yy, align) => {
+    doc.setFont(RUPEE, 'normal');
+    doc.text(str, x, yy, align ? { align } : undefined);
+    doc.setFont('helvetica', 'normal');
+  };
   const PW = 210;
   const M = 14;
   const INK = [26, 27, 35];
@@ -90,18 +105,22 @@ export async function downloadOrderPdf(row, products = []) {
   // ---- Meta grid ----
   let y = 44;
   const metaL = [['Order ID', row?.orderId], ['Party Name', row?.client], ['Order Type', row?.orderType]];
-  const metaR = [['Order Date', orderDate], ['Status', row?.status], ['Total', money(pdfFinal)]];
+  const metaR = [['Order Date', orderDate], ['Status', row?.status], ['Total', money(pdfFinal), true]];
   const drawMeta = (pairs, lx) => {
     let yy = y;
-    pairs.forEach(([label, value]) => {
+    pairs.forEach(([label, value, isMoney]) => {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
       doc.setTextColor(...MUTE);
       doc.text(String(label).toUpperCase(), lx, yy);
-      doc.setFont('helvetica', 'normal');
       doc.setFontSize(10.5);
       doc.setTextColor(...INK);
-      doc.text(String(value || '-'), lx, yy + 5);
+      if (isMoney) {
+        drawMoney(String(value || '-'), lx, yy + 5);
+      } else {
+        doc.setFont('helvetica', 'normal');
+        doc.text(String(value || '-'), lx, yy + 5);
+      }
       yy += 13;
     });
   };
@@ -172,8 +191,8 @@ export async function downloadOrderPdf(row, products = []) {
       doc.text(String(i + 1), colNum, y + 6);
       doc.text(doc.splitTextToSize(it.name, 96)[0], colProd, y + 6);
       doc.text(String(it.qty), colQty, y + 6, { align: 'right' });
-      doc.text(money(it.price), colPrice, y + 6, { align: 'right' });
-      doc.text(money(it.subtotal), colAmt, y + 6, { align: 'right' });
+      drawMoney(money(it.price), colPrice, y + 6, 'right');
+      drawMoney(money(it.subtotal), colAmt, y + 6, 'right');
       y += rowH;
     });
   }
@@ -192,12 +211,12 @@ export async function downloadOrderPdf(row, products = []) {
     doc.setTextColor(...MUTE);
     doc.text('Subtotal', boxX + 4, y + 4);
     doc.setTextColor(...INK);
-    doc.text(money(pdfSubtotal), PW - M - 4, y + 4, { align: 'right' });
+    drawMoney(money(pdfSubtotal), PW - M - 4, y + 4, 'right');
     doc.setTextColor(...MUTE);
     const offerLabel = (order?.applied_offer && order.applied_offer.title) ? String(order.applied_offer.title) : 'Discount';
     doc.text(doc.splitTextToSize(offerLabel, 70)[0], boxX + 4, y + 10);
     doc.setTextColor(...INK);
-    doc.text(`- ${money(pdfDiscount)}`, PW - M - 4, y + 10, { align: 'right' });
+    drawMoney(`- ${money(pdfDiscount)}`, PW - M - 4, y + 10, 'right');
     y += 12;
   }
   doc.setFillColor(...LIGHT);
@@ -206,7 +225,7 @@ export async function downloadOrderPdf(row, products = []) {
   doc.setFontSize(11);
   doc.setTextColor(...BRAND);
   doc.text('TOTAL', boxX + 4, y + 9);
-  doc.text(money(pdfFinal), PW - M - 4, y + 9, { align: 'right' });
+  drawMoney(money(pdfFinal), PW - M - 4, y + 9, 'right');
 
   // ---- Notes ----
   if (order?.order_notes) {
