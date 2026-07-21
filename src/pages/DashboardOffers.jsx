@@ -42,6 +42,7 @@ const emptyForm = () => ({
   min_order_amount: '',
   // product / bogo scope
   products: [], // [{ id, label }]
+  all_products: false, // apply to EVERY product (no manual selection)
   // bogo
   buy_qty: 2,
   get_qty: 1,
@@ -58,6 +59,13 @@ const buildConfig = (f) => {
     };
   }
   if (f.offer_type === 'product') {
+    if (f.all_products) {
+      return {
+        all_products: true,
+        discount_mode: f.discount_mode,
+        discount_value: Number(f.discount_value) || 0,
+      };
+    }
     return {
       items: f.products.map((p) => ({
         product_id: p.id,
@@ -67,6 +75,14 @@ const buildConfig = (f) => {
     };
   }
   // bogo
+  if (f.all_products) {
+    return {
+      all_products: true,
+      buy_qty: Number(f.buy_qty) || 0,
+      get_qty: Number(f.get_qty) || 0,
+      get_discount_percent: Number(f.get_discount_percent) || 100,
+    };
+  }
   return {
     product_ids: f.products.map((p) => p.id),
     buy_qty: Number(f.buy_qty) || 0,
@@ -82,13 +98,18 @@ const summarise = (offer) => {
     return c.discount_mode === 'percent' ? `${c.discount_value}% off order` : `₹${c.discount_value} off order`;
   }
   if (offer.offer_type === 'product') {
+    if (c.all_products) {
+      const each = c.discount_mode === 'percent' ? `${c.discount_value}%` : `₹${c.discount_value}`;
+      return `${each} off · all products`;
+    }
     const it = (c.items || [])[0] || {};
     const n = (c.items || []).length;
     const each = it.discount_mode === 'percent' ? `${it.discount_value}%` : `₹${it.discount_value}`;
     return `${each} off · ${n} product${n === 1 ? '' : 's'}`;
   }
   if (offer.offer_type === 'bogo') {
-    return `Buy ${c.buy_qty} Get ${c.get_qty} · ${(c.product_ids || []).length} product(s)`;
+    const scope = c.all_products ? 'all products' : `${(c.product_ids || []).length} product(s)`;
+    return `Buy ${c.buy_qty} Get ${c.get_qty} · ${scope}`;
   }
   return '—';
 };
@@ -148,10 +169,16 @@ const DashboardOffers = () => {
     const c = offer.config || {};
     const isFlat = offer.offer_type === 'flat';
     const isProduct = offer.offer_type === 'product';
+    const allProducts = c.all_products === true;
     const firstItem = (c.items || [])[0] || {};
-    const products = isProduct
-      ? (c.items || []).map((it) => ({ id: String(it.product_id), label: String(it.product_id) }))
-      : (c.product_ids || []).map((id) => ({ id: String(id), label: String(id) }));
+    const products = allProducts
+      ? []
+      : (isProduct
+        ? (c.items || []).map((it) => ({ id: String(it.product_id), label: String(it.product_id) }))
+        : (c.product_ids || []).map((id) => ({ id: String(id), label: String(id) })));
+    // For product offers the rate lives per-item, EXCEPT all_products where it's
+    // top-level; flat keeps it top-level too.
+    const rateSource = (isFlat || (isProduct && allProducts)) ? c : firstItem;
     setForm({
       offer_id: offer.offer_id,
       title: offer.title || '',
@@ -160,10 +187,11 @@ const DashboardOffers = () => {
       priority: offer.priority || 0,
       start_date: offer.start_date ? new Date(offer.start_date).toISOString().split('T')[0] : '',
       end_date: offer.end_date ? new Date(offer.end_date).toISOString().split('T')[0] : '',
-      discount_mode: isFlat ? (c.discount_mode || 'percent') : (firstItem.discount_mode || 'percent'),
-      discount_value: isFlat ? (c.discount_value ?? '') : (firstItem.discount_value ?? ''),
+      discount_mode: rateSource.discount_mode || 'percent',
+      discount_value: rateSource.discount_value ?? '',
       min_order_amount: c.min_order_amount ?? '',
       products,
+      all_products: allProducts,
       buy_qty: c.buy_qty ?? 2,
       get_qty: c.get_qty ?? 1,
       get_discount_percent: c.get_discount_percent ?? 100,
@@ -178,11 +206,11 @@ const DashboardOffers = () => {
       if (form.discount_mode === 'percent' && Number(form.discount_value) > 100) return 'Percent discount cannot exceed 100';
     }
     if (form.offer_type === 'product') {
-      if (form.products.length === 0) return 'Select at least one product';
+      if (!form.all_products && form.products.length === 0) return 'Select at least one product (or tick “Apply to all products”)';
       if (!form.discount_value || Number(form.discount_value) <= 0) return 'Enter a discount value greater than 0';
     }
     if (form.offer_type === 'bogo') {
-      if (form.products.length === 0) return 'Select at least one product';
+      if (!form.all_products && form.products.length === 0) return 'Select at least one product (or tick “Apply to all products”)';
       if (!form.buy_qty || Number(form.buy_qty) <= 0) return 'Buy quantity must be greater than 0';
       if (!form.get_qty || Number(form.get_qty) <= 0) return 'Get quantity must be greater than 0';
     }
@@ -363,16 +391,37 @@ const DashboardOffers = () => {
 
           {showScope && (
             <div className="form-group form-group--full">
-              <label className="ui-label">Products * <span className="text-text-subtle font-normal">({form.products.length} selected)</span></label>
-              <PagedMultiSelect
-                fetchPage={fetchProductPage}
-                mapItem={mapProduct}
-                selected={form.products}
-                onToggle={toggleProduct}
-                onRemove={removeProduct}
-                placeholder="Select products"
-                searchPlaceholder="Search products by model no…"
-              />
+              <label className="ui-label">
+                Products *{' '}
+                <span className="text-text-subtle font-normal">
+                  ({form.all_products ? 'all products' : `${form.products.length} selected`})
+                </span>
+              </label>
+              <label className="mb-2 flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={form.all_products}
+                  onChange={(e) => set('all_products', e.target.checked)}
+                />
+                <span className="text-[length:var(--text-sm)] text-text">Apply to all products</span>
+              </label>
+              {!form.all_products && (
+                <PagedMultiSelect
+                  fetchPage={fetchProductPage}
+                  mapItem={mapProduct}
+                  selected={form.products}
+                  onToggle={toggleProduct}
+                  onRemove={removeProduct}
+                  placeholder="Select products"
+                  searchPlaceholder="Search products by model no…"
+                />
+              )}
+              {form.all_products && (
+                <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
+                  This offer applies to every product — no need to pick them individually.
+                </p>
+              )}
             </div>
           )}
 
