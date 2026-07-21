@@ -107,15 +107,22 @@
   box-shadow: 0 0 0 2px var(--color-surface), 0 0 0 4px var(--color-primary);
 }
 
-/* ===== Name: clamp to 2 lines so uneven titles align ===== */
+/* ===== Name: clamp to EXACTLY 2 lines so uneven titles align ===== */
 .product-card .product-name {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
   overflow: hidden;
-  /* reserve 2 lines so cards with 1-line names keep the grid even */
-  min-height: calc(2 * var(--leading-snug) * var(--text-md));
+  margin: var(--space-3) 0 var(--space-2);
+  color: var(--color-text);
+  font-size: var(--text-md);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-snug);
+  /* FIXED 2-line box (not just min) so every card's price + buttons line up and
+     a long title can never spill onto the price row. */
+  height: calc(2 * var(--leading-snug) * var(--text-md));
+  word-break: break-word;
 }
 
 /* ===== Price row ===== */

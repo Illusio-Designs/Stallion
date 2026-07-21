@@ -173,7 +173,10 @@ const ProductCard = ({
           />
         )}
       </div>
-      <h3 className="product-name block overflow-hidden [-webkit-box-orient:vertical] [display:-webkit-box] [-webkit-line-clamp:2] [line-clamp:2] min-h-[calc(2*var(--leading-snug)*var(--text-md))]">{productName}</h3>
+      {/* Clamp/height owned entirely by .product-name in CSS — mixing Tailwind
+          display utilities here fought the -webkit-box clamp and let long titles
+          overflow onto the price row. */}
+      <h3 className="product-name" title={productName}>{productName}</h3>
 
       {hasPrice && (
         <div className="pc-price flex items-baseline flex-wrap gap-2 mb-3">
