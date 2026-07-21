@@ -37,11 +37,11 @@ function offerScopeMatches(offer, lines) {
         case 'flat':
             return true;
         case 'product':
-            return Array.isArray(cfg.items) &&
-                cfg.items.some((it) => ids.has(String(it.product_id)));
+            return cfg.all_products === true || (Array.isArray(cfg.items) &&
+                cfg.items.some((it) => ids.has(String(it.product_id))));
         case 'bogo':
-            return Array.isArray(cfg.product_ids) &&
-                cfg.product_ids.some((id) => ids.has(String(id)));
+            return cfg.all_products === true || (Array.isArray(cfg.product_ids) &&
+                cfg.product_ids.some((id) => ids.has(String(id))));
         default:
             return false;
     }
@@ -69,9 +69,14 @@ function computeOfferDiscount(offer, lines) {
 
     if (offer.offer_type === 'product') {
         const items = Array.isArray(cfg.items) ? cfg.items : [];
+        // all_products: one discount (top-level mode/value) applies to EVERY line.
+        const allMode = cfg.discount_mode;
+        const allValue = Number(cfg.discount_value) || 0;
         let total = 0;
         for (const l of lines) {
-            const item = items.find((it) => String(it.product_id) === String(l.product_id));
+            const item = cfg.all_products === true
+                ? { discount_mode: allMode, discount_value: allValue }
+                : items.find((it) => String(it.product_id) === String(l.product_id));
             if (!item) continue;
             const gross = grossOf(l);
             let ld = item.discount_mode === 'percent'
@@ -84,7 +89,8 @@ function computeOfferDiscount(offer, lines) {
     }
 
     if (offer.offer_type === 'bogo') {
-        const scope = new Set((cfg.product_ids || []).map(String));
+        // all_products: null scope => every line qualifies for the buy-x-get-y.
+        const scope = cfg.all_products === true ? null : new Set((cfg.product_ids || []).map(String));
         const buy = Math.max(1, Number(cfg.buy_qty) || 0);
         const get = Math.max(0, Number(cfg.get_qty) || 0);
         const getPct = cfg.get_discount_percent == null ? 100 : Number(cfg.get_discount_percent);
@@ -92,7 +98,7 @@ function computeOfferDiscount(offer, lines) {
         let total = 0;
         if (get > 0 && bundle > 0) {
             for (const l of lines) {
-                if (!scope.has(String(l.product_id))) continue;
+                if (scope && !scope.has(String(l.product_id))) continue;
                 const freeUnits = Math.floor((Number(l.qty) || 0) / bundle) * get;
                 if (freeUnits <= 0) continue;
                 const gross = grossOf(l);
@@ -117,6 +123,12 @@ function validateOfferConfig(offer_type, config) {
         return null;
     }
     if (offer_type === 'product') {
+        if (cfg.all_products === true) {
+            if (!['percent', 'amount'].includes(cfg.discount_mode)) return 'product: discount_mode must be percent or amount';
+            if (!isNum(cfg.discount_value) || cfg.discount_value <= 0) return 'product: discount_value must be positive';
+            if (cfg.discount_mode === 'percent' && cfg.discount_value > 100) return 'product: percent discount cannot exceed 100';
+            return null;
+        }
         if (!Array.isArray(cfg.items) || cfg.items.length === 0) return 'product: items[] is required';
         for (const it of cfg.items) {
             if (!it.product_id) return 'product: each item needs a product_id';
@@ -126,7 +138,7 @@ function validateOfferConfig(offer_type, config) {
         return null;
     }
     if (offer_type === 'bogo') {
-        if (!Array.isArray(cfg.product_ids) || cfg.product_ids.length === 0) return 'bogo: product_ids[] is required';
+        if (cfg.all_products !== true && (!Array.isArray(cfg.product_ids) || cfg.product_ids.length === 0)) return 'bogo: product_ids[] is required';
         if (!isNum(cfg.buy_qty) || cfg.buy_qty <= 0) return 'bogo: buy_qty must be a positive number';
         if (!isNum(cfg.get_qty) || cfg.get_qty <= 0) return 'bogo: get_qty must be a positive number';
         return null;
