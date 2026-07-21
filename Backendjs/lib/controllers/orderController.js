@@ -13,7 +13,7 @@ const Event = require('../models/event');
 const OrderOperation = require('../models/OrderOperation');
 const SalesmanCheckIns = require('../models/SalesmanCheckIns');
 const Offer = require('../models/Offer');
-const { isOfferActive, offerScopeMatches, pickBestOffer, applyOfferToItems } = require('../utils/offerPricing');
+const { isOfferActive, offerScopeMatches, applyOfferToItems } = require('../utils/offerPricing');
 const Zone = require('../models/Zone');
 const User = require('../models/User');
 const sequelize = require('../constants/database');
@@ -639,12 +639,10 @@ class OrderController {
                     });
                 }
 
-                // Apply an offer off the resolved WHP prices. If the caller picked
-                // one (offer_id) we re-validate it server-side; otherwise we AUTO-
-                // apply the best active offer that matches this cart — so admin /
-                // Whatsapp orders (which never pass an offer_id) still get the
-                // applicable discount on the order view + PDF. Out-of-scope /
-                // expired offers are simply ignored (order places at full price).
+                // Apply ONLY the offer the user explicitly selected (offer_id),
+                // re-validated server-side. No auto-apply: an order with no offer
+                // chosen places at full price. An inactive / expired / out-of-scope
+                // offer is ignored.
                 const offerLines = resolvedOrderItems.map(i => ({ product_id: i.product_id, qty: i.quantity, unit_price: i.price }));
                 let appliedOfferModel = null;
                 if (offer_id) {
@@ -652,9 +650,6 @@ class OrderController {
                     if (candidate && isOfferActive(candidate) && offerScopeMatches(candidate, offerLines)) {
                         appliedOfferModel = candidate;
                     }
-                } else {
-                    const activeOffers = await Offer.findAll({ where: { is_active: true }, transaction });
-                    appliedOfferModel = pickBestOffer(activeOffers, offerLines);
                 }
                 const priced = applyOfferToItems(appliedOfferModel, resolvedOrderItems);
 
@@ -866,10 +861,6 @@ class OrderController {
                 if (candidate && isOfferActive(candidate) && offerScopeMatches(candidate, offerLines)) {
                     offer = candidate;
                 }
-            } else {
-                // Mirror createOrder: preview the best auto-applied offer.
-                const activeOffers = await Offer.findAll({ where: { is_active: true } });
-                offer = pickBestOffer(activeOffers, offerLines);
             }
             const priced = applyOfferToItems(offer, resolvedItems);
             res.status(200).json({
