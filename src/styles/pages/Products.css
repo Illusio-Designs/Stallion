@@ -399,12 +399,20 @@
 }
 
 .products-grid-container .product-name {
+  /* Match the card component: clamp to exactly 2 lines with a fixed height so
+     titles never overflow onto the price and every card aligns. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  height: calc(2 * var(--leading-snug) * var(--text-md));
   color: var(--color-text);
   font-size: var(--text-md);
   font-weight: var(--font-weight-semibold);
-  margin-bottom: var(--space-3);
+  margin: var(--space-3) 0;
   text-align: left;
-  word-wrap: break-word;
+  word-break: break-word;
   overflow-wrap: break-word;
   width: 100%;
   line-height: var(--leading-snug);
@@ -645,6 +653,9 @@
 
   .products-grid-container .product-name {
     font-size: var(--text-base);
+    /* keep the 2-line box in sync with the smaller mobile font */
+    height: calc(2 * var(--leading-snug) * var(--text-base));
+    margin: var(--space-2) 0;
   }
 
   .products-header h2 {
