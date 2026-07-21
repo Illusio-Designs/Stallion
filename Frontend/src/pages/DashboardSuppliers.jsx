@@ -579,43 +579,61 @@ const DashboardSuppliers = () => {
       // they don't create a check-in row, so they'd otherwise be missing from
       // the Visit Report. Merge the salesman's own visit orders in as "ordered"
       // rows, skipping any order already represented by a check-in (order_id).
-      if (isSalesman) {
-        try {
-          const orders = await getMyOrders();
-          const linked = new Set(rows.map((c) => c.order_id).filter(Boolean));
-          const visitRows = (Array.isArray(orders) ? orders : [])
-            .filter((o) => (o.order_type === 'visit_order') && !linked.has(o.order_id || o.id))
-            .map((o) => {
-              // order_items may arrive as a real array OR a JSON string — parse
-              // both, otherwise the QTY column computed to 0 for every order.
-              const parseItems = (v) => {
-                if (Array.isArray(v)) return v;
-                if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; } }
-                if (v && typeof v === 'object') return Object.values(v);
-                return [];
-              };
-              const items = parseItems(o.order_items);
-              const qty = items.reduce((s, it) => s + (Number(it.quantity ?? it.qty) || 0), 0)
-                || Number(o.total_qty) || 0;
-              return {
-                id: `order-${o.order_id || o.id}`,
-                type: 'ordered',
-                salesman_id: o.salesman_id,
-                party_id: o.party_id,
-                party_name: o.party_name,
-                order_id: o.order_id || o.id,
-                order_total: o.order_total,
-                order_qty: qty,
-                order_notes: o.order_notes,
-                check_in_date: o.order_date || o.created_at || o.createdAt,
-                latitude: o.latitude,
-                longitude: o.longitude,
-              };
-            });
-          rows = [...rows, ...visitRows];
-        } catch (e) {
-          console.error('Failed to merge visit orders into Visit Report:', e);
-        }
+      // Populate QTY / AMOUNT for order rows (salesman AND admin views):
+      //  1) attach a linked order's qty/amount to its check-in row, and
+      //  2) merge visit orders that have no check-in row of their own.
+      // getMyOrders returns the caller's orders (all orders for admin).
+      try {
+        const orders = await getMyOrders();
+        const orderList = Array.isArray(orders) ? orders : [];
+        // order_items can be a real array OR a JSON string — parse both, else the
+        // QTY column computed to 0/'-' for every order.
+        const parseItems = (v) => {
+          if (Array.isArray(v)) return v;
+          if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; } }
+          if (v && typeof v === 'object') return Object.values(v);
+          return [];
+        };
+        const qtyOf = (o) => parseItems(o.order_items).reduce((s, it) => s + (Number(it.quantity ?? it.qty) || 0), 0)
+          || Number(o.total_qty) || 0;
+        const orderById = new Map(orderList.map((o) => [String(o.order_id || o.id), o]));
+
+        // 1) enrich check-in rows that reference an order
+        rows = rows.map((c) => {
+          const oid = c.order_id ? String(c.order_id) : null;
+          if (oid && orderById.has(oid)) {
+            const o = orderById.get(oid);
+            return {
+              ...c,
+              order_qty: c.order_qty != null ? c.order_qty : qtyOf(o),
+              order_total: c.order_total != null ? c.order_total : o.order_total,
+              order_notes: c.order_notes != null ? c.order_notes : o.order_notes,
+            };
+          }
+          return c;
+        });
+
+        // 2) merge visit orders not already represented by a check-in row
+        const linked = new Set(rows.map((c) => c.order_id).filter(Boolean).map(String));
+        const visitRows = orderList
+          .filter((o) => (o.order_type === 'visit_order') && !linked.has(String(o.order_id || o.id)))
+          .map((o) => ({
+            id: `order-${o.order_id || o.id}`,
+            type: 'ordered',
+            salesman_id: o.salesman_id,
+            party_id: o.party_id,
+            party_name: o.party_name,
+            order_id: o.order_id || o.id,
+            order_total: o.order_total,
+            order_qty: qtyOf(o),
+            order_notes: o.order_notes,
+            check_in_date: o.order_date || o.created_at || o.createdAt,
+            latitude: o.latitude,
+            longitude: o.longitude,
+          }));
+        rows = [...rows, ...visitRows];
+      } catch (e) {
+        console.error('Failed to merge visit orders into Visit Report:', e);
       }
 
       // Newest first (works for both check-ins and merged orders).
@@ -1704,9 +1722,9 @@ const DashboardSuppliers = () => {
                 ) },
                 { key: 'check_in_date', label: 'DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
                 { key: 'party_id', label: 'PARTY', render: (_v, row) => row.party_name || partyNameMap[row.party_id] || row.party_id || '-' },
-                { key: 'order_qty', label: 'QTY', render: (v, row) => (row.type === 'ordered' && v != null) ? Number(v).toLocaleString('en-IN') : '-' },
-                { key: 'order_total', label: 'AMOUNT', render: (v, row) => (row.type === 'ordered' && v != null) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
-                { key: 'check_in_remarks', label: 'REASON', render: (v, row) => (row.type === 'ordered' ? (row.order_notes || v) : v) || '-' },
+                { key: 'order_qty', label: 'QTY', render: (v) => (v != null && Number(v) > 0) ? Number(v).toLocaleString('en-IN') : '-' },
+                { key: 'order_total', label: 'AMOUNT', render: (v) => (v != null && Number(v) > 0) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
+                { key: 'check_in_remarks', label: 'REASON', render: (v, row) => (row.order_notes || v) || '-' },
                 { key: 'location', label: 'LOCATION', render: (_v, row) => {
                   const hasDev = row.latitude != null && row.longitude != null;
                   if (!hasDev) return <span className="text-text-subtle">—</span>;
