@@ -71,6 +71,28 @@ const Login = ({ onPageChange }) => {
     };
   }, []);
 
+  // OTP autofill on Android (WebOTP API): once the code screen is shown, ask the
+  // browser to read the incoming SMS and fill the 6 boxes automatically. Needs
+  // HTTPS and the SMS to end with "@<domain> #<code>" (the WebOTP binding). On
+  // iOS, autofill comes from the keyboard suggestion via autocomplete="one-time-code".
+  useEffect(() => {
+    if (!showOTP) return;
+    if (typeof window === 'undefined' || !('OTPCredential' in window) || !navigator.credentials) return;
+    const ac = new AbortController();
+    navigator.credentials
+      .get({ otp: { transport: ['sms'] }, signal: ac.signal })
+      .then((cred) => {
+        const code = cred && cred.code ? String(cred.code).replace(/\D/g, '').slice(0, 6) : '';
+        if (code.length === 6) {
+          setOtp(code.split(''));
+          setOtpError('');
+          otpInputRefs.current[5]?.focus();
+        }
+      })
+      .catch(() => { /* dismissed / unsupported / timed out — ignore */ });
+    return () => ac.abort();
+  }, [showOTP]);
+
   // Resend timer countdown
   useEffect(() => {
     let interval = null;
