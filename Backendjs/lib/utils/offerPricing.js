@@ -112,6 +112,26 @@ function computeOfferDiscount(offer, lines) {
     return { discountTotal: 0, lineDiscounts };
 }
 
+/**
+ * From a list of offers, pick the single BEST one for this cart: active, in
+ * scope, and giving the largest discount (ties broken by higher priority).
+ * Returns the winning offer model, or null if none discounts the cart.
+ */
+function pickBestOffer(offers, lines, now = new Date()) {
+    let best = null;
+    let bestAmount = 0;
+    for (const offer of offers || []) {
+        if (!isOfferActive(offer, now)) continue;
+        if (!offerScopeMatches(offer, lines)) continue;
+        const { discountTotal } = computeOfferDiscount(offer, lines);
+        if (discountTotal <= 0) continue;
+        const better = discountTotal > bestAmount
+            || (discountTotal === bestAmount && best && (Number(offer.priority) || 0) > (Number(best.priority) || 0));
+        if (better) { best = offer; bestAmount = discountTotal; }
+    }
+    return best;
+}
+
 /** Validate the config for a given offer_type. Returns null if OK, else a message. */
 function validateOfferConfig(offer_type, config) {
     const cfg = config || {};
@@ -192,6 +212,7 @@ module.exports = {
     readConfig,
     offerScopeMatches,
     computeOfferDiscount,
+    pickBestOffer,
     validateOfferConfig,
     applyOfferToItems,
 };
