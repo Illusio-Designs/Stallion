@@ -11,10 +11,12 @@ import {
   createOrder,
   deleteOrder,
   getMyOrders,
-  getProductsPage
+  getProductsPage,
+  getAvailableOffers,
 } from '../services/apiService';
 import { getUser } from '../services/authService';
 import { showError, showSuccess } from '../services/notificationService';
+import { downloadOrderPdf } from '../utils/orderPdf';
 import '../styles/pages/dashboard-orders.css';
 
 // Map API status to UI status
@@ -69,6 +71,32 @@ const DistributorOrders = () => {
     order_items: [{ product_id: '', quantity: 1, price: 0 }],
     order_notes: ''
   });
+
+  // Order detail view + user-selected offer for the create form.
+  const [viewRow, setViewRow] = useState(null);
+  const [availableOffers, setAvailableOffers] = useState([]);
+  const [selectedOffer, setSelectedOffer] = useState('');
+
+  // Load offers that apply to the current cart (user selects one — none auto-applied).
+  useEffect(() => {
+    const items = (createFormData.order_items || [])
+      .filter((it) => it.product_id && Number(it.quantity) > 0 && Number(it.price) >= 0)
+      .map((it) => ({ product_id: it.product_id, quantity: Number(it.quantity), price: Number(it.price) }));
+    if (items.length === 0) { setAvailableOffers([]); setSelectedOffer(''); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const offers = await getAvailableOffers(items);
+        const list = Array.isArray(offers) ? offers : [];
+        if (cancelled) return;
+        setAvailableOffers(list);
+        setSelectedOffer((cur) => (cur && list.some((o) => o.offer_id === cur)) ? cur : '');
+      } catch (_e) {
+        if (!cancelled) setAvailableOffers([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [createFormData.order_items]);
 
   // Fetch orders from API
   const fetchOrders = async (suppressError = false) => {
@@ -309,6 +337,7 @@ const DistributorOrders = () => {
       };
 
       if (createFormData.order_notes) orderData.order_notes = createFormData.order_notes;
+      if (selectedOffer) orderData.offer_id = selectedOffer;
 
       await createOrder(orderData);
       showSuccess('Order created successfully');
@@ -331,6 +360,8 @@ const DistributorOrders = () => {
       order_items: [{ product_id: '', quantity: 1, price: 0 }],
       order_notes: ''
     });
+    setSelectedOffer('');
+    setAvailableOffers([]);
   };
 
   // Add order item
@@ -384,7 +415,8 @@ const DistributorOrders = () => {
     {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
-          onView={() => console.log('view', row)}
+          onView={() => setViewRow(row)}
+          onDownload={() => downloadOrderPdf(row, products)}
           onDelete={() => handleDelete(row)}
         />
       )
@@ -604,6 +636,27 @@ const DistributorOrders = () => {
             </div>
           </div>
 
+          {/* Apply Offer — user-selected, optional. Lists only offers that apply
+              to the current items; nothing is auto-applied. */}
+          {availableOffers.length > 0 && (
+            <div className="form-group">
+              <label className="ui-label">Apply Offer <span className="text-text-subtle font-normal">(optional)</span></label>
+              <DropdownSelector
+                className="ui-dropdown-custom--full-width"
+                placeholder="No offer"
+                options={[
+                  { value: '', label: 'No offer' },
+                  ...availableOffers.map((o) => ({ value: o.offer_id, label: o.title || 'Offer' })),
+                ]}
+                value={selectedOffer}
+                onChange={(v) => setSelectedOffer(v)}
+              />
+              <p className="mt-1 mb-0 text-[length:var(--text-xs)] text-text-muted">
+                The selected offer's discount is applied and shown on the order view &amp; PDF.
+              </p>
+            </div>
+          )}
+
           {/* Order Notes */}
           <div className="form-group">
             <label className="ui-label">Order Notes</label>
@@ -616,6 +669,80 @@ const DistributorOrders = () => {
             />
           </div>
         </div>
+      </AsidePanel>
+
+      {/* Order detail view */}
+      <AsidePanel open={!!viewRow} onClose={() => setViewRow(null)} title="Order Details" footer={(
+        <div className="flex items-center justify-end gap-2">
+          {viewRow && <Button variant="secondary" onClick={() => downloadOrderPdf(viewRow, products)}>Download PDF</Button>}
+          <Button onClick={() => setViewRow(null)}>Close</Button>
+        </div>
+      )}>
+        {viewRow && (() => {
+          const o = viewRow.originalOrder || {};
+          const vItems = parseOrderItems(o.order_items).map((it) => {
+            const qty = Number(it.quantity) || 0;
+            const price = Number(it.price) || 0;
+            const name = it.model_no
+              || products.find(p => String(p.product_id || p.id) === String(it.product_id))?.model_no
+              || products.find(p => String(p.product_id || p.id) === String(it.product_id))?.product_name
+              || 'Unknown Product';
+            return { name, qty, price, sub: qty * price };
+          });
+          const disc = Number(o.discount_total) || 0;
+          const sub = o.subtotal != null ? Number(o.subtotal) : vItems.reduce((s, it) => s + it.sub, 0);
+          const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+          return (
+            <div className="ord-view flex flex-col gap-4 p-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div><div className="ord-field__label">Order ID</div><div className="font-semibold">{viewRow.orderId}</div></div>
+                <div><div className="ord-field__label">Order Type</div><div className="font-semibold">{viewRow.orderType}</div></div>
+                <div><div className="ord-field__label">Party Name</div><div className="font-semibold">{viewRow.client}</div></div>
+                <div><div className="ord-field__label">Status</div><div className="font-semibold"><StatusBadge status={String(viewRow.status).toLowerCase().replace(/\s+/g, '-')}>{viewRow.status}</StatusBadge></div></div>
+              </div>
+              <div>
+                <h5 className="ord-view__section-title">Order Items</h5>
+                <table className="w-full text-[length:var(--text-sm)]">
+                  <thead>
+                    <tr className="text-text-subtle">
+                      <th className="ta-l">Product</th>
+                      <th className="ta-r w-[52px]">Qty</th>
+                      <th className="ta-r w-[88px]">Price</th>
+                      <th className="ta-r w-[104px]">Subtotal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {vItems.map((it, i) => (
+                      <tr key={i}>
+                        <td className="font-medium">{it.name}</td>
+                        <td className="ta-r">{it.qty}</td>
+                        <td className="ta-r">{inr(it.price)}</td>
+                        <td className="ta-r font-medium">{inr(it.sub)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  {vItems.length > 0 && (
+                    <tfoot>
+                      {disc > 0 && (
+                        <>
+                          <tr><td colSpan={3} className="ta-r">Subtotal</td><td className="ta-r">{inr(sub)}</td></tr>
+                          <tr><td colSpan={3} className="ta-r">{o.applied_offer?.title || 'Discount'}</td><td className="ta-r">− {inr(disc)}</td></tr>
+                        </>
+                      )}
+                      <tr><td colSpan={3} className="ta-r font-semibold">Total</td><td className="ta-r font-semibold">{viewRow.value}</td></tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+              {o.order_notes && (
+                <div>
+                  <h5 className="ord-view__section-title">Notes</h5>
+                  <div className="ord-notes">{o.order_notes}</div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </AsidePanel>
     </div>
   );
