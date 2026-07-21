@@ -9,8 +9,6 @@
 import { getProductsByIds } from '../services/apiService';
 import { RUPEE_FONT_BASE64 } from './rupeeFont';
 
-const IMG_BASE = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || 'https://api.stallioneyewear.in').replace(/\/+$/, '');
-
 const parseOrderItems = (orderItems) => {
   if (!orderItems) return [];
   if (Array.isArray(orderItems)) return orderItems;
@@ -22,17 +20,18 @@ const parseOrderItems = (orderItems) => {
   return [];
 };
 
-// Build the public URL of a product's first image from its image_urls (which may
-// be a JSON string, an array of bare filenames, or full paths).
+// Resolve a product's first image to a SAME-ORIGIN URL (/uploads/products/<file>,
+// proxied to the API host by next.config rewrites) so the browser can draw it onto
+// a canvas and embed it in the PDF without a cross-origin taint. image_urls may be
+// a JSON string, an array of bare filenames, or full paths.
 const firstImageUrl = (imageUrls) => {
   let arr = imageUrls;
   if (typeof arr === 'string') { try { arr = JSON.parse(arr); } catch { arr = [arr]; } }
   if (!Array.isArray(arr) || arr.length === 0) return null;
-  let f = String(arr[0] || '').replace(/^\/+/, '').replace(/([\]"\\])+$/, '');
+  const f = String(arr[0] || '').replace(/([\]"\\])+$/, '').trim();
   if (!f) return null;
-  if (f.startsWith('http')) return f;
-  const name = f.split('/').pop();
-  return `${IMG_BASE}/uploads/products/${encodeURIComponent(name)}`;
+  const name = f.split('?')[0].split('#')[0].split('/').pop();
+  return name ? `/uploads/products/${encodeURIComponent(name)}` : null;
 };
 
 // Load an image URL and return a JPEG data-URL (square, white-matted) suitable for

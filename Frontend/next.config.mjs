@@ -27,7 +27,18 @@ const nextConfig = {
       process.env.NEXT_PUBLIC_API_URL ||
       'https://api.stallioneyewear.in/api'
     ).replace(/\/+$/, '');
-    return [{ source: '/api/:path*', destination: `${target}/:path*` }];
+    // Base host for uploaded files (the API host, without the /api suffix).
+    const imgBase = (
+      process.env.NEXT_PUBLIC_IMAGE_BASE_URL ||
+      target.replace(/\/api$/, '') ||
+      'https://api.stallioneyewear.in'
+    ).replace(/\/+$/, '');
+    return [
+      { source: '/api/:path*', destination: `${target}/:path*` },
+      // Serve product/upload images SAME-ORIGIN so they can be drawn onto a
+      // canvas and embedded in the order PDF without a cross-origin (CORS) taint.
+      { source: '/uploads/:path*', destination: `${imgBase}/uploads/:path*` },
+    ];
   },
   async headers() {
     // Baseline security headers. (A strict Content-Security-Policy is
