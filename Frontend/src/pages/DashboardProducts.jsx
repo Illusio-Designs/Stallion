@@ -3046,6 +3046,19 @@ const DashboardProducts = () => {
               required
             />
           </div>
+          <div className="form-group">
+            <label className="ui-label">Total Qty</label>
+            <input
+              className="ui-input bg-surface-muted"
+              type="number"
+              value={(parseInt(formData.warehouse_qty) || 0) + (parseInt(formData.tray_qty) || 0)}
+              readOnly
+              tabIndex={-1}
+            />
+            <p className="m-0 mt-1 text-[length:var(--text-xs)] text-text-muted">
+              Auto-calculated: Warehouse + Tray ({parseInt(formData.tray_qty) || 0} in trays).
+            </p>
+          </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Status *</label>
             <DropdownSelector

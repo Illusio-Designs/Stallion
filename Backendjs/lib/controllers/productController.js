@@ -313,9 +313,17 @@ class ProductController {
             };
 
             if (canManageInventory(req.userRoleName)) {
-                if (warehouse_qty !== undefined) updatePayload.warehouse_qty = warehouse_qty;
-                if (tray_qty !== undefined) updatePayload.tray_qty = tray_qty;
-                if (total_qty !== undefined) updatePayload.total_qty = total_qty;
+                // total_qty is ALWAYS derived as warehouse_qty + tray_qty so the three
+                // can never drift apart. The client's total_qty is ignored on purpose —
+                // the edit form carries a previously-stored (often stale) value, which is
+                // exactly what made TOTAL QTY disagree with WAREHOUSE + TRAY.
+                const nextWarehouse = warehouse_qty !== undefined ? (Number(warehouse_qty) || 0) : (Number(product.warehouse_qty) || 0);
+                const nextTray = tray_qty !== undefined ? (Number(tray_qty) || 0) : (Number(product.tray_qty) || 0);
+                if (warehouse_qty !== undefined) updatePayload.warehouse_qty = nextWarehouse;
+                if (tray_qty !== undefined) updatePayload.tray_qty = nextTray;
+                if (warehouse_qty !== undefined || tray_qty !== undefined) {
+                    updatePayload.total_qty = nextWarehouse + nextTray;
+                }
             } else if (warehouse_qty !== undefined || tray_qty !== undefined || total_qty !== undefined) {
                 return res.status(403).json({ error: 'Only admin or tray manager can update inventory quantities' });
             }
