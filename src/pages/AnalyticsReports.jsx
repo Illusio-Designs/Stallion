@@ -10,9 +10,12 @@ import {
   getAllSalesmanCheckins,
   getSalesmanCheckins,
   getSalesmanProfile,
-  getMyOrders,
-  getOrders,
+  getMyOrdersPage,
+  getOrdersPage,
 } from '../services/apiService';
+
+// Rows to load per report list (check-ins + orders). Kept small on purpose.
+const REPORT_LIMIT = 20;
 import { getUser, getUserRole } from '../services/authService';
 import { showError } from '../services/notificationService';
 
@@ -96,7 +99,7 @@ const AnalyticsReports = () => {
     // Independent calls: an empty table (404) or one failing call must not break the other.
     const [tRes, cRes] = await Promise.allSettled([
       isSalesman ? (sid ? getSalesmanTargets(sid) : Promise.resolve([])) : getAllSalesmanTargets(),
-      isSalesman ? (sid ? getSalesmanCheckins(sid) : Promise.resolve([])) : getAllSalesmanCheckins(),
+      isSalesman ? (sid ? getSalesmanCheckins(sid) : Promise.resolve([])) : getAllSalesmanCheckins(REPORT_LIMIT),
     ]);
 
     let realError = false;
@@ -111,14 +114,23 @@ const AnalyticsReports = () => {
     // would be missing from the Visit Report. Merge them in as "ordered" rows,
     // skipping any order already linked by a check-in (order_id).
     try {
-      const ordersRes = isSalesman ? await getMyOrders() : await getOrders();
+      const ordersRes = isSalesman
+        ? await getMyOrdersPage(1, REPORT_LIMIT)
+        : await getOrdersPage(1, REPORT_LIMIT);
       const orders = asArray(ordersRes);
       const linked = new Set(c.map((x) => x.order_id).filter(Boolean));
       const orderRows = orders
         .filter((o) => o.order_type === 'visit_order' && !linked.has(o.order_id || o.id))
         .map((o) => {
-          const items = Array.isArray(o.order_items) ? o.order_items : [];
-          const qty = items.reduce((s, it) => s + (Number(it.quantity) || 0), 0);
+          // The backend already computes total_qty robustly (order_items may be a
+          // JSON string), so trust it and only fall back to a local sum.
+          let its = o.order_items;
+          if (typeof its === 'string') { try { its = JSON.parse(its); } catch { its = []; } }
+          if (its && typeof its === 'object' && !Array.isArray(its)) its = Object.values(its);
+          const localQty = Array.isArray(its)
+            ? its.reduce((s, it) => s + (Number(it && (it.quantity ?? it.qty)) || 0), 0)
+            : 0;
+          const qty = o.total_qty != null ? Number(o.total_qty) : localQty;
           return {
             id: `order-${o.order_id || o.id}`,
             type: 'ordered',
