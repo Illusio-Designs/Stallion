@@ -219,12 +219,18 @@ const ProductCard = ({
           >+</button>
         </div>
 
-        <button type="button" disabled={outOfStock} className="pc-add-btn inline-flex items-center justify-center gap-2 flex-[1_1_120px] min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary text-[length:var(--text-sm)] font-semibold tracking-[var(--tracking-label)] transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle disabled:opacity-100 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]" onClick={handleAddToCart}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
+        <button
+          type="button"
+          disabled={outOfStock}
+          onClick={handleAddToCart}
+          aria-label={outOfStock ? 'Out of stock' : 'Add to cart'}
+          title={outOfStock ? 'Out of stock' : 'Add to cart'}
+          className="pc-add-btn inline-flex items-center justify-center flex-[1_1_100px] min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle disabled:opacity-100 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
             <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
           </svg>
-          {outOfStock ? 'OUT OF STOCK' : 'ADD TO CART'}
         </button>
       </div>
     </div>
