@@ -817,24 +817,6 @@ const Products = ({ onPageChange }) => {
           <FilterContent />
         </aside>
 
-        {/* Mobile Filters trigger — a compact round button on the RIGHT edge
-            (not at the bottom), so it never collides with the floating nav. */}
-        <button
-          type="button"
-          className="filter-toggle-btn md:hidden fixed right-3 top-[42%] z-[900] inline-flex h-12 w-12 items-center justify-center rounded-full border border-primary bg-primary text-text-on-primary shadow-[0_8px_24px_-8px_rgba(16,18,38,0.5)] transition-colors duration-[120ms] hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
-          onClick={() => setMobileFilterOpen(true)}
-          aria-label="Open filters"
-        >
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 6h16M7 12h10M10 18h4" />
-          </svg>
-          {activeFilterChips.length > 0 && (
-            <span className="absolute -right-1 -top-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-surface bg-accent px-1 text-[10px] font-bold leading-none text-text-on-accent">
-              {activeFilterChips.length}
-            </span>
-          )}
-        </button>
-
         {/* Mobile filter drawer — slides in from the right (aside panel style),
             full height, with its own scroll area and a sticky footer. */}
         {mobileFilterOpen && typeof document !== 'undefined' && createPortal(
@@ -892,24 +874,44 @@ const Products = ({ onPageChange }) => {
                 'Products'
               }
             </h2>
-            {searchQuery && (
+            <div className="flex items-center gap-2 ml-auto">
+              {searchQuery && (
+                <button
+                  type="button"
+                  className="clear-search-btn inline-flex items-center justify-center min-h-[40px] bg-surface text-text border border-border-strong py-2 px-4 rounded-md cursor-pointer text-[length:var(--text-base)] font-medium transition-[background,border-color] duration-[120ms] hover:bg-surface-muted hover:border-grey-400 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-grey-200"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setPage(1);
+                    // Update URL to remove search parameter
+                    if (typeof window !== 'undefined') {
+                      const url = new URL(window.location);
+                      url.searchParams.delete('search');
+                      window.history.replaceState({}, '', url);
+                    }
+                  }}
+                >
+                  Clear Search
+                </button>
+              )}
+              {/* Filters trigger — on the right of the page heading (mobile only;
+                  desktop uses the sticky sidebar). Opens the right-side drawer. */}
               <button
                 type="button"
-                className="clear-search-btn inline-flex items-center justify-center min-h-[40px] bg-surface text-text border border-border-strong py-2 px-4 rounded-md cursor-pointer text-[length:var(--text-base)] font-medium transition-[background,border-color] duration-[120ms] hover:bg-surface-muted hover:border-grey-400 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-grey-200"
-                onClick={() => {
-                  setSearchQuery('');
-                  setPage(1);
-                  // Update URL to remove search parameter
-                  if (typeof window !== 'undefined') {
-                    const url = new URL(window.location);
-                    url.searchParams.delete('search');
-                    window.history.replaceState({}, '', url);
-                  }
-                }}
+                className="filter-toggle-btn md:hidden inline-flex items-center gap-2 min-h-[40px] rounded-md border border-primary bg-primary px-4 text-[length:var(--text-base)] font-semibold text-text-on-primary transition-colors duration-[120ms] hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+                onClick={() => setMobileFilterOpen(true)}
+                aria-label="Open filters"
               >
-                Clear Search
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M4 6h16M7 12h10M10 18h4" />
+                </svg>
+                Filters
+                {activeFilterChips.length > 0 && (
+                  <span className="inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-pill bg-text-on-primary/25 px-1.5 text-[length:var(--text-xs)] font-bold leading-none">
+                    {activeFilterChips.length}
+                  </span>
+                )}
               </button>
-            )}
+            </div>
           </div>
 
           {activeFilterChips.length > 0 && (
