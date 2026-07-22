@@ -35,8 +35,18 @@ function mapOrdersWithPartyName(orders) {
     return orders.map((order) => {
         const plain = order.get({ plain: true });
         const { party, ...rest } = plain;
+        // Total quantity across the order's items, computed here so the frontend
+        // (Visit Report QTY, etc.) never has to re-parse order_items — which may be
+        // a JSON string. Handles array / JSON-string / object shapes.
+        let its = rest.order_items;
+        if (typeof its === 'string') { try { its = JSON.parse(its); } catch { its = []; } }
+        if (its && typeof its === 'object' && !Array.isArray(its)) its = Object.values(its);
+        const total_qty = Array.isArray(its)
+            ? its.reduce((s, it) => s + (Number(it && (it.quantity ?? it.qty)) || 0), 0)
+            : 0;
         return {
             ...rest,
+            total_qty,
             party_name: party ? party.party_name : null,
             party_address: party ? party.address : null,
             party_billing_address: party
