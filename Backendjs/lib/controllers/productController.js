@@ -121,7 +121,7 @@ class ProductController {
             }
             const pageNum = parseInt(page, 10);
             const limitNum = parseInt(limit, 10);
-            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody, product_ids } = req.body;
+            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody, product_ids, image_status } = req.body;
             const { name: nameQuery } = getListSearchParams(req);
             const search = (searchQuery || searchBody || nameQuery || '').trim();
             const conditions = [];
@@ -179,6 +179,18 @@ class ProductController {
                         { status: { [Op.like]: searchTerm } },
                     ]
                 });
+            }
+            // Image status filter — lets the "Unuploaded Media Gallery" page reuse
+            // the same paginated products endpoint instead of pulling the whole
+            // catalogue and filtering on the client. A product has NO image when
+            // image_urls is NULL, an empty array, or a textual empty ('[]'/'[""]').
+            if (image_status === 'unuploaded' || image_status === 'uploaded') {
+                const emptyExpr = `(
+                    image_urls IS NULL
+                    OR JSON_LENGTH(image_urls) = 0
+                    OR JSON_UNQUOTE(CAST(image_urls AS CHAR)) IN ('[]', '[""]', 'null', '')
+                )`;
+                conditions.push(Sequelize.literal(image_status === 'unuploaded' ? emptyExpr : `NOT ${emptyExpr}`));
             }
             const where = conditions.length > 0 ? { [Op.and]: conditions } : {};
             const { count, rows: products } = await Product.findAndCountAll({
