@@ -2,9 +2,9 @@ import React, { useEffect, useState } from 'react';
 import { getCartCount, registerCartListener } from '../services/cartService';
 import { isLoggedIn } from '../services/authService';
 
-// Persistent bottom navigation for the storefront on mobile (hidden ≥ md).
-// Puts the primary destinations in the thumb zone so small screens stay easy
-// to manage. The Shop page adds its Filters action just above this bar.
+// Floating pill-style bottom navigation for the storefront on mobile
+// (hidden ≥ md). The active destination expands into a dark pill with its
+// label; the rest stay icon-only — matching the reference design.
 const ICONS = {
   home: (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -60,7 +60,7 @@ const MobileBottomNav = ({ onPageChange, currentPage }) => {
 
   return (
     <nav
-      className="mobile-bottom-nav md:hidden fixed bottom-0 left-0 right-0 z-[1000] flex items-stretch justify-around border-t border-border bg-surface/95 backdrop-blur-sm pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_12px_rgba(16,18,38,0.06)]"
+      className="mobile-bottom-nav md:hidden fixed left-3 right-3 z-[1000] mx-auto flex max-w-[460px] items-center justify-between gap-1 rounded-pill border border-border bg-surface/95 px-2 py-2 shadow-[0_10px_30px_-6px_rgba(16,18,38,0.22)] backdrop-blur-sm bottom-[calc(0.75rem+env(safe-area-inset-bottom))]"
       aria-label="Primary"
     >
       {items.map((it) => {
@@ -71,17 +71,22 @@ const MobileBottomNav = ({ onPageChange, currentPage }) => {
             type="button"
             onClick={() => go(it.id)}
             aria-current={active ? 'page' : undefined}
-            className={`relative flex flex-1 flex-col items-center justify-center gap-1 py-2 min-h-[56px] text-[length:var(--text-xs)] font-medium transition-colors ${active ? 'text-primary' : 'text-text-muted'}`}
+            aria-label={it.label}
+            className={`relative inline-flex h-11 items-center justify-center rounded-pill transition-all duration-200 ease-out ${
+              active
+                ? 'flex-none gap-2 bg-primary px-4 text-text-on-primary'
+                : 'w-11 flex-none text-text-muted hover:text-text'
+            }`}
           >
             <span className="relative inline-flex">
               {it.icon}
               {it.badge > 0 && (
-                <span className="absolute -right-2 -top-1.5 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-pill bg-primary px-1 text-[10px] font-bold leading-none text-text-on-primary">
+                <span className={`absolute -right-2 -top-1.5 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-pill px-1 text-[10px] font-bold leading-none ${active ? 'bg-text-on-primary text-primary' : 'bg-primary text-text-on-primary'}`}>
                   {it.badge > 99 ? '99+' : it.badge}
                 </span>
               )}
             </span>
-            <span className="leading-none">{it.label}</span>
+            {active && <span className="text-[length:var(--text-sm)] font-semibold leading-none">{it.label}</span>}
           </button>
         );
       })}

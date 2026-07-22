@@ -817,25 +817,24 @@ const Products = ({ onPageChange }) => {
           <FilterContent />
         </aside>
 
-        {/* Mobile Filters bar — sticky just above the bottom nav so it never
-            floats over the pagination. Full-width, thumb-friendly. */}
-        <div className="md:hidden fixed left-0 right-0 z-[900] bottom-[calc(60px+env(safe-area-inset-bottom))] px-3 pointer-events-none">
-          <button
-            type="button"
-            className="filter-toggle-btn pointer-events-auto flex w-full items-center justify-center gap-2 min-h-[48px] rounded-pill border-none bg-primary px-5 text-[length:var(--text-base)] font-semibold text-text-on-primary shadow-[0_8px_24px_-8px_rgba(16,18,38,0.45)] transition-colors duration-[120ms] hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring),var(--shadow-lg)]"
-            onClick={() => setMobileFilterOpen(true)}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 6h16M7 12h10M10 18h4" />
-            </svg>
-            Filters
-            {activeFilterChips.length > 0 && (
-              <span className="inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-pill bg-text-on-primary/20 px-1.5 text-[length:var(--text-xs)] font-bold leading-none">
-                {activeFilterChips.length}
-              </span>
-            )}
-          </button>
-        </div>
+        {/* Mobile Filters trigger — a tab fixed to the RIGHT edge (not at the
+            bottom), so it never collides with the floating bottom nav. */}
+        <button
+          type="button"
+          className="filter-toggle-btn md:hidden fixed right-0 top-[38%] z-[900] inline-flex flex-col items-center gap-1 rounded-l-xl border border-r-0 border-primary bg-primary px-2.5 py-3 text-text-on-primary shadow-[0_8px_24px_-8px_rgba(16,18,38,0.45)] transition-colors duration-[120ms] hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+          onClick={() => setMobileFilterOpen(true)}
+          aria-label="Open filters"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 6h16M7 12h10M10 18h4" />
+          </svg>
+          <span className="text-[length:var(--text-xs)] font-semibold [writing-mode:vertical-rl] rotate-180 tracking-wide">Filters</span>
+          {activeFilterChips.length > 0 && (
+            <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-text-on-primary px-1 text-[length:var(--text-xs)] font-bold leading-none text-primary">
+              {activeFilterChips.length}
+            </span>
+          )}
+        </button>
 
         {/* Mobile filter drawer — slides in from the right (aside panel style),
             full height, with its own scroll area and a sticky footer. */}
@@ -886,7 +885,7 @@ const Products = ({ onPageChange }) => {
         )}
 
         {/* Products Grid */}
-        <main className="products-main flex-1 min-w-0 bg-transparent px-0 pt-0 pb-40 md:pb-0 min-h-[calc(100vh-var(--header-height))]">
+        <main className="products-main flex-1 min-w-0 bg-transparent px-0 pt-0 pb-28 md:pb-0 min-h-[calc(100vh-var(--header-height))]">
           <div className="products-header flex justify-between items-center gap-4 mb-6 flex-wrap">
             <h2 className="text-[length:var(--text-lg)] sm:text-[length:var(--text-xl)] font-semibold tracking-[-0.01em] leading-[1.2] text-text m-0">
               {loading ? '' : searchQuery ?
