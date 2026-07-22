@@ -33,8 +33,8 @@ export default function MatchMeter({ distance, radius = 250, max, href }) {
   const matched = d <= radius;
 
   return (
-    <span className="inline-flex items-center gap-2 min-w-[160px]" title={`${matched ? 'Within' : 'Outside'} ${radius}m geofence · ${Math.round(d)}m from party`}>
-      <span className="relative h-[7px] flex-1 min-w-[64px] overflow-hidden rounded-[999px] bg-[var(--color-grey-200)]">
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 w-full" title={`${matched ? 'Within' : 'Outside'} ${radius}m geofence · ${Math.round(d)}m from party`}>
+      <span className="relative h-[7px] flex-1 min-w-[48px] basis-[60px] overflow-hidden rounded-[999px] bg-[var(--color-grey-200)]">
         <span
           className="absolute inset-y-0 left-0 rounded-[999px] transition-[width] duration-300"
           style={{ width: `${pct}%`, background: color }}

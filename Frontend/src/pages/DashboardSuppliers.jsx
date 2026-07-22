@@ -1735,14 +1735,18 @@ const DashboardSuppliers = () => {
                   if (!pc) {
                     // Party address not geocoded yet — can't verify against it.
                     return (
-                      <span className="inline-flex items-center gap-2">
-                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary font-medium">View on map</a>
-                        <span className="text-text-subtle text-[var(--text-xs)]">(party location not set)</span>
-                      </span>
+                      <div className="w-[190px] max-w-full inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary font-medium whitespace-nowrap">View on map</a>
+                        <span className="text-text-subtle text-[var(--text-xs)]">(location not set)</span>
+                      </div>
                     );
                   }
                   const dist = distanceMeters(row.latitude, row.longitude, pc.lat, pc.lng);
-                  return <MatchMeter distance={dist} radius={GEOFENCE_RADIUS_M} href={href} />;
+                  return (
+                    <div className="w-[190px] max-w-full">
+                      <MatchMeter distance={dist} radius={GEOFENCE_RADIUS_M} href={href} />
+                    </div>
+                  );
                 } },
               ]}
               rows={checkins}

@@ -22,6 +22,16 @@ async function enrichCheckIns(checkIns) {
     parties.forEach((p) => { partyMap[p.party_id] = p.party_name; });
     const orderMap = {};
     orders.forEach((o) => { orderMap[o.order_id] = o; });
+    // Total quantity across an order's items (order_items may be array/JSON string/object).
+    const orderQty = (o) => {
+        if (!o) return null;
+        let its = o.order_items;
+        if (typeof its === 'string') { try { its = JSON.parse(its); } catch { its = []; } }
+        if (its && typeof its === 'object' && !Array.isArray(its)) its = Object.values(its);
+        return Array.isArray(its)
+            ? its.reduce((s, it) => s + (Number(it && (it.quantity ?? it.qty)) || 0), 0)
+            : 0;
+    };
     return rows.map((r) => {
         const o = r.order_id ? orderMap[r.order_id] : null;
         return {
@@ -29,6 +39,7 @@ async function enrichCheckIns(checkIns) {
             party_name: partyMap[r.party_id] || null,
             order_number: o ? o.order_number : null,
             order_total: o ? o.order_total : null,
+            order_qty: o ? orderQty(o) : null,
             order_notes: o ? o.order_notes : null,
             order_status: o ? o.order_status : null,
         };
