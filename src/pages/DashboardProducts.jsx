@@ -653,12 +653,16 @@ const DashboardProducts = () => {
     };
   }, [orphanedImages]);
 
+  const MEDIA_GALLERY_PRODUCT_LIMIT = 300;
   const fetchProducts = async () => {
     try {
       setLoading(true);
       setError(null);
-      // Send null filters to get all products
-      const result = await getProducts(1, 3000, null); // Increased limit to show all products
+      // Media Gallery only: the backend already returns an authoritative
+      // `isAssigned` flag per image, so this product list is used solely to label
+      // an image with its product. Cap it at 300 instead of pulling the whole
+      // catalogue — keeps the page light.
+      const result = await getProducts(1, MEDIA_GALLERY_PRODUCT_LIMIT, null);
       const data = result.data || [];
       setProducts(data);
 
