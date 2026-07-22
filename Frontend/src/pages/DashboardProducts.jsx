@@ -2351,13 +2351,13 @@ const DashboardProducts = () => {
       return;
     }
 
-    // Validate file type
-    const validExtensions = ['.xlsx', '.xls'];
+    // Validate file type (Excel or CSV — the backend parses both).
+    const validExtensions = ['.xlsx', '.xls', '.csv'];
     const fileName = selectedBulkFile.name.toLowerCase();
     const isValidFile = validExtensions.some(ext => fileName.endsWith(ext));
 
     if (!isValidFile) {
-      setError('Please select a valid Excel file (.xlsx or .xls)');
+      setError('Please select a valid Excel (.xlsx / .xls) or CSV file');
       return;
     }
 
@@ -2407,6 +2407,36 @@ const DashboardProducts = () => {
       setSelectedBulkFile(file);
       setError(null);
     }
+  };
+
+  // Download a ready-to-fill CSV template whose headers exactly match what the
+  // bulk-upload parser expects (snake_case). One example row shows the format.
+  const handleDownloadSample = () => {
+    const headers = [
+      'model_no', 'gender', 'color_code', 'shape', 'lens_color', 'frame_color',
+      'frame_type', 'lens_material', 'frame_material', 'mrp', 'whp', 'size_mm',
+      'warehouse_qty', 'brand', 'collection', 'status',
+    ];
+    const example = [
+      'STL-1001', 'Unisex', 'C1', 'Round', 'Brown', 'Black',
+      'Full Rim', 'Polycarbonate', 'Acetate', '1999', '900', '52',
+      '10', 'Stallion', 'Classic', 'active',
+    ];
+    const esc = (v) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [headers.join(','), example.map(esc).join(',')].join('\r\n');
+    // Prefix BOM so Excel opens the UTF-8 file with correct characters.
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'stallion-products-sample.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -3169,19 +3199,67 @@ const DashboardProducts = () => {
         )}
       >
         <div className="ui-form">
+          {/* Step 1 — grab the template */}
           <div className="form-group form-group--full">
-            <label className="ui-label">Select Excel File (.xlsx or .xls) *</label>
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleBulkFileSelect}
-              className="ui-input"
-              disabled={uploadingBulk}
-            />
+            <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface-muted p-4">
+              <div>
+                <p className="m-0 text-[length:var(--text-base)] font-semibold text-text">New here? Start with the sample</p>
+                <p className="m-0 mt-1 text-[length:var(--text-sm)] text-text-muted">
+                  Download the template, fill one row per product, then upload it below.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadSample}
+                className="ui-btn ui-btn--secondary inline-flex shrink-0 items-center gap-2 whitespace-nowrap"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />
+                </svg>
+                Download Sample
+              </button>
+            </div>
+          </div>
+
+          {/* Step 2 — choose the file (dropzone-style label wrapping a hidden input) */}
+          <div className="form-group form-group--full">
+            <label className="ui-label">Upload file (.xlsx, .xls or .csv) *</label>
+            <label
+              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${uploadingBulk ? 'pointer-events-none opacity-60' : 'hover:border-primary hover:bg-primary-soft'} ${selectedBulkFile ? 'border-primary bg-primary-soft' : 'border-border-strong bg-surface'}`}
+            >
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleBulkFileSelect}
+                className="sr-only"
+                disabled={uploadingBulk}
+              />
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-text-muted">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" />
+              </svg>
+              {selectedBulkFile ? (
+                <span className="text-[length:var(--text-base)] font-semibold text-text break-all">{selectedBulkFile.name}</span>
+              ) : (
+                <>
+                  <span className="text-[length:var(--text-base)] font-semibold text-text">Tap to choose a file</span>
+                  <span className="text-[length:var(--text-sm)] text-text-muted">Excel (.xlsx / .xls) or CSV</span>
+                </>
+              )}
+            </label>
             {selectedBulkFile && (
-              <p className="mt-2 text-text-muted text-sm">
-                Selected: {selectedBulkFile.name} ({(selectedBulkFile.size / 1024).toFixed(2)} KB)
-              </p>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p className="m-0 text-[length:var(--text-sm)] text-text-muted break-all">
+                  {selectedBulkFile.name} · {(selectedBulkFile.size / 1024).toFixed(1)} KB
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBulkFile(null)}
+                  disabled={uploadingBulk}
+                  className="shrink-0 text-[length:var(--text-sm)] font-semibold text-error hover:underline disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              </div>
             )}
           </div>
           {uploadProgress && (
