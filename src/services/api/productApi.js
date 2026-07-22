@@ -133,6 +133,12 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
       filterBody.search = String(filters.search).trim();
     }
 
+    // image_status: 'unuploaded' | 'uploaded' — server-side filter so the media
+    // gallery can page products by whether they have an image.
+    if (filters.image_status !== undefined && filters.image_status !== null) {
+      filterBody.image_status = filters.image_status;
+    }
+
     // Always include price filter (backend requires it)
     // If price is not provided, use full range (0-10000) to show all products
     if (filters.price !== undefined && filters.price !== null) {
