@@ -153,6 +153,10 @@ class OfferController {
                 if (!isOfferActive(offer, now)) continue;
                 if (!offerScopeMatches(offer, lines)) continue;
                 const { discountTotal } = computeOfferDiscount(offer, lines);
+                // Only surface offers that actually discount THIS cart. A Buy-X-Get-Y
+                // offer gives ₹0 until the cart holds at least (buy+get) units of a
+                // product, so without this it would show as a useless "₹0 OFF" card.
+                if (!(discountTotal > 0)) continue;
                 available.push({
                     offer_id: offer.offer_id,
                     title: offer.title,
