@@ -416,6 +416,19 @@ const Products = ({ onPageChange }) => {
   };
 
   const [mobileFilterOpen, setMobileFilterOpen] = useState(false);
+  // Drives the slide-in animation of the mobile filter drawer (flip on after mount).
+  const [drawerIn, setDrawerIn] = useState(false);
+  useEffect(() => {
+    if (!mobileFilterOpen) { setDrawerIn(false); return; }
+    const t = setTimeout(() => setDrawerIn(true), 10);
+    return () => clearTimeout(t);
+  }, [mobileFilterOpen]);
+  // Lock body scroll while the drawer is open.
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    document.body.style.overflow = mobileFilterOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [mobileFilterOpen]);
 
   const handleViewMore = (productId, modelNo) => {
     // Clean product route: /product/<model_no>
@@ -804,34 +817,76 @@ const Products = ({ onPageChange }) => {
           <FilterContent />
         </aside>
 
-        {/* Mobile filter toggle - visible via CSS on small screens */}
-        <button type="button" className="filter-toggle-btn inline-flex md:!hidden items-center gap-2 fixed left-1/2 -translate-x-1/2 bottom-6 bg-primary text-text-on-primary min-h-[48px] px-5 rounded-pill z-[1200] shadow-lg border-none cursor-pointer text-[length:var(--text-base)] font-semibold transition-colors duration-[120ms] hover:bg-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring),var(--shadow-lg)] active:bg-primary-active" onClick={() => setMobileFilterOpen(true)}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M4 6h16M7 12h10M10 18h4" />
-          </svg>
-          Filters
-        </button>
+        {/* Mobile Filters bar — sticky just above the bottom nav so it never
+            floats over the pagination. Full-width, thumb-friendly. */}
+        <div className="md:hidden fixed left-0 right-0 z-[900] bottom-[calc(60px+env(safe-area-inset-bottom))] px-3 pointer-events-none">
+          <button
+            type="button"
+            className="filter-toggle-btn pointer-events-auto flex w-full items-center justify-center gap-2 min-h-[48px] rounded-pill border-none bg-primary px-5 text-[length:var(--text-base)] font-semibold text-text-on-primary shadow-[0_8px_24px_-8px_rgba(16,18,38,0.45)] transition-colors duration-[120ms] hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring),var(--shadow-lg)]"
+            onClick={() => setMobileFilterOpen(true)}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 6h16M7 12h10M10 18h4" />
+            </svg>
+            Filters
+            {activeFilterChips.length > 0 && (
+              <span className="inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-pill bg-text-on-primary/20 px-1.5 text-[length:var(--text-xs)] font-bold leading-none">
+                {activeFilterChips.length}
+              </span>
+            )}
+          </button>
+        </div>
 
-        {/* Mobile filter modal — portaled to <body> so position:fixed centers on
-            the viewport (not a transformed ancestor) regardless of page scroll. */}
+        {/* Mobile filter drawer — slides in from the right (aside panel style),
+            full height, with its own scroll area and a sticky footer. */}
         {mobileFilterOpen && typeof document !== 'undefined' && createPortal(
-          <div className="mobile-filter-modal open fixed inset-0 bg-[rgba(26,27,35,0.55)] backdrop-blur-[2px] z-[1500] flex items-center justify-center p-4" onClick={() => setMobileFilterOpen(false)} role="dialog" aria-modal="true" aria-label="Product filters">
-            <div className="mobile-filter-modal__panel w-[min(520px,100%)]" onClick={(e) => e.stopPropagation()}>
-              <aside className="filter-sidebar block w-full max-h-[calc(100vh-64px)] relative top-auto left-auto bg-surface rounded-xl p-6 shadow-xl overflow-y-auto border border-border [scrollbar-width:thin]">
-                <div className="mobile-filter-modal__close-row flex justify-end mb-2">
-                  <button type="button" className="mobile-filter-close inline-flex items-center justify-center w-10 h-10 border-none rounded-md bg-surface-muted text-text-muted text-[length:var(--text-xl)] leading-none cursor-pointer transition-[background,color] duration-[120ms] hover:bg-grey-200 hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]" onClick={() => setMobileFilterOpen(false)} aria-label="Close filters">
-                    <span aria-hidden="true">&times;</span>
-                  </button>
-                </div>
+          <div className="fixed inset-0 z-[1500] md:hidden" role="dialog" aria-modal="true" aria-label="Product filters">
+            <div
+              className={`absolute inset-0 bg-[rgba(26,27,35,0.55)] backdrop-blur-[2px] transition-opacity duration-300 ${drawerIn ? 'opacity-100' : 'opacity-0'}`}
+              onClick={() => setMobileFilterOpen(false)}
+            />
+            <aside
+              className={`absolute right-0 top-0 flex h-full w-[min(88vw,400px)] flex-col bg-surface shadow-2xl transition-transform duration-300 ease-out ${drawerIn ? 'translate-x-0' : 'translate-x-full'}`}
+            >
+              <div className="flex items-center justify-between border-b border-border px-5 py-4">
+                <h3 className="m-0 text-[length:var(--text-lg)] font-semibold text-text">Filters</h3>
+                <button
+                  type="button"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-surface-muted text-text-muted text-[length:var(--text-xl)] leading-none transition-[background,color] duration-[120ms] hover:bg-grey-200 hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+                  onClick={() => setMobileFilterOpen(false)}
+                  aria-label="Close filters"
+                >
+                  <span aria-hidden="true">&times;</span>
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 py-4 [scrollbar-width:thin]">
                 <FilterContent />
-              </aside>
-            </div>
+              </div>
+              <div className="flex items-center gap-3 border-t border-border px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+                {activeFilterChips.length > 0 && (
+                  <button
+                    type="button"
+                    className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-border-strong bg-surface px-4 text-[length:var(--text-base)] font-semibold text-text transition-colors hover:bg-surface-muted"
+                    onClick={handleReset}
+                  >
+                    Clear all
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-md border-none bg-primary px-4 text-[length:var(--text-base)] font-semibold text-text-on-primary transition-colors hover:bg-primary-hover active:bg-primary-active"
+                  onClick={() => setMobileFilterOpen(false)}
+                >
+                  Show {totalResults != null ? totalResults : ''} results
+                </button>
+              </div>
+            </aside>
           </div>,
           document.body
         )}
 
         {/* Products Grid */}
-        <main className="products-main flex-1 min-w-0 bg-transparent px-0 pt-0 pb-28 md:pb-0 min-h-[calc(100vh-var(--header-height))]">
+        <main className="products-main flex-1 min-w-0 bg-transparent px-0 pt-0 pb-40 md:pb-0 min-h-[calc(100vh-var(--header-height))]">
           <div className="products-header flex justify-between items-center gap-4 mb-6 flex-wrap">
             <h2 className="text-[length:var(--text-lg)] sm:text-[length:var(--text-xl)] font-semibold tracking-[-0.01em] leading-[1.2] text-text m-0">
               {loading ? '' : searchQuery ?
