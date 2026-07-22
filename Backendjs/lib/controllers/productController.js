@@ -188,8 +188,15 @@ class ProductController {
                 offset: (pageNum - 1) * limitNum,
                 distinct: true,
             });
+            // Always present total_qty as warehouse + tray so the list never shows a
+            // stale/drifted stored total — matches the invariant enforced on write.
+            const rows = products.map((p) => {
+                const plain = typeof p.get === 'function' ? p.get({ plain: true }) : p;
+                plain.total_qty = (Number(plain.warehouse_qty) || 0) + (Number(plain.tray_qty) || 0);
+                return plain;
+            });
             res.status(200).json({
-                data: products,
+                data: rows,
                 pagination: {
                     page: pageNum,
                     limit: limitNum,
