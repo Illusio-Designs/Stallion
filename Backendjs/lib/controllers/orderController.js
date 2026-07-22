@@ -89,7 +89,8 @@ async function reverseOrderOperation(orderId, transaction) {
         }
         product.warehouse_qty = product.warehouse_qty + warehouseReducedQty;
         product.tray_qty = product.tray_qty + trayReducedQty;
-        product.total_qty = product.total_qty + totalReducedQty;
+        // Always derive total from warehouse + tray so it can never drift.
+        product.total_qty = (Number(product.warehouse_qty) || 0) + (Number(product.tray_qty) || 0);
         await product.save({ transaction });
         const trayIds = Array.isArray(orderOperation.tray_ids) ? orderOperation.tray_ids : [];
         for (let j = 0; j < trayIds.length; j++) {
@@ -577,7 +578,8 @@ class OrderController {
                         const left = item.quantity - warehouse_qty;
                         product.warehouse_qty = 0;
                         product.tray_qty = product.tray_qty - left;
-                        product.total_qty = product.total_qty - item.quantity;
+                        // Derive total from warehouse + tray (never drifts).
+                        product.total_qty = (Number(product.warehouse_qty) || 0) + (Number(product.tray_qty) || 0);
                         const trayProducts = await TrayProducts.findAll({
                             where: { product_id: product.product_id, status: TrayProductStatus.ALLOTED },
                             transaction,
@@ -622,7 +624,8 @@ class OrderController {
                         };
                     } else {
                         product.warehouse_qty = warehouse_qty - item.quantity;
-                        product.total_qty = product.total_qty - item.quantity;
+                        // Derive total from warehouse + tray (never drifts).
+                        product.total_qty = (Number(product.warehouse_qty) || 0) + (Number(product.tray_qty) || 0);
                         orderOperationData = {
                             warehouse_reduced_qty: item.quantity,
                             tray_reduced_qty: 0,

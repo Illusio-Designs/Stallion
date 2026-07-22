@@ -90,7 +90,8 @@ class TrayProductsController {
             await Product.update({
                 warehouse_qty: product.warehouse_qty - 1,
                 tray_qty: product.tray_qty + 1,
-                total_qty: product.total_qty,
+                // Derive total from the new warehouse + tray so it can never drift.
+                total_qty: (Number(product.warehouse_qty) - 1) + (Number(product.tray_qty) + 1),
                 updated_at: new Date(),
             }, { where: { product_id } });
 
@@ -169,12 +170,17 @@ class TrayProductsController {
             const snapshot = trayProduct.toJSON();
             const qtyToRestore = trayProduct.qty;
             await trayProduct.destroy();
-            await Product.update({
-                warehouse_qty: product.warehouse_qty + qtyToRestore,
-                tray_qty: Math.max(0, product.tray_qty - qtyToRestore),
-                total_qty: product.total_qty,
-                updated_at: new Date(),
-            }, { where: { product_id } });
+            {
+                const nextWarehouse = (Number(product.warehouse_qty) || 0) + qtyToRestore;
+                const nextTray = Math.max(0, (Number(product.tray_qty) || 0) - qtyToRestore);
+                await Product.update({
+                    warehouse_qty: nextWarehouse,
+                    tray_qty: nextTray,
+                    // Derive total from warehouse + tray so it can never drift.
+                    total_qty: nextWarehouse + nextTray,
+                    updated_at: new Date(),
+                }, { where: { product_id } });
+            }
 
             await logAudit({
                 req,
