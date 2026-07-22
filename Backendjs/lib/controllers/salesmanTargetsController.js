@@ -1,5 +1,6 @@
 const SalesmanTargets = require('../models/SalesmanTargets');
 const Order = require('../models/Order');
+const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const { Op } = require('sequelize');
 const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
@@ -21,6 +22,17 @@ const enrichTarget = async (t) => {
     const targetAmount = Number(t.target_amount) || 0;
     const target_status = (targetAmount > 0 && completed >= targetAmount) ? 'completed' : (t.target_status || 'pending');
     return { ...t.toJSON(), completed_amount: completed, target_status };
+};
+
+// Attach salesman_name to a set of rows with ONE batched query, so the report
+// doesn't fetch each salesman by id from the client.
+const attachSalesmanNames = async (rows) => {
+    const ids = [...new Set(rows.map((r) => r.salesman_id).filter(Boolean))];
+    if (!ids.length) return rows;
+    const salesmen = await Salesman.findAll({ where: { salesman_id: ids }, attributes: ['salesman_id', 'full_name'] });
+    const map = {};
+    salesmen.forEach((s) => { map[s.salesman_id] = s.full_name; });
+    return rows.map((r) => ({ ...r, salesman_name: map[r.salesman_id] || null }));
 };
 
 class SalesmanTargetsController {
@@ -76,7 +88,7 @@ class SalesmanTargetsController {
                 limit: pagination.limit,
                 offset: pagination.offset,
             });
-            const enriched = await Promise.all(salesmanTargets.map(enrichTarget));
+            const enriched = await attachSalesmanNames(await Promise.all(salesmanTargets.map(enrichTarget)));
             res.status(200).json(buildPaginatedResponse(enriched, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -90,7 +102,7 @@ class SalesmanTargetsController {
                 return res.status(400).json({ error: 'Salesman ID is required' });
             }
             const salesmanTargets = await SalesmanTargets.findAll({ where: { salesman_id: salesman_id } });
-            const enriched = await Promise.all(salesmanTargets.map(enrichTarget));
+            const enriched = await attachSalesmanNames(await Promise.all(salesmanTargets.map(enrichTarget)));
             res.status(200).json(enriched);
         } catch (error) {
             res.status(500).json({ error: error.message });

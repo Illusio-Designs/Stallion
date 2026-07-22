@@ -27,11 +27,20 @@ const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationPa
 const orderPartyInclude = {
     model: Party,
     as: 'party',
-    attributes: ['party_name', 'address', 'billing_address', 'billing_same_as_shipping'],
+    attributes: ['party_name', 'address', 'billing_address', 'billing_same_as_shipping', 'latitude', 'longitude'],
     required: false,
 };
 
-function mapOrdersWithPartyName(orders) {
+async function mapOrdersWithPartyName(orders) {
+    // Batched salesman-name lookup so order lists (and the Visit Report that
+    // merges visit orders) carry salesman_name without the client fetching each
+    // salesman by id.
+    const salesmanIds = [...new Set(orders.map((o) => o.salesman_id).filter(Boolean))];
+    const salesmanMap = {};
+    if (salesmanIds.length) {
+        const salesmen = await Salesman.findAll({ where: { salesman_id: salesmanIds }, attributes: ['salesman_id', 'full_name'] });
+        salesmen.forEach((s) => { salesmanMap[s.salesman_id] = s.full_name; });
+    }
     return orders.map((order) => {
         const plain = order.get({ plain: true });
         const { party, ...rest } = plain;
@@ -47,8 +56,11 @@ function mapOrdersWithPartyName(orders) {
         return {
             ...rest,
             total_qty,
+            salesman_name: salesmanMap[rest.salesman_id] || null,
             party_name: party ? party.party_name : null,
             party_address: party ? party.address : null,
+            party_latitude: party ? party.latitude : null,
+            party_longitude: party ? party.longitude : null,
             party_billing_address: party
                 ? (party.billing_same_as_shipping ? party.address : party.billing_address)
                 : null,
@@ -225,7 +237,7 @@ class OrderController {
                 offset: pagination.offset,
                 order: [['order_date', 'DESC']],
             });
-            res.status(200).json(buildPaginatedResponse(mapOrdersWithPartyName(orders), pagination, count));
+            res.status(200).json(buildPaginatedResponse(await mapOrdersWithPartyName(orders), pagination, count));
         } catch (error) {
             console.error('Error fetching orders:', error);
             res.status(500).json({ error: 'Failed to fetch orders' });
@@ -267,7 +279,7 @@ class OrderController {
                 offset: pagination.offset,
                 order: [['order_date', 'DESC']],
             });
-            res.status(200).json(buildPaginatedResponse(mapOrdersWithPartyName(orders), pagination, count));
+            res.status(200).json(buildPaginatedResponse(await mapOrdersWithPartyName(orders), pagination, count));
         } catch (error) {
             console.error('Error fetching orders:', error);
             res.status(500).json({ error: 'Failed to fetch orders' });

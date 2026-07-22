@@ -9,9 +9,7 @@ import {
   getSalesmanTargets,
   getAllSalesmanCheckins,
   getSalesmanCheckins,
-  getSalesmanById,
   getSalesmanProfile,
-  getPartyById,
   getMyOrders,
   getOrders,
 } from '../services/apiService';
@@ -125,8 +123,11 @@ const AnalyticsReports = () => {
             id: `order-${o.order_id || o.id}`,
             type: 'ordered',
             salesman_id: o.salesman_id,
+            salesman_name: o.salesman_name,
             party_id: o.party_id,
             party_name: o.party_name,
+            party_latitude: o.party_latitude,
+            party_longitude: o.party_longitude,
             order_id: o.order_id || o.id,
             order_total: o.order_total,
             order_qty: qty,
@@ -144,17 +145,28 @@ const AnalyticsReports = () => {
     setLoadError(realError);
     if (realError) showError('Could not load some reports.');
 
-    // Resolve names on-demand by id (best effort, never fatal).
-    try {
-      const sIds = [...new Set([...t, ...c].map((x) => x.salesman_id).filter(Boolean))];
-      const pIds = [...new Set(c.map((x) => x.party_id).filter(Boolean))];
-      const [sResolved, pResolved] = await Promise.all([
-        Promise.all(sIds.map((id) => getSalesmanById(id).catch(() => null))),
-        Promise.all(pIds.map((id) => getPartyById(id).catch(() => null))),
-      ]);
-      setSalesmen(sResolved.filter(Boolean));
-      setParties(pResolved.filter(Boolean));
-    } catch { /* names fall back to ids */ }
+    // Names + party coordinates now arrive embedded on every target / check-in /
+    // order row from the backend (one call per report), so build the lookup maps
+    // straight from those rows — no per-id salesman/party fetches.
+    const salesmanMap = {};
+    [...t, ...c].forEach((x) => {
+      if (x.salesman_id && x.salesman_name && !salesmanMap[x.salesman_id]) {
+        salesmanMap[x.salesman_id] = { salesman_id: x.salesman_id, full_name: x.salesman_name };
+      }
+    });
+    const partyMap = {};
+    c.forEach((x) => {
+      if (x.party_id && !partyMap[x.party_id]) {
+        partyMap[x.party_id] = {
+          party_id: x.party_id,
+          party_name: x.party_name || null,
+          latitude: x.party_latitude != null ? x.party_latitude : null,
+          longitude: x.party_longitude != null ? x.party_longitude : null,
+        };
+      }
+    });
+    setSalesmen(Object.values(salesmanMap));
+    setParties(Object.values(partyMap));
 
     setLoading(false);
   };
