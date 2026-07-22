@@ -3,6 +3,7 @@ import '../styles/pages/dashboard-layout.css';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardSidebar from '../components/DashboardSidebar';
 import DashboardFooter from '../components/DashboardFooter';
+import DashboardBottomNav from '../components/DashboardBottomNav';
 import { useTokenMonitor } from '../hooks/useTokenMonitor';
 
 const SIDEBAR_COLLAPSED_KEY = 'dashboardSidebarCollapsed';
@@ -102,14 +103,24 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
         />
 
         <main
-          className="dashboard-content page-enter w-full max-w-[1440px] flex-1 mx-auto px-4 py-4 sm:py-5 md:p-6"
+          className="dashboard-content page-enter w-full max-w-[1440px] flex-1 mx-auto px-4 py-4 sm:py-5 md:p-6 pb-[calc(84px+env(safe-area-inset-bottom))] md:pb-6"
           key={currentPage}
         >
           {children}
         </main>
 
-        <DashboardFooter isCollapsed={isSidebarCollapsed} />
+        {/* Footer is desktop-only; the floating bottom nav replaces it on phones. */}
+        <div className="hidden md:block">
+          <DashboardFooter isCollapsed={isSidebarCollapsed} />
+        </div>
       </div>
+
+      {/* Phone bottom navigation (mirrors the storefront). Menu opens the drawer. */}
+      <DashboardBottomNav
+        currentPage={currentPage}
+        onPageChange={onPageChange}
+        onOpenMenu={openMobileSidebar}
+      />
     </div>
   );
 };
