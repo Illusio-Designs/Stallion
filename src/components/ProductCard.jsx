@@ -203,19 +203,19 @@ const ProductCard = ({
         </div>
       )}
 
-      <div className="pc-actions flex w-full flex-wrap items-center gap-2 mt-3">
+      <div className="pc-actions flex w-full items-center gap-2 mt-3">
         <div className="pc-qty inline-flex h-10 flex-none items-center overflow-hidden rounded-md border border-border-strong bg-surface" role="group" aria-label="Quantity selector">
           <button
             type="button"
-            className="pc-qty-btn h-full w-9 cursor-pointer border-none bg-primary-soft text-primary text-[length:var(--text-lg)] leading-none transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-soft-hover active:not-disabled:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle focus-visible:relative focus-visible:z-[1] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+            className="pc-qty-btn h-full w-8 cursor-pointer border-none bg-primary-soft text-primary text-[length:var(--text-lg)] leading-none transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-soft-hover active:not-disabled:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle focus-visible:relative focus-visible:z-[1] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
             onClick={() => setQty(q => Math.max(1, q - 1))}
             disabled={qty <= 1}
             aria-label="Decrease quantity"
           >&minus;</button>
-          <span className="pc-qty-value min-w-8 text-center text-[length:var(--text-base)] font-semibold text-text" aria-live="polite">{qty}</span>
+          <span className="pc-qty-value min-w-7 text-center text-[length:var(--text-base)] font-semibold text-text" aria-live="polite">{qty}</span>
           <button
             type="button"
-            className="pc-qty-btn h-full w-9 cursor-pointer border-none bg-primary-soft text-primary text-[length:var(--text-lg)] leading-none transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-soft-hover active:not-disabled:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle focus-visible:relative focus-visible:z-[1] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+            className="pc-qty-btn h-full w-8 cursor-pointer border-none bg-primary-soft text-primary text-[length:var(--text-lg)] leading-none transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-soft-hover active:not-disabled:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle focus-visible:relative focus-visible:z-[1] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
             onClick={() => setQty(q => (stockNum != null ? Math.min(stockNum, q + 1) : q + 1))}
             disabled={outOfStock || atMax}
             aria-label="Increase quantity"
@@ -228,7 +228,7 @@ const ProductCard = ({
           onClick={handleAddToCart}
           aria-label={outOfStock ? 'Out of stock' : 'Add to cart'}
           title={outOfStock ? 'Out of stock' : 'Add to cart'}
-          className="pc-add-btn inline-flex items-center justify-center flex-[1_1_100px] min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle disabled:opacity-100 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+          className="pc-add-btn inline-flex items-center justify-center flex-1 min-w-0 min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle disabled:opacity-100 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
