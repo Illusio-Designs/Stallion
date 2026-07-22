@@ -142,11 +142,23 @@ const ProductCard = ({
   return (
     <div className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
       <div className={`product-image relative overflow-hidden rounded-md${imgBroken ? ' aspect-square' : ''}`}>
-        {outOfStock && (
-          <span className="pc-oos-badge absolute left-2 top-2 z-[2] rounded-md bg-error px-2 py-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-on-primary">
-            Out of Stock
-          </span>
-        )}
+        {/* Stock tag (top-left) */}
+        <span className={`pc-stock-tag absolute left-2.5 top-2.5 z-[2] rounded-pill px-2.5 py-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-on-primary ${outOfStock ? 'bg-error' : 'bg-primary'}`}>
+          {outOfStock ? 'Out of stock' : 'In stock'}
+        </span>
+        {/* View (eye) button (top-right) — replaces the wishlist icon */}
+        <button
+          type="button"
+          className="pc-view-fab absolute right-2.5 top-2.5 z-[2] inline-flex h-9 w-9 items-center justify-center rounded-pill border border-border bg-surface text-text shadow-sm transition duration-[120ms] ease-[ease] hover:bg-primary hover:text-text-on-primary hover:border-primary active:scale-95 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+          onClick={handleViewMoreClick}
+          aria-label="View product details"
+          title="View details"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8S1 12 1 12Z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
         {!imgLoaded && !imgBroken && <span className="pc-image-placeholder absolute inset-0" aria-hidden="true" />}
         {imgBroken ? (
           <div
@@ -189,19 +201,6 @@ const ProductCard = ({
       )}
 
       <div className="pc-actions flex w-full flex-wrap items-center gap-2 mt-3">
-        <button
-          type="button"
-          className="pc-icon-btn inline-flex h-10 w-10 flex-none cursor-pointer items-center justify-center rounded-md border border-primary bg-surface text-primary transition duration-[120ms] ease-[ease] hover:bg-primary hover:text-text-on-primary active:scale-[0.94] disabled:cursor-not-allowed disabled:bg-surface disabled:text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
-          onClick={handleViewMoreClick}
-          title="View details"
-          aria-label="View product details"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M1 12S5 4 12 4s11 8 11 8-4 8-11 8S1 12 1 12Z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
-        </button>
-
         <div className="pc-qty inline-flex h-10 flex-none items-center overflow-hidden rounded-md border border-border-strong bg-surface" role="group" aria-label="Quantity selector">
           <button
             type="button"
@@ -220,7 +219,11 @@ const ProductCard = ({
           >+</button>
         </div>
 
-        <button type="button" disabled={outOfStock} className="pc-add-btn flex-[1_1_120px] min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary text-[length:var(--text-sm)] font-semibold tracking-[var(--tracking-label)] transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle disabled:opacity-100 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]" onClick={handleAddToCart}>
+        <button type="button" disabled={outOfStock} className="pc-add-btn inline-flex items-center justify-center gap-2 flex-[1_1_120px] min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary text-[length:var(--text-sm)] font-semibold tracking-[var(--tracking-label)] transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle disabled:opacity-100 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]" onClick={handleAddToCart}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="flex-none">
+            <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
+            <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
+          </svg>
           {outOfStock ? 'OUT OF STOCK' : 'ADD TO CART'}
         </button>
       </div>
