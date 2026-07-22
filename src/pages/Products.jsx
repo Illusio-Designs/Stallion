@@ -897,7 +897,7 @@ const Products = ({ onPageChange }) => {
                   desktop uses the sticky sidebar). Opens the right-side drawer. */}
               <button
                 type="button"
-                className="filter-toggle-btn md:hidden inline-flex items-center gap-2 min-h-[40px] rounded-md border border-primary bg-primary px-4 text-[length:var(--text-base)] font-semibold text-text-on-primary transition-colors duration-[120ms] hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+                className="md:hidden inline-flex items-center gap-2 min-h-[40px] rounded-md border border-primary bg-primary px-4 text-[length:var(--text-base)] font-semibold text-text-on-primary transition-colors duration-[120ms] hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
                 onClick={() => setMobileFilterOpen(true)}
                 aria-label="Open filters"
               >
