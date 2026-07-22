@@ -1,6 +1,7 @@
 const SalesmanCheckIns = require('../models/SalesmanCheckIns');
 const Party = require('../models/Party');
 const Order = require('../models/Order');
+const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 const { SalesmanCheckInType } = require('../constants/enums');
@@ -14,12 +15,18 @@ async function enrichCheckIns(checkIns) {
     const rows = checkIns.map((c) => (typeof c.toJSON === 'function' ? c.toJSON() : c));
     const partyIds = [...new Set(rows.map((r) => r.party_id).filter(Boolean))];
     const orderIds = [...new Set(rows.map((r) => r.order_id).filter(Boolean))];
-    const [parties, orders] = await Promise.all([
-        partyIds.length ? Party.findAll({ where: { party_id: partyIds } }) : [],
+    const salesmanIds = [...new Set(rows.map((r) => r.salesman_id).filter(Boolean))];
+    // Batched lookups so the Visit Report gets party name + coordinates and the
+    // salesman name in ONE response — the client no longer fetches them per id.
+    const [parties, orders, salesmen] = await Promise.all([
+        partyIds.length ? Party.findAll({ where: { party_id: partyIds }, attributes: ['party_id', 'party_name', 'latitude', 'longitude'] }) : [],
         orderIds.length ? Order.findAll({ where: { order_id: orderIds } }) : [],
+        salesmanIds.length ? Salesman.findAll({ where: { salesman_id: salesmanIds }, attributes: ['salesman_id', 'full_name'] }) : [],
     ]);
     const partyMap = {};
-    parties.forEach((p) => { partyMap[p.party_id] = p.party_name; });
+    parties.forEach((p) => { partyMap[p.party_id] = p; });
+    const salesmanMap = {};
+    salesmen.forEach((s) => { salesmanMap[s.salesman_id] = s.full_name; });
     const orderMap = {};
     orders.forEach((o) => { orderMap[o.order_id] = o; });
     // Total quantity across an order's items (order_items may be array/JSON string/object).
@@ -34,9 +41,13 @@ async function enrichCheckIns(checkIns) {
     };
     return rows.map((r) => {
         const o = r.order_id ? orderMap[r.order_id] : null;
+        const p = partyMap[r.party_id] || null;
         return {
             ...r,
-            party_name: partyMap[r.party_id] || null,
+            party_name: p ? p.party_name : null,
+            party_latitude: p ? p.latitude : null,
+            party_longitude: p ? p.longitude : null,
+            salesman_name: salesmanMap[r.salesman_id] || null,
             order_number: o ? o.order_number : null,
             order_total: o ? o.order_total : null,
             order_qty: o ? orderQty(o) : null,
