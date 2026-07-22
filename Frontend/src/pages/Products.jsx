@@ -817,20 +817,19 @@ const Products = ({ onPageChange }) => {
           <FilterContent />
         </aside>
 
-        {/* Mobile Filters trigger — a tab fixed to the RIGHT edge (not at the
-            bottom), so it never collides with the floating bottom nav. */}
+        {/* Mobile Filters trigger — a compact round button on the RIGHT edge
+            (not at the bottom), so it never collides with the floating nav. */}
         <button
           type="button"
-          className="filter-toggle-btn md:hidden fixed right-0 top-[38%] z-[900] inline-flex flex-col items-center gap-1 rounded-l-xl border border-r-0 border-primary bg-primary px-2.5 py-3 text-text-on-primary shadow-[0_8px_24px_-8px_rgba(16,18,38,0.45)] transition-colors duration-[120ms] hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
+          className="filter-toggle-btn md:hidden fixed right-3 top-[42%] z-[900] inline-flex h-12 w-12 items-center justify-center rounded-full border border-primary bg-primary text-text-on-primary shadow-[0_8px_24px_-8px_rgba(16,18,38,0.5)] transition-colors duration-[120ms] hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
           onClick={() => setMobileFilterOpen(true)}
           aria-label="Open filters"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M4 6h16M7 12h10M10 18h4" />
           </svg>
-          <span className="text-[length:var(--text-xs)] font-semibold [writing-mode:vertical-rl] rotate-180 tracking-wide">Filters</span>
           {activeFilterChips.length > 0 && (
-            <span className="inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill bg-text-on-primary px-1 text-[length:var(--text-xs)] font-bold leading-none text-primary">
+            <span className="absolute -right-1 -top-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full border-2 border-surface bg-accent px-1 text-[10px] font-bold leading-none text-text-on-accent">
               {activeFilterChips.length}
             </span>
           )}
