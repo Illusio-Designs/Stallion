@@ -594,8 +594,10 @@ const DashboardSuppliers = () => {
           if (v && typeof v === 'object') return Object.values(v);
           return [];
         };
-        const qtyOf = (o) => parseItems(o.order_items).reduce((s, it) => s + (Number(it.quantity ?? it.qty) || 0), 0)
-          || Number(o.total_qty) || 0;
+        // Prefer the backend-computed total_qty; fall back to parsing order_items.
+        const qtyOf = (o) => Number(o.total_qty)
+          || parseItems(o.order_items).reduce((s, it) => s + (Number(it.quantity ?? it.qty) || 0), 0)
+          || 0;
         const orderById = new Map(orderList.map((o) => [String(o.order_id || o.id), o]));
 
         // 1) enrich check-in rows that reference an order
