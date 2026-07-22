@@ -163,15 +163,38 @@ export const verifyOTP = async (otp) => {
 export const resendOTP = async (channel = null) => {
   await ensureWidget();
   return new Promise((resolve, reject) => {
+    if (typeof window.retryOtp !== 'function') {
+      // Widget lost its methods — resend by starting a fresh OTP instead of failing.
+      resendViaFreshSend(resolve, reject);
+      return;
+    }
     window.retryOtp(
       channel,
       (data) => resolve({ success: true, message: 'OTP resent successfully', data }),
       (error) => {
-        console.warn('[MSG91] retryOtp failed:', error);
-        reject({ success: false, message: describeError(error, 'Failed to resend OTP'), error });
+        // retryOtp needs a live widget session (reqId). If it's gone (idle page,
+        // re-init), fall back to a fresh sendOtp so the user still gets a code.
+        console.warn('[MSG91] retryOtp failed, falling back to a fresh send:', error);
+        resendViaFreshSend(resolve, reject, error);
       }
     );
   });
+};
+
+// Fallback: send a brand-new OTP to the current number when retryOtp can't.
+const resendViaFreshSend = (resolve, reject, originalError) => {
+  if (typeof window.sendOtp !== 'function' || !currentPhoneNumber) {
+    reject({ success: false, message: describeError(originalError, 'Failed to resend OTP'), error: originalError });
+    return;
+  }
+  window.sendOtp(
+    currentPhoneNumber,
+    (data) => resolve({ success: true, message: 'OTP resent successfully', data }),
+    (error) => {
+      console.warn('[MSG91] fresh sendOtp (resend fallback) failed:', error);
+      reject({ success: false, message: describeError(error, 'Failed to resend OTP'), error });
+    }
+  );
 };
 
 export const getAccessToken = () => currentAccessToken;
