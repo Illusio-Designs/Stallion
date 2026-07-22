@@ -389,7 +389,12 @@ const DashboardProducts = () => {
       // Server-side search: hit the regular products API with the search param
       // (matches model_no/size/status). Empty search => the full list (all statuses).
       const term = String(search || '').trim();
-      const result = await getProducts(targetPage, PRODUCTS_PER_PAGE, term ? { search: term, status: null } : null);
+      // The Unuploaded Media Gallery reuses THIS paginated endpoint with an
+      // image_status filter, so it no longer pulls the whole catalogue.
+      const unuploaded = activeTab === 'Unuploaded Media Gallery';
+      let filters = term ? { search: term, status: null } : null;
+      if (unuploaded) filters = { ...(filters || {}), image_status: 'unuploaded', status: null };
+      const result = await getProducts(targetPage, PRODUCTS_PER_PAGE, filters);
       const list = result.data || [];
       setProducts(list);
       setProductPage(targetPage);
@@ -631,8 +636,9 @@ const DashboardProducts = () => {
       fetchProducts();
       fetchAllUploads();
     } else if (activeTab === 'Unuploaded Media Gallery') {
-      // Needs the full product list to find products without images
-      fetchAllData();
+      // Same paginated products endpoint as the Products tab, filtered server-side
+      // to products without an image — no more full-catalogue fetch.
+      fetchProductsPage(1);
     }
   }, [activeTab]);
 
@@ -1776,23 +1782,11 @@ const DashboardProducts = () => {
       });
   }, [orphanedImages, invalidImageUrls, products]);
 
-  const unuploadedRows = useMemo(
-    () => rows.filter(r => {
-      const product = r.data;
-
-      // Check if product has valid images using helper function
-      // Products with empty array [], arrays with empty strings, or the string "[]" should appear in unuploaded gallery
-      // Return products that have NO valid images
-      return !hasValidImageUrls(product);
-    }),
-    [rows]
-  );
-
   const filteredRowsByTab = useMemo(() => {
-    if (activeTab === 'Products') return rows; // Show ALL products (with or without images)
-    if (activeTab === 'Unuploaded Media Gallery') return unuploadedRows; // Show ONLY products WITHOUT images
+    // Unuploaded gallery is now filtered SERVER-side (image_status), so the page
+    // rows are already only products without an image — no client filtering.
     return rows;
-  }, [rows, unuploadedRows, activeTab]);
+  }, [rows, activeTab]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -2622,7 +2616,7 @@ const DashboardProducts = () => {
                 secondaryActions={[]}
                 searchPlaceholder="Search products"
                 loading={loading}
-                serverPagination={activeTab === 'Products'}
+                serverPagination={activeTab === 'Products' || activeTab === 'Unuploaded Media Gallery'}
                 serverPage={productPage}
                 serverPageCount={productPageCount}
                 serverPageSize={PRODUCTS_PER_PAGE}
