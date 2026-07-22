@@ -109,7 +109,9 @@ const summarise = (offer) => {
   }
   if (offer.offer_type === 'bogo') {
     const scope = c.all_products ? 'all products' : `${(c.product_ids || []).length} product(s)`;
-    return `Buy ${c.buy_qty} Get ${c.get_qty} · ${scope}`;
+    const pct = c.get_discount_percent == null ? 100 : Number(c.get_discount_percent);
+    const getText = pct >= 100 ? 'free' : `${pct}% off`;
+    return `Buy ${c.buy_qty} Get ${c.get_qty} ${getText} · ${scope}`;
   }
   return '—';
 };
@@ -385,6 +387,10 @@ const DashboardOffers = () => {
               <div className="form-group form-group--full">
                 <label className="ui-label">Get Discount %</label>
                 <input type="number" min="0" max="100" className="ui-input" placeholder="100 = free" value={form.get_discount_percent} onChange={(e) => set('get_discount_percent', e.target.value)} />
+                <p className="m-0 mt-1 text-[length:var(--text-xs)] text-text-muted">
+                  For every {Number(form.buy_qty) || 0} bought, the next {Number(form.get_qty) || 0} get {Number(form.get_discount_percent) >= 100 || form.get_discount_percent === '' ? '100% off (free)' : `${Number(form.get_discount_percent) || 0}% off`}.
+                  The cart must contain at least {(Number(form.buy_qty) || 0) + (Number(form.get_qty) || 0)} units of a product before any discount applies.
+                </p>
               </div>
             </>
           )}
