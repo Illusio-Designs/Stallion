@@ -437,8 +437,8 @@ const withListPaging = (endpoint, { page = 1, limit = LIST_LIMIT } = {}) => {
  * @param {string} endpoint
  * @param {Object} [opts] - apiRequest options (method/body/includeAuth/silent)
  */
-const fetchAllPages = async (endpoint, opts = {}) => {
-  const res = await apiRequest(withListPaging(endpoint), opts);
+const fetchAllPages = async (endpoint, opts = {}, { limit = LIST_LIMIT } = {}) => {
+  const res = await apiRequest(withListPaging(endpoint, { limit }), opts);
   return unwrapList(res);
 };
 

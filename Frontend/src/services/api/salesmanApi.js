@@ -6,14 +6,14 @@ import { apiRequest, fetchAllPages } from './client';
  * Get all salesman check-ins
  * @returns {Promise<Array>} Array of check-in objects
  */
-export const getAllSalesmanCheckins = async () => {
-  // GET /salesman_checkins now requires page & limit (400 otherwise). Fetch the
-  // full set for the analytics report (page=1&limit=1000) and unwrap { data }.
+export const getAllSalesmanCheckins = async (limit) => {
+  // GET /salesman_checkins now requires page & limit (400 otherwise). The
+  // analytics report passes a small limit (20); other callers get the full list.
   return fetchAllPages('/salesman_checkins', {
     method: 'GET',
     includeAuth: true,
     silent: true, // empty -> 404 "not found"; callers treat as empty list
-  });
+  }, limit != null ? { limit } : undefined);
 };
 
 /**
