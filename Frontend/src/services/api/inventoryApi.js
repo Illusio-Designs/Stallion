@@ -390,6 +390,7 @@ export const createOrder = async (orderData) => {
     order_notes,
     latitude,
     longitude,
+    offer_id,
   } = orderData;
 
   const body = {
@@ -397,6 +398,10 @@ export const createOrder = async (orderData) => {
     order_type,
     order_items,
   };
+
+  // The offer the user selected — the backend re-validates it and recomputes
+  // the discount. Without this the order always prices at full value.
+  if (offer_id) body.offer_id = offer_id;
 
   if (party_id) body.party_id = party_id;
   if (distributor_id) body.distributor_id = distributor_id;
