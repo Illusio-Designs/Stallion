@@ -462,6 +462,37 @@ const DashboardClients = () => {
     setOpenAdd(true);
   };
 
+  // Download a ready-to-fill CSV template whose headers match the party bulk
+  // parser. Only party_name is required; the rest are optional.
+  const handleDownloadPartySample = () => {
+    const headers = [
+      'party_name', 'trade_name', 'contact_person', 'email', 'phone',
+      'address', 'billing_address', 'billing_same_as_shipping',
+      'country', 'state', 'city', 'zone', 'pincode', 'gstin', 'pan',
+      'active', 'credit_days', 'prefered_courier', 'distributor', 'salesman',
+    ];
+    const example = [
+      'Acme Opticals', 'Acme', 'Ramesh Shah', 'acme@example.com', '9876543210',
+      '12 MG Road, Andheri', '', 'yes',
+      'India', 'Maharashtra', 'Mumbai', 'West', '400058', '27ABCDE1234F1Z5', 'ABCDE1234F',
+      'yes', '30', 'DTDC', '', '',
+    ];
+    const esc = (v) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [headers.join(','), example.map(esc).join(',')].join('\r\n');
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'stallion-parties-sample.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const handleBulkUpload = async () => {
     if (!bulkFile) { showError('Please select a file first.'); return; }
     try {
@@ -1503,9 +1534,14 @@ const DashboardClients = () => {
                     ? 'No parties found for the selected country. Add a new party to get started.'
                     : 'Select a country to view its parties, or add a new party to get started.'}
                 </p>
-                <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
-                  Add New Party
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
+                    Add New Party
+                  </button>
+                  <button className="ui-btn ui-btn--secondary" onClick={() => setOpenBulkUpload(true)}>
+                    Bulk Upload
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1612,21 +1648,70 @@ const DashboardClients = () => {
           </>
         )}
       >
-        <div className="py-2">
-          <p className="mb-4 text-sm text-text-muted">
-            Upload an Excel or CSV file to bulk create/update parties.
-          </p>
-          <input
-            type="file"
-            accept=".xlsx,.xls,.csv"
-            className="ui-input w-full max-w-full"
-            onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
-          />
-          {bulkFile && (
-            <p className="mt-2 text-[13px] text-text-subtle">
-              Selected: {bulkFile.name}
-            </p>
-          )}
+        <div className="ui-form">
+          {/* Step 1 — grab the template */}
+          <div className="form-group form-group--full">
+            <div className="flex items-start justify-between gap-3 rounded-lg border border-border bg-surface-muted p-4">
+              <div>
+                <p className="m-0 text-[length:var(--text-base)] font-semibold text-text">New here? Start with the sample</p>
+                <p className="m-0 mt-1 text-[length:var(--text-sm)] text-text-muted">
+                  Download the template, fill one row per party (only Party Name is required), then upload it below.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadPartySample}
+                className="ui-btn ui-btn--secondary inline-flex shrink-0 items-center gap-2 whitespace-nowrap"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M7 10l5 5 5-5" /><path d="M12 15V3" />
+                </svg>
+                Download Sample
+              </button>
+            </div>
+          </div>
+
+          {/* Step 2 — choose the file (dropzone-style) */}
+          <div className="form-group form-group--full">
+            <label className="ui-label">Upload file (.xlsx, .xls or .csv) *</label>
+            <label
+              className={`flex cursor-pointer flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${bulkUploading ? 'pointer-events-none opacity-60' : 'hover:border-primary hover:bg-primary-soft'} ${bulkFile ? 'border-primary bg-primary-soft' : 'border-border-strong bg-surface'}`}
+            >
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                className="sr-only"
+                disabled={bulkUploading}
+                onChange={(e) => setBulkFile(e.target.files?.[0] || null)}
+              />
+              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="text-text-muted">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="M17 8l-5-5-5 5" /><path d="M12 3v12" />
+              </svg>
+              {bulkFile ? (
+                <span className="text-[length:var(--text-base)] font-semibold text-text break-all">{bulkFile.name}</span>
+              ) : (
+                <>
+                  <span className="text-[length:var(--text-base)] font-semibold text-text">Tap to choose a file</span>
+                  <span className="text-[length:var(--text-sm)] text-text-muted">Excel (.xlsx / .xls) or CSV</span>
+                </>
+              )}
+            </label>
+            {bulkFile && (
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <p className="m-0 text-[length:var(--text-sm)] text-text-muted break-all">
+                  {bulkFile.name} · {(bulkFile.size / 1024).toFixed(1)} KB
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setBulkFile(null)}
+                  disabled={bulkUploading}
+                  className="shrink-0 text-[length:var(--text-sm)] font-semibold text-error hover:underline disabled:opacity-50"
+                >
+                  Remove
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </AsidePanel>
     </div>
