@@ -708,18 +708,27 @@ class ProductController {
 
             // Read all files from the directory
             const files = fs.readdirSync(uploadsPath);
-            // MySQL JSON column: filter products whose `image_urls` is a non-empty JSON array.
+            // Every product that references ANY image. We must NOT filter by
+            // JSON_LENGTH(image_urls) > 0: a product with a single image stores
+            // image_urls as a bare string (not an array), and JSON_LENGTH on a
+            // scalar/legacy value can be 1 or NULL depending on the row, so that
+            // filter silently dropped single-image products and marked their
+            // images "unassigned". Pull image_urls for all non-null rows and let
+            // normalizeImageUrls decide.
             const allProducts = await Product.findAll({
-                where: Sequelize.where(
-                    Sequelize.fn('JSON_LENGTH', Sequelize.col('image_urls')),
-                    { [Op.gt]: 0 }
-                ),
+                attributes: ['image_urls'],
+                where: { image_urls: { [Op.ne]: null } },
             });
             // Bare filenames assigned to any product (normalizeImageUrls reduces
             // every stored entry — filename / path / legacy garbage — to a filename).
-            const assignedSet = new Set(
-                allProducts.flatMap((product) => normalizeImageUrls(product.image_urls))
-            );
+            // Keep a lowercased copy too so matching is case-insensitive.
+            const assignedSet = new Set();
+            for (const product of allProducts) {
+                for (const fn of normalizeImageUrls(product.image_urls)) {
+                    assignedSet.add(fn);
+                    assignedSet.add(fn.toLowerCase());
+                }
+            }
 
             // Filter only image files and get their details
             const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
@@ -732,7 +741,7 @@ class ProductController {
                     const filePath = path.join(uploadsPath, file);
                     const stats = fs.statSync(filePath);
                     const url = `/uploads/${PRODUCT_IMAGE_UPLOAD_DIR}/${file}`;
-                    const isAssigned = assignedSet.has(file);
+                    const isAssigned = assignedSet.has(file) || assignedSet.has(file.toLowerCase());
                     return {
                         filename: file,
                         path: filePath,
