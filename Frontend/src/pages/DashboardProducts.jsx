@@ -329,6 +329,10 @@ const DashboardProducts = () => {
             size: item.size, // Include size if available
             uploadedAt: item.uploadedAt, // Include uploadedAt if available
             modifiedAt: item.modifiedAt, // Include modifiedAt if available
+            // Preserve the backend's authoritative assigned flag — without this the
+            // gallery ignored it and every image fell back to the (300-capped)
+            // client cross-reference, showing linked images as "Unassigned".
+            isAssigned: item.isAssigned === true || item.is_assigned === true,
           };
         }).filter(item => item !== null); // Remove any items that couldn't be processed
       }
