@@ -1,3 +1,4 @@
+// Product controller — media gallery isAssigned fix (redeploy trigger).
 const Product = require('../models/Product');
 const { logAudit } = require('../utils/auditLogger');
 const Brand = require('../models/Brand');
