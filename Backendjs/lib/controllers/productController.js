@@ -741,27 +741,34 @@ class ProductController {
 
             // Read all files from the directory
             const files = fs.readdirSync(uploadsPath);
-            // Every product that references ANY image. We must NOT filter by
-            // JSON_LENGTH(image_urls) > 0: a product with a single image stores
-            // image_urls as a bare string (not an array), and JSON_LENGTH on a
-            // scalar/legacy value can be 1 or NULL depending on the row, so that
-            // filter silently dropped single-image products and marked their
-            // images "unassigned". Pull image_urls for all non-null rows and let
-            // normalizeImageUrls decide.
+            // Pull image_urls + model_no for EVERY product (no WHERE filter — a
+            // JSON `image_urls != null` predicate silently returns no rows on some
+            // MySQL/Sequelize combos, which was leaving the assigned set empty and
+            // every image marked "unassigned").
             const allProducts = await Product.findAll({
-                attributes: ['image_urls'],
-                where: { image_urls: { [Op.ne]: null } },
+                attributes: ['image_urls', 'model_no'],
             });
-            // Bare filenames assigned to any product (normalizeImageUrls reduces
-            // every stored entry — filename / path / legacy garbage — to a filename).
-            // Keep a lowercased copy too so matching is case-insensitive.
+            // (1) Bare filenames actually referenced by a product's image_urls.
             const assignedSet = new Set();
+            // (2) model_no set — a file is named "<model_no>-<timestamp>.<ext>", so
+            // a file whose base name matches an existing product's model_no is
+            // assigned (this is exactly how "Link images to products" links them).
+            const modelNoSet = new Set();
             for (const product of allProducts) {
                 for (const fn of normalizeImageUrls(product.image_urls)) {
-                    assignedSet.add(fn);
                     assignedSet.add(fn.toLowerCase());
                 }
+                const mn = String(product.model_no || '').trim().toLowerCase();
+                if (mn) modelNoSet.add(mn);
             }
+            // Recover model_no candidate(s) from a stored filename:
+            // drop ext, then the "-<13-digit timestamp>", then a "-1"/"_2"/"(3)" variant.
+            const modelKeysFromFile = (file) => {
+                const ext = path.extname(file);
+                const base = path.basename(file, ext).replace(/-\d{13}$/, '').trim();
+                const stripped = base.replace(/(?:[\s._-]\d{1,2}|\s*\(\d{1,2}\))$/, '').trim();
+                return [...new Set([base, stripped])].filter(Boolean).map((k) => k.toLowerCase());
+            };
 
             // Filter only image files and get their details
             const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
@@ -774,7 +781,8 @@ class ProductController {
                     const filePath = path.join(uploadsPath, file);
                     const stats = fs.statSync(filePath);
                     const url = `/uploads/${PRODUCT_IMAGE_UPLOAD_DIR}/${file}`;
-                    const isAssigned = assignedSet.has(file) || assignedSet.has(file.toLowerCase());
+                    const isAssigned = assignedSet.has(file.toLowerCase())
+                        || modelKeysFromFile(file).some((k) => modelNoSet.has(k));
                     return {
                         filename: file,
                         path: filePath,
