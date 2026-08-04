@@ -434,7 +434,7 @@ class OrderController {
                 } else {
                     // No trusted on-site location yet -> block until it's captured.
                     return res.status(403).json({
-                        error: 'This party\'s exact location is not captured yet. Tap "I\'m at shop" to capture it here, then place the visit order.',
+                        error: 'This party\'s exact location is not set yet. Open Add/Edit Party and use "I\'m at shop" to set it, then place the visit order.',
                     });
                 }
             }
