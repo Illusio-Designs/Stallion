@@ -5,8 +5,7 @@ const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 const { SalesmanCheckInType } = require('../constants/enums');
-const { checkAddressProximity, checkGeofence } = require('../utils/geo');
-const { ensurePartyCoords } = require('../utils/geocode');
+const { checkGeofence } = require('../utils/geo');
 
 // Enrich check-ins for the Visit Report: add party_name, and for ORDERED
 // check-ins (type='ordered', which carry an order_id) the linked order's
@@ -134,12 +133,9 @@ class SalesmanCheckInsController {
                 return res.status(400).json({ error: validationError });
             }
 
-            // The party's coordinates ALWAYS come from its ADDRESS (geocoded), never
-            // from the salesman's device — so a check-in can't drag the party's pin
-            // onto wherever the salesman is. When a device location is provided (the
-            // salesman app sends it), we geocode the address on demand and only
-            // VERIFY the device is plausibly near it. Check-ins with no device
-            // location (e.g. an admin entering one manually) are not verified.
+            // When a device location is provided, enforce the 250m geofence against
+            // the party's TRUSTED verified location. Party location must be set via
+            // Add/Edit Party ("I'm at shop") — check-in never captures or changes it.
             const hasDeviceLoc = fields.latitude != null && fields.latitude !== '' && fields.longitude != null && fields.longitude !== '';
             if (hasDeviceLoc) {
                 const checkinParty = await Party.findOne({ where: { party_id: fields.party_id } });
@@ -147,17 +143,13 @@ class SalesmanCheckInsController {
                     return res.status(404).json({ error: 'Party not found' });
                 }
                 if (checkinParty.location_source === 'verified' && checkinParty.latitude != null && checkinParty.longitude != null) {
-                    // Trusted on-site location -> enforce the strict 250m geofence
-                    // against the EXACT captured spot.
                     const geo = checkGeofence({ deviceLat: fields.latitude, deviceLng: fields.longitude, party: checkinParty, action: 'check in' });
                     if (!geo.ok) {
                         return res.status(403).json({ error: geo.reason });
                     }
                 } else {
-                    // No trusted on-site location yet -> the 250m geofence can't be
-                    // enforced against an exact spot, so block until it's captured.
                     return res.status(403).json({
-                        error: 'This party\'s exact location is not captured yet. Tap "I\'m at shop" to capture it here, then check in.',
+                        error: 'This party\'s exact location is not set yet. Open Add/Edit Party and use "I\'m at shop" to set it, then check in.',
                     });
                 }
             }
@@ -235,6 +227,26 @@ class SalesmanCheckInsController {
             const validationError = validateCheckInFields(fields);
             if (validationError) {
                 return res.status(400).json({ error: validationError });
+            }
+
+            // Same geofence rules as create — verified location must already be set
+            // on the party; check-in never captures it.
+            const hasDeviceLoc = fields.latitude != null && fields.latitude !== '' && fields.longitude != null && fields.longitude !== '';
+            if (hasDeviceLoc) {
+                const checkinParty = await Party.findOne({ where: { party_id: fields.party_id } });
+                if (!checkinParty) {
+                    return res.status(404).json({ error: 'Party not found' });
+                }
+                if (checkinParty.location_source === 'verified' && checkinParty.latitude != null && checkinParty.longitude != null) {
+                    const geo = checkGeofence({ deviceLat: fields.latitude, deviceLng: fields.longitude, party: checkinParty, action: 'check in' });
+                    if (!geo.ok) {
+                        return res.status(403).json({ error: geo.reason });
+                    }
+                } else {
+                    return res.status(403).json({
+                        error: 'This party\'s exact location is not set yet. Open Add/Edit Party and use "I\'m at shop" to set it, then check in.',
+                    });
+                }
             }
 
             const oldSnapshot = existingCheckIn.toJSON();
