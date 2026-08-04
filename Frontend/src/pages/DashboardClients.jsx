@@ -2,11 +2,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import AsidePanel from '../components/ui/AsidePanel';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import RowActions from '../components/ui/RowActions';
 import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
-import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   bulkUploadParties,
   createParty,
@@ -19,9 +19,9 @@ import {
   updateParty,
   verifyPartyLocation,
 } from '../services/apiService';
-import { captureCurrentPosition } from '../utils/geolocation';
 import { getUser, getUserRole } from '../services/authService';
-import { showError, showSuccess, showInfo } from '../services/notificationService';
+import { showError, showSuccess } from '../services/notificationService';
+import { captureCurrentPosition } from '../utils/geolocation';
 
 const DashboardClients = () => {
   const confirm = useConfirm();
@@ -69,6 +69,10 @@ const DashboardClients = () => {
     credit_days: '',
     prefered_courier: '',
     is_active: true,
+    latitude: null,
+    longitude: null,
+    location_source: null,
+    location_accuracy_m: null,
   });
 
   // Countries load on mount because the listing's default-country filter
@@ -349,9 +353,11 @@ const DashboardClients = () => {
     { key: 'trade_name', label: 'TRADE NAME' },
     { key: 'contact_person', label: 'CONTACT PERSON' },
     { key: 'phone', label: 'PHONE' },
-    { key: 'status', label: 'STATUS', render: (_v, row) => (
-      <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>{row.isActive ? 'Active' : 'Inactive'}</StatusBadge>
-    ) },
+    {
+      key: 'status', label: 'STATUS', render: (_v, row) => (
+        <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>{row.isActive ? 'Active' : 'Inactive'}</StatusBadge>
+      )
+    },
     {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
@@ -453,6 +459,10 @@ const DashboardClients = () => {
       credit_days: '',
       prefered_courier: '',
       is_active: true,
+      latitude: null,
+      longitude: null,
+      location_source: null,
+      location_accuracy_m: null,
     });
   };
 
@@ -511,13 +521,15 @@ const DashboardClients = () => {
     }
   };
 
-  // On-site capture ("I'm at the shop — capture location"). Reads the device GPS
-  // (with accuracy) and sends it to the backend, which validates the fix and
-  // stores it as the party's TRUSTED verified location — the 250m geofence anchor
-  // used for visit orders and check-ins.
-  const handleVerifyLocation = async () => {
+  // On-site capture ("I'm at the shop — capture location").
+  // Add: store GPS in form state and send with create.
+  // Edit (non-admin): only when verified location is not set.
+  // Admin/superadmin: may set or overwrite any party's location with current GPS.
+  const handleCaptureAtShop = async () => {
     const partyId = editRow?.id || editRow?.party_id;
-    if (!partyId) return;
+    const isVerified = (editRow?.location_source || formData.location_source) === 'verified';
+
+    if (isVerified && !isAdmin) return;
 
     try {
       setSavingLoc(true);
@@ -533,19 +545,33 @@ const DashboardClients = () => {
         return;
       }
 
-      const res = await verifyPartyLocation(partyId, pos);
-      const lat = Number(res?.latitude);
-      const lng = Number(res?.longitude);
-      const acc = Number(res?.accuracy);
-      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 250m geofence is now active for this party.`);
-      setParties(prev => prev.map(p => {
-        const id = p.id || p.party_id;
-        return id === partyId ? { ...p, latitude: lat, longitude: lng, location_source: 'verified', location_accuracy_m: acc } : p;
-      }));
-      setEditRow(prev => (prev ? { ...prev, latitude: lat, longitude: lng, location_source: 'verified', location_accuracy_m: acc } : prev));
+      const lat = Number(pos.latitude);
+      const lng = Number(pos.longitude);
+      const acc = Number(pos.accuracy);
+
+      if (editRow && partyId) {
+        const res = await verifyPartyLocation(partyId, pos);
+        const savedLat = Number(res?.latitude);
+        const savedLng = Number(res?.longitude);
+        const savedAcc = Number(res?.accuracy);
+        showSuccess(`Location verified & saved${Number.isFinite(savedAcc) ? ` (±${Math.round(savedAcc)}m)` : ''}. The 250m geofence is now active for this party.`);
+        setParties(prev => prev.map(p => {
+          const id = p.id || p.party_id;
+          return id === partyId ? { ...p, latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc } : p;
+        }));
+        setEditRow(prev => (prev ? { ...prev, latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc } : prev));
+        setFormData(prev => ({ ...prev, latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          latitude: lat,
+          longitude: lng,
+          location_source: 'verified',
+          location_accuracy_m: Number.isFinite(acc) ? acc : null,
+        }));
+        showSuccess(`Shop location captured${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. It will be saved when you create the party.`);
+      }
     } catch (err) {
-      // 422 -> validation failure (weak GPS or too far from the address); the
-      // backend message is already user-friendly.
       showError(err?.message || 'Could not verify location. Please try again from the shop.');
     } finally {
       setSavingLoc(false);
@@ -610,6 +636,10 @@ const DashboardClients = () => {
         credit_days: row.credit_days || '',
         prefered_courier: row.prefered_courier || row.preferred_courier || '',
         is_active: row.is_active !== false,
+        latitude: row.latitude ?? null,
+        longitude: row.longitude ?? null,
+        location_source: row.location_source || null,
+        location_accuracy_m: row.location_accuracy_m ?? null,
       });
 
       // Store the complete row object with ensured ID
@@ -772,7 +802,7 @@ const DashboardClients = () => {
     }
     // Email is optional; only validate the format when one is entered.
     if (String(formData.email || '').trim() !== '' &&
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(formData.email).trim())) {
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(formData.email).trim())) {
       showError('Please enter a valid email address.');
       setLoading(false);
       return;
@@ -861,8 +891,12 @@ const DashboardClients = () => {
         prefered_courier: formData.prefered_courier && formData.prefered_courier.trim() !== '' ? String(formData.prefered_courier).trim() : null,
         billing_same_as_shipping: formData.billing_same_as_shipping !== false,
         billing_address: formData.billing_same_as_shipping === false ? String(formData.billing_address || '') : null,
-        is_active: formData.is_active !== false,
       };
+      // Only admin may change active status — sending is_active from other roles
+      // makes the backend return 403 and the whole edit fails.
+      if (isAdmin) {
+        dataToSend.is_active = formData.is_active !== false;
+      }
 
       console.log('[Update] Form data state/city/zone:', {
         state_id: formData.state_id,
@@ -876,7 +910,8 @@ const DashboardClients = () => {
       });
 
       // Final validation: ensure no undefined values and all fields are present
-      const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'billing_address', 'billing_same_as_shipping', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier', 'is_active'];
+      const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'billing_address', 'billing_same_as_shipping', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier'];
+      if (isAdmin) allFields.push('is_active');
       allFields.forEach(key => {
         if (dataToSend[key] === undefined) {
           console.warn(`[DashboardClients] Undefined value detected for ${key}, setting to default`);
@@ -896,25 +931,17 @@ const DashboardClients = () => {
       console.log('[DashboardClients] Has undefined:', Object.values(dataToSend).some(v => v === undefined));
       console.log('[DashboardClients] All fields present:', allFields.every(f => dataToSend.hasOwnProperty(f)));
 
-      // A SALESMAN registering a new party is physically at the shop, so capture
-      // their device GPS and send it — the backend saves it as the party's true
-      // location (trusted) for the visit geofence. Salesman + create only;
-      // best-effort (proceed without it if permission is denied/unavailable).
-      if (isSalesman && !editRow) {
-        try {
-          const coords = await new Promise((resolve) => {
-            if (typeof navigator === 'undefined' || !navigator.geolocation) return resolve(null);
-            navigator.geolocation.getCurrentPosition(
-              (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-              () => resolve(null),
-              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-            );
-          });
-          if (coords) {
-            dataToSend.latitude = coords.latitude;
-            dataToSend.longitude = coords.longitude;
-          }
-        } catch (_) { /* fall back to address geocoding on the backend */ }
+      // On create, send an on-site capture from "I'm at shop" when the user
+      // captured one. Backend validates and stores it as location_source=verified.
+      if (!editRow
+        && formData.location_source === 'verified'
+        && Number.isFinite(Number(formData.latitude))
+        && Number.isFinite(Number(formData.longitude))) {
+        dataToSend.latitude = Number(formData.latitude);
+        dataToSend.longitude = Number(formData.longitude);
+        if (Number.isFinite(Number(formData.location_accuracy_m))) {
+          dataToSend.accuracy = Number(formData.location_accuracy_m);
+        }
       }
 
       if (editRow) {
@@ -927,112 +954,74 @@ const DashboardClients = () => {
           return;
         }
 
-        // Update table optimistically FIRST (before API call) - this ensures UI updates immediately
-        setParties(prev => prev.map(p => {
-          const id = p.id || p.party_id || p._id;
-          if (id === partyId.trim()) {
-            return {
-              ...p,
-              party_name: dataToSend.party_name,
-              trade_name: dataToSend.trade_name,
-              contact_person: dataToSend.contact_person,
-              email: dataToSend.email,
-              phone: dataToSend.phone,
-              address: dataToSend.address,
-              country_id: dataToSend.country_id,
-              state_id: dataToSend.state_id,
-              city_id: dataToSend.city_id,
-              zone_id: dataToSend.zone_id,
-              pincode: dataToSend.pincode,
-              gstin: dataToSend.gstin,
-              pan: dataToSend.pan,
-              credit_days: dataToSend.credit_days,
-              prefered_courier: dataToSend.prefered_courier,
-              id: id
-            };
-          }
-          return p;
-        }));
+        try {
+          const updatedParty = await updateParty(partyId.trim(), dataToSend);
 
-        // Close modal immediately for better UX
-        setOpenAdd(false);
-        setEditRow(null);
-        resetForm();
-        showSuccess('Party updated successfully!');
-
-        // Try API call in background - if it fails with init error, just refresh data
-        // Wrap in async IIFE to prevent any errors from bubbling up
-        (async () => {
-          try {
-            try {
-              const updatedParty = await updateParty(partyId.trim(), dataToSend);
-
-              // Update with server response if available
-              setParties(prev => prev.map(p => {
-                const id = p.id || p.party_id || p._id;
-                if (id === partyId.trim()) {
-                  return {
-                    ...p,
-                    ...updatedParty,
-                    // Ensure state/city/zone from our data are preserved
-                    state_id: dataToSend.state_id || updatedParty.state_id || null,
-                    city_id: dataToSend.city_id || updatedParty.city_id || null,
-                    zone_id: dataToSend.zone_id || updatedParty.zone_id || null,
-                    id: id
-                  };
-                }
-                return p;
-              }));
-
-              // Refresh data to ensure we have latest
-              if (selectedCountryFilter) {
-                await fetchPartiesForCountry(selectedCountryFilter);
-              }
-            } catch (apiError) {
-              // Check if it's the initialization error - check both the flag and message
-              const errorMsg = String(apiError.message || apiError.error || JSON.stringify(apiError) || '').toLowerCase();
-              const isInitError = apiError.isInitializationError ||
-                errorMsg.includes("cannot access 'party' before initialization") ||
-                (errorMsg.includes("cannot access") && errorMsg.includes("before initialization"));
-
-              if (isInitError) {
-                // Backend error but update might have succeeded - just refresh to verify
-                // DO NOT show error to user - this is a backend timing issue
-                console.warn('[Update] Backend initialization error detected (suppressed), refreshing data to verify update...');
-                try {
-                  if (selectedCountryFilter) {
-                    await fetchPartiesForCountry(selectedCountryFilter);
-                  }
-                } catch (fetchError) {
-                  console.error('[Update] Failed to refresh data:', fetchError);
-                }
-                return;
-              }
-              // If it's a different error, log it but don't show to user (we already updated optimistically)
-              console.error('[Update] API error (non-critical):', apiError);
-              // Refresh data anyway to ensure consistency
-              try {
-                if (selectedCountryFilter) {
-                  await fetchPartiesForCountry(selectedCountryFilter);
-                }
-              } catch (fetchError) {
-                console.error('[Update] Failed to refresh data:', fetchError);
-              }
+          setParties(prev => prev.map(p => {
+            const id = p.id || p.party_id || p._id;
+            if (id === partyId.trim()) {
+              return {
+                ...p,
+                ...updatedParty,
+                party_name: dataToSend.party_name,
+                trade_name: dataToSend.trade_name,
+                contact_person: dataToSend.contact_person,
+                email: dataToSend.email,
+                phone: dataToSend.phone,
+                address: dataToSend.address,
+                country_id: dataToSend.country_id,
+                state_id: dataToSend.state_id || updatedParty?.state_id || null,
+                city_id: dataToSend.city_id || updatedParty?.city_id || null,
+                zone_id: dataToSend.zone_id || updatedParty?.zone_id || null,
+                pincode: dataToSend.pincode,
+                gstin: dataToSend.gstin,
+                pan: dataToSend.pan,
+                credit_days: dataToSend.credit_days,
+                prefered_courier: dataToSend.prefered_courier,
+                ...(isAdmin ? { is_active: dataToSend.is_active } : {}),
+                id: id
+              };
             }
-          } catch (error) {
-            // Outer catch - prevent any errors from bubbling up
-            console.error('[Update] Outer error (suppressed):', error);
+            return p;
+          }));
+
+          setOpenAdd(false);
+          setEditRow(null);
+          resetForm();
+          showSuccess('Party updated successfully!');
+          setError(null);
+
+          if (selectedCountryFilter) {
+            await fetchPartiesForCountry(selectedCountryFilter);
+          }
+        } catch (apiError) {
+          const errorMsg = String(apiError.message || apiError.error || 'Failed to update party');
+          const isInitError = apiError.isInitializationError ||
+            errorMsg.toLowerCase().includes("cannot access 'party' before initialization") ||
+            (errorMsg.toLowerCase().includes('cannot access') && errorMsg.toLowerCase().includes('before initialization'));
+
+          if (isInitError) {
+            // Backend timing quirk — refresh to verify whether the update landed.
+            console.warn('[Update] Backend initialization error detected, refreshing data...');
             try {
               if (selectedCountryFilter) {
                 await fetchPartiesForCountry(selectedCountryFilter);
               }
+              setOpenAdd(false);
+              setEditRow(null);
+              resetForm();
+              showSuccess('Party updated successfully!');
+              setError(null);
             } catch (fetchError) {
               console.error('[Update] Failed to refresh data:', fetchError);
+              showError(errorMsg);
+              setError(errorMsg);
             }
+          } else {
+            showError(errorMsg);
+            setError(errorMsg);
           }
-        })();
-
-        setError(null);
+        }
       } else {
         // Create new party. The backend creates the party's login user itself
         // (findOrCreateRoleUser by phone, and it ignores any user_id we send), so
@@ -1426,7 +1415,7 @@ const DashboardClients = () => {
           onChange={(e) => handleInputChange('prefered_courier', e.target.value)}
         />
       </div>
-      {editRow && (
+      {editRow && isAdmin && (
         <div className="form-group form-group--full">
           <label className="flex cursor-pointer items-center gap-2">
             <input
@@ -1439,38 +1428,48 @@ const DashboardClients = () => {
           </label>
         </div>
       )}
-      {editRow && (isAdmin || isSalesman) && (
-        <div className="form-group form-group--full rounded-lg border border-border bg-surface-muted p-3">
-          <label className="ui-label">Party Location (visit geofence)</label>
-          <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
-            {editRow.location_source === 'verified'
-              ? `✅ Verified on-site${Number.isFinite(Number(editRow.location_accuracy_m)) ? ` (±${Math.round(Number(editRow.location_accuracy_m))}m)` : ''}. The strict 250m geofence is active for visit orders and check-ins.`
-              : 'Not verified yet. Stand at the shop and tap “Capture location” to lock the exact spot — the 250m geofence turns on once it is verified.'}
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            {editRow.location_source !== 'verified' && (
-              <button type="button" className="ui-btn ui-btn--primary" onClick={handleVerifyLocation} disabled={savingLoc}>
-                {savingLoc ? 'Capturing…' : 'I’m at shop'}
-              </button>
-            )}
-            {Number.isFinite(Number(editRow.latitude)) && Number.isFinite(Number(editRow.longitude)) && (
-              <a
-                className="ui-btn ui-btn--secondary inline-flex items-center gap-1"
-                href={`https://www.google.com/maps/search/?api=1&query=${Number(editRow.latitude)},${Number(editRow.longitude)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                View on map
-              </a>
+      {(isAdmin || isSalesman || isDistributor || userRole === 'party_manager' || userRole === 'sales_manager') && (() => {
+        const locLat = editRow?.latitude ?? formData.latitude;
+        const locLng = editRow?.longitude ?? formData.longitude;
+        const locSource = editRow?.location_source || formData.location_source;
+        const locAcc = editRow?.location_accuracy_m ?? formData.location_accuracy_m;
+        const hasLocationSet = Number.isFinite(Number(locLat)) && Number.isFinite(Number(locLng));
+        const isVerified = locSource === 'verified';
+        // Admin/superadmin may always set or overwrite. Other roles: only when not verified.
+        const canCapture = isAdmin || !isVerified;
+        return (
+          <div className="form-group form-group--full rounded-lg border border-border bg-surface-muted p-3">
+            <label className="ui-label">Party Location (visit geofence)</label>
+            <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
+              {isVerified
+                ? `✅ Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. The strict 250m geofence is active for visit orders and check-ins.${isAdmin ? ' You can press “I’m at shop” again to overwrite with your current location.' : ''}`
+                : 'Stand at the shop and tap below to lock the exact spot — the 250m geofence turns on once it is verified.'}
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {canCapture && (
+                <button type="button" className="ui-btn ui-btn--primary" onClick={handleCaptureAtShop} disabled={savingLoc}>
+                  {savingLoc ? 'Capturing…' : 'I’m at shop'}
+                </button>
+              )}
+              {hasLocationSet && (
+                <a
+                  className="ui-btn ui-btn--secondary inline-flex items-center gap-1"
+                  href={`https://www.google.com/maps/search/?api=1&query=${Number(locLat)},${Number(locLng)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  View on map
+                </a>
+              )}
+            </div>
+            {hasLocationSet && (
+              <p className="mt-2 mb-0 text-[length:var(--text-xs)] text-text-subtle">
+                {Number(locLat).toFixed(5)}, {Number(locLng).toFixed(5)}
+              </p>
             )}
           </div>
-          {Number.isFinite(Number(editRow.latitude)) && Number.isFinite(Number(editRow.longitude)) && (
-            <p className="mt-2 mb-0 text-[length:var(--text-xs)] text-text-subtle">
-              {Number(editRow.latitude).toFixed(5)}, {Number(editRow.longitude).toFixed(5)}
-            </p>
-          )}
-        </div>
-      )}
+        );
+      })()}
     </>
   );
 

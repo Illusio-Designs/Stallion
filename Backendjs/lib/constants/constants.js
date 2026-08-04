@@ -5,6 +5,8 @@ const allowedNumbers = [
     '+917603030303',
     '+917600046416',
     '+917600032916',
+    '+916353122769',
+    '+916378667429'
 ];
 
 module.exports = { allowedNumbers };

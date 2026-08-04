@@ -1,46 +1,43 @@
-import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import TableWithControls from '../components/ui/TableWithControls';
-import AsidePanel from '../components/ui/AsidePanel';
-import RowActions from '../components/ui/RowActions';
-import StatusBadge from '../components/ui/StatusBadge';
-import DropdownSelector from '../components/ui/DropdownSelector';
-import DatePicker from '../components/ui/DatePicker';
-import DateRangePicker from '../components/ui/DateRangePicker';
-import FileUpload from '../components/ui/FileUpload';
-import MatchMeter from '../components/ui/MatchMeter';
-import { useConfirm } from '../components/ui/ConfirmProvider';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
+import AsidePanel from '../components/ui/AsidePanel';
+import { useConfirm } from '../components/ui/ConfirmProvider';
+import DatePicker from '../components/ui/DatePicker';
+import DateRangePicker from '../components/ui/DateRangePicker';
+import DropdownSelector from '../components/ui/DropdownSelector';
+import FileUpload from '../components/ui/FileUpload';
+import MatchMeter from '../components/ui/MatchMeter';
+import RowActions from '../components/ui/RowActions';
+import StatusBadge from '../components/ui/StatusBadge';
+import TableWithControls from '../components/ui/TableWithControls';
 import {
-  getSalesmen,
-  getSalesmanProfile,
   createSalesman,
-  updateSalesman,
-  deleteSalesman,
-  getCountries,
-  getStates,
-  getCities,
-  getAllZones,
-  register,
-  getRoles,
-  getAllSalesmanCheckins,
-  getSalesmanCheckins,
   createSalesmanCheckin,
-  updateSalesmanCheckin,
-  deleteSalesmanCheckin,
-  getAllSalesmanTargets,
-  getSalesmanTargets,
   createSalesmanTarget,
-  updateSalesmanTarget,
+  deleteSalesman,
   deleteSalesmanTarget,
-  getParties,
-  getMyParties,
+  getAllSalesmanCheckins,
+  getAllSalesmanTargets,
+  getAllZones,
+  getCities,
+  getCountries,
   getMyOrders,
-  verifyPartyLocation,
+  getMyParties,
+  getParties,
+  getRoles,
+  getSalesmanCheckins,
+  getSalesmanProfile,
+  getSalesmanTargets,
+  getSalesmen,
+  getStates,
+  register,
+  updateSalesman,
+  updateSalesmanCheckin,
+  updateSalesmanTarget
 } from '../services/apiService';
-import { captureCurrentPosition } from '../utils/geolocation';
-import { showSuccess, showError } from '../services/notificationService';
 import { getUser, getUserRole } from '../services/authService';
+import { showError, showSuccess } from '../services/notificationService';
 
 // Geofence radius used when a visit/order is recorded (mirror of the backend
 // GEOFENCE_RADIUS_M). A recorded location within this distance of the party's
@@ -289,7 +286,6 @@ const DashboardSuppliers = () => {
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
   const [zoneParties, setZoneParties] = useState([]); // parties for salesman's zones
-  const [verifyingLoc, setVerifyingLoc] = useState(false); // on-site capture in progress
   const [mySalesmanId, setMySalesmanId] = useState(''); // current salesman's own salesman_id
   const [allPartiesLookup, setAllPartiesLookup] = useState([]); // all parties for name lookup in tables
 
@@ -310,7 +306,7 @@ const DashboardSuppliers = () => {
   const [targetForm, setTargetForm] = useState({
     salesman_id: '', target_amount: '', start_date: '', end_date: '', order_type: '', target_description: '', target_remarks: '',
   });
-  
+
   const [formData, setFormData] = useState({
     employee_code: '',
     alternate_phone: '',
@@ -346,8 +342,8 @@ const DashboardSuppliers = () => {
       const countriesData = await getCountries();
       setCountries(countriesData || []);
     } catch (error) {
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         setError(`Failed to load countries: ${error.message}`);
       }
     }
@@ -360,7 +356,7 @@ const DashboardSuppliers = () => {
       setHasSearched(false);
       return;
     }
-    
+
     setLoading(true);
     setError(null);
     setHasSearched(false);
@@ -373,12 +369,12 @@ const DashboardSuppliers = () => {
         setLoading(false);
         return;
       }
-      
+
       console.log('[fetchSalesmenForCountry] Fetching salesmen for country:', cleanCountryId);
       const salesmenData = await getSalesmen(cleanCountryId);
-      
+
       console.log('[fetchSalesmenForCountry] Received', salesmenData?.length || 0, 'salesmen from API');
-      
+
       // CRITICAL: Backend returns wrong data, so we MUST filter strictly
       // Filter out ALL salesmen that don't match the requested country
       const validSalesmen = (salesmenData || []).filter(d => {
@@ -386,10 +382,10 @@ const DashboardSuppliers = () => {
           console.warn('[fetchSalesmenForCountry] Skipping null/undefined salesman');
           return false;
         }
-        
+
         const salesmanCountryId = String(d.country_id || d.countryId || '').trim();
         const matches = salesmanCountryId === cleanCountryId;
-        
+
         if (!matches) {
           console.warn('[fetchSalesmenForCountry] ❌ REJECTING salesman - country mismatch:', {
             salesman_id: d.id || d.salesman_id,
@@ -407,13 +403,13 @@ const DashboardSuppliers = () => {
         }
         return matches;
       });
-      
+
       const filteredOut = salesmenData.length - validSalesmen.length;
       if (filteredOut > 0) {
         console.warn('[fetchSalesmenForCountry] ⚠️ Backend returned', filteredOut, 'salesmen with WRONG country_id!');
         console.warn('[fetchSalesmenForCountry] This is a backend issue - it should filter by country_id');
       }
-      
+
       if (validSalesmen.length > 0) {
         console.log('[fetchSalesmenForCountry] ✅ Found', validSalesmen.length, 'valid salesmen for country:', cleanCountryId);
       } else {
@@ -422,7 +418,7 @@ const DashboardSuppliers = () => {
           console.warn('[fetchSalesmenForCountry] ⚠️ Backend returned', salesmenData.length, 'salesmen but none matched the requested country');
         }
       }
-      
+
       // Force update by creating a new array reference
       const newSalesmen = Array.isArray(validSalesmen) ? [...validSalesmen] : [];
       console.log('[fetchSalesmenForCountry] Setting', newSalesmen.length, 'salesmen for country:', cleanCountryId);
@@ -431,14 +427,14 @@ const DashboardSuppliers = () => {
     } catch (error) {
       console.error('[fetchSalesmenForCountry] Error:', error);
       const errorMessage = error.message?.toLowerCase() || '';
-      const isNotFound = errorMessage.includes('salesmen not found') || 
-                        errorMessage.includes('no salesmen found') ||
-                        errorMessage.includes('salesman not found') ||
-                        error.statusCode === 404;
-      
-      if (!isNotFound && 
-          !errorMessage.includes('token expired') && 
-          !errorMessage.includes('unauthorized')) {
+      const isNotFound = errorMessage.includes('salesmen not found') ||
+        errorMessage.includes('no salesmen found') ||
+        errorMessage.includes('salesman not found') ||
+        error.statusCode === 404;
+
+      if (!isNotFound &&
+        !errorMessage.includes('token expired') &&
+        !errorMessage.includes('unauthorized')) {
         setError(`Failed to load salesmen: ${error.message}`);
         showError(`Failed to load salesmen: ${error.message}`);
       }
@@ -528,9 +524,9 @@ const DashboardSuppliers = () => {
       // Step 5: filter by zone — if no zones assigned, show all parties for the country
       const filtered = zoneIds.length > 0
         ? partiesArr.filter(p => {
-            const partyZoneId = String(p.zone_id || p.zoneId || '').trim();
-            return zoneIds.includes(partyZoneId);
-          })
+          const partyZoneId = String(p.zone_id || p.zoneId || '').trim();
+          return zoneIds.includes(partyZoneId);
+        })
         : partiesArr;
 
       console.log('[fetchZoneParties] Filtered parties:', filtered.length);
@@ -671,8 +667,8 @@ const DashboardSuppliers = () => {
   // Set India as default country filter (only once when countries are loaded)
   useEffect(() => {
     if (countries.length > 0 && !selectedCountryFilter && !hasSetDefaultCountry.current) {
-      const india = countries.find(c => 
-        c.name?.toLowerCase() === 'india' || 
+      const india = countries.find(c =>
+        c.name?.toLowerCase() === 'india' ||
         c.code?.toLowerCase() === 'in'
       );
       if (india) {
@@ -734,7 +730,7 @@ const DashboardSuppliers = () => {
       fetchCheckins();
       // For admin: fetch all parties for name lookup
       if (!isSalesman) {
-        getParties().then(data => setAllPartiesLookup(Array.isArray(data) ? data : [])).catch(() => {});
+        getParties().then(data => setAllPartiesLookup(Array.isArray(data) ? data : [])).catch(() => { });
       }
     }
     if (mainTab === 'Targets') fetchTargets();
@@ -785,24 +781,28 @@ const DashboardSuppliers = () => {
     { key: 'full_name', label: 'NAME' },
     { key: 'phone', label: 'PHONE' },
     { key: 'email', label: 'EMAIL' },
-    { key: 'status', label: 'STATUS', render: (_v, row) => (
-      <button
-        type="button"
-        onClick={() => handleToggleActive(row)}
-        title={row.isActive ? 'Active — click to deactivate' : 'Inactive — click to activate'}
-        className="cursor-pointer border-0 bg-transparent p-0"
-      >
-        <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>
-          {row.isActive ? 'Active' : 'Inactive'}
-        </StatusBadge>
-      </button>
-    ) },
-    { key: 'action', label: 'ACTION', render: (_v, row) => (
-      <RowActions
-        onEdit={() => handleEdit(row)}
-        onDelete={() => handleDelete(row)}
-      />
-    ) },
+    {
+      key: 'status', label: 'STATUS', render: (_v, row) => (
+        <button
+          type="button"
+          onClick={() => handleToggleActive(row)}
+          title={row.isActive ? 'Active — click to deactivate' : 'Inactive — click to activate'}
+          className="cursor-pointer border-0 bg-transparent p-0"
+        >
+          <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>
+            {row.isActive ? 'Active' : 'Inactive'}
+          </StatusBadge>
+        </button>
+      )
+    },
+    {
+      key: 'action', label: 'ACTION', render: (_v, row) => (
+        <RowActions
+          onEdit={() => handleEdit(row)}
+          onDelete={() => handleDelete(row)}
+        />
+      )
+    },
   ]), []);
 
   const rows = useMemo(() => {
@@ -870,14 +870,14 @@ const DashboardSuppliers = () => {
       showError('Invalid salesman data: row is null or undefined');
       return;
     }
-    
+
     const salesmanId = row.id || row.salesman_id || row.salesmanId;
     if (!salesmanId) {
       console.error('Edit failed: Missing salesman ID', row);
       showError('Invalid salesman data: missing ID. Please refresh the page and try again.');
       return;
     }
-    
+
     isInitializingEditRef.current = true;
     setFormData({
       employee_code: row.employee_code || '',
@@ -918,7 +918,7 @@ const DashboardSuppliers = () => {
         await fetchCities(row.state_id);
       }
     }
-    
+
     // Reset the flag after a short delay to allow useEffect to process
     setTimeout(() => {
       isInitializingEditRef.current = false;
@@ -1009,7 +1009,7 @@ const DashboardSuppliers = () => {
 
     // Get phone number from salesman to find associated user
     const salesmanPhone = row.phone || row.phoneNumber || '';
-    
+
     // Also check if user_id is directly available in the row
     const userId = row.user_id || row.userId;
 
@@ -1024,14 +1024,14 @@ const DashboardSuppliers = () => {
       setLoading(true);
       setError(null);
       console.log('[Delete Salesman] Deleting salesman with ID:', salesmanId);
-      
+
       // Delete salesman first
       await deleteSalesman(salesmanId);
       console.log('[Delete Salesman] Salesman deleted successfully');
-      
+
       // Now find and delete associated user account
       let userToDelete = null;
-      
+
       // First, try to use user_id if available
       if (userId) {
         try {
@@ -1046,13 +1046,13 @@ const DashboardSuppliers = () => {
           console.warn('[Delete Salesman] Failed to delete user by user_id, trying by phone:', userDeleteError);
         }
       }
-      
+
       // If user_id not available or deletion failed, try finding by phone number
       if (salesmanPhone) {
         try {
           const { getUsers, deleteUser } = await import('../services/apiService');
           console.log('[Delete Salesman] Finding user account with phone:', salesmanPhone);
-          
+
           // Get all users
           const usersResponse = await getUsers();
           let usersArray = [];
@@ -1063,28 +1063,28 @@ const DashboardSuppliers = () => {
           } else if (usersResponse && Array.isArray(usersResponse.users)) {
             usersArray = usersResponse.users;
           }
-          
+
           console.log('[Delete Salesman] Total users found:', usersArray.length);
-          
+
           // Normalize phone numbers for comparison (remove +, spaces, dashes)
           const normalizePhone = (phone) => {
             if (!phone) return '';
             return String(phone).trim().replace(/^\+/, '').replace(/[\s-]/g, '');
           };
-          
+
           const normalizedSalesmanPhone = normalizePhone(salesmanPhone);
-          
+
           // Find user by phone number
           const foundUser = usersArray.find(u => {
             const userPhone = (u.phone || u.phoneNumber || '').trim();
             const normalizedUserPhone = normalizePhone(userPhone);
-            
-            return userPhone === salesmanPhone || 
-                   normalizedUserPhone === normalizedSalesmanPhone ||
-                   userPhone === `+${salesmanPhone}` ||
-                   `+${userPhone}` === salesmanPhone;
+
+            return userPhone === salesmanPhone ||
+              normalizedUserPhone === normalizedSalesmanPhone ||
+              userPhone === `+${salesmanPhone}` ||
+              `+${userPhone}` === salesmanPhone;
           });
-          
+
           if (foundUser) {
             const foundUserId = foundUser.user_id || foundUser.id;
             console.log('[Delete Salesman] Found associated user account:', {
@@ -1092,7 +1092,7 @@ const DashboardSuppliers = () => {
               userPhone: foundUser.phone || foundUser.phoneNumber,
               userName: foundUser.full_name || foundUser.name
             });
-            
+
             try {
               await deleteUser(foundUserId);
               console.log('[Delete Salesman] User account deleted successfully');
@@ -1124,11 +1124,11 @@ const DashboardSuppliers = () => {
         console.warn('[Delete Salesman] Salesman row data:', row);
         showSuccess('Salesman deleted successfully');
       }
-      
+
       setError(null);
     } catch (error) {
       console.error('[Delete Salesman] Delete salesman error:', error);
-      
+
       // Revert optimistic update on error
       if (selectedCountryFilter) {
         await fetchSalesmenForCountry(selectedCountryFilter);
@@ -1136,9 +1136,9 @@ const DashboardSuppliers = () => {
         // If no filter, we can't easily restore, so just show error
         setError(`Failed to delete: ${error.message}`);
       }
-      
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         showError(`Failed to delete salesman: ${error.message}`);
       }
     } finally {
@@ -1148,7 +1148,7 @@ const DashboardSuppliers = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     // Validate required fields. Use toasts (not setError) so the form/aside
     // panel stays open instead of being replaced by the page error state.
     if (!formData.employee_code || formData.employee_code.trim() === '') {
@@ -1179,21 +1179,21 @@ const DashboardSuppliers = () => {
     try {
       setLoading(true);
       setError(null);
-      
+
       // Get current logged-in user ID - required for salesman creation/update
       const currentUser = getUser();
       const currentUserId = currentUser?.id || currentUser?.user_id || currentUser?.user_id || null;
-      
+
       if (!currentUserId) {
         setError('User session not found. Please log in again.');
         showError('User session not found. Please log in again.');
         setLoading(false);
         return;
       }
-      
+
       // Handle reporting_manager - must be null (not empty string) if not provided, to satisfy foreign key constraint
       const trimmedReportingManager = formData.reporting_manager ? String(formData.reporting_manager).trim() : '';
-      
+
       const dataToSend = {
         user_id: editRow?.user_id || currentUserId,
         employee_code: formData.employee_code.trim(),
@@ -1212,9 +1212,9 @@ const DashboardSuppliers = () => {
         state_ids: Array.isArray(formData.state_ids) ? formData.state_ids : [],
         zone_preference: Array.isArray(formData.zones) && formData.zones.length > 0
           ? formData.zones.map(zid => {
-              const z = zones.find(z => (z.zone_id || z.id) === zid);
-              return z ? (z.zone_name || z.name || '') : '';
-            }).filter(Boolean).join(', ')
+            const z = zones.find(z => (z.zone_id || z.id) === zid);
+            return z ? (z.zone_name || z.name || '') : '';
+          }).filter(Boolean).join(', ')
           : '',
         joining_date: formData.joining_date ? new Date(formData.joining_date).toISOString() : new Date().toISOString(),
         is_active: formData.is_active !== false, // account active/inactive
@@ -1234,7 +1234,7 @@ const DashboardSuppliers = () => {
           setLoading(false);
           return;
         }
-        
+
         // Optimistically update the salesman in the table immediately
         const updatedSalesman = {
           ...editRow,
@@ -1242,20 +1242,20 @@ const DashboardSuppliers = () => {
           is_active: editRow.is_active !== undefined ? editRow.is_active : true,
           id: salesmanId,
         };
-        
+
         setSalesmen(prev => prev.map(s => {
           const id = s.id || s.salesman_id || s.salesmanId;
           return id === salesmanId ? updatedSalesman : s;
         }));
-        
+
         console.log('Updating salesman with ID:', salesmanId, 'Data:', dataToSend);
-        
+
         try {
-          await updateSalesman(salesmanId, { 
-            ...dataToSend, 
-            is_active: editRow.is_active !== undefined ? editRow.is_active : true 
+          await updateSalesman(salesmanId, {
+            ...dataToSend,
+            is_active: editRow.is_active !== undefined ? editRow.is_active : true
           });
-          
+
           // Show success notification
           showSuccess('Salesman updated successfully');
           setError(null);
@@ -1264,14 +1264,14 @@ const DashboardSuppliers = () => {
           resetForm();
         } catch (error) {
           console.error('Update salesman error:', error);
-          
+
           // Revert optimistic update on error by refetching
           if (selectedCountryFilter) {
             await fetchSalesmenForCountry(selectedCountryFilter);
           }
-          
-          if (!error.message?.toLowerCase().includes('token expired') && 
-              !error.message?.toLowerCase().includes('unauthorized')) {
+
+          if (!error.message?.toLowerCase().includes('token expired') &&
+            !error.message?.toLowerCase().includes('unauthorized')) {
             showError(`Failed to update salesman: ${error.message}`);
           }
           setLoading(false);
@@ -1335,7 +1335,7 @@ const DashboardSuppliers = () => {
           };
 
           const newSalesman = await createSalesman(salesmanData);
-          
+
           // Optimistically add to table if it matches the current filter
           if (selectedCountryFilter && newSalesman && newSalesman.country_id === selectedCountryFilter) {
             setSalesmen(prev => [...prev, {
@@ -1347,7 +1347,7 @@ const DashboardSuppliers = () => {
             // If country doesn't match filter, just refresh
             await fetchSalesmenForCountry(selectedCountryFilter);
           }
-          
+
           // Show success notification
           showSuccess('Salesman created successfully');
           setError(null);
@@ -1356,14 +1356,14 @@ const DashboardSuppliers = () => {
           resetForm();
         } catch (createError) {
           console.error('Create salesman error:', createError);
-          
+
           // Revert by refreshing if needed
           if (selectedCountryFilter) {
             await fetchSalesmenForCountry(selectedCountryFilter);
           }
-          
-          if (!createError.message?.toLowerCase().includes('token expired') && 
-              !createError.message?.toLowerCase().includes('unauthorized')) {
+
+          if (!createError.message?.toLowerCase().includes('token expired') &&
+            !createError.message?.toLowerCase().includes('unauthorized')) {
             showError(`Failed to create salesman: ${createError.message}`);
             setError(`Failed to save: ${createError.message}`);
           }
@@ -1373,8 +1373,8 @@ const DashboardSuppliers = () => {
       }
     } catch (error) {
       // This catch block only handles create errors (update errors are handled above)
-      if (!error.message?.toLowerCase().includes('token expired') && 
-          !error.message?.toLowerCase().includes('unauthorized')) {
+      if (!error.message?.toLowerCase().includes('token expired') &&
+        !error.message?.toLowerCase().includes('unauthorized')) {
         showError(`Failed to create salesman: ${error.message}`);
         setError(`Failed to save: ${error.message}`);
       }
@@ -1393,35 +1393,6 @@ const DashboardSuppliers = () => {
   // salesman can adjust. Done here (a client-side user action) — not in the
   // initial state — to avoid an SSR/client hydration mismatch from new Date().
   const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: nowDatetimeLocal(), out_time: nowDatetimeLocal(), next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
-
-  // On-site capture ("I'm at shop") for the check-in's selected party — sets its
-  // TRUSTED verified location so the 250m check-in geofence turns on.
-  const handleVerifyCheckinPartyLocation = async () => {
-    if (!checkinForm.party_id) return;
-    try {
-      setVerifyingLoc(true);
-      let pos;
-      try {
-        pos = await captureCurrentPosition();
-      } catch (geoErr) {
-        showError(geoErr?.message || 'Could not get your location. Please try again.');
-        return;
-      }
-      const res = await verifyPartyLocation(checkinForm.party_id, pos);
-      const acc = Number(res?.accuracy);
-      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 250m geofence is now active for this party.`);
-      setZoneParties(prev => prev.map(p => {
-        const id = p.party_id || p.id;
-        return id === checkinForm.party_id
-          ? { ...p, latitude: Number(res?.latitude), longitude: Number(res?.longitude), location_source: 'verified', location_accuracy_m: acc }
-          : p;
-      }));
-    } catch (err) {
-      showError(err?.message || 'Could not verify location. Please try again from the shop.');
-    } finally {
-      setVerifyingLoc(false);
-    }
-  };
 
   const handleCheckinSubmit = async (e) => {
     e.preventDefault();
@@ -1588,233 +1559,241 @@ const DashboardSuppliers = () => {
 
         {/* Salesmen Table - admin only */}
         {!isSalesman && mainTab === 'Salesmen' && (
-        <div className="dash-row">
-          <div className="dash-card full">
-            {error ? (
-              <div className="ui-state ui-state--error">
-                <div className="ui-state__icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
+          <div className="dash-row">
+            <div className="dash-card full">
+              {error ? (
+                <div className="ui-state ui-state--error">
+                  <div className="ui-state__icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                  </div>
+                  <p className="ui-state__title">Couldn&apos;t load salesmen</p>
+                  <p className="ui-state__desc">{error}</p>
+                  <button
+                    className="ui-btn ui-btn--secondary"
+                    onClick={() => {
+                      setError(null);
+                      if (selectedCountryFilter) {
+                        fetchSalesmenForCountry(selectedCountryFilter);
+                      } else {
+                        window.location.reload();
+                      }
+                    }}
+                  >
+                    Try again
+                  </button>
                 </div>
-                <p className="ui-state__title">Couldn&apos;t load salesmen</p>
-                <p className="ui-state__desc">{error}</p>
-                <button
-                  className="ui-btn ui-btn--secondary"
-                  onClick={() => {
+              ) : !loading && hasSearched && rows.length === 0 ? (
+                <div className="ui-state ui-state--empty">
+                  <div className="ui-state__icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <line x1="19" y1="8" x2="19" y2="14" />
+                      <line x1="22" y1="11" x2="16" y2="11" />
+                    </svg>
+                  </div>
+                  <p className="ui-state__title">No salesmen yet</p>
+                  <p className="ui-state__desc">
+                    {selectedCountryFilter
+                      ? 'No salesmen found for the selected country. Add one to get started.'
+                      : 'Select a country to view salesmen, or add a new salesman to get started.'}
+                  </p>
+                  <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
+                    Add New Salesman
+                  </button>
+                </div>
+              ) : (
+                <TableWithControls
+                  title="Salesmen"
+                  columns={columns}
+                  rows={rows}
+                  onAddNew={handleAdd}
+                  addNewText="Add New Salesman"
+                  onImport={() => {
                     setError(null);
                     if (selectedCountryFilter) {
                       fetchSalesmenForCountry(selectedCountryFilter);
-                    } else {
-                      window.location.reload();
                     }
                   }}
-                >
-                  Try again
-                </button>
-              </div>
-            ) : !loading && hasSearched && rows.length === 0 ? (
-              <div className="ui-state ui-state--empty">
-                <div className="ui-state__icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <line x1="19" y1="8" x2="19" y2="14" />
-                    <line x1="22" y1="11" x2="16" y2="11" />
-                  </svg>
-                </div>
-                <p className="ui-state__title">No salesmen yet</p>
-                <p className="ui-state__desc">
-                  {selectedCountryFilter
-                    ? 'No salesmen found for the selected country. Add one to get started.'
-                    : 'Select a country to view salesmen, or add a new salesman to get started.'}
-                </p>
-                <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
-                  Add New Salesman
-                </button>
-              </div>
-            ) : (
-            <TableWithControls
-              title="Salesmen"
-              columns={columns}
-              rows={rows}
-              onAddNew={handleAdd}
-              addNewText="Add New Salesman"
-              onImport={() => {
-                setError(null);
-                if (selectedCountryFilter) {
-                  fetchSalesmenForCountry(selectedCountryFilter);
-                }
-              }}
-              importText="Refresh Data"
-              showFilter={true}
-              filterContent={
-                <div>
-                  <label className="mb-2 block text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
-                    Filter by Country
-                  </label>
-                  <DropdownSelector
-                    options={[
-                      { value: '', label: 'All Countries' },
-                      ...countries.map(country => ({
-                        value: country.id,
-                        label: country.name
-                      }))
-                    ]}
-                    value={selectedCountryFilter || ''}
-                    onChange={(value) => {
-                      const newCountryId = value || null;
-                      setSalesmen([]);
-                      setHasSearched(false);
-                      setSelectedCountryFilter(newCountryId);
-                      if (!newCountryId) {
-                        setSalesmen([]);
-                        setHasSearched(false);
-                        setLoading(false);
-                      }
-                    }}
-                    placeholder="All Countries"
-                    className="ui-dropdown-custom--full-width"
-                  />
-                </div>
-              }
-              loading={loading}
-            />
-            )}
+                  importText="Refresh Data"
+                  showFilter={true}
+                  filterContent={
+                    <div>
+                      <label className="mb-2 block text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
+                        Filter by Country
+                      </label>
+                      <DropdownSelector
+                        options={[
+                          { value: '', label: 'All Countries' },
+                          ...countries.map(country => ({
+                            value: country.id,
+                            label: country.name
+                          }))
+                        ]}
+                        value={selectedCountryFilter || ''}
+                        onChange={(value) => {
+                          const newCountryId = value || null;
+                          setSalesmen([]);
+                          setHasSearched(false);
+                          setSelectedCountryFilter(newCountryId);
+                          if (!newCountryId) {
+                            setSalesmen([]);
+                            setHasSearched(false);
+                            setLoading(false);
+                          }
+                        }}
+                        placeholder="All Countries"
+                        className="ui-dropdown-custom--full-width"
+                      />
+                    </div>
+                  }
+                  loading={loading}
+                />
+              )}
+            </div>
           </div>
-        </div>
         )}
 
         {/* Check-ins Table */}
         {mainTab === 'Visit Report' && (
-        <div className="dash-row">
-          <div className="dash-card full">
-            {!checkinsLoading && checkins.length === 0 ? (
-              <div className="ui-state ui-state--empty">
-                <div className="ui-state__icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
+          <div className="dash-row">
+            <div className="dash-card full">
+              {!checkinsLoading && checkins.length === 0 ? (
+                <div className="ui-state ui-state--empty">
+                  <div className="ui-state__icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                      <circle cx="12" cy="10" r="3" />
+                    </svg>
+                  </div>
+                  <p className="ui-state__title">No visit reports yet</p>
+                  <p className="ui-state__desc">
+                    {isSalesman
+                      ? 'Record your first visit to a party to see it here.'
+                      : 'Salesman check-ins will appear here once they start recording visits.'}
+                  </p>
+                  {isSalesman && (
+                    <button
+                      className="ui-btn ui-btn--primary"
+                      onClick={() => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); }}
+                    >
+                      Add Visit Report
+                    </button>
+                  )}
                 </div>
-                <p className="ui-state__title">No visit reports yet</p>
-                <p className="ui-state__desc">
-                  {isSalesman
-                    ? 'Record your first visit to a party to see it here.'
-                    : 'Salesman check-ins will appear here once they start recording visits.'}
-                </p>
-                {isSalesman && (
-                  <button
-                    className="ui-btn ui-btn--primary"
-                    onClick={() => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); }}
-                  >
-                    Add Visit Report
-                  </button>
-                )}
-              </div>
-            ) : (
-            <TableWithControls
-              title="Visit Report"
-              columns={[
-                ...(!isSalesman ? [{ key: 'salesman_id', label: 'SALESMAN', render: (v) => salesmanNameMap[v] || v || '-' }] : []),
-                { key: 'type', label: 'TYPE', render: (v) => (
-                  <StatusBadge status={v === 'ordered' ? 'completed' : 'processing'}>{v === 'ordered' ? 'Order' : 'Visit'}</StatusBadge>
-                ) },
-                { key: 'check_in_date', label: 'DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
-                { key: 'party_id', label: 'PARTY', render: (_v, row) => row.party_name || partyNameMap[row.party_id] || row.party_id || '-' },
-                { key: 'order_qty', label: 'QTY', render: (v) => (v != null && Number(v) > 0) ? Number(v).toLocaleString('en-IN') : '-' },
-                { key: 'order_total', label: 'AMOUNT', render: (v) => (v != null && Number(v) > 0) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
-                { key: 'check_in_remarks', label: 'REASON', render: (v, row) => (row.order_notes || v) || '-' },
-                { key: 'location', label: 'LOCATION', render: (_v, row) => {
-                  const hasDev = row.latitude != null && row.longitude != null;
-                  if (!hasDev) return <span className="text-text-subtle">—</span>;
-                  const href = `https://www.google.com/maps?q=${row.latitude},${row.longitude}`;
-                  const pc = partyCoordsMap[row.party_id];
-                  if (!pc) {
-                    // Party address not geocoded yet — can't verify against it.
-                    return (
-                      <div className="w-[190px] max-w-full inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                        <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary font-medium whitespace-nowrap">View on map</a>
-                        <span className="text-text-subtle text-[var(--text-xs)]">(location not set)</span>
-                      </div>
-                    );
-                  }
-                  const dist = distanceMeters(row.latitude, row.longitude, pc.lat, pc.lng);
-                  return (
-                    <div className="w-[190px] max-w-full">
-                      <MatchMeter distance={dist} radius={GEOFENCE_RADIUS_M} href={href} />
-                    </div>
-                  );
-                } },
-              ]}
-              rows={checkins}
-              onAddNew={isSalesman ? () => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); } : undefined}
-              addNewText="Add Visit Report"
-              onImport={fetchCheckins}
-              importText="Refresh"
-              loading={checkinsLoading}
-            />
-            )}
+              ) : (
+                <TableWithControls
+                  title="Visit Report"
+                  columns={[
+                    ...(!isSalesman ? [{ key: 'salesman_id', label: 'SALESMAN', render: (v) => salesmanNameMap[v] || v || '-' }] : []),
+                    {
+                      key: 'type', label: 'TYPE', render: (v) => (
+                        <StatusBadge status={v === 'ordered' ? 'completed' : 'processing'}>{v === 'ordered' ? 'Order' : 'Visit'}</StatusBadge>
+                      )
+                    },
+                    { key: 'check_in_date', label: 'DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                    { key: 'party_id', label: 'PARTY', render: (_v, row) => row.party_name || partyNameMap[row.party_id] || row.party_id || '-' },
+                    { key: 'order_qty', label: 'QTY', render: (v) => (v != null && Number(v) > 0) ? Number(v).toLocaleString('en-IN') : '-' },
+                    { key: 'order_total', label: 'AMOUNT', render: (v) => (v != null && Number(v) > 0) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
+                    { key: 'check_in_remarks', label: 'REASON', render: (v, row) => (row.order_notes || v) || '-' },
+                    {
+                      key: 'location', label: 'LOCATION', render: (_v, row) => {
+                        const hasDev = row.latitude != null && row.longitude != null;
+                        if (!hasDev) return <span className="text-text-subtle">—</span>;
+                        const href = `https://www.google.com/maps?q=${row.latitude},${row.longitude}`;
+                        const pc = partyCoordsMap[row.party_id];
+                        if (!pc) {
+                          // Party address not geocoded yet — can't verify against it.
+                          return (
+                            <div className="w-[190px] max-w-full inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                              <a href={href} target="_blank" rel="noopener noreferrer" className="text-primary font-medium whitespace-nowrap">View on map</a>
+                              <span className="text-text-subtle text-[var(--text-xs)]">(location not set)</span>
+                            </div>
+                          );
+                        }
+                        const dist = distanceMeters(row.latitude, row.longitude, pc.lat, pc.lng);
+                        return (
+                          <div className="w-[190px] max-w-full">
+                            <MatchMeter distance={dist} radius={GEOFENCE_RADIUS_M} href={href} />
+                          </div>
+                        );
+                      }
+                    },
+                  ]}
+                  rows={checkins}
+                  onAddNew={isSalesman ? () => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); } : undefined}
+                  addNewText="Add Visit Report"
+                  onImport={fetchCheckins}
+                  importText="Refresh"
+                  loading={checkinsLoading}
+                />
+              )}
+            </div>
           </div>
-        </div>
         )}
 
         {/* Targets Table - admin only */}
         {!isSalesman && mainTab === 'Targets' && (
-        <div className="dash-row">
-          <div className="dash-card full">
-            {!targetsLoading && targets.length === 0 ? (
-              <div className="ui-state ui-state--empty">
-                <div className="ui-state__icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <circle cx="12" cy="12" r="6" />
-                    <circle cx="12" cy="12" r="2" />
-                  </svg>
+          <div className="dash-row">
+            <div className="dash-card full">
+              {!targetsLoading && targets.length === 0 ? (
+                <div className="ui-state ui-state--empty">
+                  <div className="ui-state__icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <circle cx="12" cy="12" r="6" />
+                      <circle cx="12" cy="12" r="2" />
+                    </svg>
+                  </div>
+                  <p className="ui-state__title">No targets yet</p>
+                  <p className="ui-state__desc">Set a sales target for a salesman to track their progress here.</p>
+                  <button
+                    className="ui-btn ui-btn--primary"
+                    onClick={() => { resetTargetForm(); setEditTarget(null); setOpenTargetModal(true); }}
+                  >
+                    Set Target
+                  </button>
                 </div>
-                <p className="ui-state__title">No targets yet</p>
-                <p className="ui-state__desc">Set a sales target for a salesman to track their progress here.</p>
-                <button
-                  className="ui-btn ui-btn--primary"
-                  onClick={() => { resetTargetForm(); setEditTarget(null); setOpenTargetModal(true); }}
-                >
-                  Set Target
-                </button>
-              </div>
-            ) : (
-            <TableWithControls
-              title="Salesman Targets"
-              columns={[
-                ...(!isSalesman ? [{ key: 'salesman_id', label: 'SALESMAN', render: (v) => salesmanNameMap[v] || v || '-' }] : []),
-                { key: 'target_amount', label: 'TARGET AMOUNT', render: (v) => v ? `₹${parseFloat(v).toLocaleString('en-IN')}` : '-' },
-                { key: 'start_date', label: 'START DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
-                { key: 'end_date', label: 'END DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
-                { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
-                { key: 'target_status', label: 'STATUS', render: (v) => (
-                  // Use the shared .ui-badge classes (single source of truth in
-                  // ui.css) — not hand-rolled Tailwind utilities. This gives the
-                  // pill its real shape/padding AND lets the table rules
-                  // (td:has(.ui-badge), .ui-badge max-width) keep it from being
-                  // clipped/squished by the cell, same as every other status.
-                  <span className={`ui-badge ${v === 'pending' ? 'ui-badge--warning' : 'ui-badge--success'}`}>{v || 'pending'}</span>
-                )},
-                { key: 'target_description', label: 'DESCRIPTION' },
-                ...(!isSalesman ? [{ key: 'action', label: 'ACTION', render: (_v, row) => (
-                  <RowActions onEdit={() => handleTargetEdit(row)} onDelete={() => handleTargetDelete(row)} />
-                )}] : []),
-              ]}
-              rows={targets}
-              onAddNew={!isSalesman ? () => { resetTargetForm(); setEditTarget(null); setOpenTargetModal(true); } : undefined}
-              addNewText="Set Target"
-              onImport={fetchTargets}
-              importText="Refresh"
-              loading={targetsLoading}
-            />
-            )}
+              ) : (
+                <TableWithControls
+                  title="Salesman Targets"
+                  columns={[
+                    ...(!isSalesman ? [{ key: 'salesman_id', label: 'SALESMAN', render: (v) => salesmanNameMap[v] || v || '-' }] : []),
+                    { key: 'target_amount', label: 'TARGET AMOUNT', render: (v) => v ? `₹${parseFloat(v).toLocaleString('en-IN')}` : '-' },
+                    { key: 'start_date', label: 'START DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                    { key: 'end_date', label: 'END DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                    { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
+                    {
+                      key: 'target_status', label: 'STATUS', render: (v) => (
+                        // Use the shared .ui-badge classes (single source of truth in
+                        // ui.css) — not hand-rolled Tailwind utilities. This gives the
+                        // pill its real shape/padding AND lets the table rules
+                        // (td:has(.ui-badge), .ui-badge max-width) keep it from being
+                        // clipped/squished by the cell, same as every other status.
+                        <span className={`ui-badge ${v === 'pending' ? 'ui-badge--warning' : 'ui-badge--success'}`}>{v || 'pending'}</span>
+                      )
+                    },
+                    { key: 'target_description', label: 'DESCRIPTION' },
+                    ...(!isSalesman ? [{
+                      key: 'action', label: 'ACTION', render: (_v, row) => (
+                        <RowActions onEdit={() => handleTargetEdit(row)} onDelete={() => handleTargetDelete(row)} />
+                      )
+                    }] : []),
+                  ]}
+                  rows={targets}
+                  onAddNew={!isSalesman ? () => { resetTargetForm(); setEditTarget(null); setOpenTargetModal(true); } : undefined}
+                  addNewText="Set Target"
+                  onImport={fetchTargets}
+                  importText="Refresh"
+                  loading={targetsLoading}
+                />
+              )}
+            </div>
           </div>
-        </div>
         )}
       </div>
       <AsidePanel
@@ -1826,8 +1805,8 @@ const DashboardSuppliers = () => {
         title="Add New Salesman"
         footer={(
           <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
+            <button
+              className="ui-btn ui-btn--secondary"
               onClick={() => {
                 setOpenAdd(false);
                 resetForm();
@@ -1836,8 +1815,8 @@ const DashboardSuppliers = () => {
             >
               Cancel
             </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
+            <button
+              className="ui-btn ui-btn--primary"
               onClick={handleSubmit}
               disabled={loading}
             >
@@ -1849,8 +1828,8 @@ const DashboardSuppliers = () => {
         <form className="ui-form" onSubmit={handleSubmit}>
           <div className="form-group form-group--full">
             <label className="ui-label">Employee Code *</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               placeholder="Employee code"
               value={formData.employee_code}
               onChange={(e) => handleInputChange('employee_code', e.target.value)}
@@ -1859,8 +1838,8 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Full Name *</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               placeholder="Full name"
               value={formData.full_name}
               onChange={(e) => handleInputChange('full_name', e.target.value)}
@@ -1869,8 +1848,8 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">Email *</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               type="email"
               placeholder="Email"
               value={formData.email}
@@ -1982,8 +1961,8 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">Reporting Manager</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               placeholder="Reporting manager"
               value={formData.reporting_manager}
               onChange={(e) => handleInputChange('reporting_manager', e.target.value)}
@@ -2032,8 +2011,8 @@ const DashboardSuppliers = () => {
         title="Edit Salesman"
         footer={(
           <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
+            <button
+              className="ui-btn ui-btn--secondary"
               onClick={() => {
                 setEditRow(null);
                 resetForm();
@@ -2042,8 +2021,8 @@ const DashboardSuppliers = () => {
             >
               Cancel
             </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
+            <button
+              className="ui-btn ui-btn--primary"
               onClick={handleSubmit}
               disabled={loading}
             >
@@ -2055,8 +2034,8 @@ const DashboardSuppliers = () => {
         <form className="ui-form" onSubmit={handleSubmit}>
           <div className="form-group form-group--full">
             <label className="ui-label">Employee Code *</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               placeholder="Employee code"
               value={formData.employee_code}
               onChange={(e) => handleInputChange('employee_code', e.target.value)}
@@ -2065,8 +2044,8 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Full Name *</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               placeholder="Full name"
               value={formData.full_name}
               onChange={(e) => handleInputChange('full_name', e.target.value)}
@@ -2075,8 +2054,8 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">Email *</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               type="email"
               placeholder="Email"
               value={formData.email}
@@ -2188,8 +2167,8 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">Reporting Manager</label>
-            <input 
-              className="ui-input" 
+            <input
+              className="ui-input"
               placeholder="Reporting manager"
               value={formData.reporting_manager}
               onChange={(e) => handleInputChange('reporting_manager', e.target.value)}
@@ -2231,78 +2210,66 @@ const DashboardSuppliers = () => {
 
       {/* Check-in Modal - salesman only */}
       {isSalesman && (
-      <AsidePanel
-        open={openCheckinModal}
-        onClose={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}
-        title={editCheckin ? 'Edit Visit Report' : 'Add Visit Report'}
-        footer={(
-          <>
-            <button className="ui-btn ui-btn--secondary" onClick={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}>Cancel</button>
-            <button className="ui-btn ui-btn--primary" onClick={handleCheckinSubmit} disabled={checkinsLoading}>
-              {checkinsLoading ? 'Saving...' : 'Save'}
-            </button>
-          </>
-        )}
-      >
-        <form className="ui-form" onSubmit={handleCheckinSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Party</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Party' },
-                ...zoneParties.map(p => ({ value: p.party_id || p.id, label: p.party_name || p.name || p.party_id }))
-              ]}
-              value={checkinForm.party_id}
-              onChange={(v) => setCheckinForm(prev => ({ ...prev, party_id: v }))}
-              placeholder="Select Party"
-              className="ui-dropdown-custom--full-width"
-            />
-            {isSalesman && checkinForm.party_id && (() => {
-              const sp = zoneParties.find(p => (p.party_id || p.id) === checkinForm.party_id);
-              const verified = sp && sp.location_source === 'verified';
-              return (
-                <div className="mt-2 flex flex-col gap-1.5">
-                  <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
+        <AsidePanel
+          open={openCheckinModal}
+          onClose={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}
+          title={editCheckin ? 'Edit Visit Report' : 'Add Visit Report'}
+          footer={(
+            <>
+              <button className="ui-btn ui-btn--secondary" onClick={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}>Cancel</button>
+              <button className="ui-btn ui-btn--primary" onClick={handleCheckinSubmit} disabled={checkinsLoading}>
+                {checkinsLoading ? 'Saving...' : 'Save'}
+              </button>
+            </>
+          )}
+        >
+          <form className="ui-form" onSubmit={handleCheckinSubmit}>
+            <div className="form-group form-group--full">
+              <label className="ui-label">Party</label>
+              <DropdownSelector
+                options={[
+                  { value: '', label: 'Select Party' },
+                  ...zoneParties.map(p => ({ value: p.party_id || p.id, label: p.party_name || p.name || p.party_id }))
+                ]}
+                value={checkinForm.party_id}
+                onChange={(v) => setCheckinForm(prev => ({ ...prev, party_id: v }))}
+                placeholder="Select Party"
+                className="ui-dropdown-custom--full-width"
+              />
+              {isSalesman && checkinForm.party_id && (() => {
+                const sp = zoneParties.find(p => (p.party_id || p.id) === checkinForm.party_id);
+                const verified = sp && sp.location_source === 'verified';
+                return (
+                  <p className="mt-2 mb-0 text-[length:var(--text-xs)] text-text-muted">
                     {verified
-                      ? `✅ Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 250m geofence active.`
-                      : 'Location not verified yet. Stand at the shop and tap below to enable the 250m geofence.'}
+                      ? `✅ Party location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — you must be within 250m to check in.`
+                      : 'This party’s location is not set yet. Set it from Party → Edit (“I’m at shop”) before checking in.'}
                   </p>
-                  {!verified && (
-                    <button
-                      type="button"
-                      className="ui-btn ui-btn--secondary self-start"
-                      onClick={handleVerifyCheckinPartyLocation}
-                      disabled={verifyingLoc}
-                    >
-                      {verifyingLoc ? 'Capturing…' : 'I’m at shop'}
-                    </button>
-                  )}
-                </div>
-              );
-            })()}
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Contact Person <span className="text-error">*</span></label>
-            <input className="ui-input" placeholder="Person you met" value={checkinForm.contact_person} onChange={(e) => setCheckinForm(prev => ({ ...prev, contact_person: e.target.value }))} />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">In Time <span className="text-error">*</span></label>
-            <input type="datetime-local" className="ui-input" value={checkinForm.in_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, in_time: e.target.value }))} />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Out Time <span className="text-error">*</span></label>
-            <input type="datetime-local" className="ui-input" value={checkinForm.out_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, out_time: e.target.value }))} />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
-            <input type="date" className="ui-input" value={checkinForm.next_visit_date} onChange={(e) => setCheckinForm(prev => ({ ...prev, next_visit_date: e.target.value }))} />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Remarks</label>
-            <input className="ui-input" placeholder="Check-in remarks" value={checkinForm.check_in_remarks} onChange={(e) => setCheckinForm(prev => ({ ...prev, check_in_remarks: e.target.value }))} />
-          </div>
-        </form>
-      </AsidePanel>
+                );
+              })()}
+            </div>
+            <div className="form-group form-group--full">
+              <label className="ui-label">Contact Person <span className="text-error">*</span></label>
+              <input className="ui-input" placeholder="Person you met" value={checkinForm.contact_person} onChange={(e) => setCheckinForm(prev => ({ ...prev, contact_person: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">In Time <span className="text-error">*</span></label>
+              <input type="datetime-local" className="ui-input" value={checkinForm.in_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, in_time: e.target.value }))} />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Out Time <span className="text-error">*</span></label>
+              <input type="datetime-local" className="ui-input" value={checkinForm.out_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, out_time: e.target.value }))} />
+            </div>
+            <div className="form-group form-group--full">
+              <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
+              <input type="date" className="ui-input" value={checkinForm.next_visit_date} onChange={(e) => setCheckinForm(prev => ({ ...prev, next_visit_date: e.target.value }))} />
+            </div>
+            <div className="form-group form-group--full">
+              <label className="ui-label">Remarks</label>
+              <input className="ui-input" placeholder="Check-in remarks" value={checkinForm.check_in_remarks} onChange={(e) => setCheckinForm(prev => ({ ...prev, check_in_remarks: e.target.value }))} />
+            </div>
+          </form>
+        </AsidePanel>
       )}
 
       {/* Target Modal */}

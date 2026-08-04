@@ -312,7 +312,7 @@ class PartyController {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const user = req.user;
-            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, latitude, longitude } = req.body;
+            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, latitude, longitude, accuracy, location_accuracy_m } = req.body;
             // address, city, state and pincode are required so the party can be
             // geocoded accurately for the visit/check-in geofence.
             if (!party_name || !phone || !address) {
@@ -357,14 +357,32 @@ class PartyController {
                 address,
             });
 
-            // Location for the visit/check-in geofence is ALWAYS derived from the
-            // party's ADDRESS (geocoded), never from the creator's device GPS — so a
-            // party's pin reflects where the shop actually is, not where whoever
-            // registered it happened to be standing. Visit orders / check-ins then
-            // only VERIFY the salesman's device against this address anchor.
-            let finalLat = null, finalLng = null, locationSource = null;
-            const geo = await geocodeAddress(address, { pincode });
-            if (geo) { finalLat = geo.latitude; finalLng = geo.longitude; locationSource = 'geocoded'; }
+            // Prefer an on-site GPS capture from "I'm at shop" on create (trusted
+            // verified anchor). Otherwise fall back to geocoding the address so the
+            // party still has coordinates for the visit/check-in geofence.
+            let finalLat = null, finalLng = null, locationSource = null, locationAccuracyM = null;
+            const hasDeviceLoc = latitude != null && latitude !== '' && longitude != null && longitude !== '';
+            if (hasDeviceLoc) {
+                // Geocode address as a reference to validate the on-site capture.
+                let refLat = null, refLng = null;
+                const geo = await geocodeAddress(address, { pincode });
+                if (geo) { refLat = geo.latitude; refLng = geo.longitude; }
+                const acc = accuracy != null && accuracy !== '' ? accuracy : location_accuracy_m;
+                const check = validateOnsiteCapture({
+                    deviceLat: latitude, deviceLng: longitude, accuracy: acc, refLat, refLng,
+                });
+                if (!check.ok) {
+                    return res.status(422).json({ error: check.reason });
+                }
+                finalLat = Number(latitude);
+                finalLng = Number(longitude);
+                locationSource = 'verified';
+                const accNum = Number(acc);
+                locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
+            } else {
+                const geo = await geocodeAddress(address, { pincode });
+                if (geo) { finalLat = geo.latitude; finalLng = geo.longitude; locationSource = 'geocoded'; }
+            }
 
             const party = await Party.create({
                 distributor_id: finalDistributorId,
@@ -388,6 +406,7 @@ class PartyController {
                 latitude: finalLat,
                 longitude: finalLng,
                 location_source: locationSource,
+                location_accuracy_m: locationAccuracyM,
                 created_by: user.user_id,
                 created_at: new Date(),
                 updated_at: new Date(),
@@ -497,25 +516,48 @@ class PartyController {
                 return res.status(404).json({ error: 'Party not found' });
             }
 
+            const adminOverride = isAdmin(req.userRoleName);
+
+            // Non-admins may only capture when a trusted on-site location is not
+            // set yet. Admin/superadmin may overwrite any party's location.
+            if (!adminOverride && party.location_source === 'verified' && party.latitude != null && party.longitude != null) {
+                return res.status(409).json({
+                    error: 'This party already has a verified location. It cannot be changed from here.',
+                });
+            }
+
             const { latitude, longitude, accuracy } = req.body || {};
 
-            // Geocode the party's address as the reference to validate against.
-            let refLat = null, refLng = null;
-            try {
-                let city, state;
-                if (party.city_id) { const c = await Cities.findByPk(party.city_id); city = c && c.name; }
-                if (party.state_id) { const s = await State.findByPk(party.state_id); state = s && s.name; }
-                const ref = party.address
-                    ? await geocodeAddress(party.address, { city, state, pincode: party.pincode })
-                    : null;
-                if (ref) { refLat = ref.latitude; refLng = ref.longitude; }
-            } catch (_) { /* no reference — capture still allowed, validated on accuracy only */ }
+            let check;
+            if (adminOverride) {
+                // Admin sets the party's location to the device's current GPS
+                // without requiring on-site proximity to the address.
+                const lat = Number(latitude), lng = Number(longitude);
+                if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                    return res.status(400).json({
+                        error: 'A valid current location is required. Please enable GPS and try again.',
+                    });
+                }
+                check = { ok: true, distance: null };
+            } else {
+                // Geocode the party's address as the reference to validate against.
+                let refLat = null, refLng = null;
+                try {
+                    let city, state;
+                    if (party.city_id) { const c = await Cities.findByPk(party.city_id); city = c && c.name; }
+                    if (party.state_id) { const s = await State.findByPk(party.state_id); state = s && s.name; }
+                    const ref = party.address
+                        ? await geocodeAddress(party.address, { city, state, pincode: party.pincode })
+                        : null;
+                    if (ref) { refLat = ref.latitude; refLng = ref.longitude; }
+                } catch (_) { /* no reference — capture still allowed, validated on accuracy only */ }
 
-            const check = validateOnsiteCapture({
-                deviceLat: latitude, deviceLng: longitude, accuracy, refLat, refLng,
-            });
-            if (!check.ok) {
-                return res.status(422).json({ error: check.reason });
+                check = validateOnsiteCapture({
+                    deviceLat: latitude, deviceLng: longitude, accuracy, refLat, refLng,
+                });
+                if (!check.ok) {
+                    return res.status(422).json({ error: check.reason });
+                }
             }
 
             const acc = Number(accuracy);
@@ -530,7 +572,9 @@ class PartyController {
             await logAudit({
                 req,
                 action: 'update',
-                description: `Party location verified on-site (±${Math.round(acc)}m)`,
+                description: adminOverride
+                    ? `Party location set by admin (±${Number.isFinite(acc) ? Math.round(acc) : '?'}m)`
+                    : `Party location verified on-site (±${Math.round(acc)}m)`,
                 tableName: 'parties',
                 recordId: party.party_id,
                 oldValues: oldSnapshot,
@@ -538,7 +582,9 @@ class PartyController {
             });
 
             return res.status(200).json({
-                message: 'On-site location verified and saved.',
+                message: adminOverride
+                    ? 'Party location set from your current position.'
+                    : 'On-site location verified and saved.',
                 latitude: party.latitude,
                 longitude: party.longitude,
                 location_source: 'verified',
@@ -575,12 +621,16 @@ class PartyController {
             const { distributor_id, salesman_id, party_name, trade_name, contact_person, email,
                 phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, is_active } = req.body;
 
+            // Active status is admin-only. Non-admins often still send the current
+            // is_active value from the edit form — ignore it instead of 403'ing the
+            // whole update (that was breaking salesman/party_manager edits).
+            let nextIsActive;
             if (is_active !== undefined) {
-                if (!isAdmin(req.userRoleName)) {
-                    return res.status(403).json({ error: 'Only admin can change party status' });
-                }
-                if (typeof is_active !== 'boolean') {
-                    return res.status(400).json({ error: 'is_active must be a boolean' });
+                if (isAdmin(req.userRoleName)) {
+                    if (typeof is_active !== 'boolean') {
+                        return res.status(400).json({ error: 'is_active must be a boolean' });
+                    }
+                    nextIsActive = is_active;
                 }
             }
 
@@ -620,8 +670,8 @@ class PartyController {
                 updated_at: new Date(),
                 updated_by: user.user_id
             };
-            if (is_active !== undefined) {
-                payload.is_active = is_active;
+            if (nextIsActive !== undefined) {
+                payload.is_active = nextIsActive;
             }
             // Re-derive the geocode anchor when the address OR the pincode changes
             // (editing the pincode to correct a party's location must actually move
