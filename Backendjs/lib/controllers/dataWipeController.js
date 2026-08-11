@@ -258,14 +258,30 @@ const dataWipeController = {
                 await sequelize.query('SET FOREIGN_KEY_CHECKS = 0', { transaction: t });
                 try {
                     // The login accounts that belong to parties — deleted with them.
-                    // Exclude the caller as a safety net (a party is never an admin,
-                    // and the protected admin email is excluded from the DELETE below).
+                    // CRITICAL: never collect an admin's account (or the caller, or the
+                    // protected superadmin). If an admin is ever also linked to a party,
+                    // deleting it here would strip their role and lock them out.
                     const [partyUserRows] = await sequelize.query(
-                        `SELECT DISTINCT user_id AS id
-                           FROM parties
-                          WHERE user_id IS NOT NULL
-                            AND user_id <> :callerId`,
-                        { replacements: { callerId: (req.user && req.user.user_id) || '' }, transaction: t }
+                        `SELECT DISTINCT p.user_id AS id
+                           FROM parties p
+                          WHERE p.user_id IS NOT NULL
+                            AND p.user_id <> :callerId
+                            AND p.user_id NOT IN (
+                                SELECT u.user_id FROM users u
+                                LEFT JOIN user_roles ur ON ur.user_id = u.user_id
+                                LEFT JOIN roles r1 ON r1.role_id = ur.role_id
+                                LEFT JOIN roles r2 ON r2.role_id = u.role_id
+                                WHERE r1.role_name = 'admin'
+                                   OR r2.role_name = 'admin'
+                                   OR u.email = :protectedEmail
+                            )`,
+                        {
+                            replacements: {
+                                callerId: (req.user && req.user.user_id) || '',
+                                protectedEmail: PROTECTED_ADMIN_EMAIL,
+                            },
+                            transaction: t,
+                        }
                     );
                     const partyUserIds = partyUserRows.map((r) => r.id).filter(Boolean);
 
