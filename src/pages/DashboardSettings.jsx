@@ -3,7 +3,7 @@ import Button from '../components/ui/Button';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import { showSuccess, showError } from '../services/notificationService';
-import { updateUser, getMe, wipeAllData, WIPE_CONFIRM_PHRASE } from '../services/apiService';
+import { updateUser, getMe, wipeAllData, deleteAllParties, WIPE_CONFIRM_PHRASE } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import '../styles/pages/dashboard-settings.css';
@@ -13,6 +13,7 @@ const DashboardSettings = () => {
   const isAdmin = useMemo(() => getUserRole() === 'admin', []);
   const [wipeConfirmText, setWipeConfirmText] = useState('');
   const [wiping, setWiping] = useState(false);
+  const [deletingParties, setDeletingParties] = useState(false);
   const [userName, setUserName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -517,6 +518,30 @@ const DashboardSettings = () => {
     }
   };
 
+  const handleDeleteAllParties = async () => {
+    if (wipeConfirmText !== WIPE_CONFIRM_PHRASE) return;
+
+    const ok = await confirm({
+      title: 'Delete all parties?',
+      message:
+        'This permanently deletes ALL parties, their login accounts, and their uploaded documents. Products, orders, salesmen, distributors and everything else are kept. This cannot be undone.',
+      confirmLabel: 'Delete all parties',
+      danger: true,
+    });
+    if (!ok) return;
+
+    try {
+      setDeletingParties(true);
+      const res = await deleteAllParties();
+      showSuccess(res?.message || 'All parties deleted.');
+      setWipeConfirmText('');
+    } catch (error) {
+      showError(`Delete all parties failed: ${error?.message || 'Unknown error'}`);
+    } finally {
+      setDeletingParties(false);
+    }
+  };
+
   return (
     <div className="dash-page">
       <div className="dash-container">
@@ -643,6 +668,7 @@ const DashboardSettings = () => {
                   Wipe all test/transactional data in one go. This deletes every product (and image), party, order,
                   salesman, tray, distributor, offer, event, audit log, and all non-admin users. Master data
                   (roles, geography, product attributes, brands, collections) and admin accounts are kept.
+                  Or use <strong>Delete all parties</strong> to remove only the parties (and their login accounts + documents), keeping everything else.
                   <strong className="text-error"> This cannot be undone.</strong>
                 </p>
               </div>
@@ -659,12 +685,20 @@ const DashboardSettings = () => {
                     spellCheck={false}
                   />
                 </div>
-                <div className="settings-actions flex items-center justify-end">
+                <div className="settings-actions flex flex-wrap items-center justify-end gap-3">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleDeleteAllParties}
+                    disabled={deletingParties || wiping || wipeConfirmText !== WIPE_CONFIRM_PHRASE}
+                  >
+                    {deletingParties ? 'Deleting…' : 'Delete all parties'}
+                  </Button>
                   <Button
                     type="button"
                     variant="danger"
                     onClick={handleWipeData}
-                    disabled={wiping || wipeConfirmText !== WIPE_CONFIRM_PHRASE}
+                    disabled={wiping || deletingParties || wipeConfirmText !== WIPE_CONFIRM_PHRASE}
                   >
                     {wiping ? 'Wiping…' : 'Wipe all data'}
                   </Button>

@@ -16,3 +16,16 @@ export const wipeAllData = async () => {
     includeAuth: true,
   });
 };
+
+/**
+ * DESTRUCTIVE: delete ALL parties (and their linked login accounts + party
+ * upload files) only, leaving everything else intact. Admin-only + confirm phrase.
+ * @returns {Promise<Object>} { success, message, rowsDeleted, filesDeleted }
+ */
+export const deleteAllParties = async () => {
+  return apiRequest('/admin/delete-all-parties', {
+    method: 'POST',
+    body: { confirm: WIPE_CONFIRM_PHRASE },
+    includeAuth: true,
+  });
+};
