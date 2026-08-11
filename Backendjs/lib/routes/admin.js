@@ -9,4 +9,8 @@ const dataWipeController = require('../controllers/dataWipeController');
 //   POST /api/admin/wipe-data   body: { "confirm": "WIPE ALL DATA" }
 router.post('/wipe-data', authenticateToken, isAdmin, dataWipeController.wipeData);
 
+// DESTRUCTIVE: delete all parties (+ their login accounts and upload files) only.
+//   POST /api/admin/delete-all-parties   body: { "confirm": "WIPE ALL DATA" }
+router.post('/delete-all-parties', authenticateToken, isAdmin, dataWipeController.deleteAllParties);
+
 module.exports = router;
