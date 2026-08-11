@@ -229,6 +229,91 @@ const dataWipeController = {
             });
         }
     },
+
+    /**
+     * DESTRUCTIVE: delete ALL parties (and their linked login accounts + party
+     * upload files) in one shot, leaving everything else (products, orders,
+     * salesmen, distributors, master data, admins) intact.
+     *
+     * Guarded by: admin role (route middleware) + the same exact confirmation
+     * phrase as the full wipe.
+     *
+     *   POST /api/admin/delete-all-parties
+     *   body: { "confirm": "WIPE ALL DATA" }
+     */
+    async deleteAllParties(req, res) {
+        const confirm = req.body && req.body.confirm;
+        if (confirm !== CONFIRM_PHRASE) {
+            return res.status(400).json({
+                success: false,
+                message: `Confirmation failed. Send { "confirm": "${CONFIRM_PHRASE}" } to proceed.`,
+            });
+        }
+
+        const rowsDeleted = {};
+        try {
+            await sequelize.transaction(async (t) => {
+                // FK checks off so party rows referenced by orders/check-ins can be
+                // removed; re-enabled in finally on this connection no matter what.
+                await sequelize.query('SET FOREIGN_KEY_CHECKS = 0', { transaction: t });
+                try {
+                    // The login accounts that belong to parties — deleted with them.
+                    // Exclude the caller as a safety net (a party is never an admin,
+                    // and the protected admin email is excluded from the DELETE below).
+                    const [partyUserRows] = await sequelize.query(
+                        `SELECT DISTINCT user_id AS id
+                           FROM parties
+                          WHERE user_id IS NOT NULL
+                            AND user_id <> :callerId`,
+                        { replacements: { callerId: (req.user && req.user.user_id) || '' }, transaction: t }
+                    );
+                    const partyUserIds = partyUserRows.map((r) => r.id).filter(Boolean);
+
+                    rowsDeleted.parties = await Party.destroy({ where: {}, transaction: t });
+
+                    if (partyUserIds.length) {
+                        await sequelize.query(
+                            `DELETE FROM user_roles WHERE user_id IN (:ids)`,
+                            { replacements: { ids: partyUserIds }, transaction: t }
+                        );
+                        const [[cntRow]] = await sequelize.query(
+                            `SELECT COUNT(*) AS c FROM users
+                              WHERE user_id IN (:ids)
+                                AND email <> :protectedEmail`,
+                            { replacements: { ids: partyUserIds, protectedEmail: PROTECTED_ADMIN_EMAIL }, transaction: t }
+                        );
+                        await sequelize.query(
+                            `DELETE FROM users WHERE user_id IN (:ids) AND email <> :protectedEmail`,
+                            { replacements: { ids: partyUserIds, protectedEmail: PROTECTED_ADMIN_EMAIL }, transaction: t }
+                        );
+                        rowsDeleted.party_users = Number(cntRow.c) || 0;
+                    } else {
+                        rowsDeleted.party_users = 0;
+                    }
+                } finally {
+                    await sequelize.query('SET FOREIGN_KEY_CHECKS = 1', { transaction: t });
+                }
+            });
+
+            // Party document/KYC uploads — all parties are gone, so clear the folder.
+            const filesResult = clearUploadDir('party_uploads');
+
+            return res.status(200).json({
+                success: true,
+                message: `Deleted ${rowsDeleted.parties} part${rowsDeleted.parties === 1 ? 'y' : 'ies'} and ${rowsDeleted.party_users} linked login account(s).`,
+                rowsDeleted,
+                filesDeleted: { total: filesResult.deleted, byFolder: [filesResult] },
+                ...(filesResult.errors.length ? { fileWarnings: filesResult.errors } : {}),
+            });
+        } catch (error) {
+            console.error('Delete all parties error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Delete all parties failed. No partial database changes were committed.',
+                error: error.message,
+            });
+        }
+    },
 };
 
 module.exports = dataWipeController;
