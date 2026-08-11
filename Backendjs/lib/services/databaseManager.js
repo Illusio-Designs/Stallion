@@ -334,46 +334,57 @@ class DatabaseManager {
                 }
             }
 
-            // Create default admin if not exists
+            // Ensure the protected superadmin exists AND always has the 'admin'
+            // role association that login needs. This SELF-HEALS on every startup:
+            // a data operation (wipe / delete-all-parties) can strip the user_roles
+            // row while keeping the admin user, leaving them locked out with
+            // "User role not found". Recreating the association here fixes that on
+            // the next restart without any manual DB surgery.
             const User = require('../models/User');
             const Role = require('../models/Role');
             const UserRole = require('../models/UserRole');
+            const ADMIN_EMAIL = 'illusiodesigns@gmail.com';
 
-            const adminExists = await User.findOne({
-                where: {
-                    email: 'illusiodesigns@gmail.com'
-                }
-            });
-
-            if (!adminExists) {
-                // Find or create admin role (using sales_manager as default admin role)
-                let adminRole = await Role.findOne({
-                    where: { role_name: 'sales_manager' }
-                });
-
+            try {
+                // The admin role must exist (created above in the roles seed, but be
+                // defensive in case that changes).
+                let adminRole = await Role.findOne({ where: { role_name: 'admin' } });
                 if (!adminRole) {
                     adminRole = await Role.create({
-                        role_name: 'sales_manager',
-                        description: 'Manages sales operations and team'
+                        role_name: 'admin',
+                        description: 'Super admin',
+                        is_office_role: true,
                     });
                 }
 
-                const adminUser = await User.create({
-                    full_name: 'Superadmin',
-                    email: 'illusiodesigns@gmail.com',
-                    phone: '7600046416',
-                    address: 'Head Office',
-                    is_active: true,
-                    role_id: adminRole.role_id
-                });
+                let adminUser = await User.findOne({ where: { email: ADMIN_EMAIL } });
+                if (!adminUser) {
+                    adminUser = await User.create({
+                        full_name: 'Superadmin',
+                        email: ADMIN_EMAIL,
+                        phone: '7600046416',
+                        address: 'Head Office',
+                        is_active: true,
+                        role_id: adminRole.role_id,
+                    });
+                    console.log('👤 Default admin user created');
+                }
 
-                // Assign role to admin user
-                await UserRole.create({
-                    user_id: adminUser.user_id,
-                    role_id: adminRole.role_id
-                });
+                // Keep the superadmin active and pointed at the admin role.
+                if (!adminUser.is_active || adminUser.role_id !== adminRole.role_id) {
+                    await adminUser.update({ is_active: true, role_id: adminRole.role_id });
+                }
 
-                console.log('👤 Default admin user created');
+                // Make sure the user_roles association login reads actually exists.
+                const [, created] = await UserRole.findOrCreate({
+                    where: { user_id: adminUser.user_id, role_id: adminRole.role_id },
+                    defaults: { user_id: adminUser.user_id, role_id: adminRole.role_id },
+                });
+                if (created) {
+                    console.log('🔑 Restored admin role association for superadmin');
+                }
+            } catch (adminSeedErr) {
+                console.warn('⚠️ Admin self-heal skipped:', adminSeedErr.message);
             }
 
             // Load all models that use Sequelize define() to ensure they're registered
