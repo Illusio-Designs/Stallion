@@ -383,6 +383,26 @@ class DatabaseManager {
                 if (created) {
                     console.log('🔑 Restored admin role association for superadmin');
                 }
+
+                // GENERAL heal: any user that still has a role_id but lost its
+                // user_roles row (login reads user_roles, so those accounts fail
+                // with "User role not found") gets the association recreated. This
+                // covers every account affected by the delete-all-parties bug, not
+                // just the superadmin.
+                const [healResult] = await sequelize.query(
+                    `INSERT INTO user_roles (user_role_id, user_id, role_id, assigned_at)
+                     SELECT UUID(), u.user_id, u.role_id, NOW()
+                       FROM users u
+                      WHERE u.role_id IS NOT NULL
+                        AND NOT EXISTS (
+                            SELECT 1 FROM user_roles ur
+                             WHERE ur.user_id = u.user_id AND ur.role_id = u.role_id
+                        )`
+                );
+                const healed = (healResult && (healResult.affectedRows ?? healResult.rowCount)) || 0;
+                if (healed) {
+                    console.log(`🔑 Restored ${healed} missing user role association(s)`);
+                }
             } catch (adminSeedErr) {
                 console.warn('⚠️ Admin self-heal skipped:', adminSeedErr.message);
             }
