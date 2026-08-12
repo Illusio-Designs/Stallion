@@ -793,22 +793,22 @@ class PartyController {
                     }
                 }
                 if (row.city && state_id) {
-                    const city = await Cities.findOne({ where: { name: { [Op.eq]: row.city }, state_id } });
-                    if (city) city_id = city.id;
-                    else {
-                        return {
-                            success: false,
-                            message: row.city + ' City not found',
-                            data: null,
-                        };
+                    // Auto-create the city (mapped to its state) when it doesn't
+                    // exist yet, so bulk upload doesn't fail on new cities.
+                    let city = await Cities.findOne({ where: { name: { [Op.eq]: row.city }, state_id } });
+                    if (!city) {
+                        city = await Cities.create({ name: row.city, state_id, is_active: true });
                     }
+                    city_id = city.id;
                 } else if (row.city) {
+                    // A city needs a state to be attached to. Use an existing city by
+                    // name if there is one; otherwise we can't create it without a state.
                     const city = await Cities.findOne({ where: { name: { [Op.eq]: row.city } } });
                     if (city) city_id = city.id;
                     else {
                         return {
                             success: false,
-                            message: row.city + ' City not found',
+                            message: `Cannot create city "${row.city}" without a State. Add a State value for this row.`,
                             data: null,
                         };
                     }
