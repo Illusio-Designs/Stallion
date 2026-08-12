@@ -770,51 +770,66 @@ class PartyController {
                 let distributor_id = null;
                 let salesman_id = null;
 
-                if (row.country) {
-                    const country = await Country.findOne({ where: { name: { [Op.eq]: row.country } } });
+                // Trim geography names — Excel cells often carry trailing spaces,
+                // which made exact-match lookups fail ("State/City not found") even
+                // though the value looked correct.
+                const countryName = row.country != null ? String(row.country).trim() : '';
+                const stateName = row.state != null ? String(row.state).trim() : '';
+                const cityName = row.city != null ? String(row.city).trim() : '';
+
+                if (countryName) {
+                    const country = await Country.findOne({ where: { name: { [Op.eq]: countryName } } });
                     if (country) { country_id = country.id; }
                     else {
                         return {
                             success: false,
-                            message: row.country + ' Country not found',
+                            message: countryName + ' Country not found',
                             data: null,
                         };
                     }
                 }
-                if (row.state) {
-                    const state = await State.findOne({ where: { name: { [Op.eq]: row.state } } });
+                if (stateName) {
+                    // Auto-create the state (mapped to its country) when it doesn't
+                    // exist yet, so bulk upload doesn't fail on new states.
+                    let state = await State.findOne({
+                        where: { name: { [Op.eq]: stateName }, ...(country_id ? { country_id } : {}) },
+                    });
+                    if (!state && country_id) {
+                        state = await State.create({ name: stateName, country_id, is_active: true });
+                    }
                     if (state) state_id = state.id;
                     else {
                         return {
                             success: false,
-                            message: row.state + ' State not found',
+                            message: `Cannot create state "${stateName}" without a Country. Add a Country value for this row.`,
                             data: null,
                         };
                     }
                 }
-                if (row.city && state_id) {
+                if (cityName && state_id) {
                     // Auto-create the city (mapped to its state) when it doesn't
                     // exist yet, so bulk upload doesn't fail on new cities.
-                    let city = await Cities.findOne({ where: { name: { [Op.eq]: row.city }, state_id } });
+                    let city = await Cities.findOne({ where: { name: { [Op.eq]: cityName }, state_id } });
                     if (!city) {
-                        city = await Cities.create({ name: row.city, state_id, is_active: true });
+                        city = await Cities.create({ name: cityName, state_id, is_active: true });
                     }
                     city_id = city.id;
-                } else if (row.city) {
+                } else if (cityName) {
                     // A city needs a state to be attached to. Use an existing city by
                     // name if there is one; otherwise we can't create it without a state.
-                    const city = await Cities.findOne({ where: { name: { [Op.eq]: row.city } } });
+                    const city = await Cities.findOne({ where: { name: { [Op.eq]: cityName } } });
                     if (city) city_id = city.id;
                     else {
                         return {
                             success: false,
-                            message: `Cannot create city "${row.city}" without a State. Add a State value for this row.`,
+                            message: `Cannot create city "${cityName}" without a State. Add a State value for this row.`,
                             data: null,
                         };
                     }
                 }
-                if (row.zone) {
-                    const zoneWhere = { name: { [Op.eq]: row.zone } };
+                const zoneName = row.zone != null ? String(row.zone).trim() : '';
+                if (zoneName) {
+                    const zoneWhere = { name: { [Op.eq]: zoneName } };
                     if (city_id) zoneWhere.city_id = city_id;
                     if (state_id) zoneWhere.state_id = state_id;
                     const zone = await Zone.findOne({ where: zoneWhere });
@@ -822,7 +837,7 @@ class PartyController {
                     else {
                         return {
                             success: false,
-                            message: row.zone + ' Zone not found',
+                            message: zoneName + ' Zone not found',
                             data: null,
                         };
                     }
