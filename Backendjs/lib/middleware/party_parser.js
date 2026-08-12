@@ -20,8 +20,13 @@ function getCell(record, ...keys) {
  * All id-based fields are left as names; controller will resolve to IDs.
  */
 function mapRecordToParty(record) {
+    // Parties are ACTIVE by default on bulk upload. Only an explicit negative
+    // value (0/false/no/inactive/…) makes a row inactive; a blank cell, a missing
+    // column, or any other text (e.g. "Active") stays active.
     const activeVal = getCell(record, 'active', 'Active', 'is_active', 'is_active');
-    const isActive = activeVal === null ? true : /^(1|true|yes|y)$/i.test(activeVal);
+    const isActive = activeVal === null
+        ? true
+        : !/^(0|false|no|n|inactive|disable|disabled|deactivate|deactivated)$/i.test(activeVal);
 
     const billingSameVal = getCell(
         record,
