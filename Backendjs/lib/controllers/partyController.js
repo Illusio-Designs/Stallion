@@ -9,7 +9,12 @@ const Country = require('../models/Country');
 const State = require('../models/State');
 const Cities = require('../models/Cities');
 const Zone = require('../models/Zone');
-const { Op } = require('sequelize');
+const { Op, fn, col, where } = require('sequelize');
+
+// Case-insensitive exact match on a `name` column (LOWER(name) = lower(value)),
+// so "gujarat", "Gujarat" and "GUJARAT" all resolve to the same row and we never
+// create case-variant duplicates during bulk upload.
+const ciNameEq = (value) => where(fn('LOWER', col('name')), String(value || '').trim().toLowerCase());
 const { geocodeAddress, geocodeDiagnostic } = require('../utils/geocode');
 const { validateOnsiteCapture } = require('../utils/geo');
 const DistributorZones = require('../models/DistributorZones');
@@ -778,7 +783,7 @@ class PartyController {
                 const cityName = row.city != null ? String(row.city).trim() : '';
 
                 if (countryName) {
-                    const country = await Country.findOne({ where: { name: { [Op.eq]: countryName } } });
+                    const country = await Country.findOne({ where: ciNameEq(countryName) });
                     if (country) { country_id = country.id; }
                     else {
                         return {
@@ -789,10 +794,11 @@ class PartyController {
                     }
                 }
                 if (stateName) {
-                    // Auto-create the state (mapped to its country) when it doesn't
-                    // exist yet, so bulk upload doesn't fail on new states.
+                    // Case-insensitive lookup; auto-create the state (mapped to its
+                    // country) when it doesn't exist yet, so bulk upload doesn't fail
+                    // on new states.
                     let state = await State.findOne({
-                        where: { name: { [Op.eq]: stateName }, ...(country_id ? { country_id } : {}) },
+                        where: { [Op.and]: [ciNameEq(stateName), ...(country_id ? [{ country_id }] : [])] },
                     });
                     if (!state && country_id) {
                         state = await State.create({ name: stateName, country_id, is_active: true });
@@ -807,9 +813,9 @@ class PartyController {
                     }
                 }
                 if (cityName && state_id) {
-                    // Auto-create the city (mapped to its state) when it doesn't
-                    // exist yet, so bulk upload doesn't fail on new cities.
-                    let city = await Cities.findOne({ where: { name: { [Op.eq]: cityName }, state_id } });
+                    // Case-insensitive lookup; auto-create the city (mapped to its
+                    // state) when it doesn't exist yet.
+                    let city = await Cities.findOne({ where: { [Op.and]: [ciNameEq(cityName), { state_id }] } });
                     if (!city) {
                         city = await Cities.create({ name: cityName, state_id, is_active: true });
                     }
@@ -817,7 +823,7 @@ class PartyController {
                 } else if (cityName) {
                     // A city needs a state to be attached to. Use an existing city by
                     // name if there is one; otherwise we can't create it without a state.
-                    const city = await Cities.findOne({ where: { name: { [Op.eq]: cityName } } });
+                    const city = await Cities.findOne({ where: ciNameEq(cityName) });
                     if (city) city_id = city.id;
                     else {
                         return {
@@ -829,10 +835,10 @@ class PartyController {
                 }
                 const zoneName = row.zone != null ? String(row.zone).trim() : '';
                 if (zoneName) {
-                    const zoneWhere = { name: { [Op.eq]: zoneName } };
-                    if (city_id) zoneWhere.city_id = city_id;
-                    if (state_id) zoneWhere.state_id = state_id;
-                    const zone = await Zone.findOne({ where: zoneWhere });
+                    const zoneAnd = [ciNameEq(zoneName)];
+                    if (city_id) zoneAnd.push({ city_id });
+                    if (state_id) zoneAnd.push({ state_id });
+                    const zone = await Zone.findOne({ where: { [Op.and]: zoneAnd } });
                     if (zone) zone_id = zone.id;
                     else {
                         return {
