@@ -55,6 +55,18 @@ class UserController {
                 return res.status(404).json({ error: 'User not found' });
             }
 
+            const callerId = (req.user && req.user.user_id) || null;
+
+            // Never allow deleting the protected superadmin or your own account —
+            // that could lock everyone out.
+            const PROTECTED_ADMIN_EMAIL = 'illusiodesigns@gmail.com';
+            if (user.email && user.email.toLowerCase() === PROTECTED_ADMIN_EMAIL) {
+                return res.status(403).json({ error: 'This is the protected superadmin account and cannot be deleted.' });
+            }
+            if (callerId && String(callerId) === String(id)) {
+                return res.status(400).json({ error: 'You cannot delete your own account while logged in as it.' });
+            }
+
             // Block only when the user OWNS a business entity — deleting would
             // orphan its data (orders, etc.). Those must be removed/reassigned first.
             const [ownParty, ownSalesman, ownDistributor] = await Promise.all([
@@ -73,7 +85,6 @@ class UserController {
             }
 
             const snapshot = user.toJSON();
-            const callerId = (req.user && req.user.user_id) || null;
 
             // Auto-clean the SAFE links so a user with no owned business entity can
             // be deleted: remove their own role rows, null the nullable "assigned by"
