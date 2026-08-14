@@ -67,37 +67,30 @@ class UserController {
                 return res.status(400).json({ error: 'You cannot delete your own account while logged in as it.' });
             }
 
-            // Block only when the user OWNS a business entity — deleting would
-            // orphan its data (orders, etc.). Those must be removed/reassigned first.
-            const [ownParty, ownSalesman, ownDistributor] = await Promise.all([
-                Party.findOne({ where: { user_id: id }, attributes: ['party_id'] }),
-                Salesman.findOne({ where: { user_id: id }, attributes: ['salesman_id'] }),
-                Distributor.findOne({ where: { user_id: id }, attributes: ['distributor_id'] }),
-            ]);
-            const owns = [];
-            if (ownDistributor) owns.push('a distributor');
-            if (ownSalesman) owns.push('a salesman');
-            if (ownParty) owns.push('a party');
-            if (owns.length) {
-                return res.status(409).json({
-                    error: `Cannot delete this user because they are linked to ${owns.join(', ')} record. Delete or reassign that record first, then delete the user.`,
-                });
+            // Deleting a user can't proceed while parties/salesmen/distributors
+            // still point at it (user_id / created_by are NOT-NULL foreign keys).
+            // Instead of blocking, RE-POINT those records to the admin doing the
+            // delete: the records (and their orders) survive untouched, only their
+            // owner/creator pointer moves. This is what makes an office/admin user
+            // that merely created some parties deletable — nothing is orphaned.
+            if (!callerId) {
+                return res.status(400).json({ error: 'Cannot resolve the acting admin to reassign linked records.' });
             }
 
             const snapshot = user.toJSON();
 
-            // Auto-clean the SAFE links so a user with no owned business entity can
-            // be deleted: remove their own role rows, null the nullable "assigned by"
-            // pointer, and reassign the NOT-NULL "created by" attribution to the admin
-            // performing the delete (non-destructive — no business data is removed).
             await sequelize.transaction(async (t) => {
+                // The user's own role assignments + the nullable "assigned by" pointer.
                 await UserRole.destroy({ where: { user_id: id }, transaction: t });
                 await UserRole.update({ assigned_by: null }, { where: { assigned_by: id }, transaction: t });
-                if (callerId) {
-                    await Party.update({ created_by: callerId }, { where: { created_by: id }, transaction: t });
-                    await Salesman.update({ created_by: callerId }, { where: { created_by: id }, transaction: t });
-                    await Distributor.update({ created_by: callerId }, { where: { created_by: id }, transaction: t });
-                }
+                // Re-point owner (user_id) and creator (created_by) references to the
+                // acting admin so nothing is orphaned. Records + orders are preserved.
+                await Party.update({ user_id: callerId }, { where: { user_id: id }, transaction: t });
+                await Party.update({ created_by: callerId }, { where: { created_by: id }, transaction: t });
+                await Salesman.update({ user_id: callerId }, { where: { user_id: id }, transaction: t });
+                await Salesman.update({ created_by: callerId }, { where: { created_by: id }, transaction: t });
+                await Distributor.update({ user_id: callerId }, { where: { user_id: id }, transaction: t });
+                await Distributor.update({ created_by: callerId }, { where: { created_by: id }, transaction: t });
                 await user.destroy({ transaction: t });
             });
 
