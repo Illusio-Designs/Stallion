@@ -9,6 +9,7 @@ const Salesman = require('../models/Salesman');
 const Party = require('../models/Party');
 const Distributor = require('../models/distributor');
 const { canManageUsers } = require('../utils/roleHelpers');
+const sequelize = require('../constants/database');
 
 class UserController {
     async getUsers(req, res) {
@@ -53,14 +54,48 @@ class UserController {
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
             }
+
+            // Block only when the user OWNS a business entity — deleting would
+            // orphan its data (orders, etc.). Those must be removed/reassigned first.
+            const [ownParty, ownSalesman, ownDistributor] = await Promise.all([
+                Party.findOne({ where: { user_id: id }, attributes: ['party_id'] }),
+                Salesman.findOne({ where: { user_id: id }, attributes: ['salesman_id'] }),
+                Distributor.findOne({ where: { user_id: id }, attributes: ['distributor_id'] }),
+            ]);
+            const owns = [];
+            if (ownDistributor) owns.push('a distributor');
+            if (ownSalesman) owns.push('a salesman');
+            if (ownParty) owns.push('a party');
+            if (owns.length) {
+                return res.status(409).json({
+                    error: `Cannot delete this user because they are linked to ${owns.join(', ')} record. Delete or reassign that record first, then delete the user.`,
+                });
+            }
+
             const snapshot = user.toJSON();
-            await user.destroy();
+            const callerId = (req.user && req.user.user_id) || null;
+
+            // Auto-clean the SAFE links so a user with no owned business entity can
+            // be deleted: remove their own role rows, null the nullable "assigned by"
+            // pointer, and reassign the NOT-NULL "created by" attribution to the admin
+            // performing the delete (non-destructive — no business data is removed).
+            await sequelize.transaction(async (t) => {
+                await UserRole.destroy({ where: { user_id: id }, transaction: t });
+                await UserRole.update({ assigned_by: null }, { where: { assigned_by: id }, transaction: t });
+                if (callerId) {
+                    await Party.update({ created_by: callerId }, { where: { created_by: id }, transaction: t });
+                    await Salesman.update({ created_by: callerId }, { where: { created_by: id }, transaction: t });
+                    await Distributor.update({ created_by: callerId }, { where: { created_by: id }, transaction: t });
+                }
+                await user.destroy({ transaction: t });
+            });
+
             await logAudit({
                 req,
                 action: 'delete',
-                description: 'User deleted',
+                description: 'User deleted (safe links auto-cleaned)',
                 tableName: 'users',
-                recordId: user.user_id,
+                recordId: id,
                 oldValues: snapshot,
                 newValues: null,
             });
