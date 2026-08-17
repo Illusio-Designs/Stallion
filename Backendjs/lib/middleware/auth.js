@@ -5,13 +5,28 @@ const Role = require('../models/Role');
 const { getJwtSecret } = require('../utils/jwtSecret');
 
 async function attachUserRole(req) {
-    const userRole = await UserRole.findOne({ where: { user_id: req.user.user_id } });
-    if (!userRole) {
+    // A member can hold several roles. Attach EVERY role name so authorization
+    // checks the union (not just the primary), then set the singular
+    // req.userRoleName for back-compat — preferring 'admin' if present so
+    // admin-gated logic still recognizes a multi-role admin.
+    const userRoles = await UserRole.findAll({
+        where: { user_id: req.user.user_id },
+        include: [{ model: Role, as: 'role' }],
+    });
+
+    const roleNames = userRoles
+        .map((ur) => (ur.role ? ur.role.role_name : null))
+        .filter(Boolean);
+
+    req.userRoleNames = roleNames;
+
+    if (roleNames.length === 0) {
         req.userRoleName = null;
         return;
     }
-    const role = await Role.findOne({ where: { role_id: userRole.role_id } });
-    req.userRoleName = role ? role.role_name : null;
+
+    const adminRole = roleNames.find((r) => String(r).toLowerCase() === 'admin');
+    req.userRoleName = adminRole || roleNames[0];
 }
 
 /**

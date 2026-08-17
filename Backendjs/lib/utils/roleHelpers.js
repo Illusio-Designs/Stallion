@@ -24,9 +24,17 @@ function normalizeRole(roleName) {
     return roleName ? String(roleName).toLowerCase() : null;
 }
 
-function hasRole(roleName, allowedRoles) {
-    const normalized = normalizeRole(roleName);
-    return normalized != null && allowedRoles.map(normalizeRole).includes(normalized);
+// A member can hold several roles. hasRole accepts EITHER a single role name or
+// an array of role names, and returns true if ANY of them is allowed.
+function hasRole(roleOrRoles, allowedRoles) {
+    const allowed = allowedRoles.map(normalizeRole);
+    const roles = Array.isArray(roleOrRoles) ? roleOrRoles : [roleOrRoles];
+    return roles.map(normalizeRole).some((r) => r != null && allowed.includes(r));
+}
+
+// True if `target` is one of the user's roles (accepts a string or an array).
+function isRole(roleOrRoles, target) {
+    return hasRole(roleOrRoles, [target]);
 }
 
 function isOfficeRole(roleName) {
@@ -80,6 +88,7 @@ module.exports = {
     ORDER_ADMIN_ROLES,
     normalizeRole,
     hasRole,
+    isRole,
     isOfficeRole,
     canManageInventory,
     canManageOrders,
