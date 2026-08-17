@@ -34,7 +34,7 @@ class PartyController {
                 return res.status(400).json({ error: 'User ID is required' });
             }
             const party = await Party.findOne({ where: { user_id: id } });
-            if (denyInactiveParty(party, req.userRoleName)) {
+            if (denyInactiveParty(party, req.userRoleNames)) {
                 return res.status(404).json({ error: 'Party not found' });
             }
             res.status(200).json(party);
@@ -45,7 +45,7 @@ class PartyController {
 
     /** GET / — party managers/admins get paginated list; party role gets own record */
     async getPartiesRoot(req, res) {
-        if (canManageParties(req.userRoleName)) {
+        if (canManageParties(req.userRoleNames)) {
             if (!req.query.page) req.query.page = '1';
             if (!req.query.limit) req.query.limit = '20';
             return this.getParties(req, res);
@@ -58,7 +58,7 @@ class PartyController {
 
     async getParties(req, res) {
         try {
-            if (!canManageParties(req.userRoleName)) {
+            if (!canManageParties(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const pagination = parsePaginationParams(req);
@@ -72,7 +72,7 @@ class PartyController {
                 nameFields: ['party_name', 'trade_name', 'contact_person'],
                 phoneFields: ['phone'],
             });
-            const where = mergeWhere(partyActiveFilter(req.userRoleName), searchFilter);
+            const where = mergeWhere(partyActiveFilter(req.userRoleNames), searchFilter);
             const { count, rows: parties } = await Party.findAndCountAll({
                 where,
                 limit: pagination.limit,
@@ -91,11 +91,11 @@ class PartyController {
                 return res.status(400).json({ error: 'Party ID is required' });
             }
             const party = await Party.findOne({ where: { party_id: id } });
-            if (denyInactiveParty(party, req.userRoleName)) {
+            if (denyInactiveParty(party, req.userRoleNames)) {
                 return res.status(404).json({ error: 'Party not found' });
             }
 
-            if (!canManageParties(req.userRoleName)) {
+            if (!canManageParties(req.userRoleNames)) {
                 const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
                 const role = normalizeRole(req.userRoleName);
                 const allowed = (role === 'party' && scope.partyId === id)
@@ -183,14 +183,14 @@ class PartyController {
     async getPartiesBySalesmanId(req, res) {
         try {
             const salesman_id = req.params.salesman_id;
-            if (!canManageParties(req.userRoleName)) {
+            if (!canManageParties(req.userRoleNames)) {
                 const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
                 if (normalizeRole(req.userRoleName) !== 'salesman' || scope.salesmanId !== salesman_id) {
                     return res.status(403).json({ error: 'Access denied' });
                 }
             }
             const parties = await Party.findAll({
-                where: mergeWhere({ salesman_id: salesman_id }, partyActiveFilter(req.userRoleName)),
+                where: mergeWhere({ salesman_id: salesman_id }, partyActiveFilter(req.userRoleNames)),
             });
             res.status(200).json(parties);
         } catch (error) {
@@ -313,7 +313,7 @@ class PartyController {
 
     async createParty(req, res) {
         try {
-            if (!canCreateParty(req.userRoleName)) {
+            if (!canCreateParty(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const user = req.user;
@@ -441,7 +441,7 @@ class PartyController {
     //    city / state / pincode (best-effort geocode, 'geocoded').
     async setPartyLocation(req, res) {
         try {
-            if (!isAdmin(req.userRoleName)) {
+            if (!isAdmin(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Only admin can set a party location' });
             }
             const id = req.params.id;
@@ -521,7 +521,7 @@ class PartyController {
                 return res.status(404).json({ error: 'Party not found' });
             }
 
-            const adminOverride = isAdmin(req.userRoleName);
+            const adminOverride = isAdmin(req.userRoleNames);
 
             // Non-admins may only capture when a trusted on-site location is not
             // set yet. Admin/superadmin may overwrite any party's location.
@@ -609,11 +609,11 @@ class PartyController {
             }
             const user = req.user;
             const party = await Party.findOne({ where: { party_id: id } });
-            if (denyInactiveParty(party, req.userRoleName)) {
+            if (denyInactiveParty(party, req.userRoleNames)) {
                 return res.status(404).json({ error: 'Party not found' });
             }
 
-            if (!canManageParties(req.userRoleName)) {
+            if (!canManageParties(req.userRoleNames)) {
                 const scope = await resolveUserScope(user.user_id, req.userRoleName);
                 const role = normalizeRole(req.userRoleName);
                 const allowed = (role === 'party' && scope.partyId === id)
@@ -631,7 +631,7 @@ class PartyController {
             // whole update (that was breaking salesman/party_manager edits).
             let nextIsActive;
             if (is_active !== undefined) {
-                if (isAdmin(req.userRoleName)) {
+                if (isAdmin(req.userRoleNames)) {
                     if (typeof is_active !== 'boolean') {
                         return res.status(400).json({ error: 'is_active must be a boolean' });
                     }
@@ -980,7 +980,7 @@ class PartyController {
                 return res.status(404).json({ error: `State not found: ${state_id}` });
             }
             const parties = await Party.findAll({
-                where: mergeWhere({ state_id: resolved }, partyActiveFilter(req.userRoleName)),
+                where: mergeWhere({ state_id: resolved }, partyActiveFilter(req.userRoleNames)),
             });
             res.status(200).json(parties);
         } catch (error) {

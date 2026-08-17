@@ -45,7 +45,7 @@ class DistributorController {
             const parties = await Party.findAll({
                 where: mergeWhere(
                     { distributor_id: distributor.distributor_id },
-                    partyActiveFilter(req.userRoleName)
+                    partyActiveFilter(req.userRoleNames)
                 ),
             });
             res.status(200).json(parties);

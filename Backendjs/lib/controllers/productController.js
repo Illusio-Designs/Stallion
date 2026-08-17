@@ -332,7 +332,7 @@ class ProductController {
                 updated_at: new Date(),
             };
 
-            if (canManageInventory(req.userRoleName)) {
+            if (canManageInventory(req.userRoleNames)) {
                 // total_qty is ALWAYS derived as warehouse_qty + tray_qty so the three
                 // can never drift apart. The client's total_qty is ignored on purpose —
                 // the edit form carries a previously-stored (often stale) value, which is

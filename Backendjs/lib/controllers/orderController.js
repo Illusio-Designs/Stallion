@@ -213,7 +213,7 @@ class OrderController {
                     return res.status(404).json({ error: 'Salesman not found' });
                 }
                 whereClause.salesman_id = scope.salesmanId;
-            } else if (canViewAllOrders(role)) {
+            } else if (canViewAllOrders(req.userRoleNames)) {
                 return this.getOrders(req, res);
             } else {
                 return res.status(403).json({ error: 'Access denied' });
@@ -246,7 +246,7 @@ class OrderController {
     }
     async getOrders(req, res) {
         try {
-            if (!canViewAllOrders(req.userRoleName)) {
+            if (!canViewAllOrders(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const pagination = parsePaginationParams(req);
@@ -747,7 +747,7 @@ class OrderController {
 
     async updateOrderStatus(req, res) {
         try {
-            if (!canManageOrders(req.userRoleName)) {
+            if (!canManageOrders(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const user = req.user;
@@ -813,7 +813,7 @@ class OrderController {
 
     async deleteOrder(req, res) {
         try {
-            if (!canManageOrders(req.userRoleName)) {
+            if (!canManageOrders(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const { id } = req.params;

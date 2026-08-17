@@ -28,7 +28,7 @@ class SalesmanExpenseController {
 
     async getAdminSalesmanExpenses(req, res) {
         try {
-            if (!isOfficeRole(req.userRoleName)) {
+            if (!isOfficeRole(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const pagination = parsePaginationParams(req);
@@ -52,7 +52,7 @@ class SalesmanExpenseController {
 
     async getAllAdminSalesmanExpenses(req, res) {
         try {
-            if (!isOfficeRole(req.userRoleName)) {
+            if (!isOfficeRole(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const pagination = parsePaginationParams(req);
@@ -144,7 +144,7 @@ class SalesmanExpenseController {
             const salesmanId = await resolveSalesmanIdForUser(req.user.user_id, req.userRoleName);
             const isOwner = normalizeRole(req.userRoleName) === 'salesman'
                 && existingExpense.salesman_id === salesmanId;
-            const isOffice = isOfficeRole(req.userRoleName);
+            const isOffice = isOfficeRole(req.userRoleNames);
 
             if (!isOwner && !isOffice) {
                 return res.status(403).json({ error: 'Access denied' });
@@ -246,7 +246,7 @@ class SalesmanExpenseController {
 
             const salesmanId = await resolveSalesmanIdForUser(req.user.user_id, req.userRoleName);
             const isOwner = normalizeRole(req.userRoleName) === 'salesman' && salesmanExpense.salesman_id === salesmanId;
-            if (!isOwner && !isOfficeRole(req.userRoleName)) {
+            if (!isOwner && !isOfficeRole(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
 

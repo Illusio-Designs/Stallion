@@ -12,8 +12,15 @@ const checkRole = (roles) => {
             return res.status(401).json({ success: false, message: 'Authentication required' });
         }
 
-        const userRole = normalizeRole(req.userRoleName);
-        if (!userRole || !allowedRoles.includes(userRole)) {
+        // A member can hold several roles — grant access if ANY of their roles
+        // is allowed. Fall back to the singular role for back-compat.
+        const userRoles = (Array.isArray(req.userRoleNames) && req.userRoleNames.length
+            ? req.userRoleNames
+            : [req.userRoleName]
+        ).map(normalizeRole).filter(Boolean);
+
+        const permitted = userRoles.some((r) => allowedRoles.includes(r));
+        if (!permitted) {
             return res.status(403).json({ success: false, message: 'Access denied - insufficient permissions' });
         }
 
