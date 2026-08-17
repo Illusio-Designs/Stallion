@@ -150,6 +150,41 @@ export const getAccessiblePages = (role) => {
  */
 export const filterMenuItemsByRole = (menuItems, role) => {
   if (!role) return [];
-  
+
   return menuItems.filter(item => hasPageAccess(role, item.id));
+};
+
+/**
+ * Check if ANY of the user's roles grants access to a page (multi-role).
+ * @param {Array<string>} roles - User roles
+ * @param {string} pageId - Page ID to check
+ * @returns {boolean}
+ */
+export const hasAnyRolePageAccess = (roles, pageId) => {
+  if (!Array.isArray(roles) || roles.length === 0) return false;
+  return roles.some(role => hasPageAccess(role, pageId));
+};
+
+/**
+ * Get the UNION of accessible pages across every role a user holds.
+ * @param {Array<string>} roles - User roles
+ * @returns {Array<string>} - De-duplicated array of accessible page IDs
+ */
+export const getAccessiblePagesForRoles = (roles) => {
+  if (!Array.isArray(roles) || roles.length === 0) return [];
+  const pages = new Set();
+  roles.forEach(role => getAccessiblePages(role).forEach(p => pages.add(p)));
+  return Array.from(pages);
+};
+
+/**
+ * Filter menu items by the union of ALL the user's roles (multi-role). A member
+ * with several roles sees every page any one of their roles unlocks.
+ * @param {Array} menuItems - Array of menu items
+ * @param {Array<string>} roles - User roles
+ * @returns {Array} - Filtered menu items
+ */
+export const filterMenuItemsByRoles = (menuItems, roles) => {
+  if (!Array.isArray(roles) || roles.length === 0) return [];
+  return menuItems.filter(item => hasAnyRolePageAccess(roles, item.id));
 };

@@ -5,9 +5,9 @@ import Header from '../components/Header';
 import Footer from '../components/Footer';
 import '../styles/pages/Login.css';
 import { showLoginSuccess, showError, showSuccess } from '../services/notificationService';
-import { setAuth, isLoggedIn, getUserRole, getUser } from '../services/authService';
+import { setAuth, isLoggedIn, getUserRoles, getUser } from '../services/authService';
 import { checkUser, login, getMe, getMyRole } from '../services/apiService';
-import { getAccessiblePages, hasPageAccess } from '../utils/rolePermissions';
+import { getAccessiblePagesForRoles, hasAnyRolePageAccess } from '../utils/rolePermissions';
 import { pageKeyToPath } from '../utils/dashboardRoutes';
 import { verifyOTP, resendOTP, initializeOTPWidget, destroyOTPWidget } from '../services/msg91Service';
 
@@ -363,6 +363,11 @@ const Login = ({ onPageChange }) => {
                 const roleName = roleList.length
                   ? (roleList[0].role_name || roleList[0].roleName || roleList[0].role || roleList[0].name)
                   : null;
+                // Keep ALL role names (multi-role): the sidebar/nav unlocks the
+                // union of every role the member holds, not just the primary one.
+                const roleNames = roleList
+                  .map((r) => r.role_name || r.roleName || r.role || r.name)
+                  .filter(Boolean);
 
                 if (!me && !roleName) return;
 
@@ -383,6 +388,8 @@ const Login = ({ onPageChange }) => {
                   role: roleName || currentUser.role,
                   role_name: roleName || currentUser.role_name,
                   roleName: roleName || currentUser.roleName,
+                  // Full multi-role list for the sidebar/nav union.
+                  roles: roleNames.length ? roleNames : currentUser.roles,
                 };
 
                 setAuth(updatedUser, loginResponse.token);
@@ -407,7 +414,7 @@ const Login = ({ onPageChange }) => {
             // This ensures we have the latest role information before redirecting
             refreshUserData().then(() => {
               // Redirect after user data is refreshed
-              const userRole = getUserRole();
+              const userRoles = getUserRoles();
               
               if (returnUrl) {
                 // Parse returnUrl - it should be a path like "/products" or "/products?id=123"
@@ -424,9 +431,9 @@ const Login = ({ onPageChange }) => {
                   
                   // Check if user has access to return URL page (if it's a dashboard page)
                   const dashboardPages = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings'];
-                  if (dashboardPages.includes(page) && userRole && !hasPageAccess(userRole, page)) {
+                  if (dashboardPages.includes(page) && userRoles.length && !hasAnyRolePageAccess(userRoles, page)) {
                     // User doesn't have access to return URL, redirect to first accessible page
-                    const accessiblePages = getAccessiblePages(userRole);
+                    const accessiblePages = getAccessiblePagesForRoles(userRoles);
                     if (accessiblePages.length > 0) {
                       if (onPageChange) {
                         onPageChange(accessiblePages[0]);
@@ -475,8 +482,8 @@ const Login = ({ onPageChange }) => {
                 }
               } else {
                 // No return URL, redirect to first accessible page based on role
-                if (userRole) {
-                  const accessiblePages = getAccessiblePages(userRole);
+                if (userRoles.length) {
+                  const accessiblePages = getAccessiblePagesForRoles(userRoles);
                   if (accessiblePages.length > 0) {
                     // Redirect to first accessible page
                     if (onPageChange) {
@@ -504,7 +511,7 @@ const Login = ({ onPageChange }) => {
             }).catch((refreshError) => {
               // If refresh fails, still redirect with whatever role we have
               console.error('User data refresh failed, proceeding with available role:', refreshError);
-              const userRole = getUserRole();
+              const userRoles = getUserRoles();
               
               if (returnUrl) {
                 // Parse returnUrl - it should be a path like "/products" or "/products?id=123"
@@ -521,9 +528,9 @@ const Login = ({ onPageChange }) => {
                   
                   // Check if user has access to return URL page (if it's a dashboard page)
                   const dashboardPages = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings'];
-                  if (dashboardPages.includes(page) && userRole && !hasPageAccess(userRole, page)) {
+                  if (dashboardPages.includes(page) && userRoles.length && !hasAnyRolePageAccess(userRoles, page)) {
                     // User doesn't have access to return URL, redirect to first accessible page
-                    const accessiblePages = getAccessiblePages(userRole);
+                    const accessiblePages = getAccessiblePagesForRoles(userRoles);
                     if (accessiblePages.length > 0) {
                       if (onPageChange) {
                         onPageChange(accessiblePages[0]);
@@ -572,8 +579,8 @@ const Login = ({ onPageChange }) => {
                 }
               } else {
                 // No return URL, redirect to first accessible page based on role
-                if (userRole) {
-                  const accessiblePages = getAccessiblePages(userRole);
+                if (userRoles.length) {
+                  const accessiblePages = getAccessiblePagesForRoles(userRoles);
                   if (accessiblePages.length > 0) {
                     // Redirect to first accessible page
                     if (onPageChange) {

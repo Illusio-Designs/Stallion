@@ -20,8 +20,8 @@ import '../styles/pages/dashboard-analytics.css';
 import '../styles/pages/dashboard-expenses.css';
 import '../styles/pages/dashboard-settings.css';
 import '../styles/pages/dashboard-support.css';
-import { getUserRole, isLoggedIn } from '../services/authService';
-import { hasPageAccess } from '../utils/rolePermissions';
+import { getUserRoles, isLoggedIn } from '../services/authService';
+import { hasAnyRolePageAccess } from '../utils/rolePermissions';
 import { pageKeyToPath, pathToDashboardPage, isDashboardPage, parseProductPath } from '../utils/dashboardRoutes';
 
 // Auth + Public pages are imported eagerly so their CSS ships in the main
@@ -145,14 +145,15 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
     const dashboardPages = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'offers', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings', 'expenses'];
     const isDashboardPage = dashboardPages.includes(currentPage);
     
-    // If it's a dashboard page, check role-based access
+    // If it's a dashboard page, check role-based access. A member can hold
+    // several roles — grant access if ANY of their roles unlocks the page.
     if (isDashboardPage && isLoggedIn()) {
-      const userRole = getUserRole();
-      if (userRole && !hasPageAccess(userRole, currentPage)) {
-        // User doesn't have access to this page, redirect to settings (which most roles have) or first accessible page
+      const userRoles = getUserRoles();
+      if (userRoles.length && !hasAnyRolePageAccess(userRoles, currentPage)) {
+        // No role grants this page: redirect to the first accessible one.
         const accessiblePages = ['settings', 'dashboard-products', 'orders', 'tray', 'events', 'party', 'salesmen', 'distributor', 'analytics'];
         for (const page of accessiblePages) {
-          if (hasPageAccess(userRole, page)) {
+          if (hasAnyRolePageAccess(userRoles, page)) {
             setTimeout(() => {
               handlePageChange(page);
             }, 100);
