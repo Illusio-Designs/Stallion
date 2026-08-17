@@ -4,8 +4,8 @@ import {
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
   FiHelpCircle, FiSettings, FiTag, FiMenu,
 } from 'react-icons/fi';
-import { getUserRole } from '../services/authService';
-import { filterMenuItemsByRole } from '../utils/rolePermissions';
+import { getUserRoles } from '../services/authService';
+import { filterMenuItemsByRoles } from '../utils/rolePermissions';
 
 // Floating pill-style bottom navigation for the dashboard on phones
 // (hidden ≥ md), mirroring the storefront nav. Shows the top role-allowed
@@ -52,12 +52,15 @@ const SHORT = { 'dashboard-products': 'Products', analytics: 'Reports', 'office-
 const DashboardBottomNav = ({ onPageChange, currentPage, onOpenMenu }) => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
-  const userRole = mounted ? getUserRole() : null;
+  // Union of every role the member holds (multi-role support).
+  const userRoles = mounted ? getUserRoles() : [];
+  const rolesKey = userRoles.join(',');
 
   const primary = useMemo(() => {
-    const items = userRole ? filterMenuItemsByRole(ALL_ITEMS, userRole) : ALL_ITEMS;
+    const items = userRoles.length ? filterMenuItemsByRoles(ALL_ITEMS, userRoles) : ALL_ITEMS;
     return items.slice(0, 4);
-  }, [userRole]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rolesKey]);
 
   const go = (id) => { if (onPageChange) onPageChange(id); };
 

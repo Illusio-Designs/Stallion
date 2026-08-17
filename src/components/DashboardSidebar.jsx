@@ -5,8 +5,8 @@ import {
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
   FiHelpCircle, FiSettings, FiChevronsLeft, FiX, FiShoppingBag, FiTag,
 } from 'react-icons/fi';
-import { getUserRole } from '../services/authService';
-import { filterMenuItemsByRole } from '../utils/rolePermissions';
+import { getUserRoles } from '../services/authService';
+import { filterMenuItemsByRoles } from '../utils/rolePermissions';
 
 const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleCollapse, isMobileOpen = false, onMobileClose }) => {
   const [tooltipState, setTooltipState] = useState({ show: false, text: '', top: 0 });
@@ -37,7 +37,8 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
   // then the filtered menu appears once mounted.
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
-  const userRole = mounted ? getUserRole() : null;
+  // A member can hold several roles — unlock the union of every role's pages.
+  const userRoles = mounted ? getUserRoles() : [];
 
   // All available menu items
   const allMenuItems = [
@@ -58,11 +59,13 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     { id: 'settings', text: 'Settings' },
   ];
   
-  // Filter menu items based on user role
+  // Filter menu items based on the union of the user's roles
+  const rolesKey = userRoles.join(',');
   const menuItems = useMemo(() => {
-    if (!userRole) return allMenuItems; // If no role, show all (fallback)
-    return filterMenuItemsByRole(allMenuItems, userRole);
-  }, [userRole]);
+    if (!userRoles.length) return allMenuItems; // If no role, show all (fallback)
+    return filterMenuItemsByRoles(allMenuItems, userRoles);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rolesKey]);
 
   return (
     <aside
