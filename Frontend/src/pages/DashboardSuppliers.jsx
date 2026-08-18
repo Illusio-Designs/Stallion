@@ -25,13 +25,11 @@ import {
   getMyOrders,
   getMyParties,
   getParties,
-  getRoles,
   getSalesmanCheckins,
   getSalesmanProfile,
   getSalesmanTargets,
   getSalesmen,
   getStates,
-  register,
   updateSalesman,
   updateSalesmanCheckin,
   updateSalesmanTarget
@@ -1278,7 +1276,10 @@ const DashboardSuppliers = () => {
           return;
         }
       } else {
-        // Create new salesman - first create user account
+        // Create new salesman. The backend now creates the login user AND the
+        // salesman in a single transaction, so we no longer pre-register a user
+        // here — that separate step used to leave an orphaned user (and then
+        // "user already exists" on retry) whenever the salesman insert failed.
         try {
           // Format phone number to E.164 format
           let phoneNumber = formData.phone.trim();
@@ -1290,48 +1291,11 @@ const DashboardSuppliers = () => {
             phoneNumber = `+${phoneNumber}`;
           }
 
-          // Get roles to find salesman role ID
-          const rolesResponse = await getRoles();
-          let rolesArray = [];
-          if (Array.isArray(rolesResponse)) {
-            rolesArray = rolesResponse;
-          } else if (rolesResponse && Array.isArray(rolesResponse.data)) {
-            rolesArray = rolesResponse.data;
-          } else if (rolesResponse && Array.isArray(rolesResponse.roles)) {
-            rolesArray = rolesResponse.roles;
-          }
-
-          // Find salesman role ID
-          const salesmanRole = rolesArray.find(r => {
-            const roleName = (r.role_name || r.name || r.roleName || r.title || r.role || '').toLowerCase().trim();
-            return roleName === 'salesman' || roleName === 'salesmen';
-          });
-
-          if (!salesmanRole) {
-            throw new Error('Salesman role not found. Please contact administrator.');
-          }
-
-          const salesmanRoleId = salesmanRole.role_id || salesmanRole.id || salesmanRole.roleId;
-
-          // Create user account first
-          const userData = {
-            phoneNumber,
-            fullName: formData.full_name.trim(),
-            roleId: salesmanRoleId,
-            address: formData.address ? formData.address.trim() : '',
-          };
-
-          const registeredUser = await register(userData);
-          const newUserId = registeredUser.user_id || registeredUser.id || registeredUser.user?.user_id || registeredUser.user?.id;
-
-          if (!newUserId) {
-            throw new Error('Failed to create user account. User ID not returned.');
-          }
-
-          // Now create salesman with the new user_id
+          // No user_id: the backend creates the salesman's login user in the same
+          // transaction (findOrCreateRoleUser by phone — reused safely on retry).
           const salesmanData = {
             ...dataToSend,
-            user_id: newUserId,
+            phone: phoneNumber,
           };
 
           const newSalesman = await createSalesman(salesmanData);

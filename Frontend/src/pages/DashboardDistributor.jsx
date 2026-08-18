@@ -15,8 +15,6 @@ import {
   getStates,
   getCities,
   getAllZones,
-  register,
-  getRoles,
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 
@@ -904,252 +902,14 @@ const DashboardDistributor = () => {
           return;
         }
       } else {
-        // Create new distributor - first create user account
+        // Create new distributor. The backend now creates the login user AND the
+        // distributor in ONE transaction (no separate pre-register step), so a
+        // failed create can no longer leave an orphaned user that then blocked
+        // retry with "user already exists".
         try {
-          // Phone number is already formatted in dataToSend.phone
           const phoneNumber = dataToSend.phone;
-
-          // Get roles to find distributor role ID
-          const rolesResponse = await getRoles();
-          let rolesArray = [];
-          if (Array.isArray(rolesResponse)) {
-            rolesArray = rolesResponse;
-          } else if (rolesResponse && Array.isArray(rolesResponse.data)) {
-            rolesArray = rolesResponse.data;
-          } else if (rolesResponse && Array.isArray(rolesResponse.roles)) {
-            rolesArray = rolesResponse.roles;
-          }
-
-          // Find distributor role ID
-          const distributorRole = rolesArray.find(r => {
-            const roleName = (r.role_name || r.name || r.roleName || r.title || r.role || '').toLowerCase().trim();
-            return roleName === 'distributor';
-          });
-
-          if (!distributorRole) {
-            throw new Error('Distributor role not found. Please contact administrator.');
-          }
-
-          const distributorRoleId = distributorRole.role_id || distributorRole.id || distributorRole.roleId;
-
-          // Create user account first
-          const userData = {
-            phoneNumber,
-            fullName: formData.contact_person.trim() || formData.distributor_name.trim(),
-            roleId: distributorRoleId,
-            address: formData.address ? formData.address.trim() : '',
-          };
-
-          console.log('[Create Distributor] Creating user account with:', {
-            phoneNumber,
-            fullName: userData.fullName,
-            roleId: distributorRoleId,
-            roleName: distributorRole.role_name || distributorRole.name
-          });
-
-          let registeredUser;
-          let newUserId;
-          
-          try {
-            registeredUser = await register(userData);
-            console.log('[Create Distributor] User registration response (full):', JSON.stringify(registeredUser, null, 2));
-            
-            // Try multiple possible response structures
-            newUserId = registeredUser.user_id || 
-                        registeredUser.id || 
-                        registeredUser.user?.user_id || 
-                        registeredUser.user?.id ||
-                        registeredUser.data?.user_id ||
-                        registeredUser.data?.id ||
-                        registeredUser.user_id ||
-                        (registeredUser.user && (registeredUser.user.user_id || registeredUser.user.id));
-
-            console.log('[Create Distributor] Extracted user_id:', newUserId, 'from response structure');
-
-            if (!newUserId) {
-              console.error('[Create Distributor] User registration failed - no user_id returned');
-              console.error('[Create Distributor] Full registration response:', registeredUser);
-              
-              // Check if user already exists (might be trying to create duplicate)
-              const responseMessage = (registeredUser.message || registeredUser.error || registeredUser.msg || '').toLowerCase();
-              if (responseMessage.includes('already exists') || responseMessage.includes('duplicate')) {
-                throw new Error('User with this phone number already exists. Please use a different phone number or contact administrator.');
-              }
-              
-              // If registration succeeded but no user_id, the backend might return user differently
-              // Try to get user by phone number
-              console.log('[Create Distributor] Attempting to find user by phone number...');
-              try {
-                const { getUsers } = await import('../services/apiService');
-                const usersResponse = await getUsers();
-                let usersArray = [];
-                if (Array.isArray(usersResponse)) {
-                  usersArray = usersResponse;
-                } else if (usersResponse && Array.isArray(usersResponse.data)) {
-                  usersArray = usersResponse.data;
-                } else if (usersResponse && Array.isArray(usersResponse.users)) {
-                  usersArray = usersResponse.users;
-                }
-                
-                const foundUser = usersArray.find(u => {
-                  const userPhone = (u.phone || u.phoneNumber || '').trim();
-                  const normalizedUserPhone = userPhone.replace(/^\+/, '');
-                  const normalizedInputPhone = phoneNumber.replace(/^\+/, '');
-                  return userPhone === phoneNumber || normalizedUserPhone === normalizedInputPhone;
-                });
-                
-                if (foundUser) {
-                  newUserId = foundUser.user_id || foundUser.id;
-                  console.log('[Create Distributor] Found user by phone number with ID:', newUserId);
-                } else {
-                  throw new Error('User account creation may have failed. User ID not returned and user not found by phone number.');
-                }
-              } catch (findError) {
-                console.error('[Create Distributor] Error finding user by phone:', findError);
-                throw new Error('Failed to create user account. User ID not returned. Please check if user was created successfully.');
-              }
-            }
-
-            console.log('[Create Distributor] User account created/found successfully with ID:', newUserId);
-          } catch (registerError) {
-            console.error('[Create Distributor] User registration error:', registerError);
-            // Check if it's a "user already exists" error
-            const errorMsg = (registerError.message || '').toLowerCase();
-            if (errorMsg.includes('already exists') || errorMsg.includes('duplicate')) {
-              // User already exists - try to find the existing user
-              console.log('[Create Distributor] User already exists, attempting to find existing user...');
-              try {
-                const { getUsers } = await import('../services/apiService');
-                const usersResponse = await getUsers();
-                let usersArray = [];
-                if (Array.isArray(usersResponse)) {
-                  usersArray = usersResponse;
-                } else if (usersResponse && Array.isArray(usersResponse.data)) {
-                  usersArray = usersResponse.data;
-                } else if (usersResponse && Array.isArray(usersResponse.users)) {
-                  usersArray = usersResponse.users;
-                }
-                
-                const existingUser = usersArray.find(u => {
-                  const userPhone = (u.phone || u.phoneNumber || '').trim();
-                  return userPhone === phoneNumber || userPhone.replace(/^\+/, '') === phoneNumber.replace(/^\+/, '');
-                });
-                
-                if (existingUser) {
-                  newUserId = existingUser.user_id || existingUser.id;
-                  console.log('[Create Distributor] Found existing user with ID:', newUserId);
-                  showSuccess('User account already exists. Using existing account.');
-                } else {
-                  throw new Error('User account creation failed and existing user not found. Please contact administrator.');
-                }
-              } catch (findError) {
-                console.error('[Create Distributor] Error finding existing user:', findError);
-                throw new Error('Failed to create or find user account. Please contact administrator.');
-              }
-            } else {
-              throw registerError;
-            }
-          }
-
-          // Verify user can be found immediately after creation
-          // This helps catch issues early
-          console.log('[Create Distributor] Verifying user account can be found...');
-          let userVerified = false;
-          for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-              const { checkUser } = await import('../services/apiService');
-              await new Promise(resolve => setTimeout(resolve, 100 * (attempt + 1))); // Wait 100ms, 200ms, 300ms
-              const checkResponse = await checkUser(phoneNumber, { autoSendOTP: false });
-              console.log(`[Create Distributor] User verification attempt ${attempt + 1}:`, checkResponse);
-              if (checkResponse && !checkResponse.error) {
-                userVerified = true;
-                break;
-              }
-            } catch (checkError) {
-              console.warn(`[Create Distributor] User verification attempt ${attempt + 1} failed:`, checkError);
-              if (attempt === 2) {
-                // Last attempt failed - log detailed error
-                console.error('[Create Distributor] User verification failed after 3 attempts. User may not be accessible yet.');
-                console.error('[Create Distributor] Phone number used:', phoneNumber);
-                console.error('[Create Distributor] User ID created:', newUserId);
-              }
-            }
-          }
-          
-          if (!userVerified) {
-            console.error('[Create Distributor] WARNING: User account created but cannot be verified. This may cause login issues.');
-          }
-
-          // Create distributor (backend should link user_id based on phone/email)
-          // The backend should automatically link the user account created above
-          // Phone number is already in dataToSend with correct format
-          console.log('[Create Distributor] Creating distributor with phone:', phoneNumber);
           const newDistributor = await createDistributor(dataToSend);
-          console.log('[Create Distributor] Distributor created successfully:', newDistributor);
-          
-          const distributorId = newDistributor.distributor_id || newDistributor.id;
-          
-          // IMPORTANT: Backend needs to link user_id to distributor
-          // The backend should automatically link by matching phone number
-          // If backend doesn't support user_id in createDistributor, it must link by phone
-          console.log('[Create Distributor] Distributor created. Backend should link user_id:', newUserId, 'to distributor_id:', distributorId, 'by phone:', phoneNumber);
-          
-          // Try to update distributor with user_id if backend supports it in update
-          // This is a fallback in case backend doesn't auto-link by phone number
-          if (newUserId && distributorId) {
-            try {
-              const { updateDistributor } = await import('../services/apiService');
-              // Some backends might accept user_id in update but not create
-              // Try updating distributor with user_id (if backend supports it)
-              // Note: This might fail if backend doesn't accept user_id in updateDistributor
-              const updateData = {
-                ...dataToSend,
-                is_active: true
-              };
-              // Only add user_id if backend might support it (some backends do)
-              // updateData.user_id = newUserId; // Uncomment if backend supports this
-              
-              await updateDistributor(distributorId, updateData);
-              console.log('[Create Distributor] Distributor updated (user_id linking handled by backend via phone match)');
-            } catch (updateError) {
-              console.warn('[Create Distributor] Could not update distributor (may not be needed):', updateError);
-              // Backend should link automatically by phone number
-            }
-          }
-          
-          // Also try updating user account to ensure phone number matches exactly
-          if (newUserId) {
-            try {
-              const { updateUser } = await import('../services/apiService');
-              await updateUser(newUserId, {
-                name: userData.fullName,
-                email: formData.email.trim(),
-                phoneNumber: phoneNumber, // Ensure phone number is exactly as stored
-                role_id: distributorRoleId,
-              });
-              console.log('[Create Distributor] User account updated to ensure phone number matches');
-            } catch (updateError) {
-              console.warn('[Create Distributor] Could not update user account (may not be needed):', updateError);
-            }
-          }
-          
-          // Wait a moment and verify user can be found
-          await new Promise(resolve => setTimeout(resolve, 200));
-          
-          try {
-            const { checkUser } = await import('../services/apiService');
-            const checkResponse = await checkUser(phoneNumber, { autoSendOTP: false });
-            console.log('[Create Distributor] User verification after creation:', checkResponse);
-            if (checkResponse && !checkResponse.error) {
-              showSuccess(`Distributor created successfully! User account verified. Phone: ${phoneNumber}. The distributor can now login.`);
-            } else {
-              showSuccess(`Distributor created successfully! User account created with phone: ${phoneNumber}. Please wait a moment before logging in.`);
-            }
-          } catch (verifyError) {
-            console.warn('[Create Distributor] User verification failed:', verifyError);
-            showSuccess(`Distributor created successfully! User account created with phone: ${phoneNumber}. If login fails, please contact administrator.`);
-          }
-          
+
           // Optimistically add to table if it matches the current filter
           if (selectedCountryFilter && newDistributor && newDistributor.country_id === selectedCountryFilter) {
             setDistributors(prev => [...prev, {
@@ -1158,11 +918,10 @@ const DashboardDistributor = () => {
               isActive: newDistributor.is_active !== false,
             }]);
           } else if (selectedCountryFilter) {
-            // If country doesn't match filter, just refresh
             await fetchDistributorsForCountry(selectedCountryFilter);
           }
-          
-          // Success notification is shown above after distributor creation
+
+          showSuccess(`Distributor created successfully! The distributor can now login with phone: ${phoneNumber}.`);
       setError(null);
       setOpenAdd(false);
       setEditRow(null);
