@@ -9,6 +9,7 @@ const DistributorStates = require('../models/DistributorStates');
 const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
+const sequelize = require('../constants/database');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 const { partyActiveFilter } = require('../utils/roleHelpers');
 
@@ -125,68 +126,80 @@ class DistributorController {
             if (email) whereConditions.push({ email });
             if (phone) whereConditions.push({ phone });
 
-            let distributorUser = null;
+            // Pre-check existing user (outside the txn — a read).
+            let existingUser = null;
             if (whereConditions.length > 0) {
-                distributorUser = await User.findOne({
+                existingUser = await User.findOne({
                     where: {
                         [Op.or]: whereConditions,
                     },
                 });
             }
-
-            if (!distributorUser) {
+            if (!existingUser) {
                 if (!phone) {
                     return res.status(400).json({ error: 'Phone is required to create distributor login' });
                 }
                 if (!address) {
                     return res.status(400).json({ error: 'Address is required to create distributor login' });
                 }
-                distributorUser = await findOrCreateRoleUser({
-                    phone,
-                    email,
-                    fullName: contact_person || distributor_name,
-                    roleName: 'distributor',
-                    address,
-                });
             }
 
-            // Create distributor record and link to user
-            const distributor = await Distributor.create({
-                distributor_name,
-                trade_name,
-                contact_person,
-                email,
-                phone,
-                address,
-                country_id,
-                state_id,
-                city_id,
-                pincode,
-                gstin,
-                pan,
-                territory,
-                commission_rate,
-                user_id: distributorUser.user_id,
-                created_by: user.user_id,
-                created_at: new Date(),
-                updated_at: new Date(),
-                is_active: true
-            });
+            // Resolve state ids up front (may 400) before opening the transaction.
+            const resolvedStateIds = await resolveStateIds(state_ids);
 
-            for (const zone of (zones || [])) {
-                const existingZone = await Zone.findOne({ where: { id: zone } });
-                if (!existingZone) {
-                    return res.status(404).json({ error: 'Zone not found' });
+            // Create login user + distributor + zones/states ATOMICALLY, so a
+            // failed create never leaves an orphaned user that blocks retry.
+            const distributor = await sequelize.transaction(async (t) => {
+                let distributorUser = existingUser;
+                if (!distributorUser) {
+                    distributorUser = await findOrCreateRoleUser({
+                        phone,
+                        email,
+                        fullName: contact_person || distributor_name,
+                        roleName: 'distributor',
+                        address,
+                    }, { transaction: t });
                 }
-                await DistributorZones.create({
-                    distributor_id: distributor.distributor_id,
-                    zone_id: existingZone.id
-                });
-            }
-            // Working states (multi-state coverage) — accepts state names or ids
-            for (const stId of await resolveStateIds(state_ids)) {
-                await DistributorStates.create({ distributor_id: distributor.distributor_id, state_id: stId });
-            }
+
+                const created = await Distributor.create({
+                    distributor_name,
+                    trade_name,
+                    contact_person,
+                    email,
+                    phone,
+                    address,
+                    country_id,
+                    state_id,
+                    city_id,
+                    pincode,
+                    gstin,
+                    pan,
+                    territory,
+                    commission_rate,
+                    user_id: distributorUser.user_id,
+                    created_by: user.user_id,
+                    created_at: new Date(),
+                    updated_at: new Date(),
+                    is_active: true
+                }, { transaction: t });
+
+                for (const zone of (zones || [])) {
+                    const existingZone = await Zone.findOne({ where: { id: zone }, transaction: t });
+                    if (!existingZone) {
+                        throw { status: 404, message: 'Zone not found' };
+                    }
+                    await DistributorZones.create({
+                        distributor_id: created.distributor_id,
+                        zone_id: existingZone.id
+                    }, { transaction: t });
+                }
+                // Working states (multi-state coverage)
+                for (const stId of resolvedStateIds) {
+                    await DistributorStates.create({ distributor_id: created.distributor_id, state_id: stId }, { transaction: t });
+                }
+
+                return created;
+            });
 
             await logAudit({
                 req,
@@ -201,6 +214,10 @@ class DistributorController {
             const distributorStates = await DistributorStates.findAll({ where: { distributor_id: distributor.distributor_id } });
             res.status(200).json({ ...distributor.toJSON(), zones: distributorZones, states: distributorStates });
         } catch (error) {
+            // Transaction rolled back — no orphan user/distributor left behind.
+            if (error && error.status) {
+                return res.status(error.status).json({ error: error.message });
+            }
             res.status(500).json({ error: error.message });
         }
     }

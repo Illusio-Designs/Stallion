@@ -10,6 +10,7 @@ const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const User = require('../models/User');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
+const sequelize = require('../constants/database');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 const { SALESMAN_UPLOAD_DIR } = require('../constants/multer');
 const fs = require('fs');
@@ -126,80 +127,97 @@ class SalesmanController {
                 return res.status(400).json({ error: 'Salesman with this employee code already exists' });
             }
 
-            let linkedUserId = user_id;
-            if (user_id) {
-                const existingUser = await User.findOne({ where: { user_id } });
-                if (!existingUser) {
-                    return res.status(400).json({ error: 'User not found' });
-                }
-            } else {
+            if (!user_id) {
                 if (!phone) {
                     return res.status(400).json({ error: 'Phone is required to create salesman login' });
                 }
                 if (!address) {
                     return res.status(400).json({ error: 'Address is required to create salesman login' });
                 }
-                const loginUser = await findOrCreateRoleUser({
-                    phone,
-                    email,
-                    fullName: full_name,
-                    roleName: 'salesman',
-                    address,
-                });
-                linkedUserId = loginUser.user_id;
             }
 
-            const salesman = await Salesman.create({
-                employee_code,
-                phone,
-                alternate_phone,
-                email,
-                full_name,
-                reporting_manager,
-                address,
-                country_id,
-                state_id,
-                city_id,
-                zone_preference,
-                joining_date,
-                pan_card_url,
-                aadhar_card_url,
-                cancel_cheque_url,
-                photo_url,
-                created_by: user.user_id,
-                created_at: new Date(),
-                updated_at: new Date(),
-                is_active: true,
-                user_id: linkedUserId,
-            });
-            console.log("salesman.salesman_id ", salesman.salesman_id);
-            // Zones (optional, kept for backward compatibility)
-            for (const zone of (zones || [])) {
-                const existingZone = await Zone.findOne({ where: { id: zone } });
-                if (!existingZone) {
-                    return res.status(404).json({ error: 'Zone not found' });
+            // Resolve the working-state ids up front (may 400) so we don't open a
+            // transaction just to roll it back on a bad input.
+            const resolvedStateIds = await resolveStateIds(state_ids);
+
+            // Create the login user + salesman + zones/states + tray ATOMICALLY.
+            // If ANY step fails the whole thing rolls back, so a failed create no
+            // longer leaves an orphaned user (which then blocked retry with
+            // "user already exists"). A thrown {status,message} becomes the HTTP
+            // response; anything else is a 500.
+            const salesman = await sequelize.transaction(async (t) => {
+                let linkedUserId = user_id;
+                if (user_id) {
+                    const existingUser = await User.findOne({ where: { user_id }, transaction: t });
+                    if (!existingUser) {
+                        throw { status: 400, message: 'User not found' };
+                    }
+                } else {
+                    const loginUser = await findOrCreateRoleUser({
+                        phone,
+                        email,
+                        fullName: full_name,
+                        roleName: 'salesman',
+                        address,
+                    }, { transaction: t });
+                    linkedUserId = loginUser.user_id;
                 }
-                await SalesmanZones.create({
-                    salesman_id: salesman.salesman_id,
-                    zone_id: existingZone.id
-                });
-            }
-            // Working states (multi-state coverage) — accepts state names or ids
-            for (const stId of await resolveStateIds(state_ids)) {
-                await SalesmanStates.create({ salesman_id: salesman.salesman_id, state_id: stId });
-            }
-            const tray = await Tray.create({
-                tray_name: full_name + "'s Tray",
-                tray_status: TrayStatus.ASSIGNED,
-                created_at: new Date(),
-                updated_at: new Date(),
+
+                const created = await Salesman.create({
+                    employee_code,
+                    phone,
+                    alternate_phone,
+                    email,
+                    full_name,
+                    reporting_manager,
+                    address,
+                    country_id,
+                    state_id,
+                    city_id,
+                    zone_preference,
+                    joining_date,
+                    pan_card_url,
+                    aadhar_card_url,
+                    cancel_cheque_url,
+                    photo_url,
+                    created_by: user.user_id,
+                    created_at: new Date(),
+                    updated_at: new Date(),
+                    is_active: true,
+                    user_id: linkedUserId,
+                }, { transaction: t });
+
+                // Zones (optional, kept for backward compatibility)
+                for (const zone of (zones || [])) {
+                    const existingZone = await Zone.findOne({ where: { id: zone }, transaction: t });
+                    if (!existingZone) {
+                        throw { status: 404, message: 'Zone not found' };
+                    }
+                    await SalesmanZones.create({
+                        salesman_id: created.salesman_id,
+                        zone_id: existingZone.id
+                    }, { transaction: t });
+                }
+                // Working states (multi-state coverage)
+                for (const stId of resolvedStateIds) {
+                    await SalesmanStates.create({ salesman_id: created.salesman_id, state_id: stId }, { transaction: t });
+                }
+                const tray = await Tray.create({
+                    tray_name: full_name + "'s Tray",
+                    tray_status: TrayStatus.ASSIGNED,
+                    created_at: new Date(),
+                    updated_at: new Date(),
+                }, { transaction: t });
+                await SalesmanTray.create({
+                    salesman_id: created.salesman_id,
+                    tray_id: tray.tray_id,
+                    created_at: new Date(),
+                    updated_at: new Date(),
+                }, { transaction: t });
+
+                return created;
             });
-            await SalesmanTray.create({
-                salesman_id: salesman.salesman_id,
-                tray_id: tray.tray_id,
-                created_at: new Date(),
-                updated_at: new Date(),
-            });
+
             await logAudit({
                 req,
                 action: 'create',
@@ -213,6 +231,16 @@ class SalesmanController {
             const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
             res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
         } catch (error) {
+            // The transaction already rolled back, so no orphan user/salesman was
+            // left. Clean up any uploaded KYC files that are now unreferenced.
+            try {
+                Object.values(req.files || {}).flat().forEach((f) => {
+                    if (f && f.path && fs.existsSync(f.path)) fs.unlinkSync(f.path);
+                });
+            } catch (_) { /* ignore */ }
+            if (error && error.status) {
+                return res.status(error.status).json({ error: error.message });
+            }
             console.error(error);
             res.status(500).json({ error: error.message });
         }
