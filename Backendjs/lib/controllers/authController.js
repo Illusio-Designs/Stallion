@@ -161,6 +161,31 @@ class AuthController {
                 return res.status(400).json({ error: 'Role not found' });
             }
 
+            // Security: a non-admin may only create the FIELD/partner account they
+            // manage — never an office or admin login (that would be privilege
+            // escalation). Admins may create any role.
+            const callerRoles = (Array.isArray(req.userRoleNames) && req.userRoleNames.length
+                ? req.userRoleNames
+                : [req.userRoleName]
+            ).map((r) => String(r || '').toLowerCase());
+            const isCallerAdmin = callerRoles.includes('admin');
+            if (!isCallerAdmin) {
+                const managerToPartner = {
+                    sales_manager: 'salesman',
+                    party_manager: 'party',
+                    distributor_manager: 'distributor',
+                };
+                const allowedPartnerRoles = callerRoles
+                    .map((r) => managerToPartner[r])
+                    .filter(Boolean);
+                const targetRole = String(role.role_name || '').toLowerCase();
+                if (!allowedPartnerRoles.includes(targetRole)) {
+                    return res.status(403).json({
+                        error: 'You can only create partner accounts for the roles you manage.',
+                    });
+                }
+            }
+
             const user = await User.create({
                 phone: phoneNumber,
                 full_name: fullName,

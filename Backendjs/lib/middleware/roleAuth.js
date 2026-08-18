@@ -31,6 +31,10 @@ const checkRole = (roles) => {
 const isAdmin = checkRole(['admin']);
 const isOrderManager = checkRole(['admin', 'order_manager']);
 const isPartyManager = checkRole(['admin', 'party_manager', 'sales_manager']);
+// Who may register a partner LOGIN account (salesman/party/distributor). The
+// register controller further restricts each manager to only the partner role
+// they manage; admins may create any role.
+const isPartnerCreator = checkRole(['admin', 'sales_manager', 'party_manager', 'distributor_manager']);
 // Creating a party is additionally open to field roles (salesman/distributor);
 // other party routes stay limited to isPartyManager.
 const isPartyCreator = checkRole(['admin', 'party_manager', 'sales_manager', 'salesman', 'distributor']);
@@ -53,6 +57,7 @@ module.exports = {
     isAdmin,
     isOrderManager,
     isPartyManager,
+    isPartnerCreator,
     isPartyCreator,
     isProductManager,
     isInventoryManager,
