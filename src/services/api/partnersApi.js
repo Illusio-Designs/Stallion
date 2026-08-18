@@ -1273,12 +1273,11 @@ export const createSalesman = async (salesmanData) => {
     throw new Error('Country is required');
   }
   
-  // Validate user_id - it's required (NOT NULL in database)
+  // user_id is now OPTIONAL: when omitted, the backend creates the partner's
+  // login user in the same transaction as the partner record (atomic). We only
+  // pass a user_id if the caller already has one (legacy path).
   const trimmedUserId = user_id ? String(user_id).trim() : '';
-  if (!trimmedUserId || trimmedUserId === '') {
-    throw new Error('User ID is required');
-  }
-  
+
   // Build request body matching the exact payload structure provided
   // reporting_manager must be null (not empty string) if not provided, to satisfy foreign key constraint
   let reportingManagerValue = null;
@@ -1293,7 +1292,7 @@ export const createSalesman = async (salesmanData) => {
   const stateIdsArray = Array.isArray(salesmanData.state_ids) ? salesmanData.state_ids : [];
 
   const requestBody = {
-    user_id: trimmedUserId,
+    user_id: trimmedUserId || undefined,
     employee_code: trimmedEmployeeCode,
     alternate_phone: alternate_phone ? String(alternate_phone).trim() : '',
     full_name: trimmedFullName,
@@ -1334,11 +1333,12 @@ export const createSalesman = async (salesmanData) => {
     console.error('[Create Salesman] Request body validation failed:', requestBody);
     throw new Error('Full name is required in request body');
   }
-  if (!requestBody.user_id || requestBody.user_id === '') {
-    console.error('[Create Salesman] Request body validation failed: user_id is required', requestBody);
-    throw new Error('User ID is required in request body');
+  // user_id is optional now — the backend creates the login user atomically when
+  // it's absent. Phone is what the backend needs to create/reuse that user.
+  if (!requestBody.phone || String(requestBody.phone).trim() === '') {
+    throw new Error('Phone is required');
   }
-  
+
   console.log('[Create Salesman] Creating salesman with employee_code:', requestBody.employee_code);
   console.log('[Create Salesman] Request body:', JSON.stringify(requestBody, null, 2));
   console.log('[Create Salesman] reporting_manager value:', requestBody.reporting_manager, 'type:', typeof requestBody.reporting_manager);
@@ -1450,12 +1450,11 @@ export const updateSalesman = async (salesmanId, salesmanData) => {
     throw new Error('Country is required');
   }
   
-  // Validate user_id - it's required (NOT NULL in database)
+  // user_id is now OPTIONAL: when omitted, the backend creates the partner's
+  // login user in the same transaction as the partner record (atomic). We only
+  // pass a user_id if the caller already has one (legacy path).
   const trimmedUserId = user_id ? String(user_id).trim() : '';
-  if (!trimmedUserId || trimmedUserId === '') {
-    throw new Error('User ID is required');
-  }
-  
+
   // Build request body matching the exact payload structure provided
   // reporting_manager must be null (not empty string) if not provided, to satisfy foreign key constraint
   let reportingManagerValue = null;
@@ -1470,7 +1469,7 @@ export const updateSalesman = async (salesmanId, salesmanData) => {
   const stateIdsArray = Array.isArray(salesmanData.state_ids) ? salesmanData.state_ids : [];
 
   const requestBody = {
-    user_id: trimmedUserId,
+    user_id: trimmedUserId || undefined,
     employee_code: trimmedEmployeeCode,
     alternate_phone: alternate_phone ? String(alternate_phone).trim() : '',
     full_name: trimmedFullName,
