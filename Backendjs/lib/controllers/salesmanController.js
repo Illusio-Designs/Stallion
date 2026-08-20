@@ -140,6 +140,20 @@ class SalesmanController {
             // transaction just to roll it back on a bad input.
             const resolvedStateIds = await resolveStateIds(state_ids);
 
+            // Coerce optional UUID/date fields: '' -> null (Sequelize UUID/DATE
+            // columns reject an empty string with a generic "Validation error").
+            const uuidOrNull = (v) => {
+                const s = v === null || v === undefined ? '' : String(v).trim();
+                return s === '' ? null : s;
+            };
+            const reportingManagerId = uuidOrNull(reporting_manager);
+            const countryIdVal = uuidOrNull(country_id);
+            const stateIdVal = uuidOrNull(state_id);
+            const cityIdVal = uuidOrNull(city_id);
+            const joiningDateVal = (joining_date === null || joining_date === undefined || String(joining_date).trim() === '')
+                ? null
+                : joining_date;
+
             // Create the login user + salesman + zones/states + tray ATOMICALLY.
             // If ANY step fails the whole thing rolls back, so a failed create no
             // longer leaves an orphaned user (which then blocked retry with
@@ -169,13 +183,13 @@ class SalesmanController {
                     alternate_phone,
                     email,
                     full_name,
-                    reporting_manager,
+                    reporting_manager: reportingManagerId,
                     address,
-                    country_id,
-                    state_id,
-                    city_id,
+                    country_id: countryIdVal,
+                    state_id: stateIdVal,
+                    city_id: cityIdVal,
                     zone_preference,
-                    joining_date,
+                    joining_date: joiningDateVal,
                     pan_card_url,
                     aadhar_card_url,
                     cancel_cheque_url,
@@ -279,23 +293,37 @@ class SalesmanController {
                 ? `/uploads/${SALESMAN_UPLOAD_DIR}/${files[field][0].filename}`
                 : undefined);
 
+            // UUID foreign-key columns reject an empty string with a generic
+            // "Validation error". Coerce '' (e.g. a cleared Reporting Manager or
+            // an unset country) to null; leave undefined fields out so a partial
+            // update never wipes an existing value.
+            const uuidOrNull = (v) => {
+                if (v === undefined) return undefined;
+                const s = v === null ? '' : String(v).trim();
+                return s === '' ? null : s;
+            };
+            const dateOrNull = (v) => {
+                if (v === undefined) return undefined;
+                return (v === null || String(v).trim() === '') ? null : v;
+            };
+
             const payload = {
-                employee_code,
-                phone,
-                alternate_phone,
-                email,
-                full_name,
-                reporting_manager,
-                address,
-                country_id,
-                state_id,
-                city_id,
-                zone_preference,
-                joining_date,
                 updated_at: new Date(),
                 updated_by: user.user_id,
-                is_active: is_active,
             };
+            if (employee_code !== undefined) payload.employee_code = employee_code;
+            if (phone !== undefined) payload.phone = phone;
+            if (alternate_phone !== undefined) payload.alternate_phone = alternate_phone;
+            if (email !== undefined) payload.email = email;
+            if (full_name !== undefined) payload.full_name = full_name;
+            if (reporting_manager !== undefined) payload.reporting_manager = uuidOrNull(reporting_manager);
+            if (address !== undefined) payload.address = address;
+            if (country_id !== undefined) payload.country_id = uuidOrNull(country_id);
+            if (state_id !== undefined) payload.state_id = uuidOrNull(state_id);
+            if (city_id !== undefined) payload.city_id = uuidOrNull(city_id);
+            if (zone_preference !== undefined) payload.zone_preference = zone_preference;
+            if (joining_date !== undefined) payload.joining_date = dateOrNull(joining_date);
+            if (is_active !== undefined) payload.is_active = is_active;
             if (docUrl('pan_card')) payload.pan_card_url = docUrl('pan_card');
             if (docUrl('aadhar_card')) payload.aadhar_card_url = docUrl('aadhar_card');
             if (docUrl('cancel_cheque')) payload.cancel_cheque_url = docUrl('cancel_cheque');
@@ -358,6 +386,11 @@ class SalesmanController {
             });
             res.status(200).json({ message: 'Salesman updated successfully' });
         } catch (error) {
+            // Surface the specific field(s) instead of a bare "Validation error".
+            if (error && Array.isArray(error.errors) && error.errors.length) {
+                const detail = error.errors.map((e) => e.message).join('; ');
+                return res.status(400).json({ error: detail });
+            }
             res.status(500).json({ error: error.message });
         }
     }

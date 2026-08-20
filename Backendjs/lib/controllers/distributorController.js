@@ -147,6 +147,16 @@ class DistributorController {
             // Resolve state ids up front (may 400) before opening the transaction.
             const resolvedStateIds = await resolveStateIds(state_ids);
 
+            // Coerce optional UUID FK fields: '' -> null (Sequelize UUID columns
+            // reject an empty string with a generic "Validation error").
+            const uuidOrNull = (v) => {
+                const s = v === null || v === undefined ? '' : String(v).trim();
+                return s === '' ? null : s;
+            };
+            const countryIdVal = uuidOrNull(country_id);
+            const stateIdVal = uuidOrNull(state_id);
+            const cityIdVal = uuidOrNull(city_id);
+
             // Create login user + distributor + zones/states ATOMICALLY, so a
             // failed create never leaves an orphaned user that blocks retry.
             const distributor = await sequelize.transaction(async (t) => {
@@ -168,9 +178,9 @@ class DistributorController {
                     email,
                     phone,
                     address,
-                    country_id,
-                    state_id,
-                    city_id,
+                    country_id: countryIdVal,
+                    state_id: stateIdVal,
+                    city_id: cityIdVal,
                     pincode,
                     gstin,
                     pan,
@@ -217,6 +227,9 @@ class DistributorController {
             // Transaction rolled back — no orphan user/distributor left behind.
             if (error && error.status) {
                 return res.status(error.status).json({ error: error.message });
+            }
+            if (error && Array.isArray(error.errors) && error.errors.length) {
+                return res.status(400).json({ error: error.errors.map((e) => e.message).join('; ') });
             }
             res.status(500).json({ error: error.message });
         }
