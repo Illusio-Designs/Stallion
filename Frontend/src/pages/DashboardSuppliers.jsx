@@ -7,6 +7,7 @@ import DatePicker from '../components/ui/DatePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import FileUpload from '../components/ui/FileUpload';
+import { resolveUploadUrl } from '../utils/imageUrl';
 import MatchMeter from '../components/ui/MatchMeter';
 import RowActions from '../components/ui/RowActions';
 import StatusBadge from '../components/ui/StatusBadge';
@@ -2153,10 +2154,10 @@ const DashboardSuppliers = () => {
             <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
-                { key: 'pan_card', label: 'PAN Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'aadhar_card', label: 'Aadhar Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'cancel_cheque', label: 'Cancel Cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'photo', label: 'Photo', accept: 'image/*', hint: 'Image only' },
+                { key: 'pan_card', urlKey: 'pan_card_url', label: 'PAN Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+                { key: 'aadhar_card', urlKey: 'aadhar_card_url', label: 'Aadhar Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+                { key: 'cancel_cheque', urlKey: 'cancel_cheque_url', label: 'Cancel Cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+                { key: 'photo', urlKey: 'photo_url', label: 'Photo', accept: 'image/*', hint: 'Image only' },
               ].map((doc) => (
                 <FileUpload
                   key={doc.key}
@@ -2164,6 +2165,7 @@ const DashboardSuppliers = () => {
                   accept={doc.accept}
                   hint={doc.hint}
                   file={formData[doc.key]}
+                  existingUrl={resolveUploadUrl(editRow && editRow[doc.urlKey])}
                   onChange={(f) => handleInputChange(doc.key, f)}
                 />
               ))}

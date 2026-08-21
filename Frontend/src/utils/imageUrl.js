@@ -71,3 +71,21 @@ export const getProductImageUrl = (product) => {
   if (fallbackFilename) return `${IMAGE_BASE_URL}/uploads/products/${encodeUploadName(fallbackFilename)}`;
   return PRODUCT_IMAGE_PLACEHOLDER;
 };
+
+/**
+ * Resolve any stored upload path (e.g. "/uploads/salesman/pan_card-…") to a
+ * full, renderable URL on the upload host. Full URLs are returned as-is; empty
+ * values return ''. The final path segment (the filename) is percent-encoded.
+ */
+export const resolveUploadUrl = (path) => {
+  if (!path || typeof path !== 'string') return '';
+  const trimmed = path.trim();
+  if (!trimmed) return '';
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  const clean = trimmed.replace(/^\/+/, '');
+  const idx = clean.lastIndexOf('/');
+  const dir = idx >= 0 ? clean.slice(0, idx) : '';
+  const file = idx >= 0 ? clean.slice(idx + 1) : clean;
+  const encoded = dir ? `${dir}/${encodeURIComponent(file)}` : encodeURIComponent(file);
+  return `${IMAGE_BASE_URL}/${encoded}`;
+};
