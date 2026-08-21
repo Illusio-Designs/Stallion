@@ -11,6 +11,7 @@ const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const User = require('../models/User');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const sequelize = require('../constants/database');
+const { Op } = require('sequelize');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 const { SALESMAN_UPLOAD_DIR } = require('../constants/multer');
 const fs = require('fs');
@@ -345,9 +346,40 @@ class SalesmanController {
                     }
                     return s;
                 };
+                const linkedUser = await User.findByPk(salesman.user_id);
                 const userUpdate = { updated_at: new Date() };
-                if (phone !== undefined && phone !== null && String(phone).trim() !== '') userUpdate.phone = toE164(phone);
-                if (email !== undefined && email !== null && String(email).trim() !== '') userUpdate.email = email;
+                if (phone !== undefined && phone !== null && String(phone).trim() !== '') {
+                    const newPhone = toE164(phone);
+                    const currentPhone = linkedUser ? toE164(linkedUser.phone) : null;
+                    // Only touch the login phone when it actually changes. Rewriting
+                    // it to the same (normalized) value is a needless write that can
+                    // clash with another account's identical E.164 number and fail
+                    // the users.phone UNIQUE constraint ("phone must be unique").
+                    if (newPhone && newPhone !== currentPhone) {
+                        const clash = await User.findOne({
+                            where: { phone: newPhone, user_id: { [Op.ne]: salesman.user_id } },
+                        });
+                        if (clash) {
+                            return res.status(400).json({ error: 'This phone number is already used by another account.' });
+                        }
+                        userUpdate.phone = newPhone;
+                    }
+                }
+                if (email !== undefined && email !== null && String(email).trim() !== '') {
+                    const newEmail = String(email).trim();
+                    const currentEmail = linkedUser && linkedUser.email ? String(linkedUser.email).trim() : null;
+                    // users.email is UNIQUE too — only change it when it differs, and
+                    // block a change to an address another account already owns.
+                    if (newEmail !== currentEmail) {
+                        const emailClash = await User.findOne({
+                            where: { email: newEmail, user_id: { [Op.ne]: salesman.user_id } },
+                        });
+                        if (emailClash) {
+                            return res.status(400).json({ error: 'This email is already used by another account.' });
+                        }
+                        userUpdate.email = newEmail;
+                    }
+                }
                 if (full_name !== undefined && full_name !== null && String(full_name).trim() !== '') userUpdate.full_name = full_name;
                 // Mirror active/inactive onto the login account so deactivating a
                 // salesman who has left actually BLOCKS their access — the auth
