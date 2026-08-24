@@ -4,6 +4,7 @@ const Role = require('../models/Role');
 const UserRole = require('../models/UserRole');
 const Party = require('../models/Party');
 const msg91Service = require('../services/msg91Service');
+const { ensureLoginUserByPhone, findPartyByPhone } = require('../utils/userFactory');
 const { allowedNumbers } = require('../constants/constants');
 const { markPhoneVerified, consumePhoneVerification, normalizePhone } = require('../services/otpSession');
 const { getJwtSecret } = require('../utils/jwtSecret');
@@ -60,6 +61,13 @@ class AuthController {
                 },
             });
             if (!user) {
+                // Self-heal: a party may own this phone but have no login user yet.
+                // Recognize it here so OTP is sent; the actual user is created and
+                // linked on the login call (after OTP is verified).
+                const party = await findPartyByPhone(phoneNumber);
+                if (party) {
+                    return res.status(200).json({ message: 'User found' });
+                }
                 return res.status(400).json({ error: 'User not found' });
             }
             res.status(200).json({ message: 'User found' });
@@ -92,11 +100,18 @@ class AuthController {
                 }
             }
 
-            const user = await User.findOne({
+            let user = await User.findOne({
                 where: {
                     phone: phoneNumber,
                 },
             });
+            if (!user) {
+                // Self-heal: OTP is already verified above, so if a PARTY owns this
+                // phone but has no login user, create the party's user now and link
+                // it, then continue the login. Never blocks — returns null on any
+                // issue, falling through to the normal "user not found".
+                user = await ensureLoginUserByPhone(phoneNumber);
+            }
             if (!user) {
                 return res.status(400).json({ error: 'User not found' });
             }
