@@ -214,7 +214,9 @@ class OrderController {
                 }
                 whereClause.salesman_id = scope.salesmanId;
             } else if (canViewAllOrders(req.userRoleNames)) {
-                return this.getOrders(req, res);
+                // Routes pass these methods as bare callbacks, so `this` is not the
+                // controller here; call the exported instance directly.
+                return orderController.getOrders(req, res);
             } else {
                 return res.status(403).json({ error: 'Access denied' });
             }
@@ -902,4 +904,5 @@ class OrderController {
 
 }
 
-module.exports = new OrderController();
+const orderController = new OrderController();
+module.exports = orderController;
