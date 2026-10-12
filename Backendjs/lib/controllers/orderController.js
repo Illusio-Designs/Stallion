@@ -427,7 +427,7 @@ class OrderController {
                 // party's order from Rajkot; the exact distance still shows in the
                 // report's location match meter.
                 if (visitParty.location_source === 'verified' && visitParty.latitude != null && visitParty.longitude != null) {
-                    // Trusted on-site location -> enforce the strict 250m geofence
+                    // Trusted on-site location -> enforce the strict 50m geofence
                     // against the EXACT captured spot.
                     const geo = checkGeofence({ deviceLat: latitude, deviceLng: longitude, party: visitParty, action: 'place a visit order' });
                     if (!geo.ok) {
