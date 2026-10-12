@@ -5,7 +5,6 @@ const UserRole = require('../models/UserRole');
 const Party = require('../models/Party');
 const msg91Service = require('../services/msg91Service');
 const { ensureLoginUserByPhone, findPartyByPhone } = require('../utils/userFactory');
-const { allowedNumbers } = require('../constants/constants');
 const { markPhoneVerified, consumePhoneVerification, normalizePhone } = require('../services/otpSession');
 const { getJwtSecret } = require('../utils/jwtSecret');
 
@@ -84,20 +83,18 @@ class AuthController {
             }
 
             const normalizedPhone = normalizePhone(phoneNumber);
-            const isBypassNumber = allowedNumbers.some((n) => normalizePhone(n) === normalizedPhone);
 
             // Single-call OTP login: verify the MSG91 widget's access-token right
             // here. Falls back to the prior markPhoneVerified/consume flow if a
             // caller still verifies in a separate step.
-            if (!isBypassNumber) {
-                if (accessToken) {
-                    const otp = await msg91Service.verifyAccessToken(accessToken);
-                    if (!otp.success) {
-                        return res.status(401).json({ error: otp.message || 'OTP verification failed' });
-                    }
-                } else if (!consumePhoneVerification(phoneNumber)) {
-                    return res.status(401).json({ error: 'OTP verification required before login' });
+            // Every number, with no exceptions, must prove it with a real OTP.
+            if (accessToken) {
+                const otp = await msg91Service.verifyAccessToken(accessToken);
+                if (!otp.success) {
+                    return res.status(401).json({ error: otp.message || 'OTP verification failed' });
                 }
+            } else if (!consumePhoneVerification(phoneNumber)) {
+                return res.status(401).json({ error: 'OTP verification required before login' });
             }
 
             let user = await User.findOne({
@@ -231,10 +228,6 @@ class AuthController {
                 return res.status(400).json({ error: 'Phone number is required' });
             }
 
-            if (allowedNumbers.includes(phoneNumber)) {
-                return res.status(200).json({ message: 'OTP sent successfully' });
-            }
-
             const result = await msg91Service.sendOtp(phoneNumber);
 
             if (!result.success) {
@@ -260,11 +253,6 @@ class AuthController {
 
             if (!phoneNumber) {
                 return res.status(400).json({ error: 'Phone number is required' });
-            }
-
-            if (allowedNumbers.includes(phoneNumber)) {
-                markPhoneVerified(phoneNumber);
-                return res.status(200).json({ message: 'OTP verified successfully' });
             }
 
             if (!otp) {
@@ -296,12 +284,6 @@ class AuthController {
     async verifyAccessToken(req, res) {
         try {
             const { accessToken, phoneNumber } = req.body;
-
-            // Whitelisted numbers skip MSG91 entirely.
-            if (phoneNumber && allowedNumbers.includes(phoneNumber)) {
-                markPhoneVerified(phoneNumber);
-                return res.status(200).json({ message: 'OTP verified successfully' });
-            }
 
             if (!accessToken) {
                 return res.status(400).json({ error: 'Access token is required' });
