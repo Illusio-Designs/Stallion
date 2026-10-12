@@ -318,7 +318,7 @@
 
 /* Mobile: sidebar becomes an off-canvas drawer (slide handled via Tailwind
    translate classes; it always renders expanded/full-width on mobile). */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .dashboard-sidebar.expanded,
   .dashboard-sidebar.collapsed {
     width: 264px;
