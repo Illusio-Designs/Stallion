@@ -1012,7 +1012,9 @@ const DashboardClients = () => {
           setOpenAdd(false);
           setEditRow(null);
           resetForm();
-          showSuccess('Party updated successfully!');
+          showSuccess(updatedParty?.location_reset
+            ? 'Party updated. The address changed, so the saved shop location was cleared. Open the party at the new shop and tap "I\'m at shop" to set it again.'
+            : 'Party updated successfully!');
           setError(null);
 
           if (selectedCountryFilter) {

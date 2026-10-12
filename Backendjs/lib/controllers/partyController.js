@@ -707,9 +707,12 @@ class PartyController {
                 billing = billing_address || null;
             }
 
+            // Who owns the party is a manager decision. A salesman can edit their
+            // party's details (including its address) but cannot reassign it.
+            const canReassign = canManageParties(req.userRoleNames);
             const payload = {
-                distributor_id: distributor_id !== undefined ? distributor_id : party.distributor_id,
-                salesman_id: salesman_id !== undefined ? salesman_id : party.salesman_id,
+                distributor_id: distributor_id !== undefined && canReassign ? distributor_id : party.distributor_id,
+                salesman_id: salesman_id !== undefined && canReassign ? salesman_id : party.salesman_id,
                 party_name: party_name !== undefined ? party_name : party.party_name,
                 trade_name: trade_name !== undefined ? trade_name : party.trade_name,
                 contact_person: contact_person !== undefined ? contact_person : party.contact_person,
@@ -733,14 +736,19 @@ class PartyController {
             if (nextIsActive !== undefined) {
                 payload.is_active = nextIsActive;
             }
-            // Re-derive the geocode anchor when the address OR the pincode changes
-            // (editing the pincode to correct a party's location must actually move
-            // it). NOT for on-site 'verified' parties — their captured GPS is the
-            // source of truth and must never be overwritten by an address geocode.
-            // Best-effort; leaves coords as-is on geocoder failure.
-            const addressChanged = address !== undefined && address && address !== party.address;
-            const pincodeChanged = pincode !== undefined && String(pincode).trim() !== String(party.pincode || '').trim();
-            if ((addressChanged || pincodeChanged) && party.location_source !== 'verified') {
+            // Re-derive the location when the address OR the pincode really changes
+            // (a spacing/case-only edit does not count). If the party had a
+            // verified on-site location, the shop may have moved, so that point is
+            // no longer trusted: it is replaced by the new address's geocode (or
+            // cleared if the address can't be located), and "I'm at shop" is
+            // available again to capture the new spot.
+            const normText = (v) => String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            const normPin = (v) => String(v || '').replace(/\D/g, '');
+            const addressChanged = address !== undefined && !!address && normText(address) !== normText(party.address);
+            const pincodeChanged = pincode !== undefined && normPin(pincode) !== normPin(party.pincode);
+            let locationReset = false;
+            if (addressChanged || pincodeChanged) {
+                const wasVerified = party.location_source === 'verified';
                 const geo = await geocodeAddress(
                     address !== undefined ? address : party.address,
                     { pincode: pincode !== undefined ? pincode : party.pincode }
@@ -749,7 +757,15 @@ class PartyController {
                     payload.latitude = geo.latitude;
                     payload.longitude = geo.longitude;
                     payload.location_source = 'geocoded';
+                    payload.location_accuracy_m = null;
+                } else if (wasVerified) {
+                    // Never keep a verified point that belonged to the old address.
+                    payload.latitude = null;
+                    payload.longitude = null;
+                    payload.location_source = null;
+                    payload.location_accuracy_m = null;
                 }
+                locationReset = wasVerified;
             }
             await Party.update(payload, { where: { party_id: id } });
 
@@ -764,6 +780,9 @@ class PartyController {
             if (is_active !== undefined && is_active !== party.is_active) {
                 description = is_active ? 'Party reactivated' : 'Party deactivated';
             }
+            if (locationReset) {
+                description += ' (address changed, verified location reset)';
+            }
 
             await logAudit({
                 req,
@@ -774,7 +793,14 @@ class PartyController {
                 oldValues: oldSnapshot,
                 newValues: { ...oldSnapshot, ...payload },
             });
-            res.status(200).json({ message: 'Party updated successfully' });
+            res.status(200).json({
+                message: 'Party updated successfully',
+                location_reset: locationReset,
+                latitude: payload.latitude !== undefined ? payload.latitude : party.latitude,
+                longitude: payload.longitude !== undefined ? payload.longitude : party.longitude,
+                location_source: payload.location_source !== undefined ? payload.location_source : party.location_source,
+                location_accuracy_m: payload.location_accuracy_m !== undefined ? payload.location_accuracy_m : party.location_accuracy_m,
+            });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
