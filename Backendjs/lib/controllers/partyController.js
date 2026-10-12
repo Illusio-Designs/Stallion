@@ -367,26 +367,34 @@ class PartyController {
             // party still has coordinates for the visit/check-in geofence.
             let finalLat = null, finalLng = null, locationSource = null, locationAccuracyM = null;
             const hasDeviceLoc = latitude != null && latitude !== '' && longitude != null && longitude !== '';
+            // Geocode once; it is both the validation reference and the fallback.
+            const geo = await geocodeAddress(address, { pincode });
+            let captured = false;
             if (hasDeviceLoc) {
-                // Geocode address as a reference to validate the on-site capture.
-                let refLat = null, refLng = null;
-                const geo = await geocodeAddress(address, { pincode });
-                if (geo) { refLat = geo.latitude; refLng = geo.longitude; }
                 const acc = accuracy != null && accuracy !== '' ? accuracy : location_accuracy_m;
                 const check = validateOnsiteCapture({
-                    deviceLat: latitude, deviceLng: longitude, accuracy: acc, refLat, refLng,
+                    deviceLat: latitude, deviceLng: longitude, accuracy: acc,
+                    refLat: geo ? geo.latitude : null, refLng: geo ? geo.longitude : null,
+                    refPrecision: geo ? geo.precision : null,
                 });
-                if (!check.ok) {
+                if (check.ok) {
+                    finalLat = Number(latitude);
+                    finalLng = Number(longitude);
+                    locationSource = 'verified';
+                    const accNum = Number(acc);
+                    locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
+                    captured = true;
+                } else if (!check.noReference) {
                     return res.status(422).json({ error: check.reason });
                 }
-                finalLat = Number(latitude);
-                finalLng = Number(longitude);
-                locationSource = 'verified';
-                const accNum = Number(acc);
-                locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
-            } else {
-                const geo = await geocodeAddress(address, { pincode });
-                if (geo) { finalLat = geo.latitude; finalLng = geo.longitude; locationSource = 'geocoded'; }
+                // noReference: the address could not be located well enough to
+                // verify the capture, so the party is still created, just without a
+                // verified location. Capture it later with "I'm at shop".
+            }
+            if (!captured && geo) {
+                finalLat = geo.latitude;
+                finalLng = geo.longitude;
+                locationSource = 'geocoded';
             }
 
             const party = await Party.create({
@@ -546,7 +554,7 @@ class PartyController {
                 check = { ok: true, distance: null };
             } else {
                 // Geocode the party's address as the reference to validate against.
-                let refLat = null, refLng = null;
+                let refLat = null, refLng = null, refPrecision = null;
                 try {
                     let city, state;
                     if (party.city_id) { const c = await Cities.findByPk(party.city_id); city = c && c.name; }
@@ -554,11 +562,11 @@ class PartyController {
                     const ref = party.address
                         ? await geocodeAddress(party.address, { city, state, pincode: party.pincode })
                         : null;
-                    if (ref) { refLat = ref.latitude; refLng = ref.longitude; }
-                } catch (_) { /* no reference — capture still allowed, validated on accuracy only */ }
+                    if (ref) { refLat = ref.latitude; refLng = ref.longitude; refPrecision = ref.precision; }
+                } catch (_) { /* no reference: validateOnsiteCapture rejects with a clear message */ }
 
                 check = validateOnsiteCapture({
-                    deviceLat: latitude, deviceLng: longitude, accuracy, refLat, refLng,
+                    deviceLat: latitude, deviceLng: longitude, accuracy, refLat, refLng, refPrecision,
                 });
                 if (!check.ok) {
                     return res.status(422).json({ error: check.reason });
