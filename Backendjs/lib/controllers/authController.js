@@ -6,6 +6,7 @@ const Party = require('../models/Party');
 const msg91Service = require('../services/msg91Service');
 const { ensureLoginUserByPhone, findPartyByPhone } = require('../utils/userFactory');
 const { markPhoneVerified, consumePhoneVerification, normalizePhone } = require('../services/otpSession');
+const { identifierMatchesPhone, allowUnboundToken } = require('../utils/otpBinding');
 const { getJwtSecret } = require('../utils/jwtSecret');
 
 class AuthController {
@@ -92,6 +93,14 @@ class AuthController {
                 const otp = await msg91Service.verifyAccessToken(accessToken);
                 if (!otp.success) {
                     return res.status(401).json({ error: otp.message || 'OTP verification failed' });
+                }
+                // The proof must have been issued for THIS phone number. Without this
+                // check, anyone could verify their own phone and use that proof to log
+                // in as somebody else.
+                if (!identifierMatchesPhone(otp.identifier, phoneNumber) && !allowUnboundToken()) {
+                    console.warn('[auth] OTP proof does not match the phone number; login refused.',
+                        { requested: normalizedPhone, verifiedFor: String(otp.identifier || '').slice(0, 4) + '…' });
+                    return res.status(401).json({ error: 'This OTP was not verified for this phone number. Please request a new code.' });
                 }
             } else if (!consumePhoneVerification(phoneNumber)) {
                 return res.status(401).json({ error: 'OTP verification required before login' });
@@ -288,6 +297,9 @@ class AuthController {
             if (!accessToken) {
                 return res.status(400).json({ error: 'Access token is required' });
             }
+            if (!phoneNumber) {
+                return res.status(400).json({ error: 'Phone number is required' });
+            }
 
             const result = await msg91Service.verifyAccessToken(accessToken);
             if (!result.success) {
@@ -296,8 +308,12 @@ class AuthController {
                     details: result.error,
                 });
             }
+            // Same rule as login: the proof must belong to this phone number.
+            if (!identifierMatchesPhone(result.identifier, phoneNumber) && !allowUnboundToken()) {
+                return res.status(400).json({ error: 'This OTP was not verified for this phone number. Please request a new code.' });
+            }
 
-            if (phoneNumber) markPhoneVerified(phoneNumber);
+            markPhoneVerified(phoneNumber);
 
             res.status(200).json({
                 message: 'OTP verified successfully',
