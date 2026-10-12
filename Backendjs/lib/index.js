@@ -34,8 +34,9 @@ const uploadsPath = path.resolve(__dirname, '..', 'uploads');
 console.log('📁 Serving static files from:', uploadsPath);
 app.use('/uploads', express.static(uploadsPath));
 
-// Serve static HTML files for testing
-app.use(express.static(path.join(__dirname, '..')));
+// NOTE: the backend folder is deliberately NOT served as static files. It used to
+// be ("for testing"), which let anyone download the source code, migrations and
+// package files from the website. Only /uploads above is public.
 
 // Import and use the route manager
 const routeManager = require('./routes/routeManager');
