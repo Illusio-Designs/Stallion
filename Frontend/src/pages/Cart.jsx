@@ -68,6 +68,10 @@ const Cart = ({ onPageChange = null }) => {
   const isParty = userRole === 'party';
   const isDistributor = userRole === 'distributor';
   const isSalesman = userRole === 'salesman';
+  // Admin and office accounts (managers) have no cart flow: orders are placed by
+  // a party, distributor or salesman. Without this they hit the server with no
+  // order type and only got "order_type is required".
+  const isOfficeOnly = !!userRole && !isParty && !isDistributor && !isSalesman;
   
   // Role-based state
   const [orderType, setOrderType] = useState(isDistributor ? "distributor_order" : "");
@@ -607,6 +611,10 @@ const Cart = ({ onPageChange = null }) => {
   };
 
   const handleCheckout = async () => {
+    if (isOfficeOnly) {
+      showError('Admin and office accounts cannot place orders from the cart. Use Dashboard > Orders to create an order.');
+      return;
+    }
     if (cartItems.length === 0) {
       showError('Your cart is empty');
       return;
@@ -1556,11 +1564,17 @@ const Cart = ({ onPageChange = null }) => {
               </div>
             </div>
 
+            {isOfficeOnly && (
+              <p className="mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-text-muted" role="note">
+                Your account type cannot place orders from the cart. To create an order, go to{' '}
+                <a href="/dashboard/orders" className="font-semibold text-primary underline">Dashboard &gt; Orders</a>.
+              </p>
+            )}
             <button
               type="button"
               className="checkout-btn mt-6 w-full min-h-[52px] bg-primary text-text-on-primary border border-primary px-6 py-3.5 rounded-xl text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_-8px_var(--color-primary)] hover:enabled:bg-primary-hover hover:enabled:border-primary-hover hover:enabled:-translate-y-px focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:translate-y-0 active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
               onClick={handleCheckout}
-              disabled={loading}
+              disabled={loading || isOfficeOnly}
               aria-busy={loading}
             >
               {loading && <span className="checkout-btn__spinner w-4 h-4 rounded-pill border-2 border-[rgba(255,255,255,0.4)] border-t-[var(--color-text-on-primary)] animate-spin motion-reduce:animate-none flex-shrink-0" aria-hidden="true" />}
