@@ -19,6 +19,19 @@ let widgetReady = false;
 let widgetLoading = null;
 let currentAccessToken = null;
 let currentPhoneNumber = null;
+// MSG91 returns the OTP request id when an OTP is sent; retryOtp needs it to know
+// WHICH OTP to re-send.
+let lastReqId = null;
+
+// Never leave the UI waiting forever if the widget does not answer.
+const withTimeout = (promise, ms, message) =>
+  new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject({ success: false, message }), ms);
+    promise.then(
+      (v) => { clearTimeout(t); resolve(v); },
+      (e) => { clearTimeout(t); reject(e); }
+    );
+  });
 
 /** Format to MSG91 form: digits only, with country code, no + (e.g. 919999999999). */
 export const formatPhoneNumberForMSG91 = (phoneNumber) => {
@@ -131,7 +144,10 @@ export const sendOTP = async (phoneNumber) => {
   return new Promise((resolve, reject) => {
     window.sendOtp(
       phone,
-      (data) => resolve({ success: true, message: 'OTP sent successfully', data }),
+      (data) => {
+        lastReqId = (data && (data.message || data.reqId)) || lastReqId;
+        resolve({ success: true, message: 'OTP sent successfully', data });
+      },
       (error) => {
         console.warn('[MSG91] sendOtp failed:', error);
         reject({ success: false, message: describeError(error, 'Failed to send OTP'), error });
@@ -159,40 +175,54 @@ export const verifyOTP = async (otp) => {
   });
 };
 
-/** Resend OTP. channel: null = widget default; '11' SMS, '4' Voice, '3' Email, '12' WhatsApp. */
-export const resendOTP = async (channel = null) => {
+/** Resend OTP. channel: '11' SMS (default), '4' Voice, '3' Email, '12' WhatsApp. */
+export const resendOTP = async (channel = '11') => {
   await ensureWidget();
-  return new Promise((resolve, reject) => {
+  const attempt = new Promise((resolve, reject) => {
     if (typeof window.retryOtp !== 'function') {
-      // Widget lost its methods — resend by starting a fresh OTP instead of failing.
+      // Widget lost its methods: resend by starting a fresh OTP instead of failing.
       resendViaFreshSend(resolve, reject);
       return;
     }
     window.retryOtp(
-      channel,
+      channel || '11',
       (data) => resolve({ success: true, message: 'OTP resent successfully', data }),
       (error) => {
-        // retryOtp needs a live widget session (reqId). If it's gone (idle page,
-        // re-init), fall back to a fresh sendOtp so the user still gets a code.
+        // retryOtp needs a live widget session. If it is gone (idle page, too many
+        // retries), fall back to a fresh sendOtp so the user still gets a code.
         console.warn('[MSG91] retryOtp failed, falling back to a fresh send:', error);
         resendViaFreshSend(resolve, reject, error);
-      }
+      },
+      lastReqId || undefined
     );
   });
+  return withTimeout(attempt, 20000, 'Resending the code is taking too long. Please check your connection and try again.');
+};
+
+// A short, readable message for the user (MSG91 errors are often raw objects).
+const friendlyResendError = (error) => {
+  const raw = describeError(error, '');
+  if (/wait|retry|limit|too many|attempt|exceed/i.test(raw)) {
+    return 'Please wait a moment before asking for another code.';
+  }
+  return 'Could not resend the code. Please try again in a few seconds.';
 };
 
 // Fallback: send a brand-new OTP to the current number when retryOtp can't.
 const resendViaFreshSend = (resolve, reject, originalError) => {
   if (typeof window.sendOtp !== 'function' || !currentPhoneNumber) {
-    reject({ success: false, message: describeError(originalError, 'Failed to resend OTP'), error: originalError });
+    reject({ success: false, message: friendlyResendError(originalError), error: originalError });
     return;
   }
   window.sendOtp(
     currentPhoneNumber,
-    (data) => resolve({ success: true, message: 'OTP resent successfully', data }),
+    (data) => {
+      lastReqId = (data && (data.message || data.reqId)) || lastReqId;
+      resolve({ success: true, message: 'OTP resent successfully', data });
+    },
     (error) => {
       console.warn('[MSG91] fresh sendOtp (resend fallback) failed:', error);
-      reject({ success: false, message: describeError(error, 'Failed to resend OTP'), error });
+      reject({ success: false, message: friendlyResendError(error), error });
     }
   );
 };
@@ -203,6 +233,7 @@ export const getCurrentPhone = () => currentPhoneNumber;
 export const destroyOTPWidget = () => {
   currentAccessToken = null;
   currentPhoneNumber = null;
+  lastReqId = null;
 };
 
 /**

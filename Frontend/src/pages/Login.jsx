@@ -640,7 +640,8 @@ const Login = ({ onPageChange }) => {
         showSuccess('OTP resent successfully');
         setResendTimer(30); // 30 seconds cooldown
         setOtp(['', '', '', '', '', '']);
-        otpInputRefs.current[0]?.focus();
+        // The boxes are disabled while loading; focus once they are enabled again.
+        setTimeout(() => otpInputRefs.current[0]?.focus(), 0);
       } else {
         showError(resendResponse.message || 'Failed to resend OTP');
         setResendDisabled(false);
