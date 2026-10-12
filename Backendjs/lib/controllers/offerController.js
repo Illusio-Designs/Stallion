@@ -1,6 +1,7 @@
 const Offer = require('../models/Offer');
 const Product = require('../models/Product');
 const { logAudit } = require('../utils/auditLogger');
+const { listWithOptionalPagination } = require('../utils/listSearchHelpers');
 const {
     isOfferActive,
     offerScopeMatches,
@@ -15,10 +16,10 @@ class OfferController {
     // Admin: full list for management.
     async getOffers(req, res) {
         try {
-            const offers = await Offer.findAll({
-                order: [['priority', 'DESC'], ['created_at', 'DESC']],
+            const body = await listWithOptionalPagination(Offer, req, {
+                order: [['priority', 'DESC'], ['created_at', 'DESC'], ['offer_id', 'DESC']],
             });
-            res.status(200).json(offers);
+            res.status(200).json(body);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

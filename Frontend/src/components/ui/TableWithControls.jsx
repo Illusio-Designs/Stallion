@@ -5,6 +5,7 @@ import DropdownSelector from "./DropdownSelector";
 import Pagination from "./Pagination";
 import { SkeletonRows } from "./Skeleton";
 import DateRangePicker from "./DateRangePicker";
+import { compareValues, detectColumnType, visibleSearchText } from "../../utils/tableSort";
 import "../../styles/components/ui.css";
 
 export default function TableWithControls({
@@ -120,30 +121,16 @@ export default function TableWithControls({
     if (serverPagination && onServerSearch) return rows;
     if (!query) return rows;
     const q = query.toLowerCase();
-    return rows.filter((r) => JSON.stringify(r).toLowerCase().includes(q));
-  }, [rows, query, serverPagination, onServerSearch]);
+    const searchCols = columns.filter((c) => visible.has(c.key));
+    return rows.filter((r) => visibleSearchText(r, searchCols).includes(q));
+  }, [rows, query, serverPagination, onServerSearch, columns, visible]);
 
   const sortedRows = useMemo(() => {
     if (!sortBy) return filteredRows;
     const copy = [...filteredRows];
-    copy.sort((a, b) => {
-      const va = a?.[sortBy];
-      const vb = b?.[sortBy];
-      if (va == null && vb == null) return 0;
-      if (va == null) return -1;
-      if (vb == null) return 1;
-      const na =
-        typeof va === "number"
-          ? va
-          : parseFloat(String(va).replace(/[^0-9.\-]/g, ""));
-      const nb =
-        typeof vb === "number"
-          ? vb
-          : parseFloat(String(vb).replace(/[^0-9.\-]/g, ""));
-      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-      return String(va).localeCompare(String(vb));
-    });
-    if (sortDir === "desc") copy.reverse();
+    // Real date / number / text comparison; blanks and "-" always last.
+    const colType = detectColumnType(filteredRows, sortBy);
+    copy.sort((a, b) => compareValues(a?.[sortBy], b?.[sortBy], sortDir, colType));
     return copy;
   }, [filteredRows, sortBy, sortDir]);
 

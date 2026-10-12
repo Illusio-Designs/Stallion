@@ -16,7 +16,7 @@ const path = require('path');
 const fs = require('fs');
 const { Op, Sequelize } = require('sequelize');
 const { canManageInventory } = require('../utils/roleHelpers');
-const { getListSearchParams } = require('../utils/listSearchHelpers');
+const { getListSearchParams, likeContains } = require('../utils/listSearchHelpers');
 
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
 
@@ -122,6 +122,9 @@ class ProductController {
             }
             const pageNum = parseInt(page, 10);
             const limitNum = parseInt(limit, 10);
+            if (pageNum < 1 || limitNum < 1) {
+                return res.status(400).json({ error: 'Page and limit must be positive numbers' });
+            }
             const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody, product_ids, image_status } = req.body;
             const { name: nameQuery } = getListSearchParams(req);
             const search = (searchQuery || searchBody || nameQuery || '').trim();
@@ -172,7 +175,7 @@ class ProductController {
                 });
             }
             if (search) {
-                const searchTerm = `%${search}%`;
+                const searchTerm = likeContains(search);
                 conditions.push({
                     [Op.or]: [
                         { model_no: { [Op.like]: searchTerm } },
@@ -417,7 +420,7 @@ class ProductController {
                             Sequelize.fn('JSON_CONTAINS', Sequelize.col('image_urls'), JSON.stringify(withPath)),
                             1
                         ),
-                        { image_urls: { [Op.like]: `%${file_name}%` } },
+                        { image_urls: { [Op.like]: likeContains(file_name) } },
                     ],
                 },
             });

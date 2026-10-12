@@ -3,7 +3,7 @@ const Party = require('../models/Party');
 const Order = require('../models/Order');
 const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
-const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 const { SalesmanCheckInType } = require('../constants/enums');
 const { checkGeofence } = require('../utils/geo');
 const { isOfficeRole, hasRole } = require('../utils/roleHelpers');
@@ -237,7 +237,15 @@ class SalesmanCheckInsController {
                 return res.status(403).json({ error: 'Access denied' });
             }
 
-            const checkIns = await SalesmanCheckIns.findAll({ where: { salesman_id } });
+            const pagination = parseOptionalPagination(req);
+            const order = [['created_at', 'DESC'], ['id', 'DESC']];
+            if (pagination) {
+                const { count, rows } = await SalesmanCheckIns.findAndCountAll({
+                    where: { salesman_id }, order, limit: pagination.limit, offset: pagination.offset,
+                });
+                return res.status(200).json(buildPaginatedResponse(await enrichCheckIns(rows), pagination, count));
+            }
+            const checkIns = await SalesmanCheckIns.findAll({ where: { salesman_id }, order, limit: UNPAGINATED_CAP });
             const enriched = await enrichCheckIns(checkIns);
 
             res.status(200).json(enriched);

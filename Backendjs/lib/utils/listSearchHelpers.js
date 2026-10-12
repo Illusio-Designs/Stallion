@@ -105,6 +105,27 @@ function buildPaginatedResponse(data, { page, limit }, count) {
     };
 }
 
+/**
+ * Run a list query with OPTIONAL pagination (backward compatible):
+ *  - request has `page`/`limit` -> findAndCountAll, respond with buildPaginatedResponse shape
+ *  - neither -> findAll capped at UNPAGINATED_CAP, respond with a plain array (legacy shape)
+ * `options` must include a deterministic `order`. `mapRows(rows)` may be async.
+ * Returns the body to send with res.json().
+ */
+async function listWithOptionalPagination(Model, req, options = {}, mapRows = (rows) => rows) {
+    const pagination = parseOptionalPagination(req);
+    if (pagination) {
+        const { count, rows } = await Model.findAndCountAll({
+            ...options,
+            limit: pagination.limit,
+            offset: pagination.offset,
+        });
+        return buildPaginatedResponse(await mapRows(rows), pagination, Array.isArray(count) ? count.length : count);
+    }
+    const rows = await Model.findAll({ ...options, limit: UNPAGINATED_CAP });
+    return mapRows(rows);
+}
+
 module.exports = {
     getListSearchParams,
     buildNamePhoneFilter,
@@ -116,4 +137,5 @@ module.exports = {
     hasPaginationParams,
     parseOptionalPagination,
     UNPAGINATED_CAP,
+    listWithOptionalPagination,
 };

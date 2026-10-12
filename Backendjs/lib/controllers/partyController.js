@@ -24,7 +24,7 @@ const { resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const { canManageParties, canCreateParty, normalizeRole, partyActiveFilter, denyInactiveParty, isAdmin } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
-const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse, listWithOptionalPagination } = require('../utils/listSearchHelpers');
 
 class PartyController {
     async getPartie(req, res) {
@@ -189,10 +189,11 @@ class PartyController {
                     return res.status(403).json({ error: 'Access denied' });
                 }
             }
-            const parties = await Party.findAll({
+            const body = await listWithOptionalPagination(Party, req, {
                 where: mergeWhere({ salesman_id: salesman_id }, partyActiveFilter(req.userRoleNames)),
+                order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
-            res.status(200).json(parties);
+            res.status(200).json(body);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -301,11 +302,11 @@ class PartyController {
             }
 
             // Find all parties in the zone
-            const parties = await Party.findAll({
+            const body = await listWithOptionalPagination(Party, req, {
                 where: mergeWhere({ zone_id: zone_id }, partyActiveFilter(roleName)),
+                order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
-
-            res.status(200).json(parties);
+            res.status(200).json(body);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -1060,10 +1061,11 @@ class PartyController {
             if (!resolved) {
                 return res.status(404).json({ error: `State not found: ${state_id}` });
             }
-            const parties = await Party.findAll({
+            const body = await listWithOptionalPagination(Party, req, {
                 where: mergeWhere({ state_id: resolved }, partyActiveFilter(req.userRoleNames)),
+                order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
-            res.status(200).json(parties);
+            res.status(200).json(body);
         } catch (error) {
             res.status(error.statusCode || 500).json({ error: error.message });
         }

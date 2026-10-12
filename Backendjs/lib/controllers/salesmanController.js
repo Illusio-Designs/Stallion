@@ -12,7 +12,7 @@ const User = require('../models/User');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const sequelize = require('../constants/database');
 const { Op } = require('sequelize');
-const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 const { SALESMAN_UPLOAD_DIR } = require('../constants/multer');
 const fs = require('fs');
 
@@ -65,17 +65,37 @@ class SalesmanController {
                 phoneFields: ['phone', 'alternate_phone'],
             });
             const where = mergeWhere({ is_active: true }, searchFilter);
-            const salesmen = await Salesman.findAll({ where });
-            const response = await Promise.all(salesmen.map(async (salesman) => {
-                const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
-                const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
-                return {
-                    ...salesman.toJSON(),
-                    zones: salesmanZones.map(zone => zone.toJSON()),
-                    states: salesmanStates.map(s => s.toJSON()),
-                }
+            // Optional pagination: with page/limit -> { data, pagination }; without -> plain
+            // array (legacy shape) hard-capped so the response is never unbounded.
+            const pagination = parseOptionalPagination(req);
+            const order = [['created_at', 'ASC'], ['salesman_id', 'ASC']];
+            let salesmen;
+            let count = 0;
+            if (pagination) {
+                ({ count, rows: salesmen } = await Salesman.findAndCountAll({
+                    where, order, limit: pagination.limit, offset: pagination.offset,
+                }));
+            } else {
+                salesmen = await Salesman.findAll({ where, order, limit: UNPAGINATED_CAP });
+            }
+            // Two batched queries (zones + states for all salesmen) instead of 2 per row.
+            const ids = salesmen.map((s) => s.salesman_id);
+            const [allZones, allStates] = ids.length
+                ? await Promise.all([
+                    SalesmanZones.findAll({ where: { salesman_id: ids } }),
+                    SalesmanStates.findAll({ where: { salesman_id: ids } }),
+                ])
+                : [[], []];
+            const zonesBy = {};
+            const statesBy = {};
+            allZones.forEach((z) => { (zonesBy[z.salesman_id] = zonesBy[z.salesman_id] || []).push(z.toJSON()); });
+            allStates.forEach((st) => { (statesBy[st.salesman_id] = statesBy[st.salesman_id] || []).push(st.toJSON()); });
+            const response = salesmen.map((salesman) => ({
+                ...salesman.toJSON(),
+                zones: zonesBy[salesman.salesman_id] || [],
+                states: statesBy[salesman.salesman_id] || [],
             }));
-            res.status(200).json(response);
+            res.status(200).json(pagination ? buildPaginatedResponse(response, pagination, count) : response);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

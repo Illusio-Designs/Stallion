@@ -200,25 +200,25 @@ export const getAllAdminExpenses = async () => {
   // missing) and returns `{ data, pagination }` instead of a bare array. Use a
   // single load-all call (large limit) and unwrap `.data`, matching the
   // fetchAllPages pattern used by the other list getters.
-  const fullUrl = `${baseUrl}/salesman_expenses/admin/all?page=1&limit=1000`;
+  // Backend caps `limit` at 100, so walk the pages (bounded) and concatenate.
+  const fetchPageNo = async (page) => {
+    const fullUrl = `${baseUrl}/salesman_expenses/admin/all?page=${page}&limit=100`;
+    const response = await fetch(fullUrl, {
+      method: 'GET',
+      headers: getHeaders(true),
+      credentials: 'omit',
+    });
+    // Handle 404 as empty (no expenses found)
+    if (response.status === 404) return { data: [], pagination: { totalPages: 0 } };
+    return handleResponse(response);
+  };
+  const listOf = (r) => (Array.isArray(r) ? r : (r && Array.isArray(r.data) ? r.data : []));
 
-  console.log('Making admin API call to:', fullUrl);
-
-  const response = await fetch(fullUrl, {
-    method: 'GET',
-    headers: getHeaders(true),
-    credentials: 'omit',
-  });
-
-  console.log('Admin API response status:', response.status);
-
-  // Handle 404 as empty array (no expenses found)
-  if (response.status === 404) {
-    return [];
+  const first = await fetchPageNo(1);
+  let all = listOf(first);
+  const totalPages = Number(first && first.pagination && first.pagination.totalPages) || 1;
+  for (let page = 2; page <= Math.min(totalPages, 50); page += 1) {
+    all = all.concat(listOf(await fetchPageNo(page)));
   }
-
-  const result = await handleResponse(response);
-  console.log('Parsed admin API result:', result);
-  // Unwrap the paginated envelope → always hand the page a plain array.
-  return Array.isArray(result) ? result : (result && Array.isArray(result.data) ? result.data : []);
+  return all;
 };

@@ -3,25 +3,50 @@ const Order = require('../models/Order');
 const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const { Op } = require('sequelize');
-const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 
-// Compute a target's achieved amount LIVE from the orders, so existing and new
-// orders always count (the report never depends on the stored running total).
-const computeCompleted = async (target) => {
-    const where = {
-        salesman_id: target.salesman_id,
-        order_date: { [Op.between]: [target.start_date, target.end_date] },
-    };
-    if (target.order_type) where.order_type = target.order_type; // null = "overall" = any type
-    const orders = await Order.findAll({ where, attributes: ['order_total'] });
-    return orders.reduce((sum, o) => sum + (Number(o.order_total) || 0), 0);
+// Compute achieved amounts LIVE from the orders for a SET of targets with ONE
+// orders query (instead of one per target), so existing and new orders always
+// count (the report never depends on the stored running total).
+const computeCompletedMap = async (targets) => {
+    const result = {};
+    if (!targets.length) return result;
+    const salesmanIds = [...new Set(targets.map((t) => t.salesman_id))];
+    const minStart = new Date(Math.min(...targets.map((t) => new Date(t.start_date).getTime())));
+    const maxEnd = new Date(Math.max(...targets.map((t) => new Date(t.end_date).getTime())));
+    const orders = await Order.findAll({
+        where: {
+            salesman_id: salesmanIds,
+            order_date: { [Op.between]: [minStart, maxEnd] },
+        },
+        attributes: ['salesman_id', 'order_date', 'order_type', 'order_total'],
+        raw: true,
+    });
+    const bySalesman = {};
+    orders.forEach((o) => { (bySalesman[o.salesman_id] = bySalesman[o.salesman_id] || []).push(o); });
+    targets.forEach((t) => {
+        const start = new Date(t.start_date).getTime();
+        const end = new Date(t.end_date).getTime();
+        let sum = 0;
+        (bySalesman[t.salesman_id] || []).forEach((o) => {
+            const d = new Date(o.order_date).getTime();
+            if (d < start || d > end) return;
+            if (t.order_type && o.order_type !== t.order_type) return; // null = "overall" = any type
+            sum += Number(o.order_total) || 0;
+        });
+        result[t.id] = sum;
+    });
+    return result;
 };
 
-const enrichTarget = async (t) => {
-    const completed = await computeCompleted(t);
-    const targetAmount = Number(t.target_amount) || 0;
-    const target_status = (targetAmount > 0 && completed >= targetAmount) ? 'completed' : (t.target_status || 'pending');
-    return { ...t.toJSON(), completed_amount: completed, target_status };
+const enrichTargets = async (targets) => {
+    const completedMap = await computeCompletedMap(targets);
+    return targets.map((t) => {
+        const completed = completedMap[t.id] || 0;
+        const targetAmount = Number(t.target_amount) || 0;
+        const target_status = (targetAmount > 0 && completed >= targetAmount) ? 'completed' : (t.target_status || 'pending');
+        return { ...t.toJSON(), completed_amount: completed, target_status };
+    });
 };
 
 // Attach salesman_name to a set of rows with ONE batched query, so the report
@@ -85,10 +110,11 @@ class SalesmanTargetsController {
                 return res.status(pagination.status).json({ error: pagination.error });
             }
             const { count, rows: salesmanTargets } = await SalesmanTargets.findAndCountAll({
+                order: [['created_at', 'DESC'], ['id', 'DESC']],
                 limit: pagination.limit,
                 offset: pagination.offset,
             });
-            const enriched = await attachSalesmanNames(await Promise.all(salesmanTargets.map(enrichTarget)));
+            const enriched = await attachSalesmanNames(await enrichTargets(salesmanTargets));
             res.status(200).json(buildPaginatedResponse(enriched, pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -101,8 +127,17 @@ class SalesmanTargetsController {
             if (!salesman_id) {
                 return res.status(400).json({ error: 'Salesman ID is required' });
             }
-            const salesmanTargets = await SalesmanTargets.findAll({ where: { salesman_id: salesman_id } });
-            const enriched = await attachSalesmanNames(await Promise.all(salesmanTargets.map(enrichTarget)));
+            const pagination = parseOptionalPagination(req);
+            const order = [['created_at', 'DESC'], ['id', 'DESC']];
+            if (pagination) {
+                const { count, rows } = await SalesmanTargets.findAndCountAll({
+                    where: { salesman_id }, order, limit: pagination.limit, offset: pagination.offset,
+                });
+                const data = await attachSalesmanNames(await enrichTargets(rows));
+                return res.status(200).json(buildPaginatedResponse(data, pagination, count));
+            }
+            const salesmanTargets = await SalesmanTargets.findAll({ where: { salesman_id }, order, limit: UNPAGINATED_CAP });
+            const enriched = await attachSalesmanNames(await enrichTargets(salesmanTargets));
             res.status(200).json(enriched);
         } catch (error) {
             res.status(500).json({ error: error.message });
