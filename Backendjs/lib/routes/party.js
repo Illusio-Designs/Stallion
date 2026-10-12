@@ -2,15 +2,16 @@ const express = require('express');
 const router = express.Router();
 const partyController = require('../controllers/partyController');
 const { authenticateToken } = require('../middleware/auth');
-const { isPartyManager, isPartyCreator } = require('../middleware/roleAuth');
+const { isAdmin, isPartyManager, isPartyCreator } = require('../middleware/roleAuth');
 const { partyFileUpload } = require('../constants/multer');
 const parsePartyFile = require('../middleware/party_parser');
 
 router.get('/', authenticateToken, (req, res) => partyController.getPartiesRoot(req, res));
 router.get('/my', authenticateToken, partyController.getMyParties);
 // Diagnostic: does the server's geocoder work? GET /parties/geocode-test?q=...
+// Admin only and read-only: it never saves coordinates on a party.
 // (declared before '/:id' so it isn't captured as an id)
-router.get('/geocode-test', authenticateToken, partyController.geocodeTest);
+router.get('/geocode-test', authenticateToken, isAdmin, partyController.geocodeTest);
 router.get('/salesman/:salesman_id', authenticateToken, partyController.getPartiesBySalesmanId);
 router.get('/:id', authenticateToken, partyController.getPartyById);
 router.post('/get', authenticateToken, isPartyManager, partyController.getParties);
