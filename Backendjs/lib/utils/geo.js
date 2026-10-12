@@ -82,12 +82,21 @@ function checkAddressProximity({ deviceLat, deviceLng, refLat, refLng }) {
 //      captured (the original Rajkot->Navi Mumbai class of error).
 const CAPTURE_MAX_ACCURACY_M = Number(process.env.CAPTURE_MAX_ACCURACY_M) || 50;
 const CAPTURE_MAX_ADDRESS_DISTANCE_M = Number(process.env.CAPTURE_MAX_ADDRESS_DISTANCE_M) || 2000;
+// A pincode centroid is the middle of a postal area (several km across), so when
+// that is all we could resolve we allow a wider distance than for a street match.
+const CAPTURE_MAX_PINCODE_DISTANCE_M = Number(process.env.CAPTURE_MAX_PINCODE_DISTANCE_M) || 8000;
 
 /**
  * Validate an on-site location capture.
- * @returns {{ ok: boolean, distance: number|null, reason?: string }}
+ *
+ * The phone must be near the party's geocoded address. How near depends on how
+ * precisely the address resolved (refPrecision): 'address' uses the tight limit,
+ * 'pincode' the wider one. A city/state centroid, or no result at all, cannot
+ * prove the person is at the shop, so the capture is rejected (noReference:true)
+ * rather than accepted from anywhere.
+ * @returns {{ ok: boolean, distance: number|null, reason?: string, noReference?: boolean }}
  */
-function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng }) {
+function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng, refPrecision }) {
   const lat = Number(deviceLat), lng = Number(deviceLng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
     return { ok: false, distance: null, reason: 'A valid current location is required. Please enable GPS and try again.' };
@@ -103,21 +112,28 @@ function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng 
       reason: `GPS signal is too weak (accurate to only ${Math.round(acc)}m). Move to open sky and try again — it must be within ${CAPTURE_MAX_ACCURACY_M}m.`,
     };
   }
-  // Compare to the address anchor when we have one (best-effort — if the address
-  // can't be geocoded we still allow the on-site person to set it).
-  if (refLat != null && refLng != null && refLat !== '' && refLng !== '') {
-    const distance = distanceMeters(lat, lng, refLat, refLng);
-    if (distance != null && distance > CAPTURE_MAX_ADDRESS_DISTANCE_M) {
-      const km = (distance / 1000).toFixed(distance >= 10000 ? 0 : 1);
-      return {
-        ok: false,
-        distance,
-        reason: `You are about ${km} km from this party's registered address. Make sure you selected the correct party and are standing at its shop before capturing.`,
-      };
-    }
-    return { ok: true, distance };
+  const hasRef = refLat != null && refLng != null && refLat !== '' && refLng !== '';
+  // 'precise' is the default for callers that don't say how the address resolved.
+  const precision = refPrecision || 'address';
+  if (!hasRef || precision === 'city' || precision === 'state') {
+    return {
+      ok: false,
+      distance: null,
+      noReference: true,
+      reason: "We couldn't locate this party's address on the map, so we can't confirm you are at the shop. Try again in a moment, or ask a manager to correct the party's address and pincode.",
+    };
   }
-  return { ok: true, distance: null };
+  const limit = precision === 'pincode' ? CAPTURE_MAX_PINCODE_DISTANCE_M : CAPTURE_MAX_ADDRESS_DISTANCE_M;
+  const distance = distanceMeters(lat, lng, refLat, refLng);
+  if (distance != null && distance > limit) {
+    const km = (distance / 1000).toFixed(distance >= 10000 ? 0 : 1);
+    return {
+      ok: false,
+      distance,
+      reason: `You are about ${km} km from this party's registered address. Make sure you selected the correct party and are standing at its shop before capturing.`,
+    };
+  }
+  return { ok: true, distance };
 }
 
 function checkGeofence({ deviceLat, deviceLng, party, action = 'perform this action' }) {
@@ -150,6 +166,7 @@ module.exports = {
   ADDRESS_PROXIMITY_RADIUS_M,
   CAPTURE_MAX_ACCURACY_M,
   CAPTURE_MAX_ADDRESS_DISTANCE_M,
+  CAPTURE_MAX_PINCODE_DISTANCE_M,
   distanceMeters,
   checkGeofence,
   checkAddressProximity,

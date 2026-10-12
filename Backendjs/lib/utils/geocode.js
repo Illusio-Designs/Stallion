@@ -60,20 +60,24 @@ async function geocodeAddress(address, opts = {}) {
   // "400092") so the geocoder resolves the postal area instead of failing and
   // falling back to a far-off city centroid.
   const pin = opts.pincode ? String(opts.pincode).replace(/\D/g, '') : '';
-  const attempts = [
-    [address, opts.city, opts.state, pin, country],   // full, most specific
-    [pin, opts.city, opts.state, country],            // pincode + locality
-    [pin, country],                                   // pincode alone -> the postal area
-    [opts.city, opts.state, country],                 // city + state
-    [opts.state, country],                            // state centroid (last resort)
-  ];
-  for (const parts of attempts) {
+  // Each attempt carries how precise its result is, so callers can decide how far
+  // to trust it: 'address' (street level), 'pincode' (postal area), 'city' or
+  // 'state' (a centroid, only good for "roughly which region").
+  const attempts = [];
+  if (address) attempts.push({ precision: 'address', parts: [address, opts.city, opts.state, pin, country] });
+  if (pin) {
+    attempts.push({ precision: 'pincode', parts: [pin, opts.city, opts.state, country] });
+    attempts.push({ precision: 'pincode', parts: [pin, country] });
+  }
+  if (opts.city) attempts.push({ precision: 'city', parts: [opts.city, opts.state, country] });
+  if (opts.state) attempts.push({ precision: 'state', parts: [opts.state, country] });
+  for (const { parts, precision } of attempts) {
     const q = parts.filter(Boolean).join(', ').trim();
     if (!q) continue;
     const r = await geocodeQuery(q);
     if (r.ok) {
-      console.log('[geocode] resolved via:', q, '->', r.coords.latitude, r.coords.longitude);
-      return r.coords;
+      console.log('[geocode] resolved via:', q, `(${precision})`, '->', r.coords.latitude, r.coords.longitude);
+      return { ...r.coords, precision };
     }
   }
   console.warn('[geocode] FAILED for address:', address, 'pin:', pin);

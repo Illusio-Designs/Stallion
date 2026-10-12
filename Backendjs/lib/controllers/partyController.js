@@ -367,26 +367,34 @@ class PartyController {
             // party still has coordinates for the visit/check-in geofence.
             let finalLat = null, finalLng = null, locationSource = null, locationAccuracyM = null;
             const hasDeviceLoc = latitude != null && latitude !== '' && longitude != null && longitude !== '';
+            // Geocode once; it is both the validation reference and the fallback.
+            const geo = await geocodeAddress(address, { pincode });
+            let captured = false;
             if (hasDeviceLoc) {
-                // Geocode address as a reference to validate the on-site capture.
-                let refLat = null, refLng = null;
-                const geo = await geocodeAddress(address, { pincode });
-                if (geo) { refLat = geo.latitude; refLng = geo.longitude; }
                 const acc = accuracy != null && accuracy !== '' ? accuracy : location_accuracy_m;
                 const check = validateOnsiteCapture({
-                    deviceLat: latitude, deviceLng: longitude, accuracy: acc, refLat, refLng,
+                    deviceLat: latitude, deviceLng: longitude, accuracy: acc,
+                    refLat: geo ? geo.latitude : null, refLng: geo ? geo.longitude : null,
+                    refPrecision: geo ? geo.precision : null,
                 });
-                if (!check.ok) {
+                if (check.ok) {
+                    finalLat = Number(latitude);
+                    finalLng = Number(longitude);
+                    locationSource = 'verified';
+                    const accNum = Number(acc);
+                    locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
+                    captured = true;
+                } else if (!check.noReference) {
                     return res.status(422).json({ error: check.reason });
                 }
-                finalLat = Number(latitude);
-                finalLng = Number(longitude);
-                locationSource = 'verified';
-                const accNum = Number(acc);
-                locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
-            } else {
-                const geo = await geocodeAddress(address, { pincode });
-                if (geo) { finalLat = geo.latitude; finalLng = geo.longitude; locationSource = 'geocoded'; }
+                // noReference: the address could not be located well enough to
+                // verify the capture, so the party is still created, just without a
+                // verified location. Capture it later with "I'm at shop".
+            }
+            if (!captured && geo) {
+                finalLat = geo.latitude;
+                finalLng = geo.longitude;
+                locationSource = 'geocoded';
             }
 
             const party = await Party.create({
@@ -546,7 +554,7 @@ class PartyController {
                 check = { ok: true, distance: null };
             } else {
                 // Geocode the party's address as the reference to validate against.
-                let refLat = null, refLng = null;
+                let refLat = null, refLng = null, refPrecision = null;
                 try {
                     let city, state;
                     if (party.city_id) { const c = await Cities.findByPk(party.city_id); city = c && c.name; }
@@ -554,11 +562,11 @@ class PartyController {
                     const ref = party.address
                         ? await geocodeAddress(party.address, { city, state, pincode: party.pincode })
                         : null;
-                    if (ref) { refLat = ref.latitude; refLng = ref.longitude; }
-                } catch (_) { /* no reference — capture still allowed, validated on accuracy only */ }
+                    if (ref) { refLat = ref.latitude; refLng = ref.longitude; refPrecision = ref.precision; }
+                } catch (_) { /* no reference: validateOnsiteCapture rejects with a clear message */ }
 
                 check = validateOnsiteCapture({
-                    deviceLat: latitude, deviceLng: longitude, accuracy, refLat, refLng,
+                    deviceLat: latitude, deviceLng: longitude, accuracy, refLat, refLng, refPrecision,
                 });
                 if (!check.ok) {
                     return res.status(422).json({ error: check.reason });
@@ -699,9 +707,12 @@ class PartyController {
                 billing = billing_address || null;
             }
 
+            // Who owns the party is a manager decision. A salesman can edit their
+            // party's details (including its address) but cannot reassign it.
+            const canReassign = canManageParties(req.userRoleNames);
             const payload = {
-                distributor_id: distributor_id !== undefined ? distributor_id : party.distributor_id,
-                salesman_id: salesman_id !== undefined ? salesman_id : party.salesman_id,
+                distributor_id: distributor_id !== undefined && canReassign ? distributor_id : party.distributor_id,
+                salesman_id: salesman_id !== undefined && canReassign ? salesman_id : party.salesman_id,
                 party_name: party_name !== undefined ? party_name : party.party_name,
                 trade_name: trade_name !== undefined ? trade_name : party.trade_name,
                 contact_person: contact_person !== undefined ? contact_person : party.contact_person,
@@ -725,14 +736,19 @@ class PartyController {
             if (nextIsActive !== undefined) {
                 payload.is_active = nextIsActive;
             }
-            // Re-derive the geocode anchor when the address OR the pincode changes
-            // (editing the pincode to correct a party's location must actually move
-            // it). NOT for on-site 'verified' parties — their captured GPS is the
-            // source of truth and must never be overwritten by an address geocode.
-            // Best-effort; leaves coords as-is on geocoder failure.
-            const addressChanged = address !== undefined && address && address !== party.address;
-            const pincodeChanged = pincode !== undefined && String(pincode).trim() !== String(party.pincode || '').trim();
-            if ((addressChanged || pincodeChanged) && party.location_source !== 'verified') {
+            // Re-derive the location when the address OR the pincode really changes
+            // (a spacing/case-only edit does not count). If the party had a
+            // verified on-site location, the shop may have moved, so that point is
+            // no longer trusted: it is replaced by the new address's geocode (or
+            // cleared if the address can't be located), and "I'm at shop" is
+            // available again to capture the new spot.
+            const normText = (v) => String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            const normPin = (v) => String(v || '').replace(/\D/g, '');
+            const addressChanged = address !== undefined && !!address && normText(address) !== normText(party.address);
+            const pincodeChanged = pincode !== undefined && normPin(pincode) !== normPin(party.pincode);
+            let locationReset = false;
+            if (addressChanged || pincodeChanged) {
+                const wasVerified = party.location_source === 'verified';
                 const geo = await geocodeAddress(
                     address !== undefined ? address : party.address,
                     { pincode: pincode !== undefined ? pincode : party.pincode }
@@ -741,7 +757,15 @@ class PartyController {
                     payload.latitude = geo.latitude;
                     payload.longitude = geo.longitude;
                     payload.location_source = 'geocoded';
+                    payload.location_accuracy_m = null;
+                } else if (wasVerified) {
+                    // Never keep a verified point that belonged to the old address.
+                    payload.latitude = null;
+                    payload.longitude = null;
+                    payload.location_source = null;
+                    payload.location_accuracy_m = null;
                 }
+                locationReset = wasVerified;
             }
             await Party.update(payload, { where: { party_id: id } });
 
@@ -756,6 +780,9 @@ class PartyController {
             if (is_active !== undefined && is_active !== party.is_active) {
                 description = is_active ? 'Party reactivated' : 'Party deactivated';
             }
+            if (locationReset) {
+                description += ' (address changed, verified location reset)';
+            }
 
             await logAudit({
                 req,
@@ -766,7 +793,14 @@ class PartyController {
                 oldValues: oldSnapshot,
                 newValues: { ...oldSnapshot, ...payload },
             });
-            res.status(200).json({ message: 'Party updated successfully' });
+            res.status(200).json({
+                message: 'Party updated successfully',
+                location_reset: locationReset,
+                latitude: payload.latitude !== undefined ? payload.latitude : party.latitude,
+                longitude: payload.longitude !== undefined ? payload.longitude : party.longitude,
+                location_source: payload.location_source !== undefined ? payload.location_source : party.location_source,
+                location_accuracy_m: payload.location_accuracy_m !== undefined ? payload.location_accuracy_m : party.location_accuracy_m,
+            });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
