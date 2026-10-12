@@ -30,7 +30,7 @@ const fmtDate = (d) =>
 
 // Geofence radius (mirror of backend GEOFENCE_RADIUS_M) + Haversine distance in
 // metres, used to verify a recorded visit's GPS against the party's address.
-const GEOFENCE_RADIUS_M = 250;
+const GEOFENCE_RADIUS_M = 50;
 const distanceMeters = (lat1, lng1, lat2, lng2) => {
   const toRad = (d) => (Number(d) * Math.PI) / 180;
   const R = 6371000;

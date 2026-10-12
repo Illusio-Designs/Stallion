@@ -205,7 +205,7 @@ The field‑verification core of the platform.
   party. The device GPS is captured with each.
 - **Geofence:** the backend geocodes the party's address (on demand if missing)
   and computes the **Haversine distance** between the salesman's GPS and the
-  party. If it exceeds the geofence radius (**`GEOFENCE_RADIUS_M`, default 250 m**),
+  party. If it exceeds the geofence radius (**`GEOFENCE_RADIUS_M`, default 50 m**),
   the visit order is **rejected (HTTP 403)**. This guarantees a recorded visit
   actually happened at the party.
 - **Visit Report** (salesman tab + Analytics "View Report") lists every visit and
@@ -295,7 +295,7 @@ sync pipeline propagate.
 
 | Variable | Purpose |
 |----------|---------|
-| `GEOFENCE_RADIUS_M` | Visit geofence radius in metres (default **250**). |
+| `GEOFENCE_RADIUS_M` | Visit geofence radius in metres (default **50**). |
 | `GEOFENCE_REQUIRE_COORDS` | If `true`, block a visit when the party has no coordinates (default fail‑open). |
 | `GEOCODER_URL` / `GEOCODER_KEY` / `GEOCODER_UA` | Geocoding provider (defaults to OpenStreetMap Nominatim). |
 | `MSG91_*` | MSG91 OTP widget / API credentials. |

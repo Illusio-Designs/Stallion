@@ -509,7 +509,7 @@ class PartyController {
     // On-site capture ("I'm at the shop — capture location"). Salesman/admin sends
     // the device GPS + accuracy while physically at the party. We validate the fix
     // (accuracy + proximity to the party's geocoded address) and, on pass, store it
-    // as the TRUSTED location_source='verified' anchor for the strict 250m geofence.
+    // as the TRUSTED location_source='verified' anchor for the strict 50m geofence.
     async verifyPartyLocation(req, res) {
         try {
             const id = req.params.id;

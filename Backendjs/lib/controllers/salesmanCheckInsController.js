@@ -133,7 +133,7 @@ class SalesmanCheckInsController {
                 return res.status(400).json({ error: validationError });
             }
 
-            // When a device location is provided, enforce the 250m geofence against
+            // When a device location is provided, enforce the 50m geofence against
             // the party's TRUSTED verified location. Party location must be set via
             // Add/Edit Party ("I'm at shop") — check-in never captures or changes it.
             const hasDeviceLoc = fields.latitude != null && fields.latitude !== '' && fields.longitude != null && fields.longitude !== '';

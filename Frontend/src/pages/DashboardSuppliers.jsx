@@ -41,7 +41,7 @@ import { showError, showSuccess } from '../services/notificationService';
 // Geofence radius used when a visit/order is recorded (mirror of the backend
 // GEOFENCE_RADIUS_M). A recorded location within this distance of the party's
 // geocoded address counts as a verified, on-site visit.
-const GEOFENCE_RADIUS_M = 250;
+const GEOFENCE_RADIUS_M = 50;
 
 // Haversine distance in metres between two lat/lng points.
 const distanceMeters = (lat1, lng1, lat2, lng2) => {
@@ -2208,7 +2208,7 @@ const DashboardSuppliers = () => {
                 return (
                   <p className="mt-2 mb-0 text-[length:var(--text-xs)] text-text-muted">
                     {verified
-                      ? `✅ Party location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — you must be within 250m to check in.`
+                      ? `✅ Party location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — you must be within 50m to check in.`
                       : 'This party’s location is not set yet. Set it from Party → Edit (“I’m at shop”) before checking in.'}
                   </p>
                 );

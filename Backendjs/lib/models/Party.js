@@ -124,10 +124,10 @@ const Party = sequelize.define('Party', {
     // How latitude/longitude were set:
     //   'verified' -> captured ON-SITE from a real device (the "I'm at the shop"
     //                 action), validated for GPS accuracy and address proximity.
-    //                 TRUSTED -> visit orders / check-ins enforce the strict 250m
+    //                 TRUSTED -> visit orders / check-ins enforce the strict 50m
     //                 geofence against it.
     //   'geocoded' -> derived from the typed address (pincode-accurate at best).
-    //                 Approximate reference only — NOT used as the 250m anchor.
+    //                 Approximate reference only — NOT used as the 50m anchor.
     //   'gps'      -> legacy value from the old auto-adopt behaviour; treated as
     //                 untrusted and re-derived from the address on next visit.
     location_source: {
