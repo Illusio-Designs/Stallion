@@ -1039,8 +1039,9 @@ class PartyController {
     //  - ?q=<address>        → geocode that free text.
     //  - ?party_id=<uuid>    → build the SAME query ensurePartyCoords builds for
     //    that real party (address + resolved city/state + pincode), geocode it,
-    //    and (if found) STORE the coordinates on the party. This shows exactly
-    //    what data we send for a party and whether it resolves.
+    //    and report the result. This shows exactly what data we send for a party
+    //    and whether it resolves. READ-ONLY: it never saves coordinates, so it
+    //    cannot disturb a party's verified location.
     async geocodeTest(req, res) {
         try {
             const partyId = req.query && req.query.party_id;
@@ -1052,11 +1053,6 @@ class PartyController {
                 if (party.state_id) { const s = await State.findByPk(party.state_id); state = s && s.name; }
                 // Full address + fallback (city/state) — the same path ensurePartyCoords uses.
                 const coords = await geocodeAddress(party.address, { city, state, pincode: party.pincode });
-                let stored = false;
-                if (coords) {
-                    await party.update({ latitude: coords.latitude, longitude: coords.longitude });
-                    stored = true;
-                }
                 // If it couldn't resolve, include the raw failure detail for the full query.
                 const detail = coords ? null : await geocodeDiagnostic(party.address, { city, state, pincode: party.pincode });
                 return res.status(200).json({
@@ -1067,7 +1063,7 @@ class PartyController {
                     pincode: party.pincode || null,
                     ok: !!coords,
                     coords: coords || null,
-                    stored,
+                    stored: false,
                     detail,
                 });
             }
@@ -1098,7 +1094,9 @@ class PartyController {
             for (const party of parties) {
                 const geo = await geocodeAddress(party.address, { pincode: party.pincode });
                 if (geo) {
-                    await party.update({ latitude: geo.latitude, longitude: geo.longitude });
+                    // Only parties with no coordinates are selected, so a verified
+                    // location is never touched. Mark the source as geocoded.
+                    await party.update({ latitude: geo.latitude, longitude: geo.longitude, location_source: 'geocoded' });
                     updated += 1;
                 } else {
                     failed.push(party.party_id);
