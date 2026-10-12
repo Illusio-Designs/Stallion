@@ -20,7 +20,7 @@ import {
   updateParty,
   verifyPartyLocation,
 } from '../services/apiService';
-import { getUser, getUserRole } from '../services/authService';
+import { getUser, getUserRole, getUserRoles } from '../services/authService';
 import { showError, showSuccess } from '../services/notificationService';
 import { captureCurrentPosition } from '../utils/geolocation';
 
@@ -32,6 +32,16 @@ const DashboardClients = () => {
   const isSalesman = useMemo(() => userRole === 'salesman', [userRole]);
   const isDistributor = useMemo(() => userRole === 'distributor', [userRole]);
   const isAdmin = useMemo(() => userRole === 'admin', [userRole]);
+  // What the server really allows, so a button is only shown to someone who can
+  // use it (otherwise it just ends in "Access denied"):
+  //  - delete + bulk upload: admin, party manager, sales manager
+  //  - edit: those managers, or a salesman for their own parties
+  const roleList = useMemo(() => getUserRoles(), []);
+  const isPartyManager = useMemo(
+    () => roleList.some((r) => ['admin', 'party_manager', 'sales_manager'].includes(r)),
+    [roleList]
+  );
+  const canEditParty = isPartyManager || isSalesman;
   // Admin-only party-location capture (geofence anchor).
   const [savingLoc, setSavingLoc] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
@@ -362,12 +372,12 @@ const DashboardClients = () => {
     {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
-          onEdit={() => handleEdit(row)}
-          onDelete={() => handleDelete(row)}
+          onEdit={canEditParty ? () => handleEdit(row) : undefined}
+          onDelete={isPartyManager ? () => handleDelete(row) : undefined}
         />
       )
     },
-  ]), []);
+  ]), [canEditParty, isPartyManager]);
 
   const rows = useMemo(() => {
     // CRITICAL: Backend returns wrong data, so we MUST filter strictly by country_id
@@ -706,8 +716,9 @@ const DashboardClients = () => {
         return id !== partyId.trim();
       }));
 
-      // Now find and delete associated user account by phone number
-      if (partyPhone) {
+      // Now find and delete the associated login account by phone number. Listing
+      // users is admin-only, so other managers skip this step.
+      if (partyPhone && isAdmin) {
         try {
           const { getUsers, deleteUser } = await import('../services/apiService');
           console.log('[Delete Party] Finding user account with phone:', partyPhone);
@@ -767,7 +778,7 @@ const DashboardClients = () => {
               phone: u.phone || u.phoneNumber,
               name: u.full_name || u.name
             })));
-            showSuccess('Party deleted successfully! (No associated user account found - check console for details)');
+            showSuccess('Party deleted successfully!');
           }
         } catch (userDeleteError) {
           console.error('[Delete Party] Error deleting user account:', userDeleteError);
@@ -776,7 +787,7 @@ const DashboardClients = () => {
             errorData: userDeleteError.errorData,
             statusCode: userDeleteError.statusCode
           });
-          showSuccess('Party deleted successfully! (User account deletion failed - check console for details)');
+          showSuccess('Party deleted. Its login account could not be removed, please ask an admin to remove it.');
         }
       } else {
         console.warn('[Delete Party] No phone number found in party record');
@@ -1571,9 +1582,11 @@ const DashboardClients = () => {
                   <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
                     Add New Party
                   </button>
-                  <button className="ui-btn ui-btn--secondary" onClick={() => setOpenBulkUpload(true)}>
-                    Bulk Upload
-                  </button>
+                  {isPartyManager && (
+                    <button className="ui-btn ui-btn--secondary" onClick={() => setOpenBulkUpload(true)}>
+                      Bulk Upload
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1587,7 +1600,7 @@ const DashboardClients = () => {
               rows={filteredRowsByTab}
               onAddNew={handleAdd}
               addNewText="Add New Party"
-              onImport={() => setOpenBulkUpload(true)}
+              onImport={isPartyManager ? () => setOpenBulkUpload(true) : undefined}
               importText="Bulk Upload"
               secondaryActions={[
                 {

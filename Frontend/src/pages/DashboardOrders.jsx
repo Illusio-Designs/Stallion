@@ -24,7 +24,7 @@ import {
 } from '../services/apiService';
 import { downloadOrderPdf } from '../utils/orderPdf';
 import { showSuccess, showError } from '../services/notificationService';
-import { getUserRole, getUser } from '../services/authService';
+import { getUserRole, getUser, getUserRoles } from '../services/authService';
 import '../styles/pages/dashboard-orders.css';
 
 // Map API status to UI status
@@ -101,6 +101,12 @@ const DashboardOrders = () => {
   const isDistributor = userRole === 'distributor';
   const isParty = userRole === 'party';
   const isSalesman = userRole === 'salesman';
+  // Changing an order's status is for admin and order manager only (the server
+  // answers "Access denied" to everyone else), so only they get the Edit button.
+  const canEditOrder = useMemo(
+    () => getUserRoles().some((r) => ['admin', 'order_manager'].includes(r)),
+    []
+  );
   
   // Dropdown data
   const [countries, setCountries] = useState([]);
@@ -1041,13 +1047,13 @@ const DashboardOrders = () => {
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions
         onView={() => setViewRow(row)}
-        onEdit={() => openEditPanel(row)}
+        onEdit={canEditOrder ? () => openEditPanel(row) : undefined}
         onDownload={() => handleDownload(row)}
         // Delete is admin-only (the backend also enforces canManageOrders).
         onDelete={isAdmin ? () => handleDelete(row) : undefined}
       />
     ) },
-  ]), [isAdmin]);
+  ]), [isAdmin, canEditOrder]);
 
   return (
     <div className="dash-page">
