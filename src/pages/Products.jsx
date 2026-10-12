@@ -229,12 +229,6 @@ const Products = ({ onPageChange }) => {
     // Always filter to show only active products in public page (hide draft products)
     filters.status = 'active';
 
-    // Always include price filter with full range (backend requires it)
-    filters.price = {
-      min: 0,
-      max: 10000
-    };
-
     return filters;
   }, [
     selectedGender,
@@ -294,6 +288,15 @@ const Products = ({ onPageChange }) => {
     return chips;
   }, [selectedGender, selectedShapes, selectedBrands, selectedLensMaterial, selectedFrameMaterials, selectedType, selectedLensColor, selectedFrameColor, gendersData, shapesData, brandsData, lensMaterialsData, frameMaterialsData, frameTypesData, lensColorsData, frameColorsData]);
 
+  // Debounce the search text (~300 ms) so typing doesn't fire a request per key.
+  // Clearing the search applies immediately.
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    if (!searchQuery) { setDebouncedSearch(''); return undefined; }
+    const t = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   // Fetch the current page of products from the server (20/page).
   // Attribute filters are sent to the backend instead of fetching the whole
   // catalogue and filtering client-side.
@@ -307,30 +310,10 @@ const Products = ({ onPageChange }) => {
         const filters = buildFilters();
         const isActive = (p) => (p.status || '').toLowerCase().trim() === 'active';
 
-        if (searchQuery && searchQuery.trim()) {
-          // The products API has no text-search parameter, so model_no search is
-          // resolved client-side. This bounded loop only runs during an explicit
-          // search (not on normal browsing), and respects the active filters.
-          const q = searchQuery.trim().toLowerCase();
-          let collected = [];
-          let p = 1;
-          let more = true;
-          while (more && p <= 50) {
-            const result = await getProducts(p, 100, filters);
-            const arr = result.data || [];
-            collected = collected.concat(
-              arr.filter((pr) => isActive(pr) && (pr.model_no || '').toLowerCase().includes(q))
-            );
-            more = arr.length === 100;
-            p += 1;
-          }
-          if (cancelled) return;
-          const start = (page - 1) * limit;
-          setProducts(collected.slice(start, start + limit));
-          setTotalResults(collected.length);
-          setTotalPages(Math.max(1, Math.ceil(collected.length / limit)));
-        } else {
-          // Normal browse / attribute filtering: true server-side pagination.
+        {
+          // Server-side pagination + search (backend `search` param; debounced above).
+          const term = (debouncedSearch || '').trim();
+          if (term) filters.search = term;
           const result = await getProducts(page, limit, filters);
           const arr = result.data || [];
           if (cancelled) return;
@@ -361,7 +344,7 @@ const Products = ({ onPageChange }) => {
     return () => { cancelled = true; };
     // buildFilters is intentionally excluded; filtersKey captures its value.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, searchQuery, filtersKey, limit]);
+  }, [page, debouncedSearch, filtersKey, limit]);
 
   const handleReset = () => {
     setSelectedBrands([]);

@@ -407,11 +407,11 @@ const DashboardDistributor = () => {
         c.name?.toLowerCase() === 'india' || 
         c.code?.toLowerCase() === 'in'
       );
-      if (india) {
-        console.log('[Filter] Setting default country to India:', india.id);
-        setSelectedCountryFilter(india.id);
-        hasSetDefaultCountry.current = true;
-      }
+      // Fall back to the first country so the list is never empty on first load
+      const defaultCountry = india || countries[0];
+      console.log('[Filter] Setting default country:', defaultCountry.id);
+      setSelectedCountryFilter(defaultCountry.id);
+      hasSetDefaultCountry.current = true;
     }
   }, [countries, selectedCountryFilter]);
 
@@ -973,6 +973,27 @@ const DashboardDistributor = () => {
       <div className="dash-container flex flex-col gap-4">
         <div className="dash-row grid grid-cols-1 gap-4 sm:grid-cols-12">
           <div className="dash-card full col-span-1 p-0 sm:col-span-12">
+            <div className="p-4 pb-0" style={{ maxWidth: 392 }}>
+              <label className="mb-2 block text-[14px] font-medium">
+                Filter by Country
+              </label>
+              <DropdownSelector
+                options={countries.map(country => ({
+                  value: country.id,
+                  label: country.name
+                }))}
+                value={selectedCountryFilter || ''}
+                onChange={(value) => {
+                  // Distributors are always loaded per country, so there is no "All" option
+                  if (!value) return;
+                  setDistributors([]);
+                  setSelectedCountryFilter(value);
+                }}
+                onOpen={fetchCountries}
+                placeholder="Select a country"
+                className="ui-dropdown-custom--full-width"
+              />
+            </div>
             {showError_ ? (
               <div className="ui-state ui-state--error">
                 <div className="ui-state__icon">
@@ -1001,8 +1022,8 @@ const DashboardDistributor = () => {
                 <p className="ui-state__title">No distributors yet</p>
                 <p className="ui-state__desc">
                   {selectedCountryFilter
-                    ? 'No distributors found for the selected country. Add one to get started.'
-                    : 'Select a country to view its distributors, or add a new one to get started.'}
+                    ? `No distributors found for ${countries.find(c => String(c.id) === String(selectedCountryFilter))?.name || 'the selected country'}. Pick another country above, or add a new distributor.`
+                    : 'Pick a country above to view its distributors, or add a new one to get started.'}
                 </p>
                 <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
                   Add New Distributor
@@ -1022,45 +1043,7 @@ const DashboardDistributor = () => {
                   }
                 }}
                 importText="Refresh Data"
-                showFilter={true}
-                filterContent={
-                  <div>
-                    <label className="mb-2 block text-[14px] font-medium">
-                      Filter by Country
-                    </label>
-                    <DropdownSelector
-                      options={[
-                        { value: '', label: 'All Countries' },
-                        ...countries.map(country => ({
-                          value: country.id,
-                          label: country.name
-                        }))
-                      ]}
-                      value={selectedCountryFilter || ''}
-                      onChange={(value) => {
-                        const newCountryId = value || null;
-                        const oldCountryId = selectedCountryFilter;
-                        console.log('[Filter] Country selection changed from', oldCountryId, 'to', newCountryId);
-
-                        // Clear distributors immediately when changing countries
-                        setDistributors([]);
-
-                        // Update state - useEffect will handle fetching or clearing
-                        setSelectedCountryFilter(newCountryId);
-
-                        // If "All Countries" is selected (empty), ensure distributors are cleared
-                        if (!newCountryId) {
-                          console.log('[Filter] All Countries selected - clearing distributors');
-                          setDistributors([]);
-                          setLoading(false);
-                        }
-                      }}
-                      onOpen={fetchCountries}
-                      placeholder="All Countries"
-                      className="ui-dropdown-custom--full-width"
-                    />
-                  </div>
-                }
+                showFilter={false}
                 loading={loading}
               />
             )}

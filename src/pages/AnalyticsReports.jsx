@@ -7,15 +7,15 @@ import MatchMeter from '../components/ui/MatchMeter';
 import {
   getAllSalesmanTargets,
   getSalesmanTargets,
-  getAllSalesmanCheckins,
+  getSalesmanCheckinsPage,
   getSalesmanCheckins,
   getSalesmanProfile,
   getMyOrdersPage,
   getOrdersPage,
 } from '../services/apiService';
 
-// Rows to load per report list (check-ins + orders). Kept small on purpose.
-const REPORT_LIMIT = 20;
+// Rows to load per report list (check-ins + orders). Older rows load on demand.
+const REPORT_LIMIT = 20; // page size; more rows load on demand via "Load more"
 import { getUser, getUserRole } from '../services/authService';
 import { showError } from '../services/notificationService';
 
@@ -57,6 +57,42 @@ const Progress = ({ pct }) => {
   );
 };
 
+// Turn visit ORDERS into Visit Report rows, skipping any already linked by a
+// check-in (order_id).
+const visitOrdersToRows = (orders, existing) => {
+  const linked = new Set((existing || []).map((x) => x.order_id).filter(Boolean));
+  return (orders || [])
+    .filter((o) => o.order_type === 'visit_order' && !linked.has(o.order_id || o.id))
+    .map((o) => {
+          // The backend already computes total_qty robustly (order_items may be a
+          // JSON string), so trust it and only fall back to a local sum.
+          let its = o.order_items;
+          if (typeof its === 'string') { try { its = JSON.parse(its); } catch { its = []; } }
+          if (its && typeof its === 'object' && !Array.isArray(its)) its = Object.values(its);
+          const localQty = Array.isArray(its)
+            ? its.reduce((s, it) => s + (Number(it && (it.quantity ?? it.qty)) || 0), 0)
+            : 0;
+          const qty = o.total_qty != null ? Number(o.total_qty) : localQty;
+          return {
+            id: `order-${o.order_id || o.id}`,
+            type: 'ordered',
+            salesman_id: o.salesman_id,
+            salesman_name: o.salesman_name,
+            party_id: o.party_id,
+            party_name: o.party_name,
+            party_latitude: o.party_latitude,
+            party_longitude: o.party_longitude,
+            order_id: o.order_id || o.id,
+            order_total: o.order_total,
+            order_qty: qty,
+            order_notes: o.order_notes,
+            check_in_date: o.order_date || o.created_at || o.createdAt,
+            latitude: o.latitude,
+            longitude: o.longitude,
+          };
+    });
+};
+
 const AnalyticsReports = () => {
   const [activeTab, setActiveTab] = useState('targets');
   const [targets, setTargets] = useState([]);
@@ -65,6 +101,10 @@ const AnalyticsReports = () => {
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  // Visit Report server paging (check-ins + visit orders are fetched page by page).
+  const [visitPage, setVisitPage] = useState(1);
+  const [visitMore, setVisitMore] = useState({ checkins: false, orders: false });
+  const [loadingMore, setLoadingMore] = useState(false);
 
   const userRole = useMemo(() => getUserRole(), []);
   const user = useMemo(() => getUser(), []);
@@ -99,7 +139,7 @@ const AnalyticsReports = () => {
     // Independent calls: an empty table (404) or one failing call must not break the other.
     const [tRes, cRes] = await Promise.allSettled([
       isSalesman ? (sid ? getSalesmanTargets(sid) : Promise.resolve([])) : getAllSalesmanTargets(),
-      isSalesman ? (sid ? getSalesmanCheckins(sid) : Promise.resolve([])) : getAllSalesmanCheckins(REPORT_LIMIT),
+      isSalesman ? (sid ? getSalesmanCheckins(sid) : Promise.resolve([])) : getSalesmanCheckinsPage(1, REPORT_LIMIT),
     ]);
 
     let realError = false;
@@ -107,53 +147,31 @@ const AnalyticsReports = () => {
     let c = [];
     if (tRes.status === 'fulfilled') t = asArray(tRes.value);
     else if (!isNotFound(tRes.reason)) { realError = true; console.error('targets load failed:', tRes.reason); }
-    if (cRes.status === 'fulfilled') c = asArray(cRes.value);
+    let moreCheckins = false;
+    if (cRes.status === 'fulfilled') {
+      c = asArray(cRes.value);
+      const pg = cRes.value && cRes.value.pagination;
+      moreCheckins = !!(pg && pg.page < pg.totalPages);
+    }
     else if (!isNotFound(cRes.reason)) { realError = true; console.error('check-ins load failed:', cRes.reason); }
 
     // Visit ORDERS live in the orders table and don't create a check-in, so they
     // would be missing from the Visit Report. Merge them in as "ordered" rows,
     // skipping any order already linked by a check-in (order_id).
+    let moreOrders = false;
     try {
       const ordersRes = isSalesman
         ? await getMyOrdersPage(1, REPORT_LIMIT)
         : await getOrdersPage(1, REPORT_LIMIT);
-      const orders = asArray(ordersRes);
-      const linked = new Set(c.map((x) => x.order_id).filter(Boolean));
-      const orderRows = orders
-        .filter((o) => o.order_type === 'visit_order' && !linked.has(o.order_id || o.id))
-        .map((o) => {
-          // The backend already computes total_qty robustly (order_items may be a
-          // JSON string), so trust it and only fall back to a local sum.
-          let its = o.order_items;
-          if (typeof its === 'string') { try { its = JSON.parse(its); } catch { its = []; } }
-          if (its && typeof its === 'object' && !Array.isArray(its)) its = Object.values(its);
-          const localQty = Array.isArray(its)
-            ? its.reduce((s, it) => s + (Number(it && (it.quantity ?? it.qty)) || 0), 0)
-            : 0;
-          const qty = o.total_qty != null ? Number(o.total_qty) : localQty;
-          return {
-            id: `order-${o.order_id || o.id}`,
-            type: 'ordered',
-            salesman_id: o.salesman_id,
-            salesman_name: o.salesman_name,
-            party_id: o.party_id,
-            party_name: o.party_name,
-            party_latitude: o.party_latitude,
-            party_longitude: o.party_longitude,
-            order_id: o.order_id || o.id,
-            order_total: o.order_total,
-            order_qty: qty,
-            order_notes: o.order_notes,
-            check_in_date: o.order_date || o.created_at || o.createdAt,
-            latitude: o.latitude,
-            longitude: o.longitude,
-          };
-        });
-      c = [...c, ...orderRows];
+      const opg = ordersRes && ordersRes.pagination;
+      moreOrders = !!(opg && opg.page < opg.totalPages);
+      c = [...c, ...visitOrdersToRows(asArray(ordersRes), c)];
     } catch (e) { console.error('Failed to merge visit orders:', e); }
 
     setTargets(t);
     setCheckins(c);
+    setVisitPage(1);
+    setVisitMore({ checkins: moreCheckins, orders: moreOrders });
     setLoadError(realError);
     if (realError) showError('Could not load some reports.');
 
@@ -181,6 +199,53 @@ const AnalyticsReports = () => {
     setParties(Object.values(partyMap));
 
     setLoading(false);
+  };
+
+  // Load the next page of the Visit Report (check-ins + visit orders) and append.
+  const loadMoreVisits = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    const next = visitPage + 1;
+    const asArray = (r) => (Array.isArray(r) ? r : r?.data || []);
+    try {
+      const [cRes, oRes] = await Promise.allSettled([
+        visitMore.checkins ? getSalesmanCheckinsPage(next, REPORT_LIMIT) : Promise.resolve(null),
+        visitMore.orders ? (isSalesman ? getMyOrdersPage(next, REPORT_LIMIT) : getOrdersPage(next, REPORT_LIMIT)) : Promise.resolve(null),
+      ]);
+      const hasMore = { checkins: false, orders: false };
+      let added = [];
+      if (cRes.status === 'fulfilled' && cRes.value) {
+        added = added.concat(asArray(cRes.value));
+        const pg = cRes.value.pagination;
+        hasMore.checkins = !!(pg && pg.page < pg.totalPages);
+      }
+      const base = [...checkins, ...added];
+      if (oRes.status === 'fulfilled' && oRes.value) {
+        added = added.concat(visitOrdersToRows(asArray(oRes.value), base));
+        const pg = oRes.value.pagination;
+        hasMore.orders = !!(pg && pg.page < pg.totalPages);
+      }
+      if (cRes.status === 'rejected' || oRes.status === 'rejected') showError('Could not load more visits.');
+      setCheckins((prev) => {
+        const seen = new Set(prev.map((x) => x.id).filter(Boolean));
+        return [...prev, ...added.filter((x) => !(x.id && seen.has(x.id)))];
+      });
+      // Keep the name / location lookups in step with the newly added rows.
+      setSalesmen((prev) => {
+        const m = new Map(prev.map((x) => [String(x.salesman_id), x]));
+        added.forEach((x) => { if (x.salesman_id && x.salesman_name && !m.has(String(x.salesman_id))) m.set(String(x.salesman_id), { salesman_id: x.salesman_id, full_name: x.salesman_name }); });
+        return [...m.values()];
+      });
+      setParties((prev) => {
+        const m = new Map(prev.map((x) => [String(x.party_id), x]));
+        added.forEach((x) => { if (x.party_id && !m.has(String(x.party_id))) m.set(String(x.party_id), { party_id: x.party_id, party_name: x.party_name || null, latitude: x.party_latitude != null ? x.party_latitude : null, longitude: x.party_longitude != null ? x.party_longitude : null }); });
+        return [...m.values()];
+      });
+      setVisitPage(next);
+      setVisitMore(hasMore);
+    } finally {
+      setLoadingMore(false);
+    }
   };
 
   const salesmanName = (id) => {
@@ -355,7 +420,23 @@ const AnalyticsReports = () => {
                   <p className="ui-state__desc">Salesman visit reports (with party and location) will show here.</p>
                 </div>
               ) : (
-                <TableWithControls title="Visit Report" columns={checkinColumns} rows={checkinRows} itemName="Visit Report" loading={loading} selectable={false} />
+                <>
+                  <TableWithControls title="Visit Report" columns={checkinColumns} rows={checkinRows} itemName="Visit Report" loading={loading} selectable={false} />
+                  {!loading && (
+                    <div className="ui-state__desc" style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', padding: '12px 0' }}>
+                      <span>
+                        {(visitMore.checkins || visitMore.orders)
+                          ? `Showing the latest ${checkinRows.length} visits — older visits are not loaded yet.`
+                          : `Showing all ${checkinRows.length} visits.`}
+                      </span>
+                      {(visitMore.checkins || visitMore.orders) && (
+                        <button type="button" className="ui-pill" onClick={loadMoreVisits} disabled={loadingMore}>
+                          {loadingMore ? 'Loading…' : 'Load more'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

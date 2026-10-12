@@ -31,7 +31,7 @@ import {
   getProductsByIds,
   verifyPartyLocation,
 } from "../services/apiService";
-import { captureCurrentPosition } from "../utils/geolocation";
+import { captureCurrentPosition, distanceMeters, GEOFENCE_RADIUS_M } from "../utils/geolocation";
 
 // Re-point any product image URL (legacy host, absolute server path, or
 // relative) to the configured image host — the same base the Media gallery and
@@ -68,6 +68,10 @@ const Cart = ({ onPageChange = null }) => {
   const isParty = userRole === 'party';
   const isDistributor = userRole === 'distributor';
   const isSalesman = userRole === 'salesman';
+  // Admin and office accounts (managers) have no cart flow: orders are placed by
+  // a party, distributor or salesman. Without this they hit the server with no
+  // order type and only got "order_type is required".
+  const isOfficeOnly = !!userRole && !isParty && !isDistributor && !isSalesman;
   
   // Role-based state
   const [orderType, setOrderType] = useState(isDistributor ? "distributor_order" : "");
@@ -343,34 +347,57 @@ const Cart = ({ onPageChange = null }) => {
     }
   };
 
-  // Approximate location from the user's IP — used as a fallback when precise
-  // GPS isn't available (e.g. desktops with no location hardware/provider).
-  const getIpLocation = async () => {
-    const res = await fetch('https://ipwho.is/', { cache: 'no-store' });
-    const data = await res.json();
-    if (data && data.success !== false && Number.isFinite(data.latitude) && Number.isFinite(data.longitude)) {
-      return { latitude: Number(data.latitude), longitude: Number(data.longitude) };
-    }
-    throw new Error('IP location unavailable');
-  };
-
-  // Silently capture the visit-order location: precise GPS first, then an
-  // approximate IP-based fallback (so desktops without GPS still get coords).
-  // No UI/messages — the captured coords go straight onto the order.
+  // Early read of the phone's GPS when the order type is chosen (it also asks for
+  // permission up front). Only real GPS is used: an IP-based guess is accurate to
+  // a city at best and can never satisfy the shop's 50 m check. The position used
+  // for the order is read again at checkout (see handleCheckout).
   const requestLocation = async () => {
     try {
-      await getCurrentLocation(); // precise GPS — exact coords
+      await getCurrentLocation();
     } catch {
-      try {
-        const ip = await getIpLocation();
-        setLatitude(ip.latitude);
-        setLongitude(ip.longitude);
-        locationRef.current = { latitude: ip.latitude, longitude: ip.longitude };
-      } catch {
-        // Both failed — leave coords null; checkout surfaces a single error.
-      }
+      // No GPS yet: checkout reads it again and explains what to do.
     }
   };
+
+  // The selected party's saved (verified) shop point, if it has one.
+  const selectedPartyRecord = parties.find((p) => (p.id || p.party_id) === selectedParty) || null;
+  const selectedPartyVerified = !!selectedPartyRecord
+    && selectedPartyRecord.location_source === 'verified'
+    && selectedPartyRecord.latitude != null && selectedPartyRecord.longitude != null;
+
+  // Read the GPS now and measure the distance to the shop. Used when a party is
+  // picked, from the "Check again" link, and right before the order is sent, so
+  // the order never carries an old position.
+  const [visitDistance, setVisitDistance] = useState(null); // { meters } | { error }
+  const [checkingDistance, setCheckingDistance] = useState(false);
+  const refreshVisitDistance = async () => {
+    if (!selectedPartyVerified) { setVisitDistance(null); return null; }
+    setCheckingDistance(true);
+    try {
+      const pos = await captureCurrentPosition();
+      locationRef.current = { latitude: pos.latitude, longitude: pos.longitude };
+      setLatitude(pos.latitude);
+      setLongitude(pos.longitude);
+      const meters = distanceMeters(pos.latitude, pos.longitude, Number(selectedPartyRecord.latitude), Number(selectedPartyRecord.longitude));
+      const result = { meters };
+      setVisitDistance(result);
+      return result;
+    } catch (e) {
+      const result = { error: e?.message || 'Could not get your location. Please turn on location and try again.' };
+      setVisitDistance(result);
+      return result;
+    } finally {
+      setCheckingDistance(false);
+    }
+  };
+  useEffect(() => {
+    if (isSalesman && orderType === 'visit_order' && selectedParty && selectedPartyVerified) {
+      refreshVisitDistance();
+    } else {
+      setVisitDistance(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderType, selectedParty, selectedPartyVerified, isSalesman]);
 
   // Fetch parties based on order type for salesman
   useEffect(() => {
@@ -528,16 +555,29 @@ const Cart = ({ onPageChange = null }) => {
     const item = currentItems.find((item) => item.id === productId);
     if (!item) return;
 
+    const max = maxFor(productId);
+    // Nothing is available: do not pretend a quantity of 1 is fine.
+    if (max <= 0) {
+      showError('This product is out of stock. Please remove it from your cart.');
+      return;
+    }
     const parsed = parseInt(value, 10);
     let newQuantity = Number.isNaN(parsed) ? 1 : Math.max(1, parsed);
-    const max = maxFor(productId);
     let capped = false;
-    if (newQuantity > max) { newQuantity = Math.max(1, max); capped = true; }
-    updateCartQuantity(productId, newQuantity);
-    const itemName = `${item.name} (${item.lenseColour})`;
+    if (newQuantity > max) { newQuantity = max; capped = true; }
+    if (newQuantity !== item.quantity) updateCartQuantity(productId, newQuantity);
+    // One message, only when the box is left, and only if something changed.
     if (capped) showError(`Only ${max} in stock — quantity set to ${newQuantity}`);
-    else showCartUpdateSuccess(itemName, newQuantity);
+    else if (newQuantity !== item.quantity) {
+      showCartUpdateSuccess(`${item.name} (${item.lenseColour})`, newQuantity);
+    }
   };
+
+  // Lines whose product has no stock left. They cannot be ordered.
+  const outOfStockItems = cartItems.filter((it) => {
+    const s = stockById[String(it.id)];
+    return s != null && s <= 0;
+  });
 
   const calculateSubtotal = () => {
     return cartItems.reduce((total, item) => {
@@ -607,8 +647,16 @@ const Cart = ({ onPageChange = null }) => {
   };
 
   const handleCheckout = async () => {
+    if (isOfficeOnly) {
+      showError('Admin and office accounts cannot place orders from the cart. Use Dashboard > Orders to create an order.');
+      return;
+    }
     if (cartItems.length === 0) {
       showError('Your cart is empty');
+      return;
+    }
+    if (outOfStockItems.length > 0) {
+      showError(`Remove out-of-stock items before checkout: ${outOfStockItems.map((it) => it.name).join(', ')}`);
       return;
     }
 
@@ -630,15 +678,26 @@ const Cart = ({ onPageChange = null }) => {
         showError('Please select an event');
         return;
       }
-      if (orderType === 'visit_order' &&
-          (locationRef.current?.latitude == null || locationRef.current?.longitude == null)) {
-        // Silently capture the visit-order location (precise GPS, then IP
-        // fallback). No prompts/messages — only error if it's truly impossible.
+      if (orderType === 'visit_order') {
+        if (!selectedParty) {
+          showError('Please select a party');
+          return;
+        }
+        if (!selectedPartyVerified) {
+          showError('This party\'s shop location is not set yet. Tap "I\'m at shop" under the party, then place the order.');
+          return;
+        }
+        // Read the GPS again right now: the order must carry where the salesman
+        // is at this moment, not where they were when they chose the order type.
         setLoading(true);
-        await requestLocation();
+        const fresh = await refreshVisitDistance();
         setLoading(false);
-        if (locationRef.current?.latitude == null || locationRef.current?.longitude == null) {
-          showError('Could not capture your location for the visit order. Please try again.');
+        if (!fresh || fresh.error) {
+          showError((fresh && fresh.error) || 'Could not get your location. Please turn on location and try again.');
+          return;
+        }
+        if (fresh.meters > GEOFENCE_RADIUS_M) {
+          showError(`You are about ${Math.round(fresh.meters)} m from this shop. Move within ${GEOFENCE_RADIUS_M} m of it to place a visit order.`);
           return;
         }
       }
@@ -1168,10 +1227,16 @@ const Cart = ({ onPageChange = null }) => {
         removeFromCart(item.id);
       });
       
-      // Reset form
+      // Reset form. Nothing from this order may leak into the next one: the note,
+      // typed quantities and the captured visit location are forgotten too.
       setSelectedParty("");
       setSelectedEvent("");
       setSelectedCountry("");
+      setOrderNote("");
+      setEditingQuantities({});
+      setLatitude(null);
+      setLongitude(null);
+      locationRef.current = { latitude: null, longitude: null };
       if (isSalesman) {
         setOrderType("");
       }
@@ -1286,10 +1351,8 @@ const Cart = ({ onPageChange = null }) => {
                           aria-label={`Quantity for ${getDisplayName(item)}`}
                           value={editingQuantities[item.id] !== undefined ? editingQuantities[item.id] : item.quantity}
                           onChange={e => {
+                            // Just hold what is typed; it is checked when the box is left.
                             setEditingQuantities(q => ({ ...q, [item.id]: e.target.value }));
-                            const itemName = `${item.name} (${item.lenseColour})`;
-                            const num = parseInt(e.target.value, 10);
-                            showCartUpdateSuccess(itemName, (!e.target.value || isNaN(num) || num < 1) ? 1 : num);
                           }}
                           onBlur={e => {
                             const val = editingQuantities[item.id];
@@ -1462,6 +1525,23 @@ const Cart = ({ onPageChange = null }) => {
                             ? `✅ Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 50m geofence active.`
                             : 'Location not verified yet. Stand at the shop and tap below to enable the 50m geofence.'}
                         </p>
+                        {verified && (
+                          <p className={`m-0 text-[length:var(--text-xs)] ${visitDistance && visitDistance.meters != null && visitDistance.meters > GEOFENCE_RADIUS_M ? 'text-error' : 'text-text-muted'}`} role="status">
+                            {checkingDistance
+                              ? 'Checking where you are…'
+                              : visitDistance && visitDistance.error
+                                ? visitDistance.error
+                                : visitDistance && visitDistance.meters != null
+                                  ? (visitDistance.meters <= GEOFENCE_RADIUS_M
+                                    ? `You are at the shop (${Math.round(visitDistance.meters)} m away).`
+                                    : `You are ${Math.round(visitDistance.meters)} m from this shop. Move within ${GEOFENCE_RADIUS_M} m to place the order.`)
+                                  : ''}
+                            {' '}
+                            <button type="button" className="border-none bg-transparent p-0 font-semibold text-primary underline cursor-pointer" onClick={refreshVisitDistance} disabled={checkingDistance}>
+                              Check again
+                            </button>
+                          </p>
+                        )}
                         {!verified && (
                           <button
                             type="button"
@@ -1556,11 +1636,22 @@ const Cart = ({ onPageChange = null }) => {
               </div>
             </div>
 
+            {outOfStockItems.length > 0 && !isOfficeOnly && (
+              <p className="mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-error" role="alert">
+                Remove the out-of-stock {outOfStockItems.length === 1 ? 'item' : 'items'} from your cart to continue.
+              </p>
+            )}
+            {isOfficeOnly && (
+              <p className="mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-text-muted" role="note">
+                Your account type cannot place orders from the cart. To create an order, go to{' '}
+                <a href="/dashboard/orders" className="font-semibold text-primary underline">Dashboard &gt; Orders</a>.
+              </p>
+            )}
             <button
               type="button"
               className="checkout-btn mt-6 w-full min-h-[52px] bg-primary text-text-on-primary border border-primary px-6 py-3.5 rounded-xl text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_-8px_var(--color-primary)] hover:enabled:bg-primary-hover hover:enabled:border-primary-hover hover:enabled:-translate-y-px focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:translate-y-0 active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
               onClick={handleCheckout}
-              disabled={loading}
+              disabled={loading || isOfficeOnly || outOfStockItems.length > 0}
               aria-busy={loading}
             >
               {loading && <span className="checkout-btn__spinner w-4 h-4 rounded-pill border-2 border-[rgba(255,255,255,0.4)] border-t-[var(--color-text-on-primary)] animate-spin motion-reduce:animate-none flex-shrink-0" aria-hidden="true" />}

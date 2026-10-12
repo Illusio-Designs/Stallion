@@ -198,7 +198,7 @@ const handleResponse = async (response) => {
       showError('Your session has expired. Please login again.');
       
       // Clear authentication immediately
-      logout();
+      logout({ keepCart: true });
       
       // Redirect to login page after a short delay to ensure notification is visible
       // Check if we're not already on the login page to avoid infinite loops
@@ -294,7 +294,7 @@ const apiRequest = async (endpoint, options = {}) => {
       isRedirecting = true;
       window.__hasShownLogoutNotification = true;
       showError('Your session has expired. Please login again.');
-      logout();
+      logout({ keepCart: true });
       
       const currentPath = window.location.pathname;
       if (!currentPath.includes('/login')) {
@@ -426,6 +426,8 @@ const apiRequest = async (endpoint, options = {}) => {
 // limit and return the unwrapped array (no per-page looping). Tables that want
 // true 20/page server pagination pass their own page/limit and read .pagination.
 const PAGE_SIZE = 20;        // strict server page size for true server-paginated tables
+const SERVER_MAX_LIMIT = 100;   // backend clamps `limit` to 1..100
+const MAX_LOAD_ALL_PAGES = 50;  // safety bound for load-all loops
 const LIST_LIMIT = 1000;     // single-call "load all" size for client-side lists/dropdowns
 
 /** Normalize an array | { data, pagination } response to its array. */
@@ -446,8 +448,21 @@ const withListPaging = (endpoint, { page = 1, limit = LIST_LIMIT } = {}) => {
  * @param {Object} [opts] - apiRequest options (method/body/includeAuth/silent)
  */
 const fetchAllPages = async (endpoint, opts = {}, { limit = LIST_LIMIT } = {}) => {
-  const res = await apiRequest(withListPaging(endpoint, { limit }), opts);
-  return unwrapList(res);
+  // The backend caps `limit` at 100 per request, so a "load all" walks the pages
+  // (bounded) using pagination.totalPages instead of relying on one huge page.
+  const perPage = Math.min(Math.max(1, Number(limit) || LIST_LIMIT), SERVER_MAX_LIMIT);
+  const first = await apiRequest(withListPaging(endpoint, { page: 1, limit: perPage }), opts);
+  let all = unwrapList(first);
+  const wantAll = (Number(limit) || LIST_LIMIT) > SERVER_MAX_LIMIT;
+  const totalPages = Number(first && first.pagination && first.pagination.totalPages) || 1;
+  if (wantAll && totalPages > 1) {
+    const last = Math.min(totalPages, MAX_LOAD_ALL_PAGES);
+    for (let page = 2; page <= last; page += 1) {
+      const res = await apiRequest(withListPaging(endpoint, { page, limit: perPage }), opts);
+      all = all.concat(unwrapList(res));
+    }
+  }
+  return all;
 };
 
 /**

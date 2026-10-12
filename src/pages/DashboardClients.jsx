@@ -20,7 +20,7 @@ import {
   updateParty,
   verifyPartyLocation,
 } from '../services/apiService';
-import { getUser, getUserRole } from '../services/authService';
+import { getUser, getUserRole, getUserRoles } from '../services/authService';
 import { showError, showSuccess } from '../services/notificationService';
 import { captureCurrentPosition } from '../utils/geolocation';
 
@@ -32,6 +32,16 @@ const DashboardClients = () => {
   const isSalesman = useMemo(() => userRole === 'salesman', [userRole]);
   const isDistributor = useMemo(() => userRole === 'distributor', [userRole]);
   const isAdmin = useMemo(() => userRole === 'admin', [userRole]);
+  // What the server really allows, so a button is only shown to someone who can
+  // use it (otherwise it just ends in "Access denied"):
+  //  - delete + bulk upload: admin, party manager, sales manager
+  //  - edit: those managers, or a salesman for their own parties
+  const roleList = useMemo(() => getUserRoles(), []);
+  const isPartyManager = useMemo(
+    () => roleList.some((r) => ['admin', 'party_manager', 'sales_manager'].includes(r)),
+    [roleList]
+  );
+  const canEditParty = isPartyManager || isSalesman;
   // Admin-only party-location capture (geofence anchor).
   const [savingLoc, setSavingLoc] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
@@ -50,6 +60,8 @@ const DashboardClients = () => {
   const [zones, setZones] = useState([]);
 
   const hasSetDefaultCountry = useRef(false);
+  const [countriesReady, setCountriesReady] = useState(false);
+  const [defaultCountryResolved, setDefaultCountryResolved] = useState(false);
 
   const [formData, setFormData] = useState({
     party_name: '',
@@ -90,6 +102,8 @@ const DashboardClients = () => {
       setCountries(countriesData || []);
     } catch (error) {
       console.error('Failed to load countries:', error);
+    } finally {
+      setCountriesReady(true);
     }
   };
 
@@ -202,18 +216,16 @@ const DashboardClients = () => {
   }, [formData.city_id]);
 
   const fetchPartiesForCountry = useCallback(async (countryId) => {
-    if (!countryId) {
-      console.log('[fetchPartiesForCountry] No country ID provided, clearing parties');
-      setParties([]);
-      return;
-    }
+    // No country = "All Countries": the API supports it with a single
+    // unfiltered request (getParties with no country_id).
+    const allCountries = !countryId;
 
     setLoading(true);
     setError(null);
     try {
       // Validate countryId before making API call
-      const cleanCountryId = String(countryId).trim();
-      if (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null') {
+      const cleanCountryId = allCountries ? '' : String(countryId).trim();
+      if (!allCountries && (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null')) {
         console.error('[fetchPartiesForCountry] Invalid country ID:', countryId);
         setParties([]);
         setLoading(false);
@@ -223,7 +235,7 @@ const DashboardClients = () => {
       console.log('[fetchPartiesForCountry] Fetching parties for country:', cleanCountryId);
       // Role-aware: salesman/distributor/party get their own scoped parties;
       // admin & *_manager roles get the full country-filtered list.
-      const partiesData = await getPartiesForRole(userRole, cleanCountryId);
+      const partiesData = await getPartiesForRole(userRole, allCountries ? null : cleanCountryId);
 
       console.log('[fetchPartiesForCountry] Received', partiesData?.length || 0, 'parties from API');
 
@@ -236,7 +248,8 @@ const DashboardClients = () => {
         }
 
         const partyCountryId = String(p.country_id || p.countryId || '').trim();
-        const matches = partyCountryId === cleanCountryId;
+        // Parties without a country_id (e.g. newly added) stay visible under any selection.
+        const matches = allCountries || !partyCountryId || partyCountryId === cleanCountryId;
 
         if (!matches) {
           console.warn('[fetchPartiesForCountry] ❌ REJECTING party - country mismatch:', {
@@ -321,33 +334,28 @@ const DashboardClients = () => {
     }
   }, [isSalesman, isDistributor]);
 
-  // Set India as default country filter (only once when countries are loaded)
+  // Default the country filter once countries have loaded: India if present,
+  // otherwise the first country, so the list is not empty on first load.
   useEffect(() => {
+    if (!countriesReady || defaultCountryResolved) return;
     if (countries.length > 0 && !selectedCountryFilter && !hasSetDefaultCountry.current) {
       const india = countries.find(c =>
         c.name?.toLowerCase() === 'india' ||
         c.code?.toLowerCase() === 'in'
       );
-      if (india) {
-        console.log('[Filter] Setting default country to India:', india.id);
-        setSelectedCountryFilter(india.id);
-        hasSetDefaultCountry.current = true;
-      }
+      const defaultCountry = india || countries[0];
+      console.log('[Filter] Setting default country:', defaultCountry.id);
+      setSelectedCountryFilter(defaultCountry.id);
     }
-  }, [countries, selectedCountryFilter]);
+    hasSetDefaultCountry.current = true;
+    setDefaultCountryResolved(true);
+  }, [countries, countriesReady, defaultCountryResolved, selectedCountryFilter]);
 
-  // Fetch parties when country filter changes
+  // Fetch parties when country filter changes (empty = All Countries)
   useEffect(() => {
-    if (selectedCountryFilter) {
-      console.log('[Filter] Country changed, fetching parties for:', selectedCountryFilter);
-      fetchPartiesForCountry(selectedCountryFilter);
-    } else {
-      // If no country selected (All Countries), clear parties
-      console.log('[Filter] No country selected (All Countries), clearing parties');
-      setParties([]);
-      setLoading(false);
-    }
-  }, [selectedCountryFilter, fetchPartiesForCountry]);
+    if (!defaultCountryResolved) return;
+    fetchPartiesForCountry(selectedCountryFilter);
+  }, [selectedCountryFilter, defaultCountryResolved, fetchPartiesForCountry]);
 
   const columns = useMemo(() => ([
     { key: 'party_name', label: 'PARTY NAME' },
@@ -362,12 +370,12 @@ const DashboardClients = () => {
     {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
-          onEdit={() => handleEdit(row)}
-          onDelete={() => handleDelete(row)}
+          onEdit={canEditParty ? () => handleEdit(row) : undefined}
+          onDelete={isPartyManager ? () => handleDelete(row) : undefined}
         />
       )
     },
-  ]), []);
+  ]), [canEditParty, isPartyManager]);
 
   const rows = useMemo(() => {
     // CRITICAL: Backend returns wrong data, so we MUST filter strictly by country_id
@@ -375,11 +383,11 @@ const DashboardClients = () => {
 
     if (selectedCountryFilter) {
       const cleanFilterId = String(selectedCountryFilter).trim();
-      // Only show parties that EXACTLY match the selected country
+      // Show parties matching the selected country, plus parties with no country_id
       filteredParties = parties.filter(party => {
         if (!party) return false;
         const partyCountryId = String(party.country_id || party.countryId || '').trim();
-        const matches = partyCountryId === cleanFilterId;
+        const matches = !partyCountryId || partyCountryId === cleanFilterId;
 
         if (!matches && party.party_name) {
           console.warn('[rows] ❌ Filtering out party with wrong country:', {
@@ -392,9 +400,8 @@ const DashboardClients = () => {
       });
       console.log('[rows] ✅ Displaying', filteredParties.length, 'parties for country:', cleanFilterId, 'out of', parties.length, 'total');
     } else {
-      // If no country selected (All Countries), show nothing
-      filteredParties = [];
-      console.log('[rows] No country selected, showing no parties');
+      // All Countries: show everything that was loaded
+      filteredParties = parties.filter(Boolean);
     }
 
     // Filter by zone for salesman and distributor
@@ -514,7 +521,7 @@ const DashboardClients = () => {
       showSuccess(`Bulk upload complete. Created: ${created}, Updated: ${updated}.`);
       setOpenBulkUpload(false);
       setBulkFile(null);
-      if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter);
+      fetchPartiesForCountry(selectedCountryFilter);
     } catch (err) {
       showError(`Bulk upload failed: ${err.message}`);
     } finally {
@@ -706,8 +713,9 @@ const DashboardClients = () => {
         return id !== partyId.trim();
       }));
 
-      // Now find and delete associated user account by phone number
-      if (partyPhone) {
+      // Now find and delete the associated login account by phone number. Listing
+      // users is admin-only, so other managers skip this step.
+      if (partyPhone && isAdmin) {
         try {
           const { getUsers, deleteUser } = await import('../services/apiService');
           console.log('[Delete Party] Finding user account with phone:', partyPhone);
@@ -767,7 +775,7 @@ const DashboardClients = () => {
               phone: u.phone || u.phoneNumber,
               name: u.full_name || u.name
             })));
-            showSuccess('Party deleted successfully! (No associated user account found - check console for details)');
+            showSuccess('Party deleted successfully!');
           }
         } catch (userDeleteError) {
           console.error('[Delete Party] Error deleting user account:', userDeleteError);
@@ -776,7 +784,7 @@ const DashboardClients = () => {
             errorData: userDeleteError.errorData,
             statusCode: userDeleteError.statusCode
           });
-          showSuccess('Party deleted successfully! (User account deletion failed - check console for details)');
+          showSuccess('Party deleted. Its login account could not be removed, please ask an admin to remove it.');
         }
       } else {
         console.warn('[Delete Party] No phone number found in party record');
@@ -1017,9 +1025,7 @@ const DashboardClients = () => {
             : 'Party updated successfully!');
           setError(null);
 
-          if (selectedCountryFilter) {
-            await fetchPartiesForCountry(selectedCountryFilter);
-          }
+          await fetchPartiesForCountry(selectedCountryFilter);
         } catch (apiError) {
           const errorMsg = String(apiError.message || apiError.error || 'Failed to update party');
           const isInitError = apiError.isInitializationError ||
@@ -1030,9 +1036,7 @@ const DashboardClients = () => {
             // Backend timing quirk — refresh to verify whether the update landed.
             console.warn('[Update] Backend initialization error detected, refreshing data...');
             try {
-              if (selectedCountryFilter) {
-                await fetchPartiesForCountry(selectedCountryFilter);
-              }
+              await fetchPartiesForCountry(selectedCountryFilter);
               setOpenAdd(false);
               setEditRow(null);
               resetForm();
@@ -1059,13 +1063,13 @@ const DashboardClients = () => {
           showSuccess('Party created successfully!');
 
           // Optimistically add to table if it matches the current filter
-          if (selectedCountryFilter && newParty && newParty.country_id === selectedCountryFilter) {
+          if (newParty && (!selectedCountryFilter || !newParty.country_id || String(newParty.country_id) === String(selectedCountryFilter))) {
             setParties(prev => [...prev, {
               ...newParty,
               id: newParty.id || newParty.party_id,
               isActive: newParty.is_active !== false,
             }]);
-          } else if (selectedCountryFilter) {
+          } else {
             // If country doesn't match filter, just refresh
             await fetchPartiesForCountry(selectedCountryFilter);
           }
@@ -1122,9 +1126,7 @@ const DashboardClients = () => {
               try {
                 await createParty(retryData);
                 showSuccess(`Party created successfully! (${fixedFields.join(', ')} set to null due to invalid references)`);
-                if (selectedCountryFilter) {
-                  await fetchPartiesForCountry(selectedCountryFilter);
-                }
+                await fetchPartiesForCountry(selectedCountryFilter);
                 setError(null);
                 setOpenAdd(false);
                 setEditRow(null);
@@ -1143,9 +1145,7 @@ const DashboardClients = () => {
                   retryData.zone_id = null;
                   await createParty(retryData);
                   showSuccess('Party created successfully! (All location IDs set to null due to invalid references)');
-                  if (selectedCountryFilter) {
-                    await fetchPartiesForCountry(selectedCountryFilter);
-                  }
+                  await fetchPartiesForCountry(selectedCountryFilter);
                   setError(null);
                   setOpenAdd(false);
                   setEditRow(null);
@@ -1163,9 +1163,7 @@ const DashboardClients = () => {
               try {
                 await createParty(retryData);
                 showSuccess('Party created successfully! (All location IDs set to null due to invalid references)');
-                if (selectedCountryFilter) {
-                  await fetchPartiesForCountry(selectedCountryFilter);
-                }
+                await fetchPartiesForCountry(selectedCountryFilter);
                 setError(null);
                 setOpenAdd(false);
                 setEditRow(null);
@@ -1186,9 +1184,7 @@ const DashboardClients = () => {
         const errorMsg = (error.message || '').toLowerCase();
         if (errorMsg.includes("cannot access") && errorMsg.includes("before initialization")) {
           // Already handled, just refresh data
-          if (selectedCountryFilter) {
-            await fetchPartiesForCountry(selectedCountryFilter);
-          }
+          await fetchPartiesForCountry(selectedCountryFilter);
           showError('Table data may not be updated. Please refresh the page to verify.');
           setError(null);
           setOpenAdd(false);
@@ -1523,6 +1519,31 @@ const DashboardClients = () => {
             ))}
           </div>
         </div>
+        <div className="dash-row">
+          <div className="dash-card full" style={{ maxWidth: 360 }}>
+            <label className="block mb-2 text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
+              Filter by Country
+            </label>
+            <DropdownSelector
+              options={[
+                { value: '', label: 'All Countries' },
+                ...countries.map(country => ({
+                  value: country.id,
+                  label: country.name
+                }))
+              ]}
+              value={selectedCountryFilter || ''}
+              onChange={(newCountryId) => {
+                // Single source of truth; the effect above refetches (empty = All Countries)
+                setParties([]);
+                setSelectedCountryFilter(newCountryId || null);
+              }}
+              onOpen={fetchCountries}
+              placeholder="All Countries"
+              className="ui-dropdown-custom--full-width"
+            />
+          </div>
+        </div>
         {!loading && error ? (
           <div className="dash-row">
             <div className="dash-card full">
@@ -1540,8 +1561,7 @@ const DashboardClients = () => {
                   className="ui-btn ui-btn--secondary"
                   onClick={() => {
                     setError(null);
-                    if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter);
-                    else window.location.reload();
+                    fetchPartiesForCountry(selectedCountryFilter);
                   }}
                 >
                   Try again
@@ -1564,16 +1584,18 @@ const DashboardClients = () => {
                 <p className="ui-state__title">No parties yet</p>
                 <p className="ui-state__desc">
                   {selectedCountryFilter
-                    ? 'No parties found for the selected country. Add a new party to get started.'
-                    : 'Select a country to view its parties, or add a new party to get started.'}
+                    ? `No parties found for ${countries.find(c => String(c.id) === String(selectedCountryFilter))?.name || 'the selected country'}. Pick another country above, or add a new party.`
+                    : 'No parties found. Pick a country above, or add a new party to get started.'}
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
                     Add New Party
                   </button>
-                  <button className="ui-btn ui-btn--secondary" onClick={() => setOpenBulkUpload(true)}>
-                    Bulk Upload
-                  </button>
+                  {isPartyManager && (
+                    <button className="ui-btn ui-btn--secondary" onClick={() => setOpenBulkUpload(true)}>
+                      Bulk Upload
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -1587,49 +1609,15 @@ const DashboardClients = () => {
               rows={filteredRowsByTab}
               onAddNew={handleAdd}
               addNewText="Add New Party"
-              onImport={() => setOpenBulkUpload(true)}
+              onImport={isPartyManager ? () => setOpenBulkUpload(true) : undefined}
               importText="Bulk Upload"
               secondaryActions={[
                 {
                   label: 'Refresh',
-                  onClick: () => { setError(null); if (selectedCountryFilter) fetchPartiesForCountry(selectedCountryFilter); }
+                  onClick: () => { setError(null); fetchPartiesForCountry(selectedCountryFilter); }
                 }
               ]}
-              showFilter={true}
-              filterContent={
-                <div>
-                  <label className="block mb-2 text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
-                    Filter by Country
-                  </label>
-                  <DropdownSelector
-                    options={[
-                      { value: '', label: 'All Countries' },
-                      ...countries.map(country => ({
-                        value: country.id,
-                        label: country.name
-                      }))
-                    ]}
-                    value={selectedCountryFilter || ''}
-                    onChange={(newCountryId) => {
-                      const countryId = newCountryId || null;
-                      console.log('[Filter] Country selection changed from', selectedCountryFilter, 'to', countryId);
-                      // Clear parties immediately when changing countries
-                      setParties([]);
-                      // Update state - useEffect will handle fetching or clearing
-                      setSelectedCountryFilter(countryId);
-                      // If "All Countries" is selected (empty), ensure parties are cleared
-                      if (!countryId) {
-                        console.log('[Filter] All Countries selected - clearing parties');
-                        setParties([]);
-                        setLoading(false);
-                      }
-                    }}
-                    onOpen={fetchCountries}
-                    placeholder="All Countries"
-                    className="ui-dropdown-custom--full-width"
-                  />
-                </div>
-              }
+              showFilter={false}
               loading={loading}
             />
           </div>

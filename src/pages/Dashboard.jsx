@@ -2,13 +2,13 @@ import React, { useMemo, useState, useEffect } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
-import { showError, showInfo } from '../services/notificationService';
+import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import SalesRevenueChart from '../components/charts/SalesRevenueChart';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
-import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser } from 'react-icons/fi';
 
 // Quick Action button — pure Tailwind (no legacy ui-btn / .btn-col CSS, no
 // inline styles). Colours are set explicitly on the children because the
@@ -51,6 +51,7 @@ const Dashboard = () => {
   const [targetsLoading, setTargetsLoading] = useState(true);
   const [mySalesmanId, setMySalesmanId] = useState(null);
   const [partyNamesMap, setPartyNamesMap] = useState({});
+  const [myPartyCount, setMyPartyCount] = useState(null); // distributor: parties assigned to them
 
   // Read once — these don't change during a session
   const [userRole] = useState(() => getUserRole());
@@ -126,6 +127,19 @@ const Dashboard = () => {
     fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // A distributor's own parties (the server scopes this list to them).
+  useEffect(() => {
+    if (userRole !== 'distributor') return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await getPartiesForRole(userRole);
+        if (!cancelled) setMyPartyCount(Array.isArray(list) ? list.length : (list?.data?.length ?? null));
+      } catch { /* fall back to parties seen in orders */ }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Fetch salesman targets — runs once on mount if salesman.
   // Key off the RAW userRole, not the mounted-gated `isSalesman`: this effect
   // runs once on mount when the gated role is still null, so using `isSalesman`
@@ -161,99 +175,105 @@ const Dashboard = () => {
     fetchTargets();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Calculate dashboard statistics
+  const statusOf = (o) => String(o.order_status || 'pending').toLowerCase();
+  const amountOf = (o) => Number(o.order_total) || Number(o.total_value) || Number(o.total_amount) || 0;
+
+  // Calculate dashboard statistics. Cancelled orders never count towards money.
   const stats = useMemo(() => {
     const baseOrders = [...orders];
+    const live = baseOrders.filter((o) => statusOf(o) !== 'cancelled');
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
-    
-    // Filter orders for current month
-    const currentMonthOrders = baseOrders.filter(order => {
+
+    const currentMonthOrders = live.filter((order) => {
       if (!order.order_date) return false;
       const orderDate = new Date(order.order_date);
       return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
     });
-    
-    // Calculate total sales for current month
-    const totalSales = currentMonthOrders.reduce((sum, order) => {
-      return sum + (Number(order.order_total) || order.total_value || order.total_amount || 0);
-    }, 0);
-    
-    // Calculate total orders
-    const totalOrders = baseOrders.length;
-    
-    // Count by order type
-    const retailOrders = baseOrders.filter(o => 
-      o.order_type?.includes('retail') || o.order_type === 'retail_order'
-    ).length;
-    const bulkOrders = baseOrders.filter(o => 
-      o.order_type?.includes('bulk') || o.order_type === 'bulk_order'
-    ).length;
-    
-    // Calculate completed orders value
-    const completedOrders = baseOrders.filter(o => 
-      o.order_status?.toLowerCase() === 'completed'
-    );
-    const completedValue = completedOrders.reduce((sum, o) => {
-      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
-    }, 0);
-    
-    // Calculate pending payments (orders that are not completed)
-    const pendingOrders = baseOrders.filter(o => 
-      o.order_status?.toLowerCase() !== 'completed' && 
-      o.order_status?.toLowerCase() !== 'cancelled'
-    );
-    const pendingPayments = pendingOrders.reduce((sum, o) => {
-      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
-    }, 0);
-    
-    // Calculate total revenue across ALL orders
-    const totalRevenue = baseOrders.reduce((sum, o) => {
-      return sum + (Number(o.order_total) || 0);
-    }, 0);
+    const totalSales = currentMonthOrders.reduce((sum, o) => sum + amountOf(o), 0);
+    const totalRevenue = live.reduce((sum, o) => sum + amountOf(o), 0);
 
-    // Get unique clients count
+    const completedCount = live.filter((o) => statusOf(o) === 'completed').length;
+    const openOrders = live.filter((o) => statusOf(o) !== 'completed');
+
     const uniqueClients = new Set();
-    baseOrders.forEach(order => {
+    live.forEach((order) => {
       if (order.party_id) uniqueClients.add(order.party_id);
       if (order.party?.party_id) uniqueClients.add(order.party.party_id);
       if (order.party?.id) uniqueClients.add(order.party.id);
     });
-    
+
     return {
       totalSales,
-      totalOrders,
-      retailOrders,
-      bulkOrders,
-      completedValue,
-      pendingPayments,
+      totalOrders: baseOrders.length,
+      completedCount,
+      openCount: openOrders.length,
+      openOrders,
       totalRevenue,
-      activeClients: uniqueClients.size
+      activeClients: uniqueClients.size,
     };
   }, [orders]);
 
-  // Monthly aggregation for the Sales & Revenue chart — real data from orders
+  // Sales & Revenue chart for the chosen period. Sales = order value (cancelled
+  // excluded); Revenue = completed orders only.
   const chartData = useMemo(() => {
     if (!orders.length) return [];
-    const currentYear = new Date().getFullYear();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const buckets = months.map(label => ({ label, sales: 0, revenue: 0 }));
-    orders.forEach(o => {
-      const raw = o.order_date || o.created_at;
-      if (!raw) return;
-      const d = new Date(raw);
-      if (isNaN(d.getTime()) || d.getFullYear() !== currentYear) return;
-      const m = d.getMonth();
-      const amount = Number(o.order_total) || 0;
-      // Both series in ₹ so they share the axis sensibly:
-      // Sales = gross order value (all orders); Revenue = realized (completed).
-      buckets[m].sales += amount;
-      if ((o.order_status || '').toLowerCase() === 'completed') {
-        buckets[m].revenue += amount;
+    const live = orders.filter((o) => statusOf(o) !== 'cancelled');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const dateOf = (o) => {
+      const d = new Date(o.order_date || o.created_at);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    const add = (bucket, o) => {
+      const amount = amountOf(o);
+      bucket.sales += amount;
+      if (statusOf(o) === 'completed') bucket.revenue += amount;
+    };
+
+    if (period === 'Yearly') {
+      const thisYear = new Date().getFullYear();
+      const buckets = [];
+      for (let y = thisYear - 4; y <= thisYear; y++) buckets.push({ label: String(y), year: y, sales: 0, revenue: 0 });
+      live.forEach((o) => {
+        const d = dateOf(o);
+        const b = d && buckets.find((x) => x.year === d.getFullYear());
+        if (b) add(b, o);
+      });
+      return buckets;
+    }
+
+    if (period === 'Weekly') {
+      // The last 8 weeks, each starting on Monday.
+      const monday = (d) => {
+        const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
+        return x;
+      };
+      const thisWeek = monday(new Date());
+      const buckets = [];
+      for (let i = 7; i >= 0; i--) {
+        const start = new Date(thisWeek);
+        start.setDate(start.getDate() - i * 7);
+        buckets.push({ label: `${start.getDate()} ${monthNames[start.getMonth()]}`, start: start.getTime(), sales: 0, revenue: 0 });
       }
+      live.forEach((o) => {
+        const d = dateOf(o);
+        if (!d) return;
+        const t = monday(d).getTime();
+        const b = buckets.find((x) => x.start === t);
+        if (b) add(b, o);
+      });
+      return buckets;
+    }
+
+    const currentYear = new Date().getFullYear();
+    const buckets = monthNames.map((label) => ({ label, sales: 0, revenue: 0 }));
+    live.forEach((o) => {
+      const d = dateOf(o);
+      if (d && d.getFullYear() === currentYear) add(buckets[d.getMonth()], o);
     });
     return buckets;
-  }, [orders]);
+  }, [orders, period]);
 
   // Top selling products — aggregate order_items by product_id across all orders
   const topProductRaw = useMemo(() => {
@@ -371,38 +391,65 @@ const Dashboard = () => {
     </div>
   );
 
+  const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+  const partiesCount = isDistributor && myPartyCount != null ? myPartyCount : stats.activeClients;
+
+  // The four headline numbers, worded for whoever is looking at the page.
+  const kpis = isParty
+    ? [
+        { label: 'Spent This Month', value: money(stats.totalSales), sub: "This month's orders, cancelled excluded" },
+        { label: 'My Orders', value: `${stats.totalOrders} Orders`, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
+        { label: 'Open Orders', value: stats.openCount, sub: 'Waiting to be completed' },
+        { label: 'Total Spent', value: money(stats.totalRevenue), sub: `Across ${stats.totalOrders} orders` },
+      ]
+    : isDistributor
+    ? [
+        { label: 'Sales This Month', value: money(stats.totalSales), sub: "Your parties' orders this month" },
+        { label: 'Orders', value: `${stats.totalOrders} Orders`, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
+        { label: 'My Parties', value: partiesCount, sub: 'Parties assigned to you' },
+        { label: 'Total Value', value: money(stats.totalRevenue), sub: `Across ${stats.totalOrders} orders` },
+      ]
+    : [
+        { label: 'Total Sales (This Month)', value: money(stats.totalSales), sub: "This month's confirmed sales" },
+        { label: 'Total Orders', value: `${stats.totalOrders} Orders`, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
+        { label: 'Active Clients', value: stats.activeClients, sub: 'Optical Stores + Enterprises' },
+        { label: 'Total Revenue', value: money(stats.totalRevenue), sub: `Across ${stats.totalOrders} orders (cancelled excluded)` },
+      ];
+
+  // Only pages the role can really open.
+  const go = (path) => () => { window.location.href = path; };
+  const quickActions = isParty
+    ? [
+        { icon: FiShoppingBag, label: 'My Orders', desc: 'Track your orders', primary: true, onClick: go('/dashboard/orders') },
+        { icon: FiShoppingCart, label: 'Place an Order', desc: 'Browse the catalogue', onClick: go('/products') },
+        { icon: FiUser, label: 'My Profile', desc: 'Account settings', onClick: go('/dashboard/settings') },
+      ]
+    : isDistributor
+    ? [
+        { icon: FiShoppingBag, label: 'Orders', desc: "Your parties' orders", primary: true, onClick: go('/dashboard/orders') },
+        { icon: FiUsers, label: 'My Parties', desc: 'Parties assigned to you', onClick: go('/dashboard/party') },
+        { icon: FiShoppingCart, label: 'Place an Order', desc: 'Browse the catalogue', onClick: go('/products') },
+      ]
+    : [
+        { icon: FiShoppingCart, label: 'View All Orders', desc: 'All orders', primary: true, onClick: go('/dashboard/orders') },
+        { icon: FiBarChart2, label: 'View Report', desc: 'Sales analytics', onClick: go('/dashboard/analytics') },
+        { icon: FiTag, label: 'Manage Offers', desc: 'Discounts and offers', onClick: go('/dashboard/offers') },
+      ];
+  const ownData = isParty || isDistributor; // their own orders only: no warehouse stock
+
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
         <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
-          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Sales (This Month)</h4>
-            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
-              {loading ? <Skeleton width={90} height={24} /> : `₹${stats.totalSales.toLocaleString('en-IN')}`}
+          {kpis.map((k) => (
+            <div key={k.label} className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
+              <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">{k.label}</h4>
+              <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
+                {loading ? <Skeleton width={90} height={24} /> : k.value}
+              </div>
+              <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">{k.sub}</div>
             </div>
-            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">This month's confirmed sales</div>
-          </div>
-          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Orders</h4>
-            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
-              {loading ? <Skeleton width={90} height={24} /> : `${stats.totalOrders} Orders`}
-            </div>
-            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">Retail {stats.retailOrders} | Bulk {stats.bulkOrders}</div>
-          </div>
-          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Active Clients</h4>
-            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
-              {loading ? <Skeleton width={90} height={24} /> : stats.activeClients}
-            </div>
-            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">Optical Stores + Enterprises</div>
-          </div>
-          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Revenue</h4>
-            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
-              {loading ? <Skeleton width={90} height={24} /> : `₹${stats.totalRevenue.toLocaleString('en-IN')}`}
-            </div>
-            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">Across {stats.totalOrders} orders</div>
-          </div>
+          ))}
         </div>
 
         {!isSalesman && (
@@ -412,10 +459,9 @@ const Dashboard = () => {
             <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5 max-md:p-4">
               <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
               <div className="grid grid-cols-3 items-stretch gap-3 max-[720px]:grid-cols-2 max-[560px]:grid-cols-1">
-                <QuickActionCard icon={FiShoppingCart} label="View All Orders" desc="All orders" primary onClick={() => { window.location.href = '/dashboard/orders'; }} />
-                <QuickActionCard icon={FiBarChart2} label="View Report" desc="Sales analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
-                {/* Display only — offers feature not built yet. */}
-                <QuickActionCard icon={FiTag} label="Create Offer" desc="Coming soon" onClick={() => showInfo('Offers — coming soon')} />
+                {quickActions.map((q) => (
+                  <QuickActionCard key={q.label} icon={q.icon} label={q.label} desc={q.desc} primary={q.primary} onClick={q.onClick} />
+                ))}
               </div>
             </div>
           </div>
@@ -423,7 +469,7 @@ const Dashboard = () => {
           <div className="dash-row grid grid-cols-12 gap-4 mt-4">
             <div className="col-span-full min-h-[320px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
               <div className="chart-header flex items-center justify-between mb-[10px]">
-                <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] m-0">Sales &amp; Revenue</h4>
+                <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] m-0">{ownData ? 'Your Orders' : 'Sales & Revenue'}</h4>
                 <DropdownSelector
                   options={[
                     { value: 'Monthly', label: 'Monthly' },
@@ -444,7 +490,7 @@ const Dashboard = () => {
         {!isSalesman && (
         <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
           <div className="dash-card col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Top Selling Products</h4>
+            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">{ownData ? 'Most Ordered by You' : 'Top Selling Products'}</h4>
             <div className="mini-list">
               {topProducts.length === 0 ? (
                 loadError ? backendDownState : (
@@ -467,6 +513,32 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
+          {ownData ? (
+          <div className="dash-card col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Open Orders</h4>
+            <div className="mini-list">
+              {stats.openOrders.length === 0 ? (
+                loadError ? backendDownState : (
+                <div className="ui-state ui-state--empty">
+                  <p className="ui-state__title">No open orders</p>
+                  <p className="ui-state__desc">Orders that are not completed yet will show here.</p>
+                </div>
+                )
+              ) : [...stats.openOrders]
+                  .sort((a, b) => new Date(b.created_at || b.order_date || 0) - new Date(a.created_at || a.order_date || 0))
+                  .slice(0, 5)
+                  .map((o) => (
+                <div key={o.order_id || o.id || o.order_number} className="row grid grid-cols-[1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
+                  <div className="name text-text font-medium text-[var(--text-sm)] leading-snug">
+                    {o.order_number || `#${String(o.order_id || o.id || '').slice(-6)}`}
+                    <span className="ml-2 text-text-muted text-[var(--text-xs)]">{String(o.order_status || 'pending').toUpperCase()}</span>
+                  </div>
+                  <div className="units text-text-muted text-[var(--text-xs)] [font-variant-numeric:tabular-nums]">{money(amountOf(o))}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          ) : (
           <div className="dash-card col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Inventory Alerts</h4>
             <div className="inv-list">
@@ -493,6 +565,7 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
+          )}
         </div>
         )}
 

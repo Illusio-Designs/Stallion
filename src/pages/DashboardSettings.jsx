@@ -3,7 +3,8 @@ import Button from '../components/ui/Button';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import { showSuccess, showError } from '../services/notificationService';
-import { updateUser, getMe, wipeAllData, deleteAllParties, WIPE_CONFIRM_PHRASE } from '../services/apiService';
+import { updateUser, uploadProfileImage, getMe, wipeAllData, deleteAllParties, WIPE_CONFIRM_PHRASE } from '../services/apiService';
+import { resolveProfileImageUrl, toStoredProfileImage } from '../utils/profileImage';
 import { getUser, getUserRole } from '../services/authService';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import '../styles/pages/dashboard-settings.css';
@@ -100,14 +101,14 @@ const DashboardSettings = () => {
           }
           
           // Use API response first (for cross-device sync) - accept base64 from API
-          const apiAvatar = apiImageUrl || apiProfileImage;
+          const apiAvatar = resolveProfileImageUrl(apiImageUrl || apiProfileImage);
           const storedAvatar = typeof window !== 'undefined' ? window.localStorage.getItem('userAvatarUrl') : null;
           const validStoredAvatar = storedAvatar && storedAvatar.trim() !== ''
             ? storedAvatar 
             : null;
           
           // Prioritize API response (for cross-device sync) - can be URL or base64
-          const avatarValue = apiAvatar || validStoredAvatar || '';
+          const avatarValue = apiAvatar || resolveProfileImageUrl(validStoredAvatar) || '';
           
           console.log('Setting avatar value:', {
             hasValue: !!avatarValue,
@@ -174,7 +175,7 @@ const DashboardSettings = () => {
           }
         })() : '';
         
-        const avatarValue = validStoredAvatar || userAvatar || '';
+        const avatarValue = resolveProfileImageUrl(validStoredAvatar || userAvatar) || '';
         
         let next = { 
           name: storedName || '', 
@@ -356,38 +357,36 @@ const DashboardSettings = () => {
         // Prepare user data
         // If we have a file, send it directly in updateUser (it will use FormData)
         // If we have a URL (not data URL), send it in image_url
-        const isDataUrl = avatar && avatar.startsWith('data:image/');
-        const imageUrlValue = isDataUrl ? '' : (avatar || '');
-
-        // If we have a file, convert it to base64 (compressed) for JSON payload
-        // Otherwise use the existing URL
-        let profileImageBase64 = '';
+        // A newly picked photo is uploaded to the server first; the server saves
+        // the file and answers with its stored file name. That name is what the
+        // profile keeps, so the photo is still there after a reload or on another
+        // device. With no new photo: an unchanged one is sent back as it is, a
+        // removed one ('') clears it, and a local preview is left alone.
+        let imageUrlValue;
         if (avatarFile) {
           try {
-            // Convert compressed file to base64
-            profileImageBase64 = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onerror = reject;
-              reader.onload = () => resolve(reader.result);
-              reader.readAsDataURL(avatarFile);
-            });
-          } catch (error) {
-            console.error('Error converting file to base64:', error);
-            showError('Failed to process image');
+            const uploaded = await uploadProfileImage(currentUserId, avatarFile);
+            const storedName = uploaded && (uploaded.profile_image || uploaded.image_url || uploaded.data?.profile_image);
+            if (!storedName) throw new Error('The server did not return the saved photo.');
+            imageUrlValue = String(storedName);
+          } catch (uploadError) {
+            console.error('Profile photo upload failed:', uploadError);
+            showError(`Could not upload the photo: ${uploadError?.message || 'please try again'}`);
             setLoading(false);
             return;
           }
+        } else {
+          imageUrlValue = toStoredProfileImage(avatar);
         }
 
         const userData = {
           name: userName.trim(),
           email: email.trim() || '',
           phone: phone.trim() || '',
-          profile_image: profileImageBase64, // Send compressed base64 if file exists
           is_active: isActive,
-          image_url: imageUrlValue, // Send URL if it's a regular URL (not data URL)
+          image_url: imageUrlValue, // file name to keep, '' to remove, undefined to leave as is
           role_id: currentRoleId,
-          profileImageFile: null, // Don't use FormData, send as base64 in JSON
+          profileImageFile: null,
         };
 
         console.log('Updating user with data:', { 
@@ -417,6 +416,14 @@ const DashboardSettings = () => {
           updatedImageUrl = response.data.user.profile_image;
         }
         
+        // The photo we just uploaded is known exactly; otherwise use what the server
+        // sent back. Either way, turn a stored file name into a loadable path.
+        if (avatarFile && imageUrlValue) {
+          updatedImageUrl = resolveProfileImageUrl(imageUrlValue);
+        } else if (updatedImageUrl) {
+          updatedImageUrl = resolveProfileImageUrl(updatedImageUrl);
+        }
+
         // If we got image from API (URL or base64), use it (this ensures cross-device sync)
         if (updatedImageUrl && updatedImageUrl.trim() !== '') {
           setAvatar(updatedImageUrl);
@@ -437,7 +444,7 @@ const DashboardSettings = () => {
                   preview: fetchedImage.substring(0, 50) + '...',
                   end: '...' + fetchedImage.substring(Math.max(0, fetchedImage.length - 50))
                 });
-                setAvatar(fetchedImage);
+                setAvatar(resolveProfileImageUrl(fetchedImage));
                 setAvatarError(false); // Reset error state
               } else {
                 console.warn('No image found in refetched user data');

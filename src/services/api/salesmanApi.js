@@ -1,4 +1,4 @@
-import { apiRequest, fetchAllPages } from './client';
+import { apiRequest, fetchAllPages, fetchPage } from './client';
 
 // ==================== SALESMAN CHECK-IN ENDPOINTS ====================
 
@@ -14,6 +14,17 @@ export const getAllSalesmanCheckins = async (limit) => {
     includeAuth: true,
     silent: true, // empty -> 404 "not found"; callers treat as empty list
   }, limit != null ? { limit } : undefined);
+};
+
+/**
+ * One server page of check-ins (office roles). Returns { data, pagination }.
+ */
+export const getSalesmanCheckinsPage = async (page = 1, limit = 20) => {
+  return fetchPage('/salesman_checkins', { page, limit }, {
+    method: 'GET',
+    includeAuth: true,
+    silent: true,
+  });
 };
 
 /**

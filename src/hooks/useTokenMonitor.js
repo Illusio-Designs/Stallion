@@ -31,7 +31,7 @@ export const useTokenMonitor = (isDashboard = false) => {
         
         // Token was removed - log out immediately
         showError('Your session has expired. Please login again.');
-        logout();
+        logout({ keepCart: true });
         
         // Redirect to login page
         const currentPath = window.location.pathname;

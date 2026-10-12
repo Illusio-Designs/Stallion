@@ -664,18 +664,18 @@ const DashboardSuppliers = () => {
     }
   };
 
-  // Set India as default country filter (only once when countries are loaded)
+  // Default country filter (India, else first country; only once when countries are loaded)
   useEffect(() => {
     if (countries.length > 0 && !selectedCountryFilter && !hasSetDefaultCountry.current) {
       const india = countries.find(c =>
         c.name?.toLowerCase() === 'india' ||
         c.code?.toLowerCase() === 'in'
       );
-      if (india) {
-        console.log('[Filter] Setting default country to India:', india.id);
-        setSelectedCountryFilter(india.id);
-        hasSetDefaultCountry.current = true;
-      }
+      // Fall back to the first country so the list is never empty on first load
+      const defaultCountry = india || countries[0];
+      console.log('[Filter] Setting default country:', defaultCountry.id);
+      setSelectedCountryFilter(defaultCountry.id);
+      hasSetDefaultCountry.current = true;
     }
   }, [countries, selectedCountryFilter]);
 
@@ -1532,6 +1532,27 @@ const DashboardSuppliers = () => {
         {!isSalesman && mainTab === 'Salesmen' && (
           <div className="dash-row">
             <div className="dash-card full">
+              <div className="mb-4" style={{ maxWidth: 360 }}>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
+                  Filter by Country
+                </label>
+                <DropdownSelector
+                  options={countries.map(country => ({
+                    value: country.id,
+                    label: country.name
+                  }))}
+                  value={selectedCountryFilter || ''}
+                  onChange={(value) => {
+                    // Salesmen are always loaded per country, so there is no "All" option
+                    if (!value) return;
+                    setSalesmen([]);
+                    setHasSearched(false);
+                    setSelectedCountryFilter(value);
+                  }}
+                  placeholder="Select a country"
+                  className="ui-dropdown-custom--full-width"
+                />
+              </div>
               {error ? (
                 <div className="ui-state ui-state--error">
                   <div className="ui-state__icon">
@@ -1570,8 +1591,8 @@ const DashboardSuppliers = () => {
                   <p className="ui-state__title">No salesmen yet</p>
                   <p className="ui-state__desc">
                     {selectedCountryFilter
-                      ? 'No salesmen found for the selected country. Add one to get started.'
-                      : 'Select a country to view salesmen, or add a new salesman to get started.'}
+                      ? `No salesmen found for ${countries.find(c => String(c.id) === String(selectedCountryFilter))?.name || 'the selected country'}. Pick another country above, or add a new salesman.`
+                      : 'Pick a country above to view salesmen, or add a new salesman to get started.'}
                   </p>
                   <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
                     Add New Salesman
@@ -1591,37 +1612,7 @@ const DashboardSuppliers = () => {
                     }
                   }}
                   importText="Refresh Data"
-                  showFilter={true}
-                  filterContent={
-                    <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
-                        Filter by Country
-                      </label>
-                      <DropdownSelector
-                        options={[
-                          { value: '', label: 'All Countries' },
-                          ...countries.map(country => ({
-                            value: country.id,
-                            label: country.name
-                          }))
-                        ]}
-                        value={selectedCountryFilter || ''}
-                        onChange={(value) => {
-                          const newCountryId = value || null;
-                          setSalesmen([]);
-                          setHasSearched(false);
-                          setSelectedCountryFilter(newCountryId);
-                          if (!newCountryId) {
-                            setSalesmen([]);
-                            setHasSearched(false);
-                            setLoading(false);
-                          }
-                        }}
-                        placeholder="All Countries"
-                        className="ui-dropdown-custom--full-width"
-                      />
-                    </div>
-                  }
+                  showFilter={false}
                   loading={loading}
                 />
               )}

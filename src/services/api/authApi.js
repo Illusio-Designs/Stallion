@@ -296,9 +296,11 @@ export const updateUser = async (userId, userData) => {
       phoneNumber: phoneValue,
       phone: phoneValue, // Also send as 'phone' in case backend expects that
       email: email || '',
-      profile_image: profile_image || '',
       is_active,
-      image_url: image_url || '',
+      // Only send the photo when the caller says what it should be: a file name
+      // sets it, '' removes it, and leaving it out keeps the stored one. (An
+      // empty value used to be sent every time and wiped the photo.)
+      ...(image_url !== undefined && image_url !== null ? { image_url } : {}),
       role_id,
     },
     includeAuth: true,
@@ -331,7 +333,14 @@ export const uploadProfileImage = async (userId, profileImage) => {
   const fullUrl = `${baseUrl}/users/upload-profile`;
 
   const formData = new FormData();
-  formData.append('file', profileImage);
+  // The server reads the field named "profile_image", and builds the stored file
+  // name from the original name, so give a compressed Blob a real name + extension.
+  const extByType = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+  const ext = extByType[profileImage && profileImage.type] || 'jpg';
+  const uploadName = (profileImage && profileImage.name && /\.[a-z0-9]+$/i.test(profileImage.name))
+    ? profileImage.name
+    : `profile.${ext}`;
+  formData.append('profile_image', profileImage, uploadName);
   
   const token = getAuthToken();
   const headers = { Accept: 'application/json' };

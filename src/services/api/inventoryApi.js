@@ -460,6 +460,7 @@ export const createOrder = async (orderData) => {
     includeAuth: true,
   });
   invalidateCache('orders'); // New order - drop cached order list
+  invalidateCache('products:'); // Stock changed - drop cached product lists so stock shows fresh
   return result;
 };
 

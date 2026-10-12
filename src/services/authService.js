@@ -4,6 +4,7 @@
  */
 
 import { clearCache } from './cacheService';
+import { clearCart } from './cartService';
 
 // Check if user is logged in
 export const isLoggedIn = () => {
@@ -28,6 +29,13 @@ export const getUser = () => {
 // Set user data and token
 export const setAuth = (user, token) => {
   if (typeof window === 'undefined') return;
+  // A cart left on this device by someone else is not the new user's cart.
+  try {
+    const newOwner = String((user && (user.user_id ?? user.id)) ?? '');
+    const prevOwner = localStorage.getItem('stallion_cart_owner');
+    if (prevOwner && newOwner && prevOwner !== newOwner) clearCart();
+    if (newOwner) localStorage.setItem('stallion_cart_owner', newOwner);
+  } catch { /* storage unavailable: nothing to protect */ }
   localStorage.setItem('user', JSON.stringify(user));
   localStorage.setItem('token', token);
   // Dispatch custom event for same-tab updates
@@ -35,10 +43,15 @@ export const setAuth = (user, token) => {
 };
 
 // Clear authentication data
-export const logout = () => {
+// keepCart: used when the session simply expired, so a half-filled cart is not
+// lost; it is still cleared if a different person logs in on this device.
+export const logout = ({ keepCart = false } = {}) => {
   if (typeof window === 'undefined') return;
   // Drop all cached API data so the next user never sees the previous session's data
   clearCache();
+  // The cart belongs to the person who filled it: the next user on this device
+  // must not see (or order) it.
+  if (!keepCart) clearCart();
   localStorage.removeItem('user');
   localStorage.removeItem('token');
   // Dispatch custom event for same-tab updates
