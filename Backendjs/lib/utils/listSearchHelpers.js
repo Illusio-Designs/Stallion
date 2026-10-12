@@ -18,14 +18,14 @@ function buildNamePhoneFilter({ name, phone, nameFields = [], phoneFields = [] }
     const conditions = [];
 
     if (name && nameFields.length > 0) {
-        const term = `%${name}%`;
+        const term = likeContains(name);
         conditions.push({
             [Op.or]: nameFields.map((field) => ({ [field]: { [Op.like]: term } })),
         });
     }
 
     if (phone && phoneFields.length > 0) {
-        const term = `%${phone}%`;
+        const term = likeContains(phone);
         conditions.push({
             [Op.or]: phoneFields.map((field) => ({ [field]: { [Op.like]: term } })),
         });
@@ -45,34 +45,85 @@ function mergeWhere(baseWhere, searchFilter) {
     return { [Op.and]: [baseWhere, searchFilter] };
 }
 
-/** Required `page` and `limit` from query string. */
+const MAX_PAGE_LIMIT = 100;
+const DEFAULT_PAGE_LIMIT = 20;
+/** Hard cap for list endpoints called without page/limit (legacy array responses). */
+const UNPAGINATED_CAP = 500;
+
+/** Escape LIKE wildcards (% _) and the escape char (\\) so user input matches literally. */
+function escapeLike(value) {
+    return String(value ?? '').replace(/[\\%_]/g, '\\$&');
+}
+
+/** `%term%` pattern with the term's wildcards escaped. */
+function likeContains(value) {
+    return `%${escapeLike(value)}%`;
+}
+
+function toInt(value, fallback) {
+    const n = parseInt(value, 10);
+    return Number.isFinite(n) ? n : fallback;
+}
+
+function clampPagination(rawPage, rawLimit) {
+    const page = Math.max(1, toInt(rawPage, 1));
+    const limit = Math.min(MAX_PAGE_LIMIT, Math.max(1, toInt(rawLimit, DEFAULT_PAGE_LIMIT)));
+    return { page, limit, offset: (page - 1) * limit };
+}
+
+/** `page` and `limit` from query string, always safe: page >= 1, limit 1..100. */
 function parsePaginationParams(req) {
-    const { page, limit } = req.query;
-    if (!page || !limit) {
-        return { error: 'Page and limit are required', status: 400 };
-    }
-    if (isNaN(page) || isNaN(limit)) {
-        return { error: 'Page and limit must be numbers', status: 400 };
-    }
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    return {
-        page: pageNum,
-        limit: limitNum,
-        offset: (pageNum - 1) * limitNum,
-    };
+    const { page, limit } = req.query || {};
+    return clampPagination(page, limit);
+}
+
+/** True when the request asked for pagination (has `page` or `limit`). */
+function hasPaginationParams(req) {
+    const q = req.query || {};
+    return (q.page !== undefined && q.page !== '') || (q.limit !== undefined && q.limit !== '');
+}
+
+/**
+ * Optional pagination: returns the pagination object when `page`/`limit` are present,
+ * otherwise null (caller returns the legacy array, capped at UNPAGINATED_CAP rows).
+ */
+function parseOptionalPagination(req) {
+    return hasPaginationParams(req) ? parsePaginationParams(req) : null;
 }
 
 function buildPaginatedResponse(data, { page, limit }, count) {
+    const total = Number.isFinite(Number(count)) ? Number(count) : 0;
+    const safeLimit = Number.isFinite(limit) && limit > 0 ? limit : DEFAULT_PAGE_LIMIT;
     return {
         data,
         pagination: {
             page,
             limit,
-            total: count,
-            totalPages: Math.ceil(count / limit) || 0,
+            total,
+            totalPages: Math.ceil(total / safeLimit) || 0,
         },
     };
+}
+
+/**
+ * Run a list query with OPTIONAL pagination (backward compatible):
+ *  - request has `page`/`limit` -> findAndCountAll, respond with buildPaginatedResponse shape
+ *  - neither -> findAll capped at UNPAGINATED_CAP, respond with a plain array (legacy shape)
+ * `options` must include a deterministic `order`. `mapRows(rows)` may be async.
+ * Returns the body to send with res.json().
+ */
+async function listWithOptionalPagination(Model, req, options = {}, mapRows = (rows) => rows) {
+    const pagination = parseOptionalPagination(req);
+    if (pagination) {
+        const { count, rows } = await Model.findAndCountAll({
+            ...options,
+            limit: pagination.limit,
+            offset: pagination.offset,
+        });
+        return buildPaginatedResponse(await mapRows(rows), pagination, Array.isArray(count) ? count.length : count);
+    }
+    const rows = await Model.findAll({ ...options, limit: UNPAGINATED_CAP });
+    return mapRows(rows);
 }
 
 module.exports = {
@@ -81,4 +132,10 @@ module.exports = {
     mergeWhere,
     parsePaginationParams,
     buildPaginatedResponse,
+    escapeLike,
+    likeContains,
+    hasPaginationParams,
+    parseOptionalPagination,
+    UNPAGINATED_CAP,
+    listWithOptionalPagination,
 };

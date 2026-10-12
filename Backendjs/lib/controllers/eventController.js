@@ -1,10 +1,13 @@
 const { logAudit } = require('../utils/auditLogger');
 const Event = require('../models/event');
 const { EventStatus } = require('../constants/enums');
+const { UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 class EventController {
     async getEvents(req, res) {
         try {
-            const events = await Event.findAll();
+            // Refresh statuses only for rows whose status actually changed (was one
+            // UPDATE per event on every request), then return a bounded list.
+            const events = await Event.findAll({ order: [['end_date', 'DESC']], limit: UNPAGINATED_CAP });
             for (const event of events) {
                 let eventStatus;
                 const startDate = new Date(event.start_date);
@@ -16,13 +19,12 @@ class EventController {
                 } else {
                     eventStatus = EventStatus.UPCOMING;
                 }
-                event.event_status = eventStatus;
-                await event.save();
+                if (event.event_status !== eventStatus) {
+                    event.event_status = eventStatus;
+                    await event.save();
+                }
             }
-            const updatedEvents = await Event.findAll({
-                order: [['end_date', 'DESC']],
-            });
-            res.status(200).json(updatedEvents);
+            res.status(200).json(events);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

@@ -10,7 +10,7 @@ const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const sequelize = require('../constants/database');
-const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse, listWithOptionalPagination } = require('../utils/listSearchHelpers');
 const { partyActiveFilter } = require('../utils/roleHelpers');
 
 class DistributorController {
@@ -43,13 +43,14 @@ class DistributorController {
             if (!distributor) {
                 return res.status(404).json({ error: 'Distributor not found' });
             }
-            const parties = await Party.findAll({
+            const body = await listWithOptionalPagination(Party, req, {
                 where: mergeWhere(
                     { distributor_id: distributor.distributor_id },
                     partyActiveFilter(req.userRoleNames)
                 ),
+                order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
-            res.status(200).json(parties);
+            res.status(200).json(body);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

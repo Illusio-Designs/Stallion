@@ -10,6 +10,7 @@ const Party = require('../models/Party');
 const Distributor = require('../models/distributor');
 const { canManageUsers } = require('../utils/roleHelpers');
 const sequelize = require('../constants/database');
+const { listWithOptionalPagination } = require('../utils/listSearchHelpers');
 
 class UserController {
     async getUsers(req, res) {
@@ -22,24 +23,24 @@ class UserController {
                 }
             );
             const roleIds = roles.map(role => role.role_id);
-            const users = await User.findAll(
-                {
-                    where: {
-                        role_id: {
-                            [Op.in]: roleIds
-                        }
-                    },
-                    // Include every assigned role (multi-role) so the office-team
-                    // UI can show/edit all of a member's roles, not just primary.
-                    include: [{
-                        model: Role,
-                        as: 'roles',
-                        attributes: ['role_id', 'role_name'],
-                        through: { attributes: [] },
-                    }],
-                }
-            );
-            res.status(200).json(users);
+            const body = await listWithOptionalPagination(User, req, {
+                where: {
+                    role_id: {
+                        [Op.in]: roleIds
+                    }
+                },
+                // Include every assigned role (multi-role) so the office-team
+                // UI can show/edit all of a member's roles, not just primary.
+                include: [{
+                    model: Role,
+                    as: 'roles',
+                    attributes: ['role_id', 'role_name'],
+                    through: { attributes: [] },
+                }],
+                distinct: true,
+                order: [['created_at', 'ASC'], ['user_id', 'ASC']],
+            });
+            res.status(200).json(body);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

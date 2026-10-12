@@ -2,7 +2,7 @@ const SalesmanExpense = require('../models/SalesmanExpense');
 const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const { normalizeRole, isOfficeRole } = require('../utils/roleHelpers');
-const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 
 async function resolveSalesmanIdForUser(userId, roleName) {
     if (normalizeRole(roleName) === 'salesman') {
@@ -19,7 +19,15 @@ class SalesmanExpenseController {
             if (!salesmanId) {
                 return res.status(404).json({ error: 'Salesman record not found for this user' });
             }
-            const salesmanExpenses = await SalesmanExpense.findAll({ where: { salesman_id: salesmanId } });
+            const pagination = parseOptionalPagination(req);
+            const order = [['created_at', 'DESC'], ['id', 'DESC']];
+            if (pagination) {
+                const { count, rows } = await SalesmanExpense.findAndCountAll({
+                    where: { salesman_id: salesmanId }, order, limit: pagination.limit, offset: pagination.offset,
+                });
+                return res.status(200).json(buildPaginatedResponse(rows, pagination, count));
+            }
+            const salesmanExpenses = await SalesmanExpense.findAll({ where: { salesman_id: salesmanId }, order, limit: UNPAGINATED_CAP });
             res.status(200).json(salesmanExpenses);
         } catch (error) {
             res.status(500).json({ error: error.message });

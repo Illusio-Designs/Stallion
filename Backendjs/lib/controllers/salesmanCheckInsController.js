@@ -3,7 +3,7 @@ const Party = require('../models/Party');
 const Order = require('../models/Order');
 const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
-const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 const { SalesmanCheckInType } = require('../constants/enums');
 const { checkGeofence } = require('../utils/geo');
 const { isOfficeRole, hasRole } = require('../utils/roleHelpers');
@@ -213,6 +213,7 @@ class SalesmanCheckInsController {
                 return res.status(pagination.status).json({ error: pagination.error });
             }
             const { count, rows: checkIns } = await SalesmanCheckIns.findAndCountAll({
+                order: [['created_at', 'DESC'], ['id', 'DESC']],
                 limit: pagination.limit,
                 offset: pagination.offset,
             });
@@ -237,7 +238,15 @@ class SalesmanCheckInsController {
                 return res.status(403).json({ error: 'Access denied' });
             }
 
-            const checkIns = await SalesmanCheckIns.findAll({ where: { salesman_id } });
+            const pagination = parseOptionalPagination(req);
+            const order = [['created_at', 'DESC'], ['id', 'DESC']];
+            if (pagination) {
+                const { count, rows } = await SalesmanCheckIns.findAndCountAll({
+                    where: { salesman_id }, order, limit: pagination.limit, offset: pagination.offset,
+                });
+                return res.status(200).json(buildPaginatedResponse(await enrichCheckIns(rows), pagination, count));
+            }
+            const checkIns = await SalesmanCheckIns.findAll({ where: { salesman_id }, order, limit: UNPAGINATED_CAP });
             const enriched = await enrichCheckIns(checkIns);
 
             res.status(200).json(enriched);
@@ -266,6 +275,24 @@ class SalesmanCheckInsController {
             }
             const body = { ...req.body };
             if (actor.salesmanId) body.salesman_id = actor.salesmanId;
+
+            // Which party was visited, and on which day, is fixed once the visit is
+            // recorded: the location was checked against THAT party when it was
+            // created, so changing either would turn it into a visit that never
+            // happened. (To correct a wrong party, an office user deletes the visit.)
+            const dayKey = (v) => {
+                const d = new Date(v);
+                return Number.isNaN(d.getTime()) ? String(v || '') : d.toISOString().slice(0, 10);
+            };
+            const sameDay = (a, b) => dayKey(a) === dayKey(b);
+            if (body.party_id !== undefined && String(body.party_id) !== String(existingCheckIn.party_id)) {
+                return res.status(400).json({ error: 'The party of a visit cannot be changed after it is recorded.' });
+            }
+            if (body.check_in_date !== undefined && !sameDay(body.check_in_date, existingCheckIn.check_in_date)) {
+                return res.status(400).json({ error: 'The date of a visit cannot be changed after it is recorded.' });
+            }
+            body.party_id = existingCheckIn.party_id;
+            body.check_in_date = existingCheckIn.check_in_date;
 
             const fields = resolveCheckInFields(body, existingCheckIn.toJSON());
             // The location was checked against the geofence when the check-in was
