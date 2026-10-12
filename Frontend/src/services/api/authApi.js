@@ -359,3 +359,16 @@ export const uploadProfileImage = async (userId, profileImage) => {
   return await handleResponse(response);
 };
 
+
+/**
+ * Ask the server for permission to re-send an OTP. The MSG91 widget sends codes
+ * straight from the browser, so this is where the resend limit is enforced.
+ * Rejects (with the server's "try again in …" message) when over the limit.
+ */
+export const requestOtpResend = async (phoneNumber) => {
+  return apiRequest('/auth/otp-request', {
+    method: 'POST',
+    body: { phoneNumber, kind: 'resend' },
+    includeAuth: false,
+  });
+};

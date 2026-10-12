@@ -425,7 +425,7 @@ class PartyController {
                 created_at: new Date(),
                 updated_at: new Date(),
                 is_active: true,
-                credit_days,
+                credit_days: canManageParties(req.userRoleNames) ? credit_days : 0,
                 prefered_courier
             });
             await logAudit({
@@ -682,12 +682,14 @@ class PartyController {
             const { distributor_id, salesman_id, party_name, trade_name, contact_person, email,
                 phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, is_active } = req.body;
 
-            // Active status is admin-only. Non-admins often still send the current
-            // is_active value from the edit form — ignore it instead of 403'ing the
-            // whole update (that was breaking salesman/party_manager edits).
+            // Login status (active/inactive) and the commercial terms (credit days,
+            // GSTIN, PAN) are managed by admin / party / sales managers only. A party,
+            // salesman or distributor often still sends the current values from the
+            // edit form — ignore them instead of 403'ing the whole update.
+            const isManager = canManageParties(req.userRoleNames);
             let nextIsActive;
             if (is_active !== undefined) {
-                if (isAdmin(req.userRoleNames)) {
+                if (isManager) {
                     if (typeof is_active !== 'boolean') {
                         return res.status(400).json({ error: 'is_active must be a boolean' });
                     }
@@ -727,9 +729,9 @@ class PartyController {
                 city_id: city_id !== undefined ? city_id : party.city_id,
                 zone_id: zone_id !== undefined ? zone_id : party.zone_id,
                 pincode: pincode !== undefined ? pincode : party.pincode,
-                gstin: gstin !== undefined ? gstin : party.gstin,
-                pan: pan !== undefined ? pan : party.pan,
-                credit_days: credit_days !== undefined ? credit_days : party.credit_days,
+                gstin: gstin !== undefined && isManager ? gstin : party.gstin,
+                pan: pan !== undefined && isManager ? pan : party.pan,
+                credit_days: credit_days !== undefined && isManager ? credit_days : party.credit_days,
                 prefered_courier: prefered_courier !== undefined ? prefered_courier : party.prefered_courier,
                 updated_at: new Date(),
                 updated_by: user.user_id
@@ -770,16 +772,16 @@ class PartyController {
             }
             await Party.update(payload, { where: { party_id: id } });
 
-            if (is_active !== undefined) {
+            if (nextIsActive !== undefined) {
                 await User.update(
-                    { is_active, updated_at: new Date() },
+                    { is_active: nextIsActive, updated_at: new Date() },
                     { where: { user_id: party.user_id } }
                 );
             }
 
             let description = 'Party updated';
-            if (is_active !== undefined && is_active !== party.is_active) {
-                description = is_active ? 'Party reactivated' : 'Party deactivated';
+            if (nextIsActive !== undefined && nextIsActive !== party.is_active) {
+                description = nextIsActive ? 'Party reactivated' : 'Party deactivated';
             }
             if (locationReset) {
                 description += ' (address changed, verified location reset)';

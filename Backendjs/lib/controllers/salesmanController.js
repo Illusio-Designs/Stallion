@@ -12,7 +12,22 @@ const User = require('../models/User');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const UserRole = require('../models/UserRole');
 const Role = require('../models/Role');
-const { isAdmin } = require('../utils/roleHelpers');
+const { isAdmin, hasRole, SALESMAN_DOC_ROLES } = require('../utils/roleHelpers');
+
+// KYC documents are only for admin / sales manager. Everyone else (including the
+// other logged-in users who read the salesman list for dropdowns) gets the record
+// without the document paths.
+const DOC_FIELDS = ['pan_card_url', 'aadhar_card_url', 'cancel_cheque_url', 'photo_url'];
+const canSeeDocs = (req) => hasRole(
+    (req.userRoleNames && req.userRoleNames.length) ? req.userRoleNames : [req.userRoleName],
+    SALESMAN_DOC_ROLES
+);
+const forViewer = (req, obj) => {
+    if (canSeeDocs(req)) return obj;
+    const copy = { ...obj };
+    DOC_FIELDS.forEach((f) => { delete copy[f]; });
+    return copy;
+};
 
 // A login account that also holds another role (admin, a manager, ...) is not a
 // plain salesman login. Only an admin may link a salesman record to it or change
@@ -44,7 +59,7 @@ class SalesmanController {
             }
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
             const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
-            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
+            res.status(200).json(forViewer(req, { ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates }));
         }
         catch (error) {
             res.status(500).json({ error: error.message });
@@ -63,7 +78,7 @@ class SalesmanController {
             }
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: id } });
             const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: id } });
-            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
+            res.status(200).json(forViewer(req, { ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates }));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -104,7 +119,7 @@ class SalesmanController {
             const statesBy = {};
             allZones.forEach((z) => { (zonesBy[z.salesman_id] = zonesBy[z.salesman_id] || []).push(z.toJSON()); });
             allStates.forEach((st) => { (statesBy[st.salesman_id] = statesBy[st.salesman_id] || []).push(st.toJSON()); });
-            const response = salesmen.map((salesman) => ({
+            const response = salesmen.map((salesman) => forViewer(req, {
                 ...salesman.toJSON(),
                 zones: zonesBy[salesman.salesman_id] || [],
                 states: statesBy[salesman.salesman_id] || [],
@@ -281,7 +296,7 @@ class SalesmanController {
             });
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
             const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
-            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
+            res.status(200).json(forViewer(req, { ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates }));
         } catch (error) {
             // The transaction already rolled back, so no orphan user/salesman was
             // left. Clean up any uploaded KYC files that are now unreferenced.
@@ -508,7 +523,7 @@ class SalesmanController {
             const links = await SalesmanStates.findAll({ where: { state_id: stateId } });
             const ids = links.map(l => l.salesman_id);
             const salesmen = ids.length ? await Salesman.findAll({ where: { salesman_id: ids } }) : [];
-            res.status(200).json(salesmen);
+            res.status(200).json(salesmen.map((sm) => forViewer(req, sm.toJSON())));
         } catch (error) {
             res.status(error.statusCode || 500).json({ error: error.message });
         }

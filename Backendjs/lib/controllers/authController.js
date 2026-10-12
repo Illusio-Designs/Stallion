@@ -8,6 +8,46 @@ const { ensureLoginUserByPhone, findPartyByPhone } = require('../utils/userFacto
 const { markPhoneVerified, consumePhoneVerification, normalizePhone } = require('../services/otpSession');
 const { identifierMatchesPhone, allowUnboundToken } = require('../utils/otpBinding');
 const { getJwtSecret } = require('../utils/jwtSecret');
+const limiter = require('../utils/rateLimiter');
+
+// Wrong-code protection: after this many failed verifications a phone (or an IP)
+// is locked out for the window.
+const FAIL_MAX_PHONE = 5;
+const FAIL_MAX_IP = 30;
+const FAIL_WINDOW_MS = 15 * 60 * 1000;
+const failKeys = (req) => [`fail-phone:${limiter.phoneKey(req)}`, `fail-ip:${limiter.clientIp(req)}`];
+// Returns true (and sends 429) when the caller is locked out.
+const lockedOut = (req, res) => {
+    const [pk, ik] = failKeys(req);
+    for (const [k, max] of [[pk, FAIL_MAX_PHONE], [ik, FAIL_MAX_IP]]) {
+        const r = limiter.blocked(k, max);
+        if (!r.ok) { limiter.deny(res, r.retryAfterSec, 'Too many wrong or failed OTP attempts.'); return true; }
+    }
+    return false;
+};
+const recordFail = (req) => {
+    const [pk, ik] = failKeys(req);
+    limiter.hit(pk, FAIL_MAX_PHONE + 1, FAIL_WINDOW_MS);
+    limiter.hit(ik, FAIL_MAX_IP + 1, FAIL_WINDOW_MS);
+};
+
+// Limits on how many codes one phone / device may ask for. Returns null when
+// allowed, else { retryAfterSec, message }.
+function checkSendLimits(req, kind) {
+    const phone = limiter.phoneKey(req);
+    const WIN = 15 * 60 * 1000;
+    const checks = [
+        [`otp-gap:${phone}`, 1, 30 * 1000, 'Please wait before asking for another code.'],
+        [`otp-phone:${phone}`, 5, WIN, 'Too many codes requested for this number.'],
+        ...(kind === 'resend' ? [[`otp-resend:${phone}`, 3, WIN, 'Too many resend requests for this number.']] : []),
+        [`otp-ip:${limiter.clientIp(req)}`, 20, 60 * 60 * 1000, 'Too many code requests from this device.'],
+    ];
+    for (const [key, max, win, message] of checks) {
+        const r = limiter.hit(key, max, win);
+        if (!r.ok) return { retryAfterSec: r.retryAfterSec, message };
+    }
+    return null;
+}
 
 class AuthController {
 
@@ -78,10 +118,11 @@ class AuthController {
 
     async login(req, res) {
         try {
-            const { phoneNumber, accessToken } = req.body;
+            const { phoneNumber, accessToken, verificationTicket } = req.body;
             if (!phoneNumber) {
                 return res.status(400).json({ error: 'Phone number is required' });
             }
+            if (lockedOut(req, res)) return;
 
             const normalizedPhone = normalizePhone(phoneNumber);
 
@@ -92,6 +133,7 @@ class AuthController {
             if (accessToken) {
                 const otp = await msg91Service.verifyAccessToken(accessToken);
                 if (!otp.success) {
+                    recordFail(req);
                     return res.status(401).json({ error: otp.message || 'OTP verification failed' });
                 }
                 // The proof must have been issued for THIS phone number. Without this
@@ -100,9 +142,11 @@ class AuthController {
                 if (!identifierMatchesPhone(otp.identifier, phoneNumber) && !allowUnboundToken()) {
                     console.warn('[auth] OTP proof does not match the phone number; login refused.',
                         { requested: normalizedPhone, verifiedFor: String(otp.identifier || '').slice(0, 4) + '…' });
+                    recordFail(req);
                     return res.status(401).json({ error: 'This OTP was not verified for this phone number. Please request a new code.' });
                 }
-            } else if (!consumePhoneVerification(phoneNumber)) {
+            } else if (!consumePhoneVerification(phoneNumber, verificationTicket)) {
+                recordFail(req);
                 return res.status(401).json({ error: 'OTP verification required before login' });
             }
 
@@ -229,6 +273,29 @@ class AuthController {
         }
     }
 
+    // The OTP widget sends and re-sends codes straight from the browser, so the
+    // server can't see those SMS. The page asks here FIRST for every send/resend;
+    // this is where the limits are enforced (and counted).
+    async otpRequest(req, res) {
+        const phone = limiter.phoneKey(req);
+        if (!phone || phone.length < 8) {
+            return res.status(400).json({ error: 'Phone number is required' });
+        }
+        const kind = req.body && req.body.kind === 'resend' ? 'resend' : 'send';
+        const denied = checkSendLimits(req, kind);
+        if (denied) return limiter.deny(res, denied.retryAfterSec, denied.message);
+        res.status(200).json({ message: 'OK' });
+    }
+
+    // Same limits as a middleware, for endpoints that themselves trigger a send.
+    otpGate(req, res, next) {
+        const phone = limiter.phoneKey(req);
+        if (!phone) return next(); // handler returns its own 400
+        const denied = checkSendLimits(req, 'send');
+        if (denied) return limiter.deny(res, denied.retryAfterSec, denied.message);
+        next();
+    }
+
     async sendOtp(req, res) {
         try {
             const { phoneNumber } = req.body;
@@ -267,20 +334,24 @@ class AuthController {
             if (!otp) {
                 return res.status(400).json({ error: 'OTP is required' });
             }
+            if (lockedOut(req, res)) return;
 
             const result = await msg91Service.verifyOtp(phoneNumber, otp);
 
             if (!result.success) {
+                recordFail(req);
                 return res.status(400).json({
                     error: result.message || 'Invalid OTP',
                     details: result.error,
                 });
             }
 
-            markPhoneVerified(phoneNumber);
+            const verificationTicket = markPhoneVerified(phoneNumber);
+            limiter.clear(failKeys(req)[0]);
 
             res.status(200).json({
                 message: 'OTP verified successfully',
+                verificationTicket,
                 data: result.data,
             });
         } catch (error) {
@@ -300,9 +371,11 @@ class AuthController {
             if (!phoneNumber) {
                 return res.status(400).json({ error: 'Phone number is required' });
             }
+            if (lockedOut(req, res)) return;
 
             const result = await msg91Service.verifyAccessToken(accessToken);
             if (!result.success) {
+                recordFail(req);
                 return res.status(400).json({
                     error: result.message || 'Invalid access token',
                     details: result.error,
@@ -310,13 +383,16 @@ class AuthController {
             }
             // Same rule as login: the proof must belong to this phone number.
             if (!identifierMatchesPhone(result.identifier, phoneNumber) && !allowUnboundToken()) {
+                recordFail(req);
                 return res.status(400).json({ error: 'This OTP was not verified for this phone number. Please request a new code.' });
             }
 
-            markPhoneVerified(phoneNumber);
+            const verificationTicket = markPhoneVerified(phoneNumber);
+            limiter.clear(failKeys(req)[0]);
 
             res.status(200).json({
                 message: 'OTP verified successfully',
+                verificationTicket,
                 data: result.data,
             });
         } catch (error) {
