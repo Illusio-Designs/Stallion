@@ -400,6 +400,11 @@ const DashboardProducts = () => {
       if (unuploaded) filters = { ...(filters || {}), image_status: 'unuploaded', status: null };
       const result = await getProducts(targetPage, PRODUCTS_PER_PAGE, filters);
       const list = result.data || [];
+      // A delete may have emptied the last page: step back to the last valid page.
+      const lastPage = result.pagination?.totalPages != null ? Math.max(1, result.pagination.totalPages) : 1;
+      if (list.length === 0 && targetPage > lastPage) {
+        return fetchProductsPage(lastPage, search);
+      }
       setProducts(list);
       setProductPage(targetPage);
       if (result.pagination?.totalPages != null) {
