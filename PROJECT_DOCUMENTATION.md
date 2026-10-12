@@ -114,7 +114,7 @@ Login is **phone + OTP** via MSG91:
 3. The frontend stores the token + a merged user object in `localStorage` and
    refreshes the profile/role from `/users/me` + `/users/role`.
 
-A short allow‑list of internal numbers can bypass live OTP for testing. A
+Every phone number must pass a real OTP; there is no bypass list. A
 `party` account that is deactivated is blocked at login.
 
 ---
