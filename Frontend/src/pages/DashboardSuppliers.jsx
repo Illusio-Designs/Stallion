@@ -37,6 +37,7 @@ import {
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
 import { showError, showSuccess } from '../services/notificationService';
+import { captureCurrentPosition } from '../utils/geolocation';
 
 // Geofence radius used when a visit/order is recorded (mirror of the backend
 // GEOFENCE_RADIUS_M). A recorded location within this distance of the party's
@@ -1386,15 +1387,20 @@ const DashboardSuppliers = () => {
       // Auto-capture location and date for salesman
       let latitude = checkinForm.latitude;
       let longitude = checkinForm.longitude;
-      const checkInDate = new Date().toISOString().split('T')[0];
+      // Keep the original date when editing; only a new check-in gets today's date.
+      const checkInDate = editCheckin?.check_in_date || new Date().toISOString().split('T')[0];
 
-      if (isSalesman && navigator.geolocation) {
-        await new Promise((resolve) => {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => { latitude = String(pos.coords.latitude); longitude = String(pos.coords.longitude); resolve(); },
-            () => resolve() // proceed even if denied
-          );
-        });
+      // A salesman's new check-in must carry their GPS (the server enforces the
+      // geofence with it). Editing an existing check-in keeps its stored location.
+      if (isSalesman && !editCheckin) {
+        try {
+          const pos = await captureCurrentPosition();
+          latitude = String(pos.latitude);
+          longitude = String(pos.longitude);
+        } catch (geoErr) {
+          showError(geoErr?.message || 'Could not get your location. Please allow location access and try again.');
+          return;
+        }
       }
 
       const currentUser = getUser();

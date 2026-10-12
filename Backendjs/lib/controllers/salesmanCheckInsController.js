@@ -6,6 +6,20 @@ const { logAudit } = require('../utils/auditLogger');
 const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 const { SalesmanCheckInType } = require('../constants/enums');
 const { checkGeofence } = require('../utils/geo');
+const { isOfficeRole, hasRole } = require('../utils/roleHelpers');
+
+// Who is calling: office roles (admin, sales/reports managers, ...) can see and
+// manage every check-in; a salesman only their own; everyone else none.
+async function resolveActor(req) {
+    const roles = req.userRoleNames && req.userRoleNames.length ? req.userRoleNames : [req.userRoleName];
+    const isOffice = isOfficeRole(roles);
+    let salesmanId = null;
+    if (!isOffice && hasRole(roles, ['salesman']) && req.user) {
+        const me = await Salesman.findOne({ where: { user_id: req.user.user_id }, attributes: ['salesman_id'] });
+        salesmanId = me ? me.salesman_id : null;
+    }
+    return { isOffice, salesmanId, allowed: isOffice || !!salesmanId };
+}
 
 // Enrich check-ins for the Visit Report: add party_name, and for ORDERED
 // check-ins (type='ordered', which carry an order_id) the linked order's
@@ -127,16 +141,27 @@ class SalesmanCheckInsController {
 
     async createSalesmanCheckIn(req, res) {
         try {
-            const fields = resolveCheckInFields(req.body);
+            const actor = await resolveActor(req);
+            if (!actor.allowed) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const body = { ...req.body };
+            // A salesman can only check in as themselves, whatever the body says.
+            if (actor.salesmanId) body.salesman_id = actor.salesmanId;
+            const fields = resolveCheckInFields(body);
             const validationError = validateCheckInFields(fields);
             if (validationError) {
                 return res.status(400).json({ error: validationError });
             }
 
-            // When a device location is provided, enforce the 50m geofence against
-            // the party's TRUSTED verified location. Party location must be set via
-            // Add/Edit Party ("I'm at shop") — check-in never captures or changes it.
+            // Enforce the geofence against the party's TRUSTED verified location.
+            // Party location must be set via Add/Edit Party ("I'm at shop") —
+            // check-in never captures or changes it. A salesman must send their
+            // GPS, so the fence cannot be skipped by leaving it out.
             const hasDeviceLoc = fields.latitude != null && fields.latitude !== '' && fields.longitude != null && fields.longitude !== '';
+            if (actor.salesmanId && !hasDeviceLoc) {
+                return res.status(400).json({ error: 'Your current location is required to check in. Please allow location access and try again.' });
+            }
             if (hasDeviceLoc) {
                 const checkinParty = await Party.findOne({ where: { party_id: fields.party_id } });
                 if (!checkinParty) {
@@ -178,6 +203,11 @@ class SalesmanCheckInsController {
 
     async getSalesmanCheckIns(req, res) {
         try {
+            // The full list is for office roles only; a salesman uses /:salesman_id.
+            const actor = await resolveActor(req);
+            if (!actor.isOffice) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
             const pagination = parsePaginationParams(req);
             if (pagination.error) {
                 return res.status(pagination.status).json({ error: pagination.error });
@@ -199,6 +229,12 @@ class SalesmanCheckInsController {
 
             if (!salesman_id) {
                 return res.status(400).json({ error: 'Salesman ID is required' });
+            }
+
+            // Office roles can read anyone's; a salesman only their own.
+            const actor = await resolveActor(req);
+            if (!actor.isOffice && actor.salesmanId !== salesman_id) {
+                return res.status(403).json({ error: 'Access denied' });
             }
 
             const checkIns = await SalesmanCheckIns.findAll({ where: { salesman_id } });
@@ -223,30 +259,23 @@ class SalesmanCheckInsController {
                 return res.status(404).json({ error: 'Salesman check-in not found' });
             }
 
-            const fields = resolveCheckInFields(req.body, existingCheckIn.toJSON());
+            // A salesman can edit only their own check-ins; office roles any.
+            const actor = await resolveActor(req);
+            if (!actor.allowed || (!actor.isOffice && existingCheckIn.salesman_id !== actor.salesmanId)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const body = { ...req.body };
+            if (actor.salesmanId) body.salesman_id = actor.salesmanId;
+
+            const fields = resolveCheckInFields(body, existingCheckIn.toJSON());
+            // The location was checked against the geofence when the check-in was
+            // created. Editing later (remarks, times) keeps that stored point and
+            // is not re-checked, so it works from anywhere.
+            fields.latitude = existingCheckIn.latitude;
+            fields.longitude = existingCheckIn.longitude;
             const validationError = validateCheckInFields(fields);
             if (validationError) {
                 return res.status(400).json({ error: validationError });
-            }
-
-            // Same geofence rules as create — verified location must already be set
-            // on the party; check-in never captures it.
-            const hasDeviceLoc = fields.latitude != null && fields.latitude !== '' && fields.longitude != null && fields.longitude !== '';
-            if (hasDeviceLoc) {
-                const checkinParty = await Party.findOne({ where: { party_id: fields.party_id } });
-                if (!checkinParty) {
-                    return res.status(404).json({ error: 'Party not found' });
-                }
-                if (checkinParty.location_source === 'verified' && checkinParty.latitude != null && checkinParty.longitude != null) {
-                    const geo = checkGeofence({ deviceLat: fields.latitude, deviceLng: fields.longitude, party: checkinParty, action: 'check in' });
-                    if (!geo.ok) {
-                        return res.status(403).json({ error: geo.reason });
-                    }
-                } else {
-                    return res.status(403).json({
-                        error: 'This party\'s exact location is not set yet. Open Add/Edit Party and use "I\'m at shop" to set it, then check in.',
-                    });
-                }
             }
 
             const oldSnapshot = existingCheckIn.toJSON();
@@ -285,6 +314,12 @@ class SalesmanCheckInsController {
             const existingCheckIn = await SalesmanCheckIns.findOne({ where: { id } });
             if (!existingCheckIn) {
                 return res.status(404).json({ error: 'Salesman check-in not found' });
+            }
+
+            // Deleting is for office roles; a salesman cannot erase a visit record.
+            const actor = await resolveActor(req);
+            if (!actor.isOffice) {
+                return res.status(403).json({ error: 'Access denied' });
             }
 
             const snapshot = existingCheckIn.toJSON();
