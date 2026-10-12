@@ -32,6 +32,18 @@ app.use(express.urlencoded({ extended: true }));
 // Serve static files from uploads directory with absolute path
 const uploadsPath = path.resolve(__dirname, '..', 'uploads');
 console.log('📁 Serving static files from:', uploadsPath);
+// Salesman KYC documents (PAN, Aadhar, cancel cheque, photo) are private: only a
+// logged-in admin / sales manager may open them. This is mounted BEFORE the public
+// /uploads handler and never falls through to it.
+const { authenticateToken } = require('./middleware/auth');
+const { checkRole } = require('./middleware/roleAuth');
+const { SALESMAN_DOC_ROLES } = require('./utils/roleHelpers');
+app.use(
+    '/uploads/salesman',
+    authenticateToken,
+    checkRole(SALESMAN_DOC_ROLES),
+    express.static(path.join(uploadsPath, 'salesman'), { fallthrough: false, dotfiles: 'deny', index: false })
+);
 app.use('/uploads', express.static(uploadsPath));
 
 // NOTE: the backend folder is deliberately NOT served as static files. It used to

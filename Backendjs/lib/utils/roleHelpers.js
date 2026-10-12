@@ -10,6 +10,8 @@ const OFFICE_ROLES = [
     'distributor_manager',
 ];
 
+// Who may see a salesman's KYC documents (PAN, Aadhar, cancel cheque, photo).
+const SALESMAN_DOC_ROLES = ['admin', 'sales_manager'];
 const INVENTORY_ROLES = ['admin', 'tray_manager'];
 const ORDER_ADMIN_ROLES = ['admin', 'order_manager'];
 const PARTY_ADMIN_ROLES = ['admin', 'party_manager', 'sales_manager'];
@@ -84,6 +86,7 @@ function isFieldRole(roleName) {
 
 module.exports = {
     OFFICE_ROLES,
+    SALESMAN_DOC_ROLES,
     INVENTORY_ROLES,
     ORDER_ADMIN_ROLES,
     normalizeRole,
