@@ -120,6 +120,7 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
           onPageChange={onPageChange}
           isCollapsed={effectiveCollapsed}
           onMobileMenuToggle={openMobileSidebar}
+          onToggleSidebar={toggleSidebar}
         />
 
         <main

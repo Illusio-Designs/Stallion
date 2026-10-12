@@ -156,3 +156,21 @@
     width: 100%;
   }
 }
+
+/* Tablet (iPad): the sidebar is the 64px rail, leaving about 700px for the
+   Party table. Tighter cell padding and shorter name columns (long names get an
+   ellipsis) keep every column, including ACTION, in view. */
+@media (min-width: 768px) and (max-width: 1100px) {
+  .dash-card .ui-table tbody td,
+  .dash-card .ui-table thead th {
+    padding-left: var(--space-2);
+    padding-right: var(--space-2);
+  }
+  .dash-card .ui-table tbody td:nth-child(3),
+  .dash-card .ui-table tbody td:nth-child(4) {
+    max-width: 120px;
+  }
+  .dash-card .ui-table tbody td:nth-child(5) {
+    max-width: 100px;
+  }
+}
