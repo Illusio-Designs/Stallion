@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import '../styles/components/DashboardHeader.css';
-import { FiMaximize, FiMinimize, FiBell, FiMenu, FiSearch, FiX } from 'react-icons/fi';
+import { FiMaximize, FiMinimize, FiBell, FiMenu, FiSearch, FiSidebar, FiX } from 'react-icons/fi';
 import Tooltip from './ui/Tooltip';
+import InstallAppButton from './InstallAppButton';
 import { logout as authLogout, getUser } from '../services/authService';
 import { showLogoutSuccess } from '../services/notificationService';
 import { getMe } from '../services/apiService';
 
-const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuToggle }) => {
+const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuToggle, onToggleSidebar }) => {
   const [userName, setUserName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -207,6 +208,22 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
           >
             <FiMenu size={22} aria-hidden="true" />
           </button>
+          {/* Expand / collapse the sidebar from the top bar (tablet and desktop).
+              Always in reach on iPad, unlike the button at the bottom of the
+              sidebar. Hidden on phones, which use the menu button above. */}
+          {onToggleSidebar && (
+            <Tooltip label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="bottom">
+              <button
+                type="button"
+                className="dashboard-sidebar-toggle hidden md:inline-flex bg-transparent border-none w-10 h-10 -ml-1 rounded-pill items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]"
+                onClick={onToggleSidebar}
+                aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                aria-expanded={!isCollapsed}
+              >
+                <FiSidebar size={20} aria-hidden="true" />
+              </button>
+            </Tooltip>
+          )}
           <div className="dashboard-title text-[length:var(--text-md)] text-text font-semibold whitespace-nowrap overflow-hidden text-ellipsis">Welcome {userName}</div>
         </div>
 
@@ -245,13 +262,14 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
             {/* Mobile-only search toggle — the desktop search bar is hidden below md */}
             <button
               type="button"
-              className="dashboard-icon-btn md:hidden bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]"
+              className="dashboard-icon-btn dashboard-search-toggle md:hidden bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]"
               onClick={() => setIsMobileSearchOpen((v) => !v)}
               aria-label={isMobileSearchOpen ? 'Close search' : 'Search'}
               aria-expanded={isMobileSearchOpen}
             >
               {isMobileSearchOpen ? <FiX size={20} aria-hidden="true" /> : <FiSearch size={20} aria-hidden="true" />}
             </button>
+            <InstallAppButton />
             <Tooltip label="Notifications" placement="bottom">
               <button className="dashboard-icon-btn bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]" aria-label="Notifications">
                 <FiBell size={20} aria-hidden="true" />

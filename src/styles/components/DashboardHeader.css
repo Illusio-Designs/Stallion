@@ -299,6 +299,16 @@
   }
 }
 
+/* The phone search button must not show next to the inline search bar. The
+   unlayered .dashboard-icon-btn display rule outranks Tailwind's `md:hidden`,
+   so hide it here from the md breakpoint up (this was showing two search icons
+   on iPad and desktop). */
+@media (min-width: 768px) {
+  .dashboard-search-toggle {
+    display: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dashboard-icon-btn,
   .dashboard-avatar-btn,

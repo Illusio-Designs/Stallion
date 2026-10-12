@@ -10,6 +10,42 @@ import { filterMenuItemsByRoles } from '../utils/rolePermissions';
 
 const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleCollapse, isMobileOpen = false, onMobileClose }) => {
   const [tooltipState, setTooltipState] = useState({ show: false, text: '', top: 0 });
+  // Tooltips label the icons in the collapsed rail. Mouse hover and keyboard
+  // focus show them directly; on touch (iPad) a long-press shows one for a
+  // moment and does not navigate.
+  const pressTimer = useRef(null);
+  const hideTimer = useRef(null);
+  const longPressed = useRef(false);
+  const showTip = (el, text) => {
+    const rect = el.getBoundingClientRect();
+    setTooltipState({ show: true, text, top: rect.top + rect.height / 2 });
+  };
+  const hideTip = () => setTooltipState({ show: false, text: '', top: 0 });
+  const tipHandlers = (text) => ({
+    onMouseEnter: (e) => { if (isCollapsed) showTip(e.currentTarget, text); },
+    onMouseLeave: () => { if (isCollapsed) hideTip(); },
+    onFocus: (e) => { if (isCollapsed) showTip(e.currentTarget, text); },
+    onBlur: () => { if (isCollapsed) hideTip(); },
+    onTouchStart: (e) => {
+      if (!isCollapsed) return;
+      const el = e.currentTarget;
+      longPressed.current = false;
+      clearTimeout(hideTimer.current);
+      pressTimer.current = setTimeout(() => {
+        longPressed.current = true;
+        showTip(el, text);
+      }, 400);
+    },
+    onTouchEnd: () => {
+      clearTimeout(pressTimer.current);
+      if (longPressed.current) {
+        hideTimer.current = setTimeout(hideTip, 1500);
+      }
+    },
+    onTouchMove: () => clearTimeout(pressTimer.current),
+    onTouchCancel: () => { clearTimeout(pressTimer.current); hideTip(); },
+  });
+  useEffect(() => () => { clearTimeout(pressTimer.current); clearTimeout(hideTimer.current); }, []);
   // Single crisp icon system (react-icons) — inherits currentColor (white on
   // the indigo sidebar), no webp + filter:brightness() hack.
   const sidebarIcons = {
@@ -71,7 +107,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     <aside
       className={`dashboard-sidebar ${isCollapsed ? 'collapsed' : 'expanded'} ${
         isMobileOpen ? 'mobile-open max-md:translate-x-0' : 'max-md:-translate-x-full'
-      } fixed left-0 top-0 z-[1000] flex h-screen flex-col overflow-visible bg-surface text-text border-r border-border transition-transform duration-200 ease-[ease] motion-reduce:transition-none md:translate-x-0 ${
+      } fixed left-0 top-0 z-[1000] flex h-dvh flex-col overflow-visible bg-surface text-text border-r border-border transition-transform duration-200 ease-[ease] motion-reduce:transition-none md:translate-x-0 ${
         isCollapsed ? 'w-16 md:w-16' : 'w-60'
       }`}
     >
@@ -129,24 +165,14 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
                 }`}
                 onClick={(e) => {
                   e.preventDefault();
+                  // A long-press only shows the label; it must not navigate.
+                  if (longPressed.current) { longPressed.current = false; return; }
+                  hideTip();
                   onPageChange(item.id);
                   onMobileClose?.();
                 }}
-                onMouseEnter={(e) => {
-                  if (isCollapsed) {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setTooltipState({
-                      show: true,
-                      text: item.text,
-                      top: rect.top + rect.height / 2
-                    });
-                  }
-                }}
-                onMouseLeave={() => {
-                  if (isCollapsed) {
-                    setTooltipState({ show: false, text: '', top: 0 });
-                  }
-                }}
+                {...tipHandlers(item.text)}
+                style={{ WebkitTouchCallout: 'none' }}
                 aria-label={item.text}
               >
                 <span className="sidebar-icon inline-flex h-5 w-5 flex-shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5 [&>svg]:flex-shrink-0">
@@ -154,14 +180,6 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
                 </span>
                 {!isCollapsed && (
                   <span className="sidebar-text whitespace-nowrap text-[length:var(--text-base)]">
-                    {item.text}
-                  </span>
-                )}
-                {isCollapsed && tooltipState.show && tooltipState.text === item.text && (
-                  <span
-                    className="sidebar-tooltip sidebar-tooltip--fixed fixed left-[76px] z-[10000] -translate-y-1/2 whitespace-nowrap rounded-sm bg-grey-900 px-2 py-1 text-[length:var(--text-xs)] text-text-on-primary shadow-md after:absolute after:left-[-5px] after:top-1/2 after:-translate-y-1/2 after:border-[5px] after:border-solid after:border-transparent after:border-r-grey-900 after:content-['']"
-                    style={{ top: `${tooltipState.top}px` }}
-                  >
                     {item.text}
                   </span>
                 )}
@@ -199,7 +217,8 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
           className={`sidebar-toggle flex min-h-10 w-full cursor-pointer items-center rounded-md border-none bg-transparent text-[length:var(--text-xs)] font-medium text-text-muted outline-none transition-[background-color,color] duration-200 ease-[ease] hover:bg-grey-100 hover:text-text focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] active:scale-[0.98] motion-reduce:transition-none ${
             isCollapsed ? 'justify-center gap-0 p-2' : 'justify-start gap-2 px-3 py-2'
           }`}
-          onClick={onToggleCollapse}
+          onClick={() => { hideTip(); onToggleCollapse(); }}
+          {...tipHandlers('Expand sidebar')}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!isCollapsed}
         >
@@ -214,6 +233,15 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
           )}
         </button>
       </div>
+      {isCollapsed && tooltipState.show && (
+        <span
+          role="tooltip"
+          className="sidebar-tooltip sidebar-tooltip--fixed pointer-events-none fixed left-[76px] z-[10000] -translate-y-1/2 whitespace-nowrap rounded-sm bg-grey-900 px-2 py-1 text-[length:var(--text-xs)] text-text-on-primary shadow-md after:absolute after:left-[-5px] after:top-1/2 after:-translate-y-1/2 after:border-[5px] after:border-solid after:border-transparent after:border-r-grey-900 after:content-['']"
+          style={{ top: `${tooltipState.top}px` }}
+        >
+          {tooltipState.text}
+        </span>
+      )}
     </aside>
   );
 };

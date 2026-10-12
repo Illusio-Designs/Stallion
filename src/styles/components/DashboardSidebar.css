@@ -5,6 +5,7 @@
   border-right: 1px solid var(--color-border);
   width: 240px;
   height: 100vh;
+  height: 100dvh; /* excludes the mobile browser bars so the bottom toggle stays reachable */
   position: fixed;
   left: 0;
   top: 0;

@@ -66,3 +66,38 @@
     padding: var(--space-4) var(--space-4);  /* 16px keeps tap targets clear */
   }
 }
+
+/* ==========================================================================
+   Tablet
+   ========================================================================== */
+
+/* Tablet (iPad): 768 to 1100px. The sidebar is the 64px icon rail by default
+   (see DashboardLayout), so give the page the width back and make everything
+   comfortable for a finger. */
+@media (min-width: 768px) and (max-width: 1100px) {
+  .dashboard-content {
+    max-width: none;
+    padding: var(--space-5) var(--space-5);
+  }
+
+  /* 44px is the minimum comfortable touch target. */
+  .dashboard-layout .ui-btn,
+  .dashboard-layout .ui-input,
+  .dashboard-layout .ui-select,
+  .dashboard-layout .ui-dropdown-custom {
+    min-height: 44px;
+  }
+  .dashboard-sidebar-nav a {
+    min-height: 44px;
+  }
+  .dashboard-layout .ui-table tbody td {
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-3);
+  }
+
+  /* Toolbars above tables wrap instead of squeezing their buttons. */
+  .dashboard-layout .ui-table__controls,
+  .dashboard-layout .ui-table__actions {
+    flex-wrap: wrap;
+  }
+}

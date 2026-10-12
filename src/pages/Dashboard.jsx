@@ -411,7 +411,7 @@ const Dashboard = () => {
           <div className="dash-row grid grid-cols-12 gap-4">
             <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5 max-md:p-4">
               <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
-              <div className="grid grid-cols-3 items-stretch gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
+              <div className="grid grid-cols-3 items-stretch gap-3 max-[720px]:grid-cols-2 max-[560px]:grid-cols-1">
                 <QuickActionCard icon={FiShoppingCart} label="View All Orders" desc="All orders" primary onClick={() => { window.location.href = '/dashboard/orders'; }} />
                 <QuickActionCard icon={FiBarChart2} label="View Report" desc="Sales analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
                 {/* Display only — offers feature not built yet. */}
@@ -503,7 +503,7 @@ const Dashboard = () => {
         <div className="dash-row mt-4">
           <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5 max-md:p-4">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
-            <div className="grid grid-cols-3 items-stretch gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
+            <div className="grid grid-cols-3 items-stretch gap-3 max-[720px]:grid-cols-2 max-[560px]:grid-cols-1">
               <QuickActionCard icon={FiMapPin} label="Add Visit" desc="Log a party visit" primary onClick={() => { window.location.href = '/dashboard/salesmen'; }} />
               <QuickActionCard icon={FiShoppingBag} label="My Orders" desc="View your orders" onClick={() => { window.location.href = '/dashboard/orders'; }} />
               <QuickActionCard icon={FiBarChart2} label="View Report" desc="Targets & analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />

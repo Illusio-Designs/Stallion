@@ -8,6 +8,14 @@ import { ConfirmProvider } from "../components/ui/ConfirmProvider";
 export const metadata = {
   title: "Stallion Eyewear",
   description: "Your Vision, Our Passion",
+  // Add to Home Screen: the manifest drives Android/desktop install; the
+  // appleWebApp settings drive iPad/iPhone (full screen, name under the icon).
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    title: 'Stallion',
+    statusBarStyle: 'default',
+  },
   icons: {
     icon: '/favicon.png',
     shortcut: '/favicon.png',
@@ -21,6 +29,10 @@ export const metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
+  // Not using viewport-fit=cover on purpose: without it the browser keeps all
+  // content inside the notch / home-bar safe area, which the storefront and the
+  // dashboard both rely on.
+  themeColor: '#ffffff',
   // Do not disable zoom — maximumScale/userScalable:false is a WCAG failure.
 };
 
