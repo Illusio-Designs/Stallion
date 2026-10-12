@@ -10,6 +10,20 @@ const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const User = require('../models/User');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
+const UserRole = require('../models/UserRole');
+const Role = require('../models/Role');
+const { isAdmin } = require('../utils/roleHelpers');
+
+// A login account that also holds another role (admin, a manager, ...) is not a
+// plain salesman login. Only an admin may link a salesman record to it or change
+// its phone, email or status; otherwise editing a "salesman" could hand someone
+// an admin's account.
+const accountHoldsOtherRoles = async (userId, transaction) => {
+    const links = await UserRole.findAll({ where: { user_id: userId }, transaction });
+    if (!links.length) return false;
+    const roles = await Role.findAll({ where: { role_id: links.map((l) => l.role_id) }, transaction });
+    return roles.some((r) => String(r.role_name || '').toLowerCase() !== 'salesman');
+};
 const sequelize = require('../constants/database');
 const { Op } = require('sequelize');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
@@ -187,6 +201,9 @@ class SalesmanController {
                     if (!existingUser) {
                         throw { status: 400, message: 'User not found' };
                     }
+                    if (!isAdmin(req.userRoleNames) && await accountHoldsOtherRoles(user_id, t)) {
+                        throw { status: 403, message: 'Only an admin can link a salesman to an account that has other roles.' };
+                    }
                 } else {
                     const loginUser = await findOrCreateRoleUser({
                         phone,
@@ -349,6 +366,11 @@ class SalesmanController {
             if (docUrl('aadhar_card')) payload.aadhar_card_url = docUrl('aadhar_card');
             if (docUrl('cancel_cheque')) payload.cancel_cheque_url = docUrl('cancel_cheque');
             if (docUrl('photo')) payload.photo_url = docUrl('photo');
+            // Refuse BEFORE saving anything when the linked login is not a plain
+            // salesman account and the caller is not an admin.
+            if (salesman.user_id && !isAdmin(req.userRoleNames) && await accountHoldsOtherRoles(salesman.user_id)) {
+                return res.status(403).json({ error: 'Only an admin can change a salesman whose login account has other roles.' });
+            }
             await Salesman.update(payload, { where: { salesman_id: id } });
             // Keep the linked login account (users table) in sync. Login (OTP)
             // matches users.phone EXACTLY against the E.164 form (+91XXXXXXXXXX),
