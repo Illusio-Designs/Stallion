@@ -554,7 +554,7 @@ const DashboardClients = () => {
         const savedLat = Number(res?.latitude);
         const savedLng = Number(res?.longitude);
         const savedAcc = Number(res?.accuracy);
-        showSuccess(`Location verified & saved${Number.isFinite(savedAcc) ? ` (±${Math.round(savedAcc)}m)` : ''}. The 250m geofence is now active for this party.`);
+        showSuccess(`Location verified & saved${Number.isFinite(savedAcc) ? ` (±${Math.round(savedAcc)}m)` : ''}. The 50m geofence is now active for this party.`);
         setParties(prev => prev.map(p => {
           const id = p.id || p.party_id;
           return id === partyId ? { ...p, latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc } : p;
@@ -1442,8 +1442,8 @@ const DashboardClients = () => {
             <label className="ui-label">Party Location (visit geofence)</label>
             <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
               {isVerified
-                ? `✅ Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. The strict 250m geofence is active for visit orders and check-ins.${isAdmin ? ' You can press “I’m at shop” again to overwrite with your current location.' : ''}`
-                : 'Stand at the shop and tap below to lock the exact spot — the 250m geofence turns on once it is verified.'}
+                ? `✅ Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. The strict 50m geofence is active for visit orders and check-ins.${isAdmin ? ' You can press “I’m at shop” again to overwrite with your current location.' : ''}`
+                : 'Stand at the shop and tap below to lock the exact spot — the 50m geofence turns on once it is verified.'}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {canCapture && (

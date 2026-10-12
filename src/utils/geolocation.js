@@ -3,7 +3,7 @@
 // Wraps navigator.geolocation.getCurrentPosition in a promise that resolves to
 // { latitude, longitude, accuracy } (accuracy in metres) or REJECTS with a
 // friendly, user-facing Error message. High-accuracy is requested because the
-// captured point becomes the party's trusted 250m geofence anchor.
+// captured point becomes the party's trusted 50m geofence anchor.
 
 export function captureCurrentPosition({ timeout = 15000 } = {}) {
   return new Promise((resolve, reject) => {

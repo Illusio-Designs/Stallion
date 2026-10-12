@@ -980,7 +980,7 @@ export const setPartyLocation = async (partyId, coords) => {
 
 /**
  * On-site capture ("I'm at the shop"): send the device GPS + accuracy to set the
- * party's TRUSTED verified location (the 250m geofence anchor). The backend
+ * party's TRUSTED verified location (the 50m geofence anchor). The backend
  * validates accuracy and proximity to the party's address before saving.
  * @param {string} partyId
  * @param {{latitude:number, longitude:number, accuracy:number}} pos

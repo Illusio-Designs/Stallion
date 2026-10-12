@@ -314,7 +314,7 @@ const Cart = ({ onPageChange = null }) => {
   };
 
   // On-site capture ("I'm at shop") for the selected party — sets its TRUSTED
-  // verified location so the 250m visit geofence turns on. Lets a salesman verify
+  // verified location so the 50m visit geofence turns on. Lets a salesman verify
   // right from the cart without opening the party editor.
   const handleVerifyPartyLocation = async () => {
     if (!selectedParty) return;
@@ -329,7 +329,7 @@ const Cart = ({ onPageChange = null }) => {
       }
       const res = await verifyPartyLocation(selectedParty, pos);
       const acc = Number(res?.accuracy);
-      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 250m geofence is now active for this party.`);
+      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 50m geofence is now active for this party.`);
       setParties(prev => prev.map(p => {
         const id = p.id || p.party_id;
         return id === selectedParty
@@ -1459,8 +1459,8 @@ const Cart = ({ onPageChange = null }) => {
                       <div className="flex flex-col gap-1.5">
                         <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
                           {verified
-                            ? `✅ Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 250m geofence active.`
-                            : 'Location not verified yet. Stand at the shop and tap below to enable the 250m geofence.'}
+                            ? `✅ Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 50m geofence active.`
+                            : 'Location not verified yet. Stand at the shop and tap below to enable the 50m geofence.'}
                         </p>
                         {!verified && (
                           <button
