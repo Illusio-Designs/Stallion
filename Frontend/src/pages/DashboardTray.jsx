@@ -127,6 +127,11 @@ const DashboardTray = () => {
     try {
       const res = await getTraysPage(page, 20, search);
       const data = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+      // A delete may have emptied the last page: step back to the last valid page.
+      const lastPage = Math.max(1, res?.pagination?.totalPages ?? 1);
+      if (data.length === 0 && page > lastPage) {
+        return fetchTraysPage(lastPage, search);
+      }
       setTrays(data);
       setTrayPage(page);
       setTrayPageCount(Math.max(1, res?.pagination?.totalPages ?? 1));

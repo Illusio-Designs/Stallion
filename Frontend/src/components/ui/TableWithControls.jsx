@@ -8,6 +8,21 @@ import DateRangePicker from "./DateRangePicker";
 import { compareValues, detectColumnType, visibleSearchText } from "../../utils/tableSort";
 import "../../styles/components/ui.css";
 
+const ROW_ID_KEYS = [
+  "id", "order_id", "party_id", "product_id", "salesman_id", "distributor_id",
+  "expense_id", "event_id", "user_id", "supplier_id", "offer_id", "tray_id",
+  "client_id", "_id", "uuid",
+];
+// Stable identity for a row (null when the row has no id).
+function stableRowId(row) {
+  if (!row || typeof row !== "object") return null;
+  for (const k of ROW_ID_KEYS) {
+    const v = row[k];
+    if (v !== undefined && v !== null && v !== "") return `${k}:${v}`;
+  }
+  return null;
+}
+
 export default function TableWithControls({
   title = "Overview",
   columns = [], // [{key,label,render?,width?}]
@@ -74,6 +89,7 @@ export default function TableWithControls({
     }
   );
   const [selected, setSelected] = useState(new Set());
+  const [gotoValue, setGotoValue] = useState("1");
   const [sortBy, setSortBy] = useState(null); // key
   const [sortDir, setSortDir] = useState("asc"); // 'asc' | 'desc'
   // Filter menu state
@@ -137,15 +153,58 @@ export default function TableWithControls({
   const totalPages = serverPagination
     ? Math.max(1, serverPageCount)
     : Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  // Always-valid page: derived from state, clamped into 1..totalPages.
+  const safePage = serverPagination ? page : Math.min(Math.max(1, page), totalPages);
+  const pageStart = (safePage - 1) * pageSize;
   const pageRows = useMemo(() => {
     // In server mode, `rows` already represents the current page - render as-is.
     if (serverPagination) return sortedRows;
-    const start = (page - 1) * pageSize;
-    return sortedRows.slice(start, start + pageSize);
-  }, [sortedRows, page, pageSize, serverPagination]);
+    return sortedRows.slice(pageStart, pageStart + pageSize);
+  }, [sortedRows, pageStart, pageSize, serverPagination]);
+
+  // Keep the stored page in sync with the clamped value.
+  useEffect(() => {
+    if (!serverPagination && page !== safePage) setPage(safePage);
+  }, [serverPagination, page, safePage]);
+
+  // Reset to page 1 when the data set changes meaningfully (filter / tab /
+  // date / country): first row differs or size changes by more than one row.
+  // A single-row delete is only clamped, not reset.
+  const dataSigRef = useRef(null);
+  useEffect(() => {
+    if (serverPagination) return;
+    const first = sortedRows.length ? (stableRowId(sortedRows[0]) ?? "") : "";
+    const prev = dataSigRef.current;
+    dataSigRef.current = { first, len: sortedRows.length };
+    if (!prev) return;
+    if (prev.first !== first || Math.abs(prev.len - sortedRows.length) > 1) setPage(1);
+  }, [sortedRows, serverPagination]);
+
+  // Selection is keyed by stable row id (index fallback); drop vanished ids.
+  const selKey = (row, absIdx) => stableRowId(row) ?? `idx:${absIdx}`;
+  useEffect(() => {
+    setSelected((prev) => {
+      if (!prev.size) return prev;
+      const valid = new Set(sortedRows.map((r, i) => selKey(r, i)));
+      let changed = false;
+      const next = new Set();
+      prev.forEach((k) => { if (valid.has(k)) next.add(k); else changed = true; });
+      return changed ? next : prev;
+    });
+  }, [sortedRows]);
 
   // Effective page / page size used for serial numbers and the footer pager.
-  const effectivePage = serverPagination ? serverPage : page;
+  const effectivePage = serverPagination ? serverPage : safePage;
+
+  // Go-to-page input mirrors the current page whenever it changes.
+  useEffect(() => { setGotoValue(String(effectivePage)); }, [effectivePage]);
+  const commitGoto = () => {
+    const val = parseInt(gotoValue, 10);
+    const target = Math.min(Math.max(1, Number.isFinite(val) ? val : effectivePage), totalPages);
+    setGotoValue(String(target));
+    if (serverPagination) onServerPageChange?.(target);
+    else setPage(target);
+  };
   const effectivePageSize = serverPagination ? serverPageSize : pageSize;
 
   const toggleColumn = (key) => {
@@ -252,19 +311,19 @@ export default function TableWithControls({
                     type="checkbox"
                     checked={
                       pageRows.length > 0 &&
-                      pageRows.every((_, i) =>
-                        selected.has((page - 1) * pageSize + i)
+                      pageRows.every((r, i) =>
+                        selected.has(selKey(r, pageStart + i))
                       )
                     }
                     onChange={(e) => {
                       const next = new Set(selected);
                       if (e.target.checked) {
-                        pageRows.forEach((_, i) =>
-                          next.add((page - 1) * pageSize + i)
+                        pageRows.forEach((r, i) =>
+                          next.add(selKey(r, pageStart + i))
                         );
                       } else {
-                        pageRows.forEach((_, i) =>
-                          next.delete((page - 1) * pageSize + i)
+                        pageRows.forEach((r, i) =>
+                          next.delete(selKey(r, pageStart + i))
                         );
                       }
                       setSelected(next);
@@ -329,17 +388,17 @@ export default function TableWithControls({
               pageRows.map((row, idx) => {
               const serialNumber = (effectivePage - 1) * effectivePageSize + idx + 1;
               return (
-                <tr key={idx}>
+                <tr key={selKey(row, pageStart + idx)}>
                   {selectable && (
                     <td style={{ width: '40px', padding: '18px 8px 0px' }}>
                       <input
                         type="checkbox"
-                        checked={selected.has((page - 1) * pageSize + idx)}
+                        checked={selected.has(selKey(row, pageStart + idx))}
                         onChange={(e) => {
                           const next = new Set(selected);
                           if (e.target.checked)
-                            next.add((page - 1) * pageSize + idx);
-                          else next.delete((page - 1) * pageSize + idx);
+                            next.add(selKey(row, pageStart + idx));
+                          else next.delete(selKey(row, pageStart + idx));
                           setSelected(next);
                         }}
                       />
@@ -384,17 +443,11 @@ export default function TableWithControls({
             min={1}
             max={totalPages}
             className="ui-input ui-input--goto"
-            defaultValue={effectivePage}
+            value={gotoValue}
+            onChange={(e) => setGotoValue(e.target.value)}
+            onBlur={commitGoto}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                const val = parseInt(e.currentTarget.value || "1", 10);
-                const target = Math.min(Math.max(1, val), totalPages);
-                if (serverPagination) {
-                  onServerPageChange?.(target);
-                } else {
-                  setPage(target);
-                }
-              }
+              if (e.key === "Enter") commitGoto();
             }}
           />
         </div>

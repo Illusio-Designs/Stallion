@@ -213,6 +213,7 @@ class SalesmanCheckInsController {
                 return res.status(pagination.status).json({ error: pagination.error });
             }
             const { count, rows: checkIns } = await SalesmanCheckIns.findAndCountAll({
+                order: [['created_at', 'DESC'], ['id', 'DESC']],
                 limit: pagination.limit,
                 offset: pagination.offset,
             });
