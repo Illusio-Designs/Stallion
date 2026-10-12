@@ -6,7 +6,7 @@ import Footer from '../components/Footer';
 import '../styles/pages/Login.css';
 import { showLoginSuccess, showError, showSuccess } from '../services/notificationService';
 import { setAuth, isLoggedIn, getUserRoles, getUser } from '../services/authService';
-import { checkUser, login, getMe, getMyRole } from '../services/apiService';
+import { checkUser, login, getMe, getMyRole, requestOtpResend } from '../services/apiService';
 import { getAccessiblePagesForRoles, hasAnyRolePageAccess } from '../utils/rolePermissions';
 import { pageKeyToPath } from '../utils/dashboardRoutes';
 import { verifyOTP, resendOTP, initializeOTPWidget, destroyOTPWidget } from '../services/msg91Service';
@@ -634,6 +634,8 @@ const Login = ({ onPageChange }) => {
     setResendDisabled(true);
 
     try {
+      // Server-side limit on resends (max 3 per 15 minutes, 30 s apart).
+      await requestOtpResend(phoneNumber);
       const resendResponse = await resendOTP();
       
       if (resendResponse.success) {
