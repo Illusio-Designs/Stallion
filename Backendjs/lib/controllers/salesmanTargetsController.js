@@ -5,6 +5,24 @@ const { logAudit } = require('../utils/auditLogger');
 const { Op } = require('sequelize');
 const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+// Midnight (UTC) at the start of the day a timestamp falls on.
+const startOfDay = (v) => {
+    const d = new Date(v);
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+};
+
+// A target's end_date is a calendar date stored as midnight, so without this the
+// WHOLE last day would be missed (an order placed at 3 pm on the end date is
+// "after" midnight). A date-only end counts through 23:59:59.999 of that day.
+const endOfTargetDay = (v) => {
+    const d = new Date(v);
+    const dateOnly = d.getUTCHours() === 0 && d.getUTCMinutes() === 0
+        && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0;
+    return dateOnly ? new Date(d.getTime() + DAY_MS - 1) : d;
+};
+
 // Compute achieved amounts LIVE from the orders for a SET of targets with ONE
 // orders query (instead of one per target), so existing and new orders always
 // count (the report never depends on the stored running total).
@@ -13,7 +31,7 @@ const computeCompletedMap = async (targets) => {
     if (!targets.length) return result;
     const salesmanIds = [...new Set(targets.map((t) => t.salesman_id))];
     const minStart = new Date(Math.min(...targets.map((t) => new Date(t.start_date).getTime())));
-    const maxEnd = new Date(Math.max(...targets.map((t) => new Date(t.end_date).getTime())));
+    const maxEnd = new Date(Math.max(...targets.map((t) => endOfTargetDay(t.end_date).getTime())));
     const orders = await Order.findAll({
         where: {
             salesman_id: salesmanIds,
@@ -26,7 +44,7 @@ const computeCompletedMap = async (targets) => {
     orders.forEach((o) => { (bySalesman[o.salesman_id] = bySalesman[o.salesman_id] || []).push(o); });
     targets.forEach((t) => {
         const start = new Date(t.start_date).getTime();
-        const end = new Date(t.end_date).getTime();
+        const end = endOfTargetDay(t.end_date).getTime();
         let sum = 0;
         (bySalesman[t.salesman_id] || []).forEach((o) => {
             const d = new Date(o.order_date).getTime();
@@ -144,8 +162,12 @@ class SalesmanTargetsController {
         }
     }
 
-    async updateTargetFromOrder(order) {
+    // Every order counts towards the salesman's target, including one that is later
+    // cancelled (it still is the salesman's effort). Pass the order's transaction
+    // so a rolled-back order cannot leave a target already raised.
+    async updateTargetFromOrder(order, options = {}) {
         try {
+            const { transaction } = options;
             const { salesman_id, order_date } = order;
             if (!salesman_id) return;
 
@@ -157,9 +179,12 @@ class SalesmanTargetsController {
             const salesmanTargets = await SalesmanTargets.findAll({
                 where: {
                     salesman_id: salesman_id,
-                    // Targets whose window still covers this order date.
-                    end_date: { [Op.gte]: new Date(order_date) }
-                }
+                    // Targets whose window covers this order's day: it has started
+                    // and its last day has not passed.
+                    start_date: { [Op.lte]: new Date(order_date) },
+                    end_date: { [Op.gte]: startOfDay(order_date) }
+                },
+                transaction
             });
             if (!salesmanTargets || salesmanTargets.length === 0) {
                 return;
@@ -178,7 +203,7 @@ class SalesmanTargetsController {
                     if (targetAmount > 0 && next >= targetAmount) {
                         target.target_status = 'completed';
                     }
-                    await target.save();
+                    await target.save({ transaction });
                 }
             }
         }
