@@ -523,11 +523,11 @@ class PartyController {
 
             const adminOverride = isAdmin(req.userRoleNames);
 
-            // Non-admins may only capture when a trusted on-site location is not
-            // set yet. Admin/superadmin may overwrite any party's location.
-            if (!adminOverride && party.location_source === 'verified' && party.latitude != null && party.longitude != null) {
+            // Capture works once for everyone. To fix a wrong location, a manager
+            // first removes it (DELETE /parties/:id/location), then captures again.
+            if (party.location_source === 'verified' && party.latitude != null && party.longitude != null) {
                 return res.status(409).json({
-                    error: 'This party already has a verified location. It cannot be changed from here.',
+                    error: 'This party already has a verified location. Ask a manager to remove it first if it is wrong.',
                 });
             }
 
@@ -595,6 +595,53 @@ class PartyController {
                 location_source: 'verified',
                 accuracy: party.location_accuracy_m,
                 distance_from_address_m: check.distance,
+            });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
+    // Remove a party's saved location (used when the on-site capture was wrong).
+    // Clears the coordinates so "I'm at shop" is available again. Route is limited
+    // to admin / party manager / sales manager; every removal is audit-logged with
+    // the old coordinates.
+    async removePartyLocation(req, res) {
+        try {
+            const id = req.params.id;
+            if (!id) {
+                return res.status(400).json({ error: 'Party ID is required' });
+            }
+            const party = await Party.findOne({ where: { party_id: id } });
+            if (!party) {
+                return res.status(404).json({ error: 'Party not found' });
+            }
+            if (party.latitude == null && party.longitude == null && !party.location_source) {
+                return res.status(409).json({ error: 'This party has no saved location to remove.' });
+            }
+
+            const oldSnapshot = party.toJSON();
+            party.latitude = null;
+            party.longitude = null;
+            party.location_source = null;
+            party.location_accuracy_m = null;
+            party.updated_at = new Date();
+            await party.save();
+
+            await logAudit({
+                req,
+                action: 'update',
+                description: 'Party location removed',
+                tableName: 'parties',
+                recordId: party.party_id,
+                oldValues: oldSnapshot,
+                newValues: party,
+            });
+
+            return res.status(200).json({
+                message: 'Location removed. Use "I\'m at shop" to set it again.',
+                latitude: null,
+                longitude: null,
+                location_source: null,
             });
         } catch (error) {
             return res.status(500).json({ error: error.message });

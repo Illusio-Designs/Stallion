@@ -999,6 +999,19 @@ export const verifyPartyLocation = async (partyId, pos) => {
 };
 
 /**
+ * Remove a party's saved location (managers only) so "I'm at shop" can capture it
+ * again. Used when the first capture was wrong.
+ * @param {string} partyId
+ * @returns {Promise<{message:string}>}
+ */
+export const removePartyLocation = async (partyId) => {
+  return apiRequest(`/parties/${partyId}/location`, {
+    method: 'DELETE',
+    includeAuth: true,
+  });
+};
+
+/**
  * Bulk upload parties from Excel/CSV file
  * @param {File} file - Excel or CSV file
  * @returns {Promise<Object>} Response with created/updated counts
