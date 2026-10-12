@@ -16,6 +16,7 @@ import {
   getPartiesForRole,
   getStates,
   getZones,
+  removePartyLocation,
   updateParty,
   verifyPartyLocation,
 } from '../services/apiService';
@@ -529,7 +530,8 @@ const DashboardClients = () => {
     const partyId = editRow?.id || editRow?.party_id;
     const isVerified = (editRow?.location_source || formData.location_source) === 'verified';
 
-    if (isVerified && !isAdmin) return;
+    // "I'm at shop" works once. To fix a wrong location, a manager removes it first.
+    if (isVerified) return;
 
     try {
       setSavingLoc(true);
@@ -573,6 +575,28 @@ const DashboardClients = () => {
       }
     } catch (err) {
       showError(err?.message || 'Could not verify location. Please try again from the shop.');
+    } finally {
+      setSavingLoc(false);
+    }
+  };
+
+  // Remove a wrong saved location (managers only) so "I'm at shop" shows again.
+  const handleRemoveLocation = async () => {
+    const partyId = editRow?.id || editRow?.party_id;
+    if (!partyId) return;
+    if (!(await confirm('Remove this party\'s saved location? Visit orders and check-ins stay blocked until someone captures it again with "I\'m at shop".'))) {
+      return;
+    }
+    try {
+      setSavingLoc(true);
+      await removePartyLocation(partyId);
+      const cleared = { latitude: null, longitude: null, location_source: null, location_accuracy_m: null };
+      setParties(prev => prev.map(p => ((p.id || p.party_id) === partyId ? { ...p, ...cleared } : p)));
+      setEditRow(prev => (prev ? { ...prev, ...cleared } : prev));
+      setFormData(prev => ({ ...prev, ...cleared }));
+      showSuccess('Location removed. Use "I\'m at shop" to set it again.');
+    } catch (err) {
+      showError(err?.message || 'Could not remove the location. Please try again.');
     } finally {
       setSavingLoc(false);
     }
@@ -1435,20 +1459,28 @@ const DashboardClients = () => {
         const locAcc = editRow?.location_accuracy_m ?? formData.location_accuracy_m;
         const hasLocationSet = Number.isFinite(Number(locLat)) && Number.isFinite(Number(locLng));
         const isVerified = locSource === 'verified';
-        // Admin/superadmin may always set or overwrite. Other roles: only when not verified.
-        const canCapture = isAdmin || !isVerified;
+        // Capture works once for everyone. A wrong location is fixed by a manager
+        // removing it first, which brings the button back.
+        const canCapture = !isVerified;
+        const canRemoveLocation = !!editRow && hasLocationSet
+          && (isAdmin || userRole === 'party_manager' || userRole === 'sales_manager');
         return (
           <div className="form-group form-group--full rounded-lg border border-border bg-surface-muted p-3">
             <label className="ui-label">Party Location (visit geofence)</label>
             <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
               {isVerified
-                ? `✅ Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. The strict 50m geofence is active for visit orders and check-ins.${isAdmin ? ' You can press “I’m at shop” again to overwrite with your current location.' : ''}`
+                ? `✅ Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. The strict 50m geofence is active for visit orders and check-ins.${canRemoveLocation ? ' If it is wrong, press “Remove location” and capture it again.' : ' If it is wrong, ask a manager to remove it.'}`
                 : 'Stand at the shop and tap below to lock the exact spot — the 50m geofence turns on once it is verified.'}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {canCapture && (
                 <button type="button" className="ui-btn ui-btn--primary" onClick={handleCaptureAtShop} disabled={savingLoc}>
                   {savingLoc ? 'Capturing…' : 'I’m at shop'}
+                </button>
+              )}
+              {canRemoveLocation && (
+                <button type="button" className="ui-btn ui-btn--secondary" onClick={handleRemoveLocation} disabled={savingLoc}>
+                  {savingLoc ? 'Removing…' : 'Remove location'}
                 </button>
               )}
               {hasLocationSet && (
