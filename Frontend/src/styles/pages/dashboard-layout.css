@@ -67,6 +67,17 @@
   }
 }
 
+/* On phones a floating bottom nav (about 72px tall, plus the home-bar inset)
+   sits over the page. The padding shorthands above would reset the bottom
+   padding that keeps the end of the page clear of it (they outrank the Tailwind
+   pb-[...] utility), so set it here, after them. Without this the last rows,
+   pager and Save buttons end up under the nav and cannot be reached. */
+@media (max-width: 767.98px) {
+  .dashboard-content {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 /* ==========================================================================
    Tablet
    ========================================================================== */
