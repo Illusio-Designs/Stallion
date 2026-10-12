@@ -3,6 +3,7 @@ import '../styles/components/DashboardHeader.css';
 import { FiMaximize, FiMinimize, FiBell, FiMenu, FiSearch, FiSidebar, FiX } from 'react-icons/fi';
 import Tooltip from './ui/Tooltip';
 import InstallAppButton from './InstallAppButton';
+import { resolveProfileImageUrl } from '../utils/profileImage';
 import { logout as authLogout, getUser } from '../services/authService';
 import { showLogoutSuccess } from '../services/notificationService';
 import { getMe } from '../services/apiService';
@@ -290,7 +291,7 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
                 title="User Menu"
               >
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt={userName} className="dashboard-avatar-image w-full h-full object-cover rounded-pill" />
+                  <img src={resolveProfileImageUrl(avatarUrl)} alt={userName} className="dashboard-avatar-image w-full h-full object-cover rounded-pill" />
                 ) : (
                   <span className="dashboard-avatar-initials text-[length:var(--text-sm)] font-semibold text-primary leading-none">{initials || 'U'}</span>
                 )}
