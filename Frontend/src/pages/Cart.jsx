@@ -532,16 +532,29 @@ const Cart = ({ onPageChange = null }) => {
     const item = currentItems.find((item) => item.id === productId);
     if (!item) return;
 
+    const max = maxFor(productId);
+    // Nothing is available: do not pretend a quantity of 1 is fine.
+    if (max <= 0) {
+      showError('This product is out of stock. Please remove it from your cart.');
+      return;
+    }
     const parsed = parseInt(value, 10);
     let newQuantity = Number.isNaN(parsed) ? 1 : Math.max(1, parsed);
-    const max = maxFor(productId);
     let capped = false;
-    if (newQuantity > max) { newQuantity = Math.max(1, max); capped = true; }
-    updateCartQuantity(productId, newQuantity);
-    const itemName = `${item.name} (${item.lenseColour})`;
+    if (newQuantity > max) { newQuantity = max; capped = true; }
+    if (newQuantity !== item.quantity) updateCartQuantity(productId, newQuantity);
+    // One message, only when the box is left, and only if something changed.
     if (capped) showError(`Only ${max} in stock — quantity set to ${newQuantity}`);
-    else showCartUpdateSuccess(itemName, newQuantity);
+    else if (newQuantity !== item.quantity) {
+      showCartUpdateSuccess(`${item.name} (${item.lenseColour})`, newQuantity);
+    }
   };
+
+  // Lines whose product has no stock left. They cannot be ordered.
+  const outOfStockItems = cartItems.filter((it) => {
+    const s = stockById[String(it.id)];
+    return s != null && s <= 0;
+  });
 
   const calculateSubtotal = () => {
     return cartItems.reduce((total, item) => {
@@ -617,6 +630,10 @@ const Cart = ({ onPageChange = null }) => {
     }
     if (cartItems.length === 0) {
       showError('Your cart is empty');
+      return;
+    }
+    if (outOfStockItems.length > 0) {
+      showError(`Remove out-of-stock items before checkout: ${outOfStockItems.map((it) => it.name).join(', ')}`);
       return;
     }
 
@@ -1176,10 +1193,16 @@ const Cart = ({ onPageChange = null }) => {
         removeFromCart(item.id);
       });
       
-      // Reset form
+      // Reset form. Nothing from this order may leak into the next one: the note,
+      // typed quantities and the captured visit location are forgotten too.
       setSelectedParty("");
       setSelectedEvent("");
       setSelectedCountry("");
+      setOrderNote("");
+      setEditingQuantities({});
+      setLatitude(null);
+      setLongitude(null);
+      locationRef.current = { latitude: null, longitude: null };
       if (isSalesman) {
         setOrderType("");
       }
@@ -1294,10 +1317,8 @@ const Cart = ({ onPageChange = null }) => {
                           aria-label={`Quantity for ${getDisplayName(item)}`}
                           value={editingQuantities[item.id] !== undefined ? editingQuantities[item.id] : item.quantity}
                           onChange={e => {
+                            // Just hold what is typed; it is checked when the box is left.
                             setEditingQuantities(q => ({ ...q, [item.id]: e.target.value }));
-                            const itemName = `${item.name} (${item.lenseColour})`;
-                            const num = parseInt(e.target.value, 10);
-                            showCartUpdateSuccess(itemName, (!e.target.value || isNaN(num) || num < 1) ? 1 : num);
                           }}
                           onBlur={e => {
                             const val = editingQuantities[item.id];
@@ -1564,6 +1585,11 @@ const Cart = ({ onPageChange = null }) => {
               </div>
             </div>
 
+            {outOfStockItems.length > 0 && !isOfficeOnly && (
+              <p className="mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-error" role="alert">
+                Remove the out-of-stock {outOfStockItems.length === 1 ? 'item' : 'items'} from your cart to continue.
+              </p>
+            )}
             {isOfficeOnly && (
               <p className="mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-text-muted" role="note">
                 Your account type cannot place orders from the cart. To create an order, go to{' '}
@@ -1574,7 +1600,7 @@ const Cart = ({ onPageChange = null }) => {
               type="button"
               className="checkout-btn mt-6 w-full min-h-[52px] bg-primary text-text-on-primary border border-primary px-6 py-3.5 rounded-xl text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_-8px_var(--color-primary)] hover:enabled:bg-primary-hover hover:enabled:border-primary-hover hover:enabled:-translate-y-px focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:translate-y-0 active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
               onClick={handleCheckout}
-              disabled={loading || isOfficeOnly}
+              disabled={loading || isOfficeOnly || outOfStockItems.length > 0}
               aria-busy={loading}
             >
               {loading && <span className="checkout-btn__spinner w-4 h-4 rounded-pill border-2 border-[rgba(255,255,255,0.4)] border-t-[var(--color-text-on-primary)] animate-spin motion-reduce:animate-none flex-shrink-0" aria-hidden="true" />}

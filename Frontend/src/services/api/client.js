@@ -198,7 +198,7 @@ const handleResponse = async (response) => {
       showError('Your session has expired. Please login again.');
       
       // Clear authentication immediately
-      logout();
+      logout({ keepCart: true });
       
       // Redirect to login page after a short delay to ensure notification is visible
       // Check if we're not already on the login page to avoid infinite loops
@@ -294,7 +294,7 @@ const apiRequest = async (endpoint, options = {}) => {
       isRedirecting = true;
       window.__hasShownLogoutNotification = true;
       showError('Your session has expired. Please login again.');
-      logout();
+      logout({ keepCart: true });
       
       const currentPath = window.location.pathname;
       if (!currentPath.includes('/login')) {
