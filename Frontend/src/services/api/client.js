@@ -147,6 +147,14 @@ const handleResponse = async (response) => {
                     (errorData.data && (errorData.data.error || errorData.data.message || errorData.data.msg)) ||
                     errorMessage;
       
+      // The server firewall (Imunify360) blocks the request before it reaches the
+      // API and answers with its own JSON message. Show something users can act
+      // on instead of the firewall's wording, and keep the original in the console.
+      if (/imunify360|bot-protection/i.test(String(errorMessage))) {
+        console.error('[API Error] Blocked by server firewall:', errorMessage, response.url);
+        errorMessage = 'The server blocked this request. Please try again in a moment, or contact support if it keeps happening.';
+      }
+
       // If we still have the default message, try to get more info
       if (errorMessage === 'An error occurred' && errorData) {
         // Log the full error data for debugging

@@ -44,7 +44,9 @@
   padding: var(--space-6) var(--space-6);   /* 24px */
 }
 
-@media (max-width: 768px) {
+/* Phone breakpoint is < 768px so it matches Tailwind's `md:` (>= 768px) exactly;
+   a 768px viewport must not fall into both the phone and desktop layouts. */
+@media (max-width: 767.98px) {
   .dashboard-content {
     padding: var(--space-5) var(--space-4);  /* 20px / 16px */
   }
@@ -52,7 +54,7 @@
 
 /* On small screens the sidebar collapses to an overlay/off-canvas pattern
    owned by the sidebar component; the shell should not reserve its width. */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .dashboard-layout .dashboard-shell,
   .dashboard-layout.collapsed .dashboard-shell {
     margin-left: 0;

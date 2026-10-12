@@ -21,7 +21,10 @@
    so buttons are never clipped.
    -------------------------------------------------------------------------- */
 .dash-card .ui-table tbody td {
-  max-width: 0;                 /* let the column distribute; ellipsis kicks in */
+  /* Cap long values instead of collapsing every column to a few characters
+     (max-width:0 only works with table-layout:fixed). The table scrolls
+     horizontally inside .ui-table__scroll when the columns need more room. */
+  max-width: 220px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
