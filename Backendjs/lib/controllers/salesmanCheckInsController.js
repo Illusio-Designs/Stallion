@@ -276,6 +276,24 @@ class SalesmanCheckInsController {
             const body = { ...req.body };
             if (actor.salesmanId) body.salesman_id = actor.salesmanId;
 
+            // Which party was visited, and on which day, is fixed once the visit is
+            // recorded: the location was checked against THAT party when it was
+            // created, so changing either would turn it into a visit that never
+            // happened. (To correct a wrong party, an office user deletes the visit.)
+            const dayKey = (v) => {
+                const d = new Date(v);
+                return Number.isNaN(d.getTime()) ? String(v || '') : d.toISOString().slice(0, 10);
+            };
+            const sameDay = (a, b) => dayKey(a) === dayKey(b);
+            if (body.party_id !== undefined && String(body.party_id) !== String(existingCheckIn.party_id)) {
+                return res.status(400).json({ error: 'The party of a visit cannot be changed after it is recorded.' });
+            }
+            if (body.check_in_date !== undefined && !sameDay(body.check_in_date, existingCheckIn.check_in_date)) {
+                return res.status(400).json({ error: 'The date of a visit cannot be changed after it is recorded.' });
+            }
+            body.party_id = existingCheckIn.party_id;
+            body.check_in_date = existingCheckIn.check_in_date;
+
             const fields = resolveCheckInFields(body, existingCheckIn.toJSON());
             // The location was checked against the geofence when the check-in was
             // created. Editing later (remarks, times) keeps that stored point and
