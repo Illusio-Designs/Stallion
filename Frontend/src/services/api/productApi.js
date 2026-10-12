@@ -139,13 +139,11 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
       filterBody.image_status = filters.image_status;
     }
 
-    // Always include price filter (backend requires it)
-    // If price is not provided, use full range (0-10000) to show all products
+    // Price is an optional filter. Only send it when the caller really set a
+    // range: the server then returns products of every price. (A default range
+    // used to be sent here and hid every frame with an MRP above its maximum.)
     if (filters.price !== undefined && filters.price !== null) {
       filterBody.price = filters.price;
-    } else {
-      // Default to full range when no price filter is specified
-      filterBody.price = { min: 0, max: 10000 };
     }
 
     // Always use POST with body since backend requires price field

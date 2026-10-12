@@ -5,6 +5,20 @@
 // friendly, user-facing Error message. High-accuracy is requested because the
 // captured point becomes the party's trusted 50m geofence anchor.
 
+// The distance a salesman must be within to place a visit order or check in.
+// Mirrors the server's GEOFENCE_RADIUS_M (50 m).
+export const GEOFENCE_RADIUS_M = 50;
+
+// Great-circle distance in metres between two lat/lng points (Haversine).
+export function distanceMeters(lat1, lng1, lat2, lng2) {
+  const toRad = (d) => (Number(d) * Math.PI) / 180;
+  const R = 6371000;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+
 export function captureCurrentPosition({ timeout = 15000 } = {}) {
   return new Promise((resolve, reject) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {

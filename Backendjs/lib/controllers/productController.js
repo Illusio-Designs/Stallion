@@ -125,7 +125,7 @@ class ProductController {
             if (pageNum < 1 || limitNum < 1) {
                 return res.status(400).json({ error: 'Page and limit must be positive numbers' });
             }
-            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody, product_ids, image_status } = req.body;
+            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody, product_ids, image_status, status } = req.body;
             const { name: nameQuery } = getListSearchParams(req);
             const search = (searchQuery || searchBody || nameQuery || '').trim();
             const conditions = [];
@@ -165,6 +165,11 @@ class ProductController {
             }
             if (gender_id) {
                 conditions.push({ gender_id });
+            }
+            // Optional status filter ('active', 'draft'), case-insensitive, so lists
+            // can be paged on the server instead of filtering each page afterwards.
+            if (status) {
+                conditions.push(Sequelize.where(Sequelize.fn('LOWER', Sequelize.col(`${Product.name}.status`)), String(status).trim().toLowerCase()));
             }
             if (price) {
                 conditions.push({

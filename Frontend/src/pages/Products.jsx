@@ -229,12 +229,6 @@ const Products = ({ onPageChange }) => {
     // Always filter to show only active products in public page (hide draft products)
     filters.status = 'active';
 
-    // Always include price filter with full range (backend requires it)
-    filters.price = {
-      min: 0,
-      max: 10000
-    };
-
     return filters;
   }, [
     selectedGender,
