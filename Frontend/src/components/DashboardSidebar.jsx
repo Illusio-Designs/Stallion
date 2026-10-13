@@ -3,7 +3,7 @@ import '../styles/components/DashboardSidebar.css';
 import {
   FiGrid, FiPackage, FiShoppingCart, FiDollarSign, FiInbox, FiCalendar,
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
-  FiHelpCircle, FiSettings, FiChevronsLeft, FiX, FiShoppingBag, FiTag,
+  FiHelpCircle, FiAlertTriangle, FiSettings, FiChevronsLeft, FiX, FiShoppingBag, FiTag,
 } from 'react-icons/fi';
 import { getUserRoles } from '../services/authService';
 import { filterMenuItemsByRoles } from '../utils/rolePermissions';
@@ -64,6 +64,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     analytics: FiBarChart2,
     support: FiHelpCircle,
     settings: FiSettings,
+    'known-issues': FiAlertTriangle,
   };
   
   // Role comes from localStorage, which doesn't exist during SSR. Reading it
@@ -92,6 +93,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     { id: 'manage', text: 'Manage' },
     { id: 'analytics', text: 'Analytics & Reports' },
     { id: 'support', text: 'Support' },
+    { id: 'known-issues', text: 'Known Problems' },
     { id: 'settings', text: 'Settings' },
   ];
   

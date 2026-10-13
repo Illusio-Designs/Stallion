@@ -51,6 +51,7 @@ const DashboardOffers = lazy(() => import('./DashboardOffers'));
 const AnalyticsReports = lazy(() => import('./AnalyticsReports'));
 const DashboardSupport = lazy(() => import('./DashboardSupport'));
 const DashboardSettings = lazy(() => import('./DashboardSettings'));
+const DashboardKnownIssues = lazy(() => import('./DashboardKnownIssues'));
 const DashboardExpenses = lazy(() => import('./DashboardExpenses'));
 
 const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
@@ -142,7 +143,7 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
 
   const renderPage = () => {
     // Check if this is a dashboard page that requires role-based access
-    const dashboardPages = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'offers', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings', 'expenses'];
+    const dashboardPages = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'offers', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings', 'expenses', 'known-issues'];
     const isDashboardPage = dashboardPages.includes(currentPage);
     
     // If it's a dashboard page, check role-based access. A member can hold
@@ -215,6 +216,8 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
         return <DashboardSupport />;
       case 'settings':
         return <DashboardSettings />;
+      case 'known-issues':
+        return <DashboardKnownIssues />;
       case 'expenses':
         return <DashboardExpenses />;
       
