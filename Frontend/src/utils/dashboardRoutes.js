@@ -26,7 +26,6 @@ export const DASHBOARD_PAGE_KEYS = [
   'analytics',
   'support',
   'settings',
-  'known-issues',
 ];
 
 // page key -> URL slug under /dashboard. Only list keys whose slug differs.
