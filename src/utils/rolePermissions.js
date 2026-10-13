@@ -20,6 +20,7 @@ export const ALL_PAGES = {
   ANALYTICS: 'analytics',
   SUPPORT: 'support',
   SETTINGS: 'settings',
+  KNOWN_ISSUES: 'known-issues',
 };
 
 // Role permissions mapping
@@ -58,6 +59,7 @@ export const ROLE_PERMISSIONS = {
     ALL_PAGES.ANALYTICS,
     ALL_PAGES.SUPPORT,
     ALL_PAGES.SETTINGS,
+    ALL_PAGES.KNOWN_ISSUES,
   ],
   'tray_manager': [
     ALL_PAGES.TRAY,
