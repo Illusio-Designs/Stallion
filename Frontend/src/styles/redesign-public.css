@@ -348,3 +348,48 @@ div.products-grid-container.grid {
 .product-card .pc-actions > button:last-child { height: 34px; border-radius: 9px; }
 .product-card .pc-view-fab { width: 30px; height: 30px; right: 8px; top: 8px; }
 .product-card .pc-badge { left: 8px; top: 8px; height: 24px; font-size: 11px; padding: 0 9px 0 8px; }
+
+/* ---- Home: About section as a clean two-column block (grey photo, no wash-out) ---- */
+.about-section .about-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 56px 48px;
+  gap: 48px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+}
+.about-section .about-image { width: 100% !important; height: 380px; border-radius: 16px; background: #f4f4f4; }
+.about-section .about-image img { width: 100% !important; height: 100%; object-fit: cover; opacity: 1; filter: grayscale(1); }
+.about-section .about-image-overlay,
+.about-section .about-goggles-icon { display: none; }
+.about-section .about-content { margin-left: 0 !important; padding: 0; }
+@media (max-width: 860px) {
+  .about-section .about-container { grid-template-columns: minmax(0, 1fr); padding: 32px 16px; gap: 24px; }
+  .about-section .about-image { height: 240px; }
+}
+
+/* Footer: white, and the (white-background) logo blends in instead of showing a box. */
+.footer { background: #ffffff; }
+.footer img[src*="logo"] { mix-blend-mode: multiply; }
+footer.footer, footer.footer > *, .footer .footer-background { background: #ffffff !important; }
+.footer-background::after { display: none; }
+
+/* ---- Cart: white page, flat cards, regular 44px buttons ---- */
+.cart-page { background: #ffffff; }
+.cart-page .shopping-cart-section,
+.cart-page .summary-section,
+.cart-page .summary-section-x {
+  border-radius: 14px;
+  box-shadow: none;
+  border: 1px solid #e1e1e1;
+}
+.cart-page .summary-section { padding: 24px; }
+.cart-page .checkout-btn {
+  min-height: 44px;
+  border-radius: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+  box-shadow: none;
+}
+.cart-page .checkout-btn:hover:enabled { transform: none; }
