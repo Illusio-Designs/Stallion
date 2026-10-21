@@ -174,6 +174,11 @@ class UserController {
                 return res.status(404).json({ error: 'User not found' });
             }
 
+            // The phone number is the login, so only an admin may change it (no OTP check here).
+            if (phone !== undefined && String(phone).replace(/\D/g, '') !== String(user.phone || '').replace(/\D/g, '') && !canManageUsers(req.userRoleName)) {
+                return res.status(403).json({ error: 'Your phone number can only be changed by an administrator' });
+            }
+
             const updates = {
                 full_name: name !== undefined ? name : user.full_name,
                 phone: phone !== undefined ? phone : user.phone,
