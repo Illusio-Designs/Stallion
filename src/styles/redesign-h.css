@@ -1,0 +1,13 @@
+/* Manage page: pill tabs scroll horizontally on small screens */
+:root .manage-tabs {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  scrollbar-width: thin;
+}
+:root .manage-tabs .order-tab {
+  flex: 0 0 auto;
+  white-space: nowrap;
+  min-height: 44px;
+}

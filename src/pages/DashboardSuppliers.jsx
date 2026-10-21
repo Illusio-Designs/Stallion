@@ -795,16 +795,18 @@ const DashboardSuppliers = () => {
 
   const columns = useMemo(() => ([
     {
-      key: 'full_name', label: 'NAME', render: (v) => (
+      key: 'full_name', label: 'NAME', render: (v, row) => (
         <span className="sm-who">
           <span className="sm-pic" aria-hidden="true">
             {String(v || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
           </span>
-          {v}
+          <span className="sm-who__txt">
+            {v}
+            {row.employee_code ? <small className="sm-sub">{row.employee_code}</small> : null}
+          </span>
         </span>
       )
     },
-    { key: 'employee_code', label: 'CODE' },
     {
       key: 'zones', label: 'ZONES', render: (_v, row) => {
         const names = (Array.isArray(row.zones) ? row.zones : [])
@@ -813,8 +815,14 @@ const DashboardSuppliers = () => {
         return names.length ? names.join(', ') : '-';
       }
     },
-    { key: 'phone', label: 'PHONE' },
-    { key: 'email', label: 'EMAIL' },
+    {
+      key: 'phone', label: 'CONTACT', render: (v, row) => (
+        <span className="sm-contact">
+          {v || '-'}
+          {row.email ? <small className="sm-sub">{row.email}</small> : null}
+        </span>
+      )
+    },
     {
       key: 'status', label: 'STATUS', render: (_v, row) => (
         <button
@@ -1590,7 +1598,7 @@ const DashboardSuppliers = () => {
         {/* Salesmen Table - admin only */}
         {!isSalesman && mainTab === 'Salesmen' && (
           <div className="dash-row">
-            <div className="dash-card full">
+            <div className="dash-card full sm-fit">
               <div className="mb-4" style={{ maxWidth: 360 }}>
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
                   Filter by Country
