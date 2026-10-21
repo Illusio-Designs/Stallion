@@ -6,7 +6,7 @@ const About = () => {
   return (
     <div className="about-page bg-bg text-text">
       {/* Hero */}
-      <section className="about-hero relative overflow-hidden bg-surface border-b border-border py-12 px-5 md:py-16">
+      <section className="about-hero relative overflow-hidden py-12 px-5 md:py-16">
         <div className="about-hero-content container relative z-[3] max-w-[760px] mx-auto text-center">
           <p className="about-eyebrow text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle m-0 mb-3">
             About Stallion
@@ -68,7 +68,7 @@ const About = () => {
       </section>
 
       {/* Certifications */}
-      <section className="about-certifications bg-surface-muted py-12 sm:py-16">
+      <section className="about-certifications bg-bg py-12 sm:py-16">
         <div className="certifications-container container max-w-[720px] mx-auto text-center">
           <p className="about-eyebrow about-eyebrow--dark text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle m-0 mb-3">
             Standards
@@ -115,7 +115,7 @@ const About = () => {
       </section>
 
       {/* Team */}
-      <section className="about-team bg-surface-muted py-12 sm:py-16">
+      <section className="about-team bg-bg py-12 sm:py-16">
         <div className="container">
           <p className="about-eyebrow about-eyebrow--dark text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle m-0 mb-3">
             Our people

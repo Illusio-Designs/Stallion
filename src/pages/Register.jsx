@@ -18,10 +18,10 @@ const Register = () => {
         <div className="register-container">
           <h1 className="register-title">Create your account</h1>
           <p className="register-subtitle">
-            Registration is handled by your administrator. Please contact your team to be added,
-            then sign in with your mobile number.
+            Trade accounts are created by your administrator. Ask your Stallion contact to add your shop, then sign in with your mobile number.
           </p>
           <a href="/login" className="register-signin ui-btn ui-btn--primary ui-btn--lg">Sign in</a>
+          <p className="register-hint">Already have an account? Use the Sign in button above.</p>
         </div>
       </div>
     </div>

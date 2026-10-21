@@ -1590,7 +1590,7 @@ const DashboardClients = () => {
           <div className="gtools">
             <label className="gsearch">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4-4" /></svg>
-              <input type="search" value={partySearch} onChange={e => setPartySearch(e.target.value)} placeholder="Search by name, contact, phone or city" aria-label="Search parties" />
+              <input type="search" value={partySearch} onChange={e => setPartySearch(e.target.value)} placeholder="Search parties" aria-label="Search parties" />
             </label>
             <button type="button" className="gbtn" onClick={handleExportParties} disabled={loading || filteredRowsByTab.length === 0}>Export CSV</button>
           </div>

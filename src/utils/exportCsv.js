@@ -2,7 +2,7 @@
 const escapeCell = (v) => {
   let s = v == null ? '' : String(v);
   // Neutralise spreadsheet formulas in text coming from user data.
-  if (/^[=+@]/.test(s) || /^-[^0-9.]/.test(s)) s = `'${s}`;
+  if (/^[=@]/.test(s) || /^[+-](?![0-9\s.])/.test(s)) s = `'${s}`;
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 };
 
