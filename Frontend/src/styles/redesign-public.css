@@ -144,7 +144,7 @@
 }
 .filter-chip { border-radius: 999px; border-color: #e1e1e1; }
 .products-state { border-radius: 14px; box-shadow: none; border-color: #e1e1e1; }
-.products-grid-container {
+div.products-grid-container.grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
@@ -233,7 +233,7 @@
   border-radius: 8px;
 }
 .auth-brand:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); }
-.auth-brand-logo { height: 44px; width: auto; display: block; filter: brightness(0) invert(1); }
+.auth-brand-logo { height: 44px; width: auto; display: block; filter: invert(1); }
 .auth-headline {
   font-family: var(--font-display);
   font-size: 44px;
@@ -288,3 +288,63 @@
   .products-main .products-header h2 { font-size: 24px; }
   .footer-content { padding-left: 16px; padding-right: 16px; }
 }
+
+/* Stock badge sits on the image corner: a white chip with a coloured dot. */
+.product-card .pc-badge {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  z-index: 2;
+  height: 28px;
+  padding: 0 11px 0 9px;
+  background: #ffffff;
+  color: #0a0a0a;
+  border: 1px solid #e1e1e1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  font-size: 12px;
+  line-height: 1;
+}
+.product-card .pc-badge.pc-pill--ok::before { background: #0b7a53; }
+.product-card .pc-badge.pc-pill--idle::before { background: #8c8c8c; }
+.product-card .pc-badge.pc-pill--bad { color: #b3261e; border-color: #f0b9b4; }
+.product-card .pc-badge.pc-pill--bad::before { background: #b3261e; }
+.product-card .pc-row { display: block; min-height: 0; margin-top: 2px; }
+
+/* ---- Compact, SaaS-style product cards ---------------------------------- */
+div.products-grid-container.grid {
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 12px;
+}
+.product-card {
+  padding: 10px;
+  border-radius: 12px;
+  box-shadow: none;
+  transition: border-color 0.15s ease;
+}
+.product-card:hover { transform: none; box-shadow: none; border-color: #0a0a0a; }
+.product-card .product-image { border-radius: 8px; }
+.products-grid-container .product-card .product-image { height: 132px; }
+.product-card .product-image img { height: 100%; width: 100%; object-fit: contain; }
+.product-card > .product-name,
+.product-card > .pc-row,
+.product-card > .pc-actions { margin-left: 4px; margin-right: 4px; }
+.products-grid-container .product-card .product-name {
+  font-size: 14px;
+  min-height: 0;
+  height: auto;
+  margin-top: 10px;
+  margin-bottom: 2px;
+  -webkit-line-clamp: 1;
+}
+.product-card .pc-price { margin-bottom: 0; gap: 6px; }
+.product-card .pc-price-label { font-size: 10.5px; }
+.product-card .pc-price-now { font-size: 14px; }
+.product-card .pc-price-mrp { font-size: 12px; }
+.product-card .pc-actions { margin-top: 8px; margin-bottom: 4px; gap: 6px; }
+.product-card .pc-qty { height: 34px; border-radius: 9px; }
+.product-card .pc-qty-btn { width: 26px; }
+.product-card .pc-qty-value { min-width: 22px; font-size: 13px; }
+.product-card .pc-add-btn,
+.product-card .pc-actions > button:last-child { height: 34px; border-radius: 9px; }
+.product-card .pc-view-fab { width: 30px; height: 30px; right: 8px; top: 8px; }
+.product-card .pc-badge { left: 8px; top: 8px; height: 24px; font-size: 11px; padding: 0 9px 0 8px; }

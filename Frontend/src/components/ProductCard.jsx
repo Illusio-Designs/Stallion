@@ -143,6 +143,10 @@ const ProductCard = ({
   return (
     <div className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
       <div className={`product-image relative overflow-hidden rounded-md${imgBroken ? ' aspect-square' : ''}`}>
+        {/* Stock badge (top-left of the image): white chip, coloured dot */}
+        <span className={`pc-pill pc-badge ${outOfStock ? 'pc-pill--bad' : lowStock ? 'pc-pill--idle' : 'pc-pill--ok'}`}>
+          {outOfStock ? 'Sold out' : lowStock ? 'Low stock' : 'In stock'}
+        </span>
         {/* View (eye) button (top-right) — replaces the wishlist icon */}
         <button
           type="button"
@@ -197,9 +201,6 @@ const ProductCard = ({
           )}
         </div>
       )}
-        <span className={`pc-pill ${outOfStock ? 'pc-pill--bad' : lowStock ? 'pc-pill--idle' : 'pc-pill--ok'}`}>
-          {outOfStock ? 'Sold out' : lowStock ? 'Low stock' : 'In stock'}
-        </span>
       </div>
 
       <div className="pc-actions flex w-full items-center gap-2 mt-3">

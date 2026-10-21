@@ -16,28 +16,28 @@ h1, h2, h3,
 .dash-card { border-radius: 14px; }
 
 /* ---- Sidebar: ink black, white text ---- */
-.dashboard-sidebar {
+:root .dashboard-sidebar {
   background: #0a0a0a;
   color: #d2d2d2;
   border-right: 1px solid #0a0a0a;
 }
-.dashboard-sidebar .sidebar-logo-img { filter: brightness(0) invert(1); }
-.dashboard-sidebar-nav a { color: #d2d2d2; }
-.dashboard-sidebar-nav a:hover { background: #1c1c1c; color: #ffffff; }
-.dashboard-sidebar-nav a.active,
-.dashboard-sidebar.collapsed .dashboard-sidebar-nav a.active {
+:root .dashboard-sidebar.expanded .sidebar-logo-img { filter: invert(1); } /* dark art on an opaque white file */
+:root .dashboard-sidebar-nav a { color: #d2d2d2; }
+:root .dashboard-sidebar-nav a:hover { background: #1c1c1c; color: #ffffff; }
+:root .dashboard-sidebar-nav a.active,
+:root .dashboard-sidebar.collapsed .dashboard-sidebar-nav a.active {
   background: #1c1c1c;
   color: #ffffff;
 }
-.dashboard-sidebar-nav a.active::before { display: none; }
-.dashboard-sidebar-nav a:focus-visible { box-shadow: 0 0 0 2px #ffffff; }
-.dashboard-sidebar-footer { border-top-color: #1c1c1c; }
-.dashboard-sidebar .sidebar-toggle { color: #bdbdbd; }
-.dashboard-sidebar .sidebar-toggle:hover { background: #1c1c1c; color: #ffffff; }
-.dashboard-sidebar .sidebar-mobile-close { color: #d2d2d2; }
-.dashboard-sidebar .sidebar-mobile-close:hover { background: #1c1c1c; color: #ffffff; }
+:root .dashboard-sidebar-nav a.active::before { display: none; }
+:root .dashboard-sidebar-nav a:focus-visible { box-shadow: 0 0 0 2px #ffffff; }
+:root .dashboard-sidebar-footer { border-top-color: #1c1c1c; }
+:root .dashboard-sidebar .sidebar-toggle { color: #bdbdbd; }
+:root .dashboard-sidebar .sidebar-toggle:hover { background: #1c1c1c; color: #ffffff; }
+:root .dashboard-sidebar .sidebar-mobile-close { color: #d2d2d2; }
+:root .dashboard-sidebar .sidebar-mobile-close:hover { background: #1c1c1c; color: #ffffff; }
 /* The mobile "Back to Shop" button is a black fill; on the black sidebar it turns white. */
-.dashboard-sidebar a[aria-label="Back to Shop"] {
+:root .dashboard-sidebar a[aria-label="Back to Shop"] {
   background: #ffffff;
   color: #0a0a0a !important;
 }

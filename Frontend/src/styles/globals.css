@@ -182,18 +182,10 @@ video {
   padding: 0 20px;
 }
 
-.flex {
-  display: flex;
-}
-
 .flex-center {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.grid {
-  display: grid;
 }
 
 /* Common spacing */

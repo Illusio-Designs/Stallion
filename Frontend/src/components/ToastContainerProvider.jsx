@@ -1,32 +1,26 @@
 'use client';
 import React from 'react';
-import { ToastContainer } from 'react-toastify';
+import { GooeyToaster } from 'goey-toast';
+import 'goey-toast/styles.css';
 import '../styles/components/Toast.css';
 
+// One gooey toaster for the whole app (see services/notificationService.js).
 const ToastContainerProvider = ({ children }) => {
   return (
     <>
       {children}
-      <ToastContainer
+      <GooeyToaster
         position="top-right"
-        // Above the AsidePanel drawer (z-10050) and its dropdowns (z-99999) so
-        // toasts/errors are never hidden behind an open panel.
-        style={{ zIndex: 100001 }}
-        autoClose={4000}
-        limit={3}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        closeButton
-        rtl={false}
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
         theme="light"
+        duration={4000}
+        closeButton
+        showProgress
+        // Above the AsidePanel drawer (z-10050) and its dropdowns (z-99999) so
+        // notifications are never hidden behind an open panel.
+        toastOptions={{ style: { zIndex: 100001 } }}
       />
     </>
   );
 };
 
 export default ToastContainerProvider;
-
