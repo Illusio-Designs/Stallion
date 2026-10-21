@@ -852,38 +852,10 @@ class PartyController {
         }
     }
 
+    // A party is never deleted: its orders, check-ins and login all refer to it.
+    // Make the party inactive instead (edit the party and switch it off).
     async deleteParty(req, res) {
-        try {
-            const id = req.params.id;
-            if (!id) {
-                return res.status(400).json({ error: 'Party ID is required' });
-            }
-            const party = await Party.findOne({ where: { party_id: id } });
-            if (!party) {
-                return res.status(404).json({ error: 'Party not found' });
-            }
-            const snapshot = party.toJSON();
-            try {
-                await party.destroy();
-            } catch (err) {
-                if (err.name === 'SequelizeForeignKeyConstraintError') {
-                    return res.status(409).json({ error: 'This party has orders, so it cannot be deleted. Mark it inactive instead.' });
-                }
-                throw err;
-            }
-            await logAudit({
-                req,
-                action: 'delete',
-                description: 'Party deleted',
-                tableName: 'parties',
-                recordId: id,
-                oldValues: snapshot,
-                newValues: null,
-            });
-            res.status(200).json({ message: 'Party deleted successfully' });
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        }
+        return res.status(409).json({ error: 'A party cannot be deleted because its records are kept. Make the party inactive instead.' });
     }
 
     /**
