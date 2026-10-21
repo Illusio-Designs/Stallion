@@ -5,7 +5,7 @@ import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
-  getCountries,
+  getIndianCountries,
   createCountry,
   updateCountry,
   deleteCountry,
@@ -289,7 +289,7 @@ const DashboardManage = () => {
     try {
       switch (tab) {
         case 'Country':
-          const countriesData = await getCountries().catch((error) => {
+          const countriesData = await getIndianCountries().catch((error) => {
             if (!error.message?.toLowerCase().includes('token expired') && 
                 !error.message?.toLowerCase().includes('unauthorized')) {
               console.error('Error fetching countries:', error);
@@ -307,7 +307,7 @@ const DashboardManage = () => {
         
         case 'State':
           // Only fetch countries, states will be fetched when country filter is selected
-          const countriesForStates = await getCountries().catch(() => []);
+          const countriesForStates = await getIndianCountries().catch(() => []);
           setCountries(countriesForStates || []);
           // Don't fetch states here - wait for country filter selection
           setStates([]);
@@ -315,7 +315,7 @@ const DashboardManage = () => {
         
         case 'City':
           // Only fetch countries, states will be fetched for default country (India)
-          const countriesForCities = await getCountries().catch(() => []);
+          const countriesForCities = await getIndianCountries().catch(() => []);
           setCountries(countriesForCities || []);
           // Don't fetch states here - wait for default country selection
           setStates([]);
@@ -327,7 +327,7 @@ const DashboardManage = () => {
           // Fetch all zones directly, and cities for the filter dropdown
           const [allZonesData, countriesForZones] = await Promise.all([
             getAllZones().catch(() => []),
-            getCountries().catch(() => []),
+            getIndianCountries().catch(() => []),
           ]);
           setAllZones(allZonesData || []);
           setZones(allZonesData || []);
