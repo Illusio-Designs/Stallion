@@ -484,21 +484,23 @@ const Dashboard = () => {
   const hour = now.getHours();
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
   const todayText = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-  const fullName = String(user?.full_name || user?.name || '').trim();
+  // localStorage and the clock only exist in the browser: keep the first render identical to the server's.
+  const viewer = mounted ? user : null;
+  const fullName = String(viewer?.full_name || viewer?.name || '').trim();
   const firstName = fullName.split(/\s+/)[0] || '';
-  const companyName = (ownParty && (ownParty.party_name || ownParty.name)) || user?.party_name || user?.distributor_name || fullName;
+  const companyName = (ownParty && (ownParty.party_name || ownParty.name)) || viewer?.party_name || viewer?.distributor_name || fullName;
   const heading = isSalesman
     ? `Hi ${firstName || 'there'}`
     : (isParty || isDistributor)
     ? (companyName || 'Welcome')
-    : `${greeting}${firstName ? `, ${firstName}` : ''}`;
+    : mounted ? `${greeting}${firstName ? `, ${firstName}` : ''}` : 'Welcome';
   const subline = isSalesman
     ? 'Only your own parties, orders and visits are shown here.'
     : isParty
     ? 'Your own orders and account only.'
     : isDistributor
     ? 'Only your own parties and their orders are shown.'
-    : `${todayText}.${stats.openCount > 0 ? ` ${stats.openCount} order${stats.openCount > 1 ? 's are' : ' is'} still open.` : ''}`;
+    : !mounted ? '' : `${todayText}.${stats.openCount > 0 ? ` ${stats.openCount} order${stats.openCount > 1 ? 's are' : ' is'} still open.` : ''}`;
 
   const RANGES = [['today', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['year', 'Year']];
   const partyOf = (row) => row.party?.party_name || row.party_name || row.party?.name || partyNamesMap[row.party_id] || '-';

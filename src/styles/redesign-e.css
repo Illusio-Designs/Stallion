@@ -61,3 +61,20 @@
 :root .cart-notice--bad { background: #fbe5e3; border-color: #f0b9b4; color: #b3261e; }
 :root .cart-notice--bad p, :root .cart-notice--bad button { color: #b3261e; }
 :root .cart-notice--bad .text-text-muted { color: #b3261e; }
+:root .cart-page .checkout-btn { text-transform: none !important; letter-spacing: 0 !important; }
+
+/* ---- Auth ---- */
+:root .auth-split .login-title,
+:root .auth-split .login-subtitle { text-align: left; }
+:root .auth-split .login-title { font-family: var(--font-display); font-size: 28px; }
+:root .auth-split .login-subtitle { margin-bottom: 24px; }
+:root .auth-split .ui-field-error {
+  margin: 0; padding: 11px 14px; border-radius: 10px;
+  background: #fbe5e3; border: 1px solid #f0b9b4; color: #b3261e; font-size: 14px;
+}
+:root .auth-split .otp-container--error .otp-input { border-color: #b3261e; }
+:root .auth-split .otp-input { height: 52px; border-radius: 10px; border-color: #e1e1e1; }
+:root .auth-split .otp-input:focus { border-color: #0a0a0a; box-shadow: 0 0 0 3px rgba(0,0,0,.12); outline: none; }
+:root .auth-alt { margin: 4px 0 0; font-size: 14px; color: #595959; }
+:root .auth-alt a { color: #0a0a0a; font-weight: 600; text-decoration: underline; }
+:root .auth-split .login-container, :root .auth-split .register-container { width: 100%; max-width: 400px; }

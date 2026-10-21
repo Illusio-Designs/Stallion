@@ -675,7 +675,7 @@ const DashboardTray = () => {
                     <h3 className="mb-[15px] mt-0">
                       Products in Sample ({trayProducts.length})
                     </h3>
-                    <div className="max-h-[500px] overflow-x-auto overflow-y-auto rounded-lg border border-[#e5e7eb]">
+                    <div className="tray-assign-table max-h-[500px] overflow-x-auto overflow-y-auto rounded-lg border border-[#e5e7eb]">
                       <table className="w-full min-w-[720px] border-collapse">
                         <thead>
                           <tr className="sticky top-0 bg-[#f0f0f0]">
