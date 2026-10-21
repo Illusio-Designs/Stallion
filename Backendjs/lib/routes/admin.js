@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { isAdmin } = require('../middleware/roleAuth');
@@ -11,6 +12,6 @@ router.post('/wipe-data', authenticateToken, isAdmin, dataWipeController.wipeDat
 
 // DESTRUCTIVE: delete all parties (+ their login accounts and upload files) only.
 //   POST /api/admin/delete-all-parties   body: { "confirm": "WIPE ALL DATA" }
-router.post('/delete-all-parties', authenticateToken, isAdmin, dataWipeController.deleteAllParties);
+router.post('/delete-all-parties', authenticateToken, isAdmin, noDelete('Parties'));
 
 module.exports = router;

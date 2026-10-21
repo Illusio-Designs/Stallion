@@ -1,5 +1,6 @@
 
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const eventController = require('../controllers/eventController');
 const { authenticateToken } = require('../middleware/auth');
@@ -11,6 +12,6 @@ const canWrite = checkRole(['admin', 'tray_manager']);
 router.get('/', authenticateToken, eventController.getEvents);
 router.post('/', authenticateToken, canWrite, eventController.createEvent);
 router.put('/:id', authenticateToken, canWrite, eventController.updateEvent);
-router.delete('/:id', authenticateToken, canWrite, eventController.deleteEvent);
+router.delete('/:id', authenticateToken, noDelete('An event'));
 
 module.exports = router;

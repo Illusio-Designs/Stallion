@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const frameColorController = require('../controllers/frameColorController');
 const { authenticateToken } = require('../middleware/auth');
@@ -11,6 +12,6 @@ router.get('/', authenticateToken, frameColorController.getFrameColors);
 router.get('/:id', authenticateToken, frameColorController.getFrameColorById);
 router.post('/', authenticateToken, canWrite, frameColorController.createFrameColor);
 router.put('/:id', authenticateToken, canWrite, frameColorController.updateFrameColor);
-router.delete('/:id', authenticateToken, canWrite, frameColorController.deleteFrameColor);
+router.delete('/:id', authenticateToken, noDelete('A frame colour'));
 
 module.exports = router;

@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const frameTypeController = require('../controllers/frameTypeController');
 const { authenticateToken } = require('../middleware/auth');
@@ -11,6 +12,6 @@ router.get('/', authenticateToken, frameTypeController.getFrameTypes);
 router.get('/:id', authenticateToken, frameTypeController.getFrameTypeById);
 router.post('/', authenticateToken, canWrite, frameTypeController.createFrameType);
 router.put('/:id', authenticateToken, canWrite, frameTypeController.updateFrameType);
-router.delete('/:id', authenticateToken, canWrite, frameTypeController.deleteFrameType);
+router.delete('/:id', authenticateToken, noDelete('A frame type'));
 
 module.exports = router;

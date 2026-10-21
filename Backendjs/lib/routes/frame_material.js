@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const frameMaterialController = require('../controllers/frameMaterialController');
 const { authenticateToken } = require('../middleware/auth');
@@ -11,6 +12,6 @@ router.get('/', authenticateToken, frameMaterialController.getFrameMaterials);
 router.get('/:id', authenticateToken, frameMaterialController.getFrameMaterialById);
 router.post('/', authenticateToken, canWrite, frameMaterialController.createFrameMaterial);
 router.put('/:id', authenticateToken, canWrite, frameMaterialController.updateFrameMaterial);
-router.delete('/:id', authenticateToken, canWrite, frameMaterialController.deleteFrameMaterial);
+router.delete('/:id', authenticateToken, noDelete('A frame material'));
 
 module.exports = router;

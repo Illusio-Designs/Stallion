@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const shapesController = require('../controllers/shapesController');
 const { authenticateToken } = require('../middleware/auth');
@@ -10,6 +11,6 @@ const canWrite = checkRole(['admin', 'product_manager']);
 router.get('/', authenticateToken, shapesController.getShapes);
 router.post('/', authenticateToken, canWrite, shapesController.createShape);
 router.put('/:id', authenticateToken, canWrite, shapesController.updateShape);
-router.delete('/:id', authenticateToken, canWrite, shapesController.deleteShape);
+router.delete('/:id', authenticateToken, noDelete('A shape'));
 
 module.exports = router;

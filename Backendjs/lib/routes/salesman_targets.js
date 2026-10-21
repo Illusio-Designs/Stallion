@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const { authenticateToken } = require('../middleware/auth');
 const { checkRole } = require('../middleware/roleAuth');
@@ -11,6 +12,6 @@ router.post('/', authenticateToken, canWrite, salesmanTargetsController.createSa
 router.get('/', authenticateToken, salesmanTargetsController.getSalesmanTargets);
 router.get('/:salesman_id', authenticateToken, salesmanTargetsController.getSalesmanTargetsBySalesmanId);
 router.put('/:id', authenticateToken, canWrite, salesmanTargetsController.updateSalesmanTarget);
-router.delete('/:id', authenticateToken, canWrite, salesmanTargetsController.deleteSalesmanTarget);
+router.delete('/:id', authenticateToken, noDelete('A target'));
 
 module.exports = router;

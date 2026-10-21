@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const brandController = require('../controllers/brandController');
 const { authenticateToken } = require('../middleware/auth');
@@ -10,6 +11,6 @@ const canWrite = checkRole(['admin', 'product_manager']);
 router.get('/', authenticateToken, brandController.getBrands);
 router.post('/', authenticateToken, canWrite, brandController.createBrand);
 router.put('/:id', authenticateToken, canWrite, brandController.updateBrand);
-router.delete('/:id', authenticateToken, canWrite, brandController.deleteBrand);
+router.delete('/:id', authenticateToken, noDelete('A brand'));
 
 module.exports = router;

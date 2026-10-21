@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const countryController = require('../controllers/countryController');
 const { authenticateToken } = require('../middleware/auth');
@@ -11,6 +12,6 @@ router.get('/', authenticateToken, countryController.getCountries);
 router.get('/:id', authenticateToken, countryController.getCountryById);
 router.post('/', authenticateToken, canWrite, countryController.createCountry);
 router.put('/:id', authenticateToken, canWrite, countryController.updateCountry);
-router.delete('/:id', authenticateToken, canWrite, countryController.deleteCountry);
+router.delete('/:id', authenticateToken, noDelete('A country'));
 
 module.exports = router;

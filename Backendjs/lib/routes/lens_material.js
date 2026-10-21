@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const lensMaterialController = require('../controllers/lensMaterialController');
 const { authenticateToken } = require('../middleware/auth');
@@ -11,6 +12,6 @@ router.get('/', authenticateToken, lensMaterialController.getLensMaterials);
 router.get('/:id', authenticateToken, lensMaterialController.getLensMaterialById);
 router.post('/', authenticateToken, canWrite, lensMaterialController.createLensMaterial);
 router.put('/:id', authenticateToken, canWrite, lensMaterialController.updateLensMaterial);
-router.delete('/:id', authenticateToken, canWrite, lensMaterialController.deleteLensMaterial);
+router.delete('/:id', authenticateToken, noDelete('A lens material'));
 
 module.exports = router;
