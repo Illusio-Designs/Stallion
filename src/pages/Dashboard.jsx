@@ -9,7 +9,7 @@ import OrdersPerDayChart from '../components/charts/OrdersPerDayChart';
 import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets, getTrays, getIndianCountries, getSalesmen, getAllSalesmanCheckins } from '../services/apiService';
 import { getAllAdminExpenses } from '../services/expenseService';
 import { getUserRole, getUserRoles, getUser } from '../services/authService';
-import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiPackage, FiInbox, FiNavigation2 } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiPackage, FiInbox, FiNavigation2 } from '../components/icons/hugeicons';
 import RupeeIcon from '../components/icons/RupeeIcon';
 
 // A link that switches pages inside the app instead of reloading the whole page.

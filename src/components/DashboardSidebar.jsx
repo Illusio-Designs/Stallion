@@ -4,7 +4,7 @@ import {
   FiGrid, FiPackage, FiShoppingCart, FiInbox, FiCalendar,
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
   FiHelpCircle, FiSettings, FiChevronsLeft, FiX, FiShoppingBag, FiTag,
-} from 'react-icons/fi';
+} from './icons/hugeicons';
 import RupeeIcon from './icons/RupeeIcon';
 import { getUserRoles } from '../services/authService';
 import { filterMenuItemsByRoles } from '../utils/rolePermissions';

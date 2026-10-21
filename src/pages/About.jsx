@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiBox, FiTag, FiGlobe, FiTool, FiTruck, FiUsers } from 'react-icons/fi';
+import { FiBox, FiTag, FiGlobe, FiTool, FiTruck, FiUsers } from '../components/icons/hugeicons';
 import '../styles/pages/About.css';
 
 const About = () => {

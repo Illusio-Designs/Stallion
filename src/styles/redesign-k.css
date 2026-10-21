@@ -28,3 +28,16 @@
   :root .header-actions .cart-btn .cart-badge { position: absolute; top: -5px; right: -5px; }
   :root .header-actions .hd-btn--solid.user-btn { height: 46px; border-radius: 999px; }
 }
+
+/* Dashboard header on phones: big round buttons like the shop header. */
+@media (max-width: 767px) {
+  :root .dashboard-menu-btn,
+  :root .dashboard-icon-btn,
+  :root .dashboard-avatar-btn {
+    width: 46px; height: 46px; border-radius: 999px;
+  }
+  :root .dashboard-menu-btn svg,
+  :root .dashboard-icon-btn svg { width: 24px; height: 24px; }
+  :root .dashboard-avatar-btn { background: #0a0a0a; border: 0; }
+  :root .dashboard-avatar-btn .dashboard-avatar-initials { color: #fff; font-size: 15px; }
+}

@@ -140,7 +140,6 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
       <DashboardBottomNav
         currentPage={currentPage}
         onPageChange={onPageChange}
-        onOpenMenu={openMobileSidebar}
       />
     </div>
   );
