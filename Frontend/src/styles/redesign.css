@@ -1,0 +1,58 @@
+/* Stallion redesign: black and white, Bricolage Grotesque headings, Figtree text.
+   Unlayered on purpose: it must outrank Tailwind utilities that sit in a layer.
+   Green and red stay only as status colours. */
+
+h1, h2, h3,
+.metric-value,
+.card-title,
+.login-title,
+.ui-state__title,
+.support-title {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+.dashboard-layout { background: #ffffff; }
+.dash-card { border-radius: 14px; }
+
+/* ---- Sidebar: ink black, white text ---- */
+.dashboard-sidebar {
+  background: #0a0a0a;
+  color: #d2d2d2;
+  border-right: 1px solid #0a0a0a;
+}
+.dashboard-sidebar .sidebar-logo-img { filter: brightness(0) invert(1); }
+.dashboard-sidebar-nav a { color: #d2d2d2; }
+.dashboard-sidebar-nav a:hover { background: #1c1c1c; color: #ffffff; }
+.dashboard-sidebar-nav a.active,
+.dashboard-sidebar.collapsed .dashboard-sidebar-nav a.active {
+  background: #1c1c1c;
+  color: #ffffff;
+}
+.dashboard-sidebar-nav a.active::before { display: none; }
+.dashboard-sidebar-nav a:focus-visible { box-shadow: 0 0 0 2px #ffffff; }
+.dashboard-sidebar-footer { border-top-color: #1c1c1c; }
+.dashboard-sidebar .sidebar-toggle { color: #bdbdbd; }
+.dashboard-sidebar .sidebar-toggle:hover { background: #1c1c1c; color: #ffffff; }
+.dashboard-sidebar .sidebar-mobile-close { color: #d2d2d2; }
+.dashboard-sidebar .sidebar-mobile-close:hover { background: #1c1c1c; color: #ffffff; }
+/* The mobile "Back to Shop" button is a black fill; on the black sidebar it turns white. */
+.dashboard-sidebar a[aria-label="Back to Shop"] {
+  background: #ffffff;
+  color: #0a0a0a !important;
+}
+
+/* ---- Dashboard numbers: the first card is the ink "hero" card ---- */
+.dash-kpis > .dash-card.metric:first-child {
+  background: #0a0a0a;
+  border-color: #0a0a0a;
+}
+.dash-kpis > .dash-card.metric:first-child h4 { color: #bdbdbd; }
+.dash-kpis > .dash-card.metric:first-child .metric-value { color: #ffffff; }
+.dash-kpis > .dash-card.metric:first-child .metric-sub { color: #bdbdbd; }
+.dash-card.metric .metric-value { font-size: 30px; font-weight: 700; }
+
+/* ---- Sign in: black page, white card ---- */
+.login-page { background-color: #0a0a0a; }
+.login-bg-image, .login-gradient-overlay { display: none; }
+.login-container { border-color: #ffffff; box-shadow: none; }
