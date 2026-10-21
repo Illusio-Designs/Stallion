@@ -194,29 +194,34 @@ class SalesmanExpenseController {
         }
     }
 
+    // Bill photos. The expense form uploads the files BEFORE the expense exists (it then sends the
+    // returned paths when it creates the expense), so no expense_id is needed: the files are saved
+    // and their public paths are returned. If an expense_id IS sent, the files are attached to that
+    // expense (kept for older callers).
     async uploadImages(req, res) {
         try {
             const salesmanId = await resolveSalesmanIdForUser(req.user.user_id);
             if (!salesmanId) {
                 return res.status(404).json({ error: 'Salesman record not found for this user' });
             }
-            const { expense_id } = req.body;
-            if (!expense_id) {
-                return res.status(400).json({ error: 'Expense ID is required' });
+            const fileInfos = req.fileInfos;
+            if (fileInfos == undefined || fileInfos.length === 0) {
+                return res.status(400).json({ error: 'Images not found' });
             }
+            // Public path under /uploads, never the server's disk path.
+            const images = fileInfos.map((fileInfo) => `/uploads/bills/${fileInfo.filename}`);
+
+            const { expense_id } = req.body || {};
+            if (!expense_id) {
+                return res.status(200).json({ images });
+            }
+
             const salesmanExpense = await SalesmanExpense.findOne({
                 where: { id: expense_id, salesman_id: salesmanId },
             });
             if (!salesmanExpense) {
                 return res.status(404).json({ error: 'Salesman expense not found' });
             }
-            const fileInfos = req.fileInfos;
-            if (fileInfos == undefined || fileInfos.length === 0) {
-                return res.status(400).json({ error: 'Images not found' });
-            }
-
-            const images = fileInfos.map(fileInfo => fileInfo.path);
-
             const oldSnapshot = salesmanExpense.toJSON();
             const imagesPayload = { images };
 
@@ -234,7 +239,7 @@ class SalesmanExpenseController {
                 newValues: { ...oldSnapshot, ...imagesPayload },
             });
             const updatedSalesmanExpense = await SalesmanExpense.findOne({ where: { id: expense_id } });
-            res.status(200).json(updatedSalesmanExpense);
+            res.status(200).json({ ...updatedSalesmanExpense.toJSON(), images });
         }
         catch (error) {
             res.status(500).json({ error: error.message });
