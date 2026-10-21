@@ -104,6 +104,18 @@ function validateCheckInFields(fields) {
         return 'Salesman ID, check-in date, party ID, contact person, type, in time, out time, and next visit date are required';
     }
 
+    const inAt = new Date(in_time);
+    const outAt = new Date(out_time);
+    if (!Number.isNaN(inAt.getTime()) && !Number.isNaN(outAt.getTime()) && outAt <= inAt) {
+        return 'Out time must be after in time';
+    }
+    const visitDay = new Date(check_in_date);
+    const nextDay = new Date(next_visit_date);
+    if (!Number.isNaN(visitDay.getTime()) && !Number.isNaN(nextDay.getTime())
+        && nextDay.setHours(0, 0, 0, 0) < visitDay.setHours(0, 0, 0, 0)) {
+        return 'Next visit date cannot be before the visit date';
+    }
+
     const validTypes = Object.values(SalesmanCheckInType);
     if (!validTypes.includes(type)) {
         return `Type must be one of: ${validTypes.join(', ')}`;
