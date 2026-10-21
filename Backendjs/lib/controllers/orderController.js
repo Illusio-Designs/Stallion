@@ -560,8 +560,25 @@ class OrderController {
             if (isDistributorRequired && distributor_id && userScope.role === 'distributor' && userScope.distributorId !== distributor_id) {
                 return res.status(403).json({ error: 'Cannot create orders for another distributor' });
             }
-            if (isSalesmanRequired && salesman_id && userScope.role === 'salesman' && userScope.salesmanId !== salesman_id) {
-                return res.status(403).json({ error: 'Cannot create orders for another salesman' });
+            if (userScope.role === 'salesman') {
+                if (!userScope.salesmanId) {
+                    return res.status(404).json({ error: 'Salesman record not found for this user' });
+                }
+                if (isSalesmanRequired && salesman_id && userScope.salesmanId !== salesman_id) {
+                    return res.status(403).json({ error: 'Cannot create orders for another salesman' });
+                }
+                // A salesman's orders always go under the logged-in salesman.
+                if (isSalesmanRequired) salesman_id = userScope.salesmanId;
+                // ...and only for parties that belong to them.
+                if (party_id) {
+                    const ownParty = await Party.findOne({ where: { party_id }, attributes: ['party_id', 'salesman_id'] });
+                    if (!ownParty) {
+                        return res.status(404).json({ error: 'Party not found' });
+                    }
+                    if (ownParty.salesman_id !== userScope.salesmanId) {
+                        return res.status(403).json({ error: 'This party is not assigned to you, so you cannot place an order for it.' });
+                    }
+                }
             }
 
             // The same product on two lines becomes one line, so an offer is worked out once.
