@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../styles/components/Header.css';
 import { getCartCount, registerCartListener } from '../services/cartService';
-import { isLoggedIn, logout as authLogout } from '../services/authService';
+import { isLoggedIn, logout as authLogout, getUser } from '../services/authService';
+import { resolveProfileImageUrl } from '../utils/profileImage';
 import { showLogoutSuccess } from '../services/notificationService';
 import { FiSearch, FiShoppingCart, FiUser, FiMenu, FiX } from 'react-icons/fi';
 
@@ -10,6 +11,7 @@ const Header = ({ onPageChange, currentPage }) => {
   const [cartCount, setCartCount] = useState(0);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [profile, setProfile] = useState({ name: '', avatar: '' });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef(null);
@@ -156,6 +158,21 @@ const Header = ({ onPageChange, currentPage }) => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isUserDropdownOpen]);
 
+  // Name and photo for the round profile button (same as the dashboard's).
+  useEffect(() => {
+    if (!loggedIn) return;
+    try {
+      const u = getUser() || {};
+      const name = localStorage.getItem('userName') || u.full_name || u.fullName || u.name || u.email || '';
+      const avatar = localStorage.getItem('userAvatarUrl') || u.profile_image || u.image_url || u.avatar || u.avatarUrl || '';
+      setProfile({ name: String(name), avatar: String(avatar || '').trim() });
+    } catch (_e) { /* no stored profile */ }
+  }, [loggedIn, currentPage]);
+  const initials = (() => {
+    const parts = (profile.name || '').trim().split(/\s+/);
+    return `${parts[0]?.[0] || ''}${parts[1]?.[0] || ''}`.toUpperCase() || 'U';
+  })();
+
   // Handle user icon click
   const handleUserIconClick = () => {
     if (loggedIn) {
@@ -296,14 +313,22 @@ const Header = ({ onPageChange, currentPage }) => {
             <div className="user-menu-container relative" ref={dropdownRef}>
               <button
                 type="button"
-                className="hd-btn hd-btn--solid user-btn"
+                className={loggedIn ? 'profile-avatar-btn' : 'hd-btn hd-btn--solid user-btn'}
                 onClick={handleUserIconClick}
                 aria-label={loggedIn ? 'User menu' : 'Login'}
                 aria-haspopup={loggedIn ? 'menu' : undefined}
                 aria-expanded={loggedIn ? isUserDropdownOpen : undefined}
               >
-                <FiUser size={18} aria-hidden="true" />
-                <span className="hd-btn__text">{loggedIn ? 'Dashboard' : 'Sign in'}</span>
+                {loggedIn ? (
+                  profile.avatar
+                    ? <img src={resolveProfileImageUrl(profile.avatar)} alt={profile.name || 'Profile'} className="profile-avatar-img" />
+                    : <span className="profile-avatar-initials">{initials}</span>
+                ) : (
+                  <>
+                    <FiUser size={18} aria-hidden="true" />
+                    <span className="hd-btn__text">Sign in</span>
+                  </>
+                )}
               </button>
               {loggedIn && isUserDropdownOpen && (
                 <div className="user-dropdown absolute right-0 top-[calc(100%+0.5rem)] z-[1001] min-w-[184px] max-[768px]:min-w-[168px] overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg" role="menu">
@@ -314,6 +339,14 @@ const Header = ({ onPageChange, currentPage }) => {
                     onClick={handleDashboardClick}
                   >
                     My Dashboard
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="dropdown-item flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md border-none bg-none px-3 py-2 text-left text-[length:var(--text-base)] text-text"
+                    onClick={() => { setIsUserDropdownOpen(false); onPageChange('settings'); }}
+                  >
+                    Edit Profile
                   </button>
                   <button
                     type="button"
