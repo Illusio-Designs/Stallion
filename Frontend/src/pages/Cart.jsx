@@ -1664,7 +1664,7 @@ const Cart = ({ onPageChange = null }) => {
               aria-busy={loading}
             >
               {loading && <span className="checkout-btn__spinner w-4 h-4 rounded-pill border-2 border-[rgba(255,255,255,0.4)] border-t-[var(--color-text-on-primary)] animate-spin motion-reduce:animate-none flex-shrink-0" aria-hidden="true" />}
-              {loading ? 'PLACING ORDER...' : 'CHECKOUT'}
+              {loading ? 'Placing order...' : 'Place order'}
             </button>
           </div>
         </div>

@@ -66,7 +66,7 @@ const DashboardBottomNav = ({ onPageChange, currentPage, onOpenMenu }) => {
 
   return (
     <nav
-      className="dashboard-bottom-nav md:hidden fixed left-3 right-3 z-[1000] mx-auto flex max-w-[480px] items-center justify-between gap-1 rounded-pill border border-border bg-surface/95 px-2 py-2 shadow-[0_10px_30px_-6px_rgba(16,18,38,0.22)] backdrop-blur-sm bottom-[calc(0.75rem+env(safe-area-inset-bottom))]"
+      className="dashboard-bottom-nav md:hidden fixed z-[1000]"
       aria-label="Dashboard"
     >
       {primary.map((it) => {
@@ -79,16 +79,10 @@ const DashboardBottomNav = ({ onPageChange, currentPage, onOpenMenu }) => {
             onClick={() => go(it.id)}
             aria-current={active ? 'page' : undefined}
             aria-label={it.text}
-            className={`relative inline-flex h-11 items-center justify-center rounded-pill transition-all duration-200 ease-out ${
-              active ? 'flex-none gap-2 bg-primary px-4 text-text-on-primary' : 'w-11 flex-none text-text-muted hover:text-text'
-            }`}
+            className="relative inline-flex flex-col items-center justify-center"
           >
             <Icon size={21} aria-hidden="true" />
-            {active && (
-              <span className="whitespace-nowrap text-[length:var(--text-sm)] font-semibold leading-none">
-                {SHORT[it.id] || it.text}
-              </span>
-            )}
+            <span className="dashboard-bottom-nav__label">{SHORT[it.id] || it.text}</span>
           </button>
         );
       })}
@@ -97,9 +91,10 @@ const DashboardBottomNav = ({ onPageChange, currentPage, onOpenMenu }) => {
         type="button"
         onClick={onOpenMenu}
         aria-label="Open menu"
-        className="inline-flex h-11 w-11 flex-none items-center justify-center rounded-pill text-text-muted transition-colors hover:text-text"
+        className="inline-flex flex-col items-center justify-center"
       >
         <FiMenu size={21} aria-hidden="true" />
+        <span className="dashboard-bottom-nav__label">Menu</span>
       </button>
     </nav>
   );

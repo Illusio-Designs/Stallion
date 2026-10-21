@@ -505,6 +505,16 @@ const DashboardDistributor = () => {
     { key: 'trade_name', label: 'TRADE NAME' },
     { key: 'contact_person', label: 'CONTACT PERSON' },
     { key: 'phone', label: 'PHONE' },
+    { key: 'state', label: 'STATE', render: (_v, row) => {
+      const names = (Array.isArray(row.states) ? row.states : [])
+        .map(st => (st && typeof st === 'object') ? (st.state_name || st.name || '') : '')
+        .filter(Boolean);
+      return names.length ? names.join(', ') : (row.state_name || row.state?.name || '-');
+    } },
+    { key: 'status', label: 'STATUS', render: (_v, row) => {
+      const on = row.is_active !== false;
+      return <span className={`ui-badge ${on ? 'ui-badge--success' : 'ui-badge--danger'}`}>{on ? 'Active' : 'Inactive'}</span>;
+    } },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions 
         onEdit={() => handleEdit(row)} 
@@ -972,8 +982,8 @@ const DashboardDistributor = () => {
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
         <div className="dash-row grid grid-cols-1 gap-4 sm:grid-cols-12">
-          <div className="dash-card full col-span-1 p-0 sm:col-span-12">
-            <div className="p-4 pb-0" style={{ maxWidth: 392 }}>
+          <div className="dash-card full col-span-1 p-0 sm:col-span-12 dist-wrap">
+            <div className="p-4 pb-0 dist-filter" style={{ maxWidth: 392 }}>
               <label className="mb-2 block text-[14px] font-medium">
                 Filter by Country
               </label>

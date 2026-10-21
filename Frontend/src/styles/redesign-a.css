@@ -1,1 +1,210 @@
-/* Redesign area a: own rules for this area only (unlayered, outranks Tailwind utilities). */
+/* Redesign area A: dashboard home (every role), sidebar, header, phone bottom nav.
+   Unlayered on purpose (outranks Tailwind utilities). Selectors carry `:root` where a
+   later page stylesheet could otherwise win. Palette: ink #0a0a0a, lines #e1e1e1,
+   muted #595959. Green and red only as status. */
+
+/* ---------- Greeting header ---------- */
+.rda-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 14px; }
+.rda-head h1 { margin: 0; font-family: var(--font-display); font-size: 32px; line-height: 1.1; font-weight: 700; letter-spacing: -0.01em; color: #0a0a0a; }
+.rda-head p { margin: 4px 0 0; color: #595959; font-size: 15px; }
+.rda-seg { display: inline-flex; gap: 2px; padding: 3px; background: #ffffff; border: 1px solid #e1e1e1; border-radius: 10px; }
+.rda-seg button { border: 0; background: transparent; padding: 6px 14px; border-radius: 7px; font: inherit; font-size: 13px; font-weight: 600; color: #595959; cursor: pointer; min-height: 32px; }
+.rda-seg button:hover { color: #0a0a0a; }
+.rda-seg button.on { background: #0a0a0a; color: #ffffff; }
+.rda-seg button:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.25); }
+.rda-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.rda-btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 11px; border: 1px solid #0a0a0a; background: #0a0a0a; color: #ffffff; font: inherit; font-weight: 600; font-size: 14px; cursor: pointer; text-decoration: none; white-space: nowrap; }
+.rda-btn:hover { background: #1c1c1c; color: #ffffff; }
+.rda-btn--ghost { background: #ffffff; color: #0a0a0a; border-color: #e1e1e1; }
+.rda-btn--ghost:hover { background: #f4f4f4; color: #0a0a0a; }
+.rda-btn--sm { height: 34px; padding: 0 12px; border-radius: 9px; font-size: 13px; }
+.rda-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.25); }
+
+/* ---------- Four number cards ---------- */
+:root .dash-row.rda-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+:root .rda-kpis > .rda-kpi { grid-column: auto; padding: 20px; border-radius: 14px; box-shadow: none; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.rda-kpi__lab { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #595959; font-weight: 500; font-size: 14px; }
+.rda-kpi__lab svg { color: #3b3b3b; flex: none; }
+:root .rda-kpi .metric-value.rda-kpi__num { font-family: var(--font-display); font-size: 34px; font-weight: 700; line-height: 1; letter-spacing: -0.02em; }
+.rda-kpi__num small { font-size: 16px; font-weight: 600; color: #595959; margin-right: 2px; letter-spacing: 0; }
+.rda-kpi__delta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: 13px; color: #595959; font-weight: 400; }
+.rda-kpi__delta .up { color: #1e7a3c; font-weight: 600; }
+.rda-kpi__delta .dn { color: #b3261e; font-weight: 600; }
+/* hero card (first): ink */
+:root .rda-kpis > .rda-kpi:first-child { background: #0a0a0a; border-color: #0a0a0a; }
+:root .rda-kpis > .rda-kpi:first-child .rda-kpi__lab,
+:root .rda-kpis > .rda-kpi:first-child .rda-kpi__delta { color: #bdbdbd; }
+:root .rda-kpis > .rda-kpi:first-child .rda-kpi__lab svg { color: #ffffff; }
+:root .rda-kpis > .rda-kpi:first-child .rda-kpi__num small { color: #bdbdbd; }
+:root .rda-kpis > .rda-kpi:first-child .rda-kpi__delta .up,
+:root .rda-kpis > .rda-kpi:first-child .rda-kpi__delta .dn { color: #ffffff; text-decoration: underline; }
+:root .rda-kpis > .rda-kpi:first-child .metric-value { color: #ffffff; }
+
+/* ---------- Cards, columns, tables ---------- */
+.rda-cols { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr); gap: 16px; }
+.rda-cols--even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.rda-cols--one { grid-template-columns: minmax(0, 1fr); }
+.rda-card { background: #ffffff; border: 1px solid #e1e1e1; border-radius: 14px; padding: 20px; min-width: 0; box-shadow: none; }
+:root .needs-attention.rda-card { padding: 20px; }
+.rda-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+.rda-card__head h3 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; color: #0a0a0a; }
+.rda-card__head p { margin: 2px 0 0; color: #595959; font-size: 13px; }
+.rda-link { color: #0a0a0a; text-decoration: underline; font-weight: 600; font-size: 13px; white-space: nowrap; }
+.rda-legend { display: flex; flex-wrap: wrap; gap: 14px; color: #595959; font-size: 13px; flex: none; }
+.rda-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; }
+.rda-chart { width: 100%; }
+.rda-chart svg { display: block; overflow: visible; }
+.rda-chart text { font-family: var(--font-body, inherit); font-size: 11px; fill: #595959; }
+.rda-chart__empty { margin: 4px 0 0; text-align: center; font-size: 13px; color: #595959; }
+.rda-tw { overflow-x: auto; }
+.rda-table { width: 100%; border-collapse: collapse; min-width: 0; }
+.rda-table th { text-align: left; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #595959; font-weight: 600; padding: 0 12px 10px 0; border-bottom: 1px solid #e1e1e1; white-space: nowrap; background: transparent; }
+.rda-table td { padding: 13px 12px 13px 0; border-bottom: 1px solid #e1e1e1; vertical-align: middle; font-size: 14px; color: #0a0a0a; }
+.rda-table tr:last-child td { border-bottom: 0; }
+.rda-table td.r, .rda-table th.r { text-align: right; padding-right: 0; }
+.rda-table .mono { font-feature-settings: "tnum"; }
+.rda-empty { color: #595959; font-size: 14px; text-align: center; padding: 18px 0; margin: 0; }
+td.rda-empty { padding: 22px 0; }
+.rda-who { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+.rda-pic { width: 32px; height: 32px; border-radius: 50%; background: #3b3b3b; color: #ffffff; display: grid; place-items: center; font-size: 12px; font-weight: 700; flex: none; }
+.rda-prog { height: 8px; border-radius: 99px; background: #e1e1e1; overflow: hidden; min-width: 90px; }
+.rda-prog i { display: block; height: 100%; border-radius: 99px; background: #8c8c8c; }
+.rda-prog i.hit { background: #0a0a0a; }
+.rda-pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 99px; padding: 3px 10px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.rda-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.rda-pill.ok { background: #e4f4ea; color: #1e7a3c; }
+.rda-pill.idle { background: #f4f4f4; color: #595959; }
+.rda-lock { display: flex; gap: 10px; align-items: flex-start; background: #f4f4f4; border-radius: 10px; padding: 10px 12px; color: #595959; font-size: 13px; }
+.rda-lock svg { flex: none; margin-top: 2px; }
+
+/* ---------- Needs attention: a vertical list inside the card ---------- */
+.needs-attention__list { display: flex; flex-direction: column; }
+:root .needs-attention__item { border: 0; border-top: 1px solid #e1e1e1; border-radius: 0; padding: 12px 0; width: 100%; background: transparent; align-items: flex-start; }
+:root .needs-attention__item:first-child { border-top: 0; padding-top: 0; }
+:root .needs-attention__item:hover { border-color: #e1e1e1; background: transparent; }
+:root .needs-attention__item:hover .needs-attention__title { text-decoration: underline; }
+.needs-attention__icon { width: 34px; height: 34px; }
+.needs-attention__go { margin-top: 9px; }
+.needs-attention__title { font-size: 14px; }
+.needs-attention__desc { font-size: 13px; }
+
+/* ---------- Salesman: the target ring only on phones (desktop shows it in the hero card) ---------- */
+.dash-row:has(.target-ring) { display: none; }
+@media (max-width: 767.98px) {
+  .dash-row:has(.target-ring) { display: block; }
+  .rda-head h1 { font-size: 26px; }
+}
+@media (min-width: 768px) {
+  .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child { background: #0a0a0a; border-color: #0a0a0a; }
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 1100px) {
+  :root .dash-row.rda-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .rda-cols, .rda-cols--even { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  :root .dash-row.rda-kpis { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .rda-card { padding: 16px; }
+  .rda-table td { padding-top: 11px; padding-bottom: 11px; }
+  .rda-actions { width: 100%; }
+  .rda-actions .rda-btn { flex: 1 1 auto; justify-content: center; }
+  .rda-seg { width: 100%; }
+  .rda-seg button { flex: 1; padding-inline: 6px; }
+}
+
+/* Secondary cards on the home page (top products, inventory alerts) use the same card titles */
+:root .dash-card h4.card-title { font-family: var(--font-display); font-size: 17px; font-weight: 600; text-transform: none; letter-spacing: 0; color: #0a0a0a; }
+
+/* ==========================================================================
+   Sidebar (desktop full / tablet icon rail / phone drawer)
+   ========================================================================== */
+/* Logo: the files are dark art on white (nearly square). Invert them for the black sidebar and
+   blend the white away, inside a fixed box so the header never jumps between the two states. */
+:root .dashboard-sidebar .dashboard-sidebar-header { min-height: 80px; padding: 14px 16px; }
+:root .dashboard-sidebar.collapsed .dashboard-sidebar-header { padding: 14px 0; justify-content: center; }
+:root .dashboard-sidebar .sidebar-logo-wrap { width: 56px; height: 52px; align-items: center; justify-content: center; flex: none; }
+:root .dashboard-sidebar.collapsed .sidebar-logo-wrap { width: 40px; height: 40px; }
+:root .dashboard-sidebar .sidebar-logo-img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  max-width: none;
+  object-fit: contain;
+  filter: invert(1);
+  mix-blend-mode: screen;
+}
+/* Nav rows: 44px, 9px radius, ink-2 active, hover lift */
+:root .dashboard-sidebar-nav a { min-height: 44px; border-radius: 9px; font-weight: 500; font-size: 15px; gap: 12px; }
+:root .dashboard-sidebar-nav a.active { font-weight: 600; }
+:root .dashboard-sidebar.collapsed .dashboard-sidebar-nav a { width: 44px; height: 44px; min-height: 44px; }
+:root .dashboard-sidebar-nav a:focus-visible { box-shadow: 0 0 0 2px #ffffff; }
+:root .dashboard-sidebar-footer { padding: 12px; }
+/* Tooltips on the rail: black chip with a hairline, readable against the black rail */
+:root .sidebar-tooltip--fixed { background: #ffffff; color: #0a0a0a; border: 1px solid #e1e1e1; font-weight: 600; box-shadow: 0 8px 24px -8px rgba(10, 10, 10, 0.35); border-radius: 8px; padding: 6px 10px; left: 72px !important; }
+:root .sidebar-tooltip--fixed::after { border-right-color: #ffffff; }
+/* Phone drawer: wide enough for the labels, black like the desktop sidebar */
+@media (max-width: 767.98px) {
+  :root .dashboard-sidebar { width: min(84vw, 300px); }
+  :root .dashboard-sidebar.expanded .dashboard-sidebar-header { justify-content: space-between; }
+}
+
+/* ==========================================================================
+   Header: search, bell and primary button, 44px / 11px like the mockups
+   ========================================================================== */
+:root .dashboard-layout .dashboard-title { display: none; }
+:root .dashboard-layout .dashboard-header-content { gap: 12px; padding-block: 18px; }
+:root .dashboard-layout .dashboard-header-content > div:first-child { flex: none; }
+:root .dashboard-layout .dashboard-header-actions { flex: 1 1 auto; justify-content: flex-end; }
+:root .dashboard-layout .dashboard-search-bar { max-width: none; flex: 1 1 auto; order: 0; }
+:root .dashboard-layout .dashboard-back-shop { order: 2; }
+:root .dashboard-layout .dashboard-action-icons { order: 3; }
+:root .dashboard-layout .dashboard-search-bar { margin-right: 4px; }
+:root .dashboard-layout .dashboard-back-shop { background: #0a0a0a; color: #ffffff; }
+@media (max-width: 1100px) {
+  :root .dashboard-layout .install-app-btn { display: none; }
+}
+@media (max-width: 767.98px) {
+  :root .dashboard-layout .dashboard-header-content { padding: 12px 16px; min-height: 68px; }
+  :root .dashboard-layout .dashboard-header-actions { gap: 8px; }
+}
+
+/* ==========================================================================
+   Phone bottom nav: flat white tab bar, label under each icon, ink for the current one
+   ========================================================================== */
+:root .dashboard-bottom-nav {
+  left: 0; right: 0; bottom: 0; max-width: none; width: 100%; margin: 0;
+  display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0;
+  padding: 8px 8px calc(10px + env(safe-area-inset-bottom));
+  border: 0; border-top: 1px solid #e1e1e1; border-radius: 0;
+  background: #ffffff; box-shadow: none;
+}
+:root .dashboard-bottom-nav button {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  height: auto; min-height: 48px; width: auto; padding: 0; border-radius: 10px;
+  background: transparent; color: #595959; font-size: 11.5px; font-weight: 600;
+}
+:root .dashboard-bottom-nav button[aria-current="page"] { background: transparent; color: #0a0a0a; }
+:root .dashboard-bottom-nav button[aria-current="page"] svg { stroke-width: 2.4; }
+.dashboard-bottom-nav__label { font-size: 11.5px; line-height: 1.1; white-space: nowrap; }
+.dashboard-bottom-nav button[aria-current="page"] .dashboard-bottom-nav__label::after { content: ""; display: block; width: 18px; height: 2px; margin: 3px auto 0; border-radius: 2px; background: #0a0a0a; }
+@media (min-width: 768px) { :root .dashboard-bottom-nav { display: none; } }
+/* The drawer and its backdrop sit above the phone tab bar */
+:root .dashboard-bottom-nav { z-index: 900; }
+/* Salesman with a target: desktop keeps the ink hero card (the ring shows on phones only) */
+@media (min-width: 768px) {
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-value { color: #ffffff; }
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .rda-kpi__lab,
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-sub { color: #bdbdbd; }
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .rda-kpi__delta .up { color: #ffffff; }
+}
+/* On phones the salesman's black target ring leads, so the first number card goes white */
+@media (max-width: 767.98px) {
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child { background: #ffffff; border-color: #e1e1e1; }
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .rda-kpi__lab,
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .rda-kpi__delta,
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .rda-kpi__num small { color: #595959; }
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .rda-kpi__lab svg { color: #3b3b3b; }
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-value { color: #0a0a0a; }
+  :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .rda-kpi__delta .up { color: #1e7a3c; text-decoration: none; }
+}

@@ -1751,12 +1751,10 @@ const DashboardSuppliers = () => {
           const pct = goal > 0 ? Math.round((done / goal) * 100) : 0;
           const inr = (n) => `₹${Math.round(n).toLocaleString('en-IN')}`;
           return (
-            <div className="dash-row">
-              <div className="dash-kpis sm-target-cards">
+            <div className="dash-row dash-kpis sm-target-cards">
                 <div className="dash-card metric"><h4>Achieved</h4><div className="metric-value">{inr(done)}</div><div className="metric-sub">of {inr(goal)} target</div></div>
                 <div className="dash-card metric"><h4>Due</h4><div className="metric-value">{inr(Math.max(0, goal - done))}</div><div className="metric-sub">still to reach</div></div>
                 <div className="dash-card metric"><h4>Percent</h4><div className="metric-value">{pct}%</div><div className="metric-sub"><span className="prog" role="img" aria-label={`${pct} percent`}><i style={{ width: `${Math.min(100, pct)}%` }} /></span></div></div>
-              </div>
             </div>
           );
         })()}
@@ -2004,6 +2002,7 @@ const DashboardSuppliers = () => {
           <div className="form-group form-group--full">
             <label className="ui-label">KYC Documents *</label>
             <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
+            <p className="ord-view__lock party-form__lock mb-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Only admin and sales managers can open these files.</span></p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 { key: 'pan_card', label: 'PAN Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
@@ -2210,6 +2209,7 @@ const DashboardSuppliers = () => {
           <div className="form-group form-group--full">
             <label className="ui-label">KYC Documents <span className="text-text-muted font-normal">(upload only to replace)</span></label>
             <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
+            <p className="ord-view__lock party-form__lock mb-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Only admin and sales managers can open these files.</span></p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {[
                 { key: 'pan_card', urlKey: 'pan_card_url', label: 'PAN Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },

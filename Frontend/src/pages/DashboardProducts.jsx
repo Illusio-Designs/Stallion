@@ -2012,18 +2012,16 @@ const DashboardProducts = () => {
     {
       key: 'image',
       label: 'IMAGE',
-      width: '84px',
+      width: '72px',
       render: (_v, row) => <ProductThumb product={row.data} alt={row.model_no} />,
     },
-    { key: 'model_no', label: 'MODEL NO', width: '120px' },
-    { key: 'brand', label: 'BRAND', width: '120px' },
-    { key: 'collection', label: 'COLLECTION', width: '130px' },
-    { key: 'color_code_name', label: 'COLOR CODE', width: '120px' },
-    { key: 'warehouse_qty', label: 'WAREHOUSE QTY', width: '140px' },
-    { key: 'tray_qty', label: 'TRAY QTY', width: '110px' },
-    { key: 'total_qty', label: 'STOCK', width: '90px' },
+    { key: 'model_no', label: 'MODEL NO', width: '110px' },
+    { key: 'brand', label: 'BRAND', width: '90px' },
+    { key: 'gender_name', label: 'GENDER', width: '80px' },
+    { key: 'shape_name', label: 'SHAPE', width: '80px' },
+    { key: 'total_qty', label: 'STOCK', width: '70px' },
     {
-      key: 'status', label: 'STATUS', width: '120px',
+      key: 'status', label: 'STATUS', width: '110px',
       render: (v, row) => {
         const st = String(v || '').toLowerCase();
         const qty = Number(row.total_qty) || 0;
@@ -2034,9 +2032,9 @@ const DashboardProducts = () => {
         return <StatusBadge status="default">{label}</StatusBadge>;
       },
     },
-    { key: 'whp_formatted', label: 'PRICE', width: '110px', render: (v) => <b>{v}</b> },
+    { key: 'whp_formatted', label: 'PRICE', width: '100px', render: (v) => <b>{v}</b> },
     {
-      key: 'action', label: 'ACTION', width: '120px', render: (_v, row) => (
+      key: 'action', label: 'ACTION', width: '100px', render: (_v, row) => (
         <RowActions
           onEdit={() => handleEdit(row)}
           onDelete={() => handleDelete(row)}
