@@ -78,3 +78,7 @@
 :root .auth-alt { margin: 4px 0 0; font-size: 14px; color: #595959; }
 :root .auth-alt a { color: #0a0a0a; font-weight: 600; text-decoration: underline; }
 :root .auth-split .login-container, :root .auth-split .register-container { width: 100%; max-width: 400px; }
+
+/* ---- About ---- */
+:root .about-page .about-hero .about-hero-lede { color: #bdbdbd; }
+:root .about-page .about-hero .about-eyebrow { color: #9a9a9a; }
