@@ -7,13 +7,13 @@
   align-items: center;
   justify-content: center;
   gap: var(--space-2);
-  border-radius: var(--radius-md);
+  border-radius: 11px;
   font-weight: var(--font-weight-semibold);
   font-size: var(--text-base);
   line-height: 1.2;
   border: 1px solid transparent;
-  padding: 0 var(--space-4);
-  min-height: 40px;
+  padding: 0 18px;
+  min-height: 44px;
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
@@ -39,14 +39,14 @@
 }
 
 .ui-btn--sm {
-  min-height: 32px;
-  padding: 0 var(--space-3);
-  font-size: var(--text-xs);
-  border-radius: var(--radius-sm);
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  border-radius: 9px;
 }
 
 .ui-btn--md {
-  min-height: 40px;
+  min-height: 44px;
   font-size: var(--text-base);
 }
 
@@ -56,12 +56,12 @@
   font-size: var(--text-md);
 }
 
-/* Primary — filled indigo */
+/* Primary — ink black fill */
 .ui-btn--primary {
   background: var(--color-primary);
   color: var(--color-text-on-primary);
   border-color: var(--color-primary);
-  box-shadow: var(--shadow-xs);
+  box-shadow: none;
 }
 
 .ui-btn--primary:hover {
@@ -84,7 +84,7 @@
 .ui-btn--secondary {
   background: var(--color-surface);
   color: var(--color-text);
-  border-color: var(--color-border-strong);
+  border-color: #e1e1e1;
 }
 
 .ui-btn--secondary:hover {
@@ -118,7 +118,7 @@
   background: var(--color-error);
   color: var(--color-text-on-primary);
   border-color: var(--color-error);
-  box-shadow: var(--shadow-xs);
+  box-shadow: none;
 }
 
 .ui-btn--danger:hover {
@@ -135,12 +135,12 @@
   box-shadow: var(--focus-ring-error);
 }
 
-/* Accent — amber call-to-action (optional, opt-in) */
+/* Accent — same ink black as primary (monochrome) */
 .ui-btn--accent {
   background: var(--color-accent);
   color: var(--color-text-on-accent);
   border-color: var(--color-accent);
-  box-shadow: var(--shadow-xs);
+  box-shadow: none;
 }
 
 .ui-btn--accent:hover {
@@ -185,7 +185,7 @@
 }
 
 .ui-btn__label {
-  font-family: 'Spoof Trial', sans-serif;
+  font-family: var(--font-spoof);
 }
 
 /* ============================================================
@@ -455,7 +455,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
-  color: #475569;
+  color: #3b3b3b;
   cursor: pointer;
   transition: background var(--transition), color var(--transition), transform var(--transition-fast);
 }
@@ -491,10 +491,10 @@
    ============================================================ */
 .ui-input,
 .ui-select {
-  border: 1px solid var(--color-border-strong);
-  padding: 0 var(--space-3);
-  min-height: 40px;
-  border-radius: var(--radius-md);
+  border: 1px solid #c9c9c9;
+  padding: 0 12px;
+  min-height: 44px;
+  border-radius: 10px;
   background: var(--color-surface);
   font-size: var(--text-base);
   color: var(--color-text);
@@ -514,12 +514,12 @@ textarea.ui-input {
 
 .ui-input:hover,
 .ui-select:hover {
-  border-color: var(--color-grey-400);
+  border-color: #8c8c8c;
 }
 
-/* Ensure modal form inputs always have md border radius */
+/* Ensure modal form inputs always keep the 10px radius */
 .ui-form .ui-input {
-  border-radius: var(--radius-md) !important;
+  border-radius: 10px !important;
 }
 
 .ui-input:focus,
@@ -528,7 +528,7 @@ textarea.ui-input {
 .ui-select:focus-visible {
   outline: none;
   border-color: var(--color-primary);
-  box-shadow: var(--focus-ring);
+  box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.13);
 }
 
 .ui-input:disabled,
@@ -562,7 +562,7 @@ textarea.ui-input {
 .ui-dropdown-custom {
   position: relative;
   width: 100%;
-  font-family: 'Spoof Trial', sans-serif;
+  font-family: var(--font-spoof);
   display: inline-block;
   z-index: 1;
 }
@@ -587,12 +587,12 @@ textarea.ui-input {
   justify-content: space-between;
   gap: var(--space-2);
   padding: 0 var(--space-3);
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
+  border: 1px solid #c9c9c9;
+  border-radius: 10px;
   background: var(--color-surface);
   cursor: pointer;
   transition: border-color var(--transition), box-shadow var(--transition);
-  min-height: 40px;
+  min-height: 44px;
 }
 
 .ui-dropdown-custom__trigger:hover {
@@ -905,10 +905,10 @@ textarea.ui-input {
 .ui-badge {
   display: inline-flex;
   align-items: center;
-  gap: var(--space-1);
-  padding: 2px var(--space-2);
-  min-height: 22px;
-  font-size: var(--text-xs);
+  gap: 6px;
+  padding: 3px 10px;
+  min-height: 24px;
+  font-size: 12px;
   line-height: 1.4;
   border-radius: var(--radius-pill);
   background: var(--color-grey-100);
@@ -917,19 +917,31 @@ textarea.ui-input {
   white-space: nowrap;
 }
 
+/* Leading status dot */
+.ui-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+
+/* Green and red are reserved for real success / error status. Everything else
+   (pending, processing, dispatched...) reads as neutral grey. */
 .ui-badge--success {
   background: var(--color-success-soft);
   color: var(--color-success);
 }
 
 .ui-badge--warning {
-  background: var(--color-warning-soft);
-  color: var(--color-warning);
+  background: #ececec;
+  color: #0a0a0a;
 }
 
 .ui-badge--info {
-  background: var(--color-primary-soft);
-  color: var(--color-primary);
+  background: #ececec;
+  color: #0a0a0a;
 }
 
 .ui-badge--danger {
@@ -942,61 +954,50 @@ textarea.ui-input {
    ============================================================ */
 .ui-tabs {
   display: flex;
-  gap: var(--space-1);
-  overflow-x: auto;
-  border-bottom: 1px solid var(--color-border);
-  scrollbar-width: none;
-}
-
-.ui-tabs::-webkit-scrollbar {
-  display: none;
+  flex-wrap: wrap;
+  gap: 8px;
+  border-bottom: none !important;
+  padding-bottom: 2px;
+  overflow: visible !important;
 }
 
 .ui-tab {
   position: relative;
-  padding: var(--space-3) var(--space-3);
-  border: none;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid #e1e1e1;
+  background: var(--color-surface);
   color: var(--color-text-muted);
-  border-radius: 0;
-  font-weight: var(--font-weight-medium);
+  border-radius: var(--radius-pill);
+  font-weight: var(--font-weight-semibold);
   font-size: var(--text-base);
   white-space: nowrap;
   cursor: pointer;
-  transition: color var(--transition);
+  transition: color var(--transition), background var(--transition), border-color var(--transition);
 }
 
 .ui-tab::after {
-  content: "";
-  position: absolute;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: -1px;
-  height: 2px;
-  background: transparent;
-  border-radius: var(--radius-pill);
-  transition: background var(--transition);
+  display: none;
 }
 
 .ui-tab:hover {
   color: var(--color-text);
+  border-color: #c9c9c9;
 }
 
 .ui-tab:focus-visible {
   outline: none;
   box-shadow: var(--focus-ring);
-  border-radius: var(--radius-sm);
 }
 
-.ui-tab--active {
-  background: transparent;
-  color: var(--color-primary);
-  border-color: transparent;
+.ui-tab--active,
+.ui-tab--active:hover {
+  background: #0a0a0a;
+  border-color: #0a0a0a;
+  color: #ffffff;
   font-weight: var(--font-weight-semibold);
-}
-
-.ui-tab--active::after {
-  background: var(--color-primary);
 }
 
 /* ============================================================
@@ -1005,7 +1006,7 @@ textarea.ui-input {
 .ui-modal__backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(26, 27, 35, 0.45);
+  background: rgba(10, 10, 10, 0.45);
   overflow-y: auto;
   z-index: 50;
   backdrop-filter: blur(var(--backdrop-blur));
@@ -1109,9 +1110,10 @@ textarea.ui-input {
   border: 1px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
-  width: 32px;
-  height: 32px;
-  border-radius: var(--radius-md);
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border-color: #e1e1e1;
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -1172,7 +1174,7 @@ textarea.ui-input {
 .ui-aside-panel__backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(26, 27, 35, 0.5);
+  background: rgba(10, 10, 10, 0.45);
   /* Above all dashboard chrome (header z-100, sidebar z-1000/10000) so the
      panel is never clipped by them, but below the toast layer (z-99998). */
   z-index: 10050;
@@ -1198,7 +1200,8 @@ textarea.ui-input {
   width: 100%;
   max-width: 520px;
   background: var(--color-surface);
-  box-shadow: var(--shadow-xl);
+  border-left: 1px solid #e1e1e1;
+  box-shadow: -12px 0 32px rgba(10, 10, 10, 0.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1244,6 +1247,7 @@ textarea.ui-input {
   font-weight: var(--font-weight-semibold);
   color: var(--color-text);
   letter-spacing: -0.01em;
+  font-family: var(--font-display);
 }
 
 .ui-aside-panel__close {
@@ -1529,9 +1533,9 @@ textarea.ui-input {
   padding: var(--space-6);
   overflow: visible;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid #e1e1e1;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   position: relative;
 }
 
@@ -1551,6 +1555,7 @@ textarea.ui-input {
   color: var(--color-text);
   font-weight: var(--font-weight-semibold);
   letter-spacing: -0.01em;
+  font-family: var(--font-display);
 }
 
 .ui-table__actions {
@@ -1561,9 +1566,11 @@ textarea.ui-input {
 
 .ui-table__controls {
   padding: var(--space-3) var(--space-4);
-  background: var(--color-grey-50);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 .ui-table__control-row {
@@ -1590,10 +1597,10 @@ textarea.ui-input {
   align-items: center;
   gap: var(--space-2);
   padding: 0 var(--space-3);
-  min-height: 40px;
-  height: 40px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
+  min-height: 44px;
+  height: 44px;
+  border: 1px solid #c9c9c9;
+  border-radius: 11px;
   background: var(--color-surface);
   font-weight: var(--font-weight-normal);
   color: var(--color-text);
@@ -1625,11 +1632,11 @@ textarea.ui-input {
 }
 
 .ui-search .ui-input {
-  padding-left: 36px;
-  border-radius: var(--radius-pill);
-  min-height: 40px;
-  height: 40px;
-  font-family: 'Spoof Trial', sans-serif;
+  padding-left: 38px;
+  border-radius: 11px;
+  min-height: 44px;
+  height: 44px;
+  font-family: var(--font-spoof);
 }
 
 .ui-search svg {
@@ -1651,10 +1658,10 @@ textarea.ui-input {
   align-items: center;
   gap: var(--space-2);
   padding: 0 var(--space-3);
-  min-height: 40px;
-  height: 40px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
+  min-height: 44px;
+  height: 44px;
+  border: 1px solid #c9c9c9;
+  border-radius: 11px;
   background: var(--color-surface);
   font-weight: var(--font-weight-normal);
   color: var(--color-text);
@@ -1702,7 +1709,7 @@ textarea.ui-input {
 
 .ui-table__scroll {
   overflow-x: auto;
-  overflow-y: visible;
+  
   position: relative;
   scrollbar-width: thin;
   scrollbar-color: var(--color-grey-300) transparent;
@@ -1740,15 +1747,15 @@ textarea.ui-input {
 
 .ui-table thead th {
   text-align: left;
-  padding: var(--space-3) var(--space-3);
-  font-size: var(--text-xs);
+  padding: 0 12px 10px 0;
+  font-size: 11px;
   font-weight: var(--font-weight-semibold);
-  color: var(--color-text-subtle);
-  border-bottom: 1px solid var(--color-border);
+  color: #595959;
+  border-bottom: 1px solid #e1e1e1;
   position: sticky;
   top: 0;
   text-transform: uppercase;
-  letter-spacing: var(--tracking-label);
+  letter-spacing: 0.1em;
   white-space: nowrap;
   overflow: visible;
   background: var(--color-surface);
@@ -1817,14 +1824,14 @@ textarea.ui-input {
 }
 
 .ui-table tbody tr:hover {
-  background: var(--color-grey-50);
+  background: #fafafa;
 }
 
 .ui-table tbody td {
-  padding: var(--space-4) var(--space-3);
+  padding: 13px 12px 13px 0;
   font-size: var(--text-base);
   color: var(--color-text);
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid #e1e1e1;
   /* Show the full value on one line; the row scrolls horizontally rather than
      truncating. */
   white-space: nowrap;
@@ -1846,9 +1853,9 @@ textarea.ui-input {
 }
 
 .ui-table__footer {
-  background: var(--color-grey-50);
-  border: 1px solid var(--color-border);
-  border-top: none;
+  background: var(--color-surface);
+  border: 1px solid #e1e1e1;
+  border-top: 1px solid #e1e1e1;
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   padding: var(--space-3) var(--space-6);
   display: flex;
@@ -1998,8 +2005,8 @@ textarea.ui-input {
 }
 
 .ui-page-num {
-  min-width: 32px;
-  height: 32px;
+  min-width: 34px;
+  height: 34px;
   padding: 0 var(--space-2);
   display: inline-flex;
   align-items: center;
@@ -2047,8 +2054,8 @@ textarea.ui-input {
 .ui-page-chip {
   width: 36px;
   height: 36px;
-  border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-pill);
+  border: 1px solid #c9c9c9;
+  border-radius: 10px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2084,7 +2091,7 @@ input[type="number"] {
   padding-right: 34px;
   padding-left: var(--space-3);
   border: 1px solid var(--color-border-strong);
-  font-family: 'Spoof Trial', sans-serif;
+  font-family: var(--font-spoof);
   font-weight: var(--font-weight-normal);
   color: var(--color-text);
   background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="%236b6f7d" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>');
@@ -2144,7 +2151,7 @@ input[type="number"] {
 
 .sr-chart__line {
   width: 4px;
-  background: var(--color-accent);
+  background: #8c8c8c;
   border-radius: var(--radius-sm) var(--radius-sm) 0 0;
   margin-top: 2px;
 }
@@ -2191,10 +2198,10 @@ input[type="number"] {
    ============================================================ */
 .card-full {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid #e1e1e1;
   border-radius: var(--radius-lg);
   padding: 0;
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   margin-bottom: var(--space-8);
   width: 100%;
   overflow: hidden;
@@ -2202,17 +2209,17 @@ input[type="number"] {
 
 .ui-card {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid #e1e1e1;
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   padding: var(--space-6);
 }
 
 .ui-panel {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid #e1e1e1;
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   padding: var(--space-6);
 }
 
@@ -2281,8 +2288,8 @@ input[type="number"] {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   border-radius: var(--radius-pill);
   background: var(--color-grey-100);
   color: var(--color-text-subtle);
@@ -2307,10 +2314,11 @@ input[type="number"] {
   gap: var(--space-2);
 }
 
-/* Empty variant */
+/* Empty variant: grey ring icon, bold title, grey hint */
 .ui-state--empty .ui-state__icon {
-  background: var(--color-grey-100);
-  color: var(--color-text-subtle);
+  background: #f4f4f4;
+  border: 1px solid #e1e1e1;
+  color: #0a0a0a;
 }
 
 /* Error variant */

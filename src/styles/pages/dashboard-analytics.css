@@ -42,7 +42,7 @@
   fill: var(--color-primary);
 }
 .srchart__bar--revenue {
-  fill: var(--color-accent);
+  fill: #9a9a9a;
 }
 .srchart__svg:hover .srchart__bar {
   opacity: 0.45;
@@ -80,7 +80,7 @@
   background: var(--color-primary);
 }
 .srchart__legend-item--revenue::before {
-  background: var(--color-accent);
+  background: #9a9a9a;
 }
 
 /* Loading state — skeleton bars + shimmer (respects reduced-motion below) */

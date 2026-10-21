@@ -20,7 +20,7 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
+  box-shadow: none;
   padding: var(--space-5);
   grid-column: span 6;
   /* Allow the card to shrink inside the grid so a wide table scrolls within
@@ -58,7 +58,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  color: var(--color-text-subtle);
+  color: #595959;
   margin: 0 0 var(--space-2) 0;
 }
 .card-title {
@@ -120,8 +120,8 @@
   font-variant-numeric: tabular-nums;
 }
 .stock-badge.warn {
-  background: var(--color-warning-soft);
-  color: var(--color-warning);
+  background: #ececec;
+  color: #0a0a0a;
 }
 .stock-badge.danger {
   background: var(--color-error-soft);
@@ -175,9 +175,10 @@
   border: none;
   border-radius: var(--radius-md);
   padding: var(--space-2) var(--space-3);
-  min-height: 40px;
+  min-height: 44px;
+  border-radius: 11px;
   cursor: pointer;
-  font-family: "Spoof Trial", sans-serif;
+  font-family: var(--font-spoof);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-semibold);
   transition: background var(--transition-fast), box-shadow var(--transition-fast), transform var(--transition-fast);
@@ -202,8 +203,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 40px;
-  font-family: "Spoof Trial", sans-serif;
+  min-height: 44px;
+  font-family: var(--font-spoof);
   font-weight: var(--font-weight-semibold);
   font-size: var(--text-sm);
 }

@@ -1,5 +1,6 @@
 import "./globals.css";
 import "../styles/redesign.css";
+import "../styles/redesign-public.css";
 import 'react-toastify/dist/ReactToastify.css';
 import LoaderProvider from "../components/LoaderProvider";
 import ToastContainerProvider from "../components/ToastContainerProvider";

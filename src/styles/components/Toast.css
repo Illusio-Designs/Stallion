@@ -14,31 +14,33 @@
   background: var(--color-surface) !important;
   color: var(--color-text) !important;
   border: 1px solid var(--color-border) !important;
-  border-radius: var(--radius-lg) !important;
-  box-shadow: var(--shadow-lg) !important;
+  border-radius: 10px !important;
+  box-shadow: 0 8px 24px rgba(10, 10, 10, 0.12) !important;
   padding: var(--space-1) var(--space-3) !important;
-  min-height: 56px;
+  min-height: 52px;
 }
 
-/* Left accent rail carries the semantic meaning (kept hairline elsewhere) */
+/* Success and error are tinted green / red (status only). Info, warning and
+   default stay white with an ink border. */
 .Toastify__toast--success {
-  border-left: 3px solid var(--color-success) !important;
+  background: var(--color-success-soft) !important;
+  border-color: #a9d9c3 !important;
+  color: var(--color-success) !important;
 }
 
 .Toastify__toast--error {
-  border-left: 3px solid var(--color-error) !important;
+  background: var(--color-error-soft) !important;
+  border-color: #f0b9b4 !important;
+  color: var(--color-error) !important;
 }
 
-.Toastify__toast--info {
-  border-left: 3px solid var(--color-primary) !important;
-}
+.Toastify__toast--success .Toastify__toast-body { color: var(--color-success); }
+.Toastify__toast--error .Toastify__toast-body { color: var(--color-error); }
 
-.Toastify__toast--warning {
-  border-left: 3px solid var(--color-accent) !important;
-}
-
+.Toastify__toast--info,
+.Toastify__toast--warning,
 .Toastify__toast--default {
-  border-left: 3px solid var(--color-primary) !important;
+  border-color: #0a0a0a !important;
 }
 
 .Toastify__toast-body {
@@ -71,7 +73,7 @@
   fill: var(--color-primary);
 }
 .Toastify__toast--warning .Toastify__toast-icon svg {
-  fill: var(--color-accent);
+  fill: var(--color-primary);
 }
 
 /* Dismissible close button — proper tap target + visible focus */
@@ -124,7 +126,7 @@
 }
 
 .Toastify__progress-bar--warning {
-  background: var(--color-accent) !important;
+  background: var(--color-primary) !important;
 }
 
 /* Container width / mobile readability */

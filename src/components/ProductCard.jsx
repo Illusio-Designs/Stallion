@@ -44,6 +44,7 @@ const ProductCard = ({
   const stockNum = stock == null ? null : Number(stock);
   const outOfStock = stockNum != null && stockNum <= 0;
   const atMax = stockNum != null && qty >= stockNum;
+  const lowStock = stockNum != null && stockNum > 0 && stockNum <= 10;
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgBroken, setImgBroken] = useState(false);
 
@@ -142,13 +143,6 @@ const ProductCard = ({
   return (
     <div className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
       <div className={`product-image relative overflow-hidden rounded-md${imgBroken ? ' aspect-square' : ''}`}>
-        {/* Stock tag (top-left) — only shown when the product is out of stock;
-            in-stock is the default so we don't clutter every card with a badge. */}
-        {outOfStock && (
-          <span className="pc-stock-tag absolute left-2.5 top-2.5 z-[2] rounded-pill bg-error px-2.5 py-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-on-primary">
-            Out of stock
-          </span>
-        )}
         {/* View (eye) button (top-right) — replaces the wishlist icon */}
         <button
           type="button"
@@ -193,6 +187,7 @@ const ProductCard = ({
           overflow onto the price row. */}
       <h3 className="product-name" title={productName}>{productName}</h3>
 
+      <div className="pc-row">
       {hasPrice && (
         <div className="pc-price flex items-baseline flex-wrap gap-2 mb-3">
           <span className="pc-price-label self-center text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle">WHP</span>
@@ -202,6 +197,10 @@ const ProductCard = ({
           )}
         </div>
       )}
+        <span className={`pc-pill ${outOfStock ? 'pc-pill--bad' : lowStock ? 'pc-pill--idle' : 'pc-pill--ok'}`}>
+          {outOfStock ? 'Sold out' : lowStock ? 'Low stock' : 'In stock'}
+        </span>
+      </div>
 
       <div className="pc-actions flex w-full items-center gap-2 mt-3">
         <div className="pc-qty inline-flex h-10 flex-none items-center overflow-hidden rounded-md border border-border-strong bg-surface" role="group" aria-label="Quantity selector">

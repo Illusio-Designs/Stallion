@@ -53,15 +53,15 @@ const getStatusLabel = (status) => {
 const getStatusColor = (status) => {
   switch (status) {
     case TrayProductStatus.ALLOTED:
-      return { bg: '#e3f2fd', text: '#1976d2' };
+      return { bg: '#ececec', text: '#0a0a0a' };
     case TrayProductStatus.PRIORITY_BOOKED:
-      return { bg: '#fff3e0', text: '#e65100' };
+      return { bg: '#0a0a0a', text: '#ffffff' };
     case TrayProductStatus.PARTIALLY_BOOKED:
-      return { bg: '#f3e5f5', text: '#6a1b9a' };
+      return { bg: '#f4f4f4', text: '#3b3b3b' };
     case TrayProductStatus.RETURNED:
-      return { bg: '#ffebee', text: '#c62828' };
+      return { bg: '#fbe5e3', text: '#b3261e' };
     default:
-      return { bg: '#f5f5f5', text: '#666' };
+      return { bg: '#f4f4f4', text: '#595959' };
   }
 };
 

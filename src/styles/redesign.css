@@ -56,3 +56,69 @@ h1, h2, h3,
 .login-page { background-color: #0a0a0a; }
 .login-bg-image, .login-gradient-overlay { display: none; }
 .login-container { border-color: #ffffff; box-shadow: none; }
+
+/* ==========================================================================
+   Dashboard area restyle (black and white, matches the approved mockups).
+   Shared pieces (buttons, inputs, tables, badges, tabs, drawer, toasts, header)
+   are restyled in ui.css, DashboardHeader.css, Toast.css, filter-chips.css.
+   This section holds the cross-cutting overrides that must beat Tailwind
+   utilities used in the dashboard JSX.
+   ========================================================================== */
+
+/* Page titles */
+.page-title,
+.settings-header h4,
+.support-header h4 {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.settings-subtitle,
+.support-subtitle { color: #595959; }
+
+/* Hero KPI numbers use the display face on every dashboard page */
+.dash-card.metric .metric-value,
+.orders-card .metric-value,
+.expenses-summary .metric-value,
+.analytics-card .metric-value { font-family: var(--font-display); letter-spacing: -0.02em; }
+.dash-card.metric h4,
+.orders-card h4 { color: #595959; }
+
+/* Profit / loss text stays green / red (status). Everything else is ink. */
+.dash-card .ui-table-container { box-shadow: none; }
+
+/* Dashboard shell: white page, hairline header */
+.dashboard-layout .dashboard-header { background: #ffffff; border-bottom-color: #e1e1e1; }
+.dashboard-layout .dashboard-footer { background: #ffffff; border-top-color: #e1e1e1; }
+
+/* Phone bottom bar: white pill, black active item, neutral shadow */
+.dashboard-bottom-nav {
+  background: #ffffff;
+  border: 1px solid #e1e1e1;
+  box-shadow: 0 10px 30px -8px rgba(10, 10, 10, 0.2);
+  backdrop-filter: none;
+}
+.dashboard-bottom-nav button { color: #595959; }
+.dashboard-bottom-nav button[aria-current="page"] {
+  background: #0a0a0a;
+  color: #ffffff;
+}
+
+/* Cards hold tables edge to edge: keep the table card flat inside them */
+.dash-card.full .ui-table { border-radius: 14px 14px 0 0; }
+
+/* Lock / info notes inside drawers */
+.ui-aside-panel__body .ui-label { font-weight: 600; font-size: 13px; }
+.ui-label { font-weight: 600; font-size: 13px; color: #0a0a0a; }
+
+/* Row action icon buttons */
+.row-action-btn { border-radius: 10px; }
+
+/* Stop any shared piece from forcing horizontal page scroll on phones */
+@media (max-width: 767.98px) {
+  .dashboard-layout { overflow-x: clip; }
+  .dashboard-content { overflow-x: clip; }
+  .ui-table { padding: var(--space-4); }
+  .ui-table__footer { padding-left: var(--space-3); padding-right: var(--space-3); }
+}
