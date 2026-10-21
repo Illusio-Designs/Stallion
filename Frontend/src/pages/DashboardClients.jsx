@@ -23,6 +23,7 @@ import {
 import { getUser, getUserRole, getUserRoles } from '../services/authService';
 import { showError, showSuccess } from '../services/notificationService';
 import { captureCurrentPosition } from '../utils/geolocation';
+import { downloadCsv } from '../utils/exportCsv';
 
 const DashboardClients = () => {
   const confirm = useConfirm();
@@ -444,12 +445,47 @@ const DashboardClients = () => {
     });
   }, [parties, selectedCountryFilter, isSalesman, isDistributor]);
 
-  const filteredRowsByTab = useMemo(() => {
-    if (activeTab === 'All') return rows;
+  const rowsByTab = useMemo(() => {
     if (activeTab === 'Activate') return rows.filter(r => r.isActive);
     if (activeTab === 'Deactivate') return rows.filter(r => !r.isActive);
     return rows;
   }, [rows, activeTab]);
+
+  // List tools (display only): client-side search + location chips over loaded rows.
+  const [partySearch, setPartySearch] = useState('');
+  const [locChip, setLocChip] = useState('');
+  const LOC_CHIPS = [
+    { key: 'ok', label: 'Shop verified' },
+    { key: 'warn', label: 'Address only' },
+    { key: 'idle', label: 'No location' },
+  ];
+  const locCounts = useMemo(() => {
+    const c = { ok: 0, warn: 0, idle: 0 };
+    rowsByTab.forEach(r => { c[r.locationState] = (c[r.locationState] || 0) + 1; });
+    return c;
+  }, [rowsByTab]);
+  const filteredRowsByTab = useMemo(() => {
+    const q = partySearch.trim().toLowerCase();
+    return rowsByTab.filter(r => {
+      if (locChip && r.locationState !== locChip) return false;
+      if (!q) return true;
+      return [r.party_name, r.trade_name, r.contact_person, r.phone, r.cityLabel]
+        .some(v => String(v || '').toLowerCase().includes(q));
+    });
+  }, [rowsByTab, partySearch, locChip]);
+  const handleExportParties = () => {
+    downloadCsv('parties', [
+      { label: 'Party', value: r => r.party_name },
+      { label: 'Trade name', value: r => r.trade_name },
+      { label: 'Contact', value: r => r.contact_person },
+      { label: 'Phone', value: r => r.phone },
+      { label: 'City', value: r => r.cityLabel },
+      { label: 'Salesman', value: r => r.salesmanLabel },
+      { label: 'Location', value: r => r.locationLabel },
+      { label: 'Credit days', value: r => Number(r.credit_days) || 0 },
+      { label: 'Status', value: r => (r.isActive ? 'Active' : 'Inactive') },
+    ], filteredRowsByTab);
+  };
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -1550,6 +1586,22 @@ const DashboardClients = () => {
             ))}
           </div>
         </div>
+        <div className="dash-row party-tools">
+          <div className="gtools">
+            <label className="gsearch">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4-4" /></svg>
+              <input type="search" value={partySearch} onChange={e => setPartySearch(e.target.value)} placeholder="Search by name, contact, phone or city" aria-label="Search parties" />
+            </label>
+            <button type="button" className="gbtn" onClick={handleExportParties} disabled={loading || filteredRowsByTab.length === 0}>Export CSV</button>
+          </div>
+          <div className="gchips" role="group" aria-label="Location">
+            {LOC_CHIPS.map(c => (
+              <button key={c.key} type="button" aria-pressed={locChip === c.key} className={`gchip ${locChip === c.key ? 'on' : ''}`} onClick={() => setLocChip(locChip === c.key ? '' : c.key)}>
+                {c.label} <b>{locCounts[c.key] || 0}</b>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="dash-row">
           <div className="dash-card full" style={{ maxWidth: 360 }}>
             <label className="block mb-2 text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
@@ -1612,9 +1664,11 @@ const DashboardClients = () => {
                     <line x1="22" y1="11" x2="16" y2="11" />
                   </svg>
                 </div>
-                <p className="ui-state__title">No parties yet</p>
+                <p className="ui-state__title">{rows.length > 0 ? 'No matching parties' : 'No parties yet'}</p>
                 <p className="ui-state__desc">
-                  {selectedCountryFilter
+                  {rows.length > 0
+                    ? 'Nothing matches the search or location filter. Clear it to see all parties.'
+                    : selectedCountryFilter
                     ? `No parties found for ${countries.find(c => String(c.id) === String(selectedCountryFilter))?.name || 'the selected country'}. Pick another country above, or add a new party.`
                     : 'No parties found. Pick a country above, or add a new party to get started.'}
                 </p>

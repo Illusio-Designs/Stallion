@@ -1,1 +1,32 @@
 /* Redesign area G: page headings and list tools. */
+
+/* Page heading (h1 + one-line subtitle), like the mockups' .head */
+:root .pg-head{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px;margin:0 0 4px}
+:root .pg-head h1{font-family:var(--font-display);font-size:32px;line-height:1.1;font-weight:700;letter-spacing:-.01em;color:#0a0a0a;margin:0}
+:root .pg-head p{color:#595959;margin:4px 0 0;font-size:15px;max-width:68ch}
+:root .pg-head__tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+@media (max-width:640px){:root .pg-head h1{font-size:26px}}
+
+/* Segmented control (matches mockup .seg) */
+:root .seg{display:inline-flex;background:#fff;border:1px solid #e1e1e1;border-radius:10px;padding:3px;gap:2px}
+:root .seg button{padding:6px 14px;border-radius:7px;font-weight:600;color:#595959;font-size:13px;min-height:34px;background:transparent;border:0;cursor:pointer}
+:root .seg button.on{background:#0a0a0a;color:#fff}
+:root .seg button:focus-visible{outline:2px solid #0a0a0a;outline-offset:2px}
+
+/* List tools: search / chips / export row */
+:root .gtools{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+:root .gtools .gsearch{flex:1 1 260px;display:flex;align-items:center;gap:10px;background:#fff;border:1px solid #e1e1e1;border-radius:11px;padding:0 14px;height:44px;color:#595959;min-width:0}
+:root .gtools .gsearch input{flex:1;min-width:0;border:0;outline:0;background:transparent;font:inherit;color:#0a0a0a;height:100%}
+:root .gtools .gsearch:focus-within{border-color:#0a0a0a;box-shadow:0 0 0 3px #00000022}
+:root .gtools .gsearch svg{width:18px;height:18px;flex:none;stroke:currentColor;fill:none;stroke-width:1.8}
+:root .gbtn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:0 18px;border-radius:11px;border:1px solid #c9c9c9;background:#fff;color:#0a0a0a;font:inherit;font-weight:600;cursor:pointer;white-space:nowrap}
+:root .gbtn:hover{border-color:#0a0a0a}
+:root .gbtn.dark{background:#0a0a0a;border-color:#0a0a0a;color:#fff}
+:root .gbtn:disabled{opacity:.5;cursor:not-allowed}
+:root .gchips{display:flex;flex-wrap:wrap;gap:8px}
+:root .gchip{display:inline-flex;gap:8px;align-items:center;padding:8px 14px;border-radius:99px;background:#fff;border:1px solid #e1e1e1;font:inherit;font-weight:600;color:#595959;cursor:pointer;min-height:40px}
+:root .gchip b{font-size:12px;opacity:.8}
+:root .gchip.on{background:#0a0a0a;border-color:#0a0a0a;color:#fff}
+:root .gchip:focus-visible{outline:2px solid #0a0a0a;outline-offset:2px}
+:root .rep-export{white-space:nowrap}
+:root .party-tools{display:flex;flex-direction:column;gap:10px;align-items:stretch}
