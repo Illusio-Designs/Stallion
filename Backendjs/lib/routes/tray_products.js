@@ -11,5 +11,6 @@ router.get('/:id', authenticateToken, trayProductsController.getProductsInTray);
 router.post('/', authenticateToken, canWrite, trayProductsController.addProductToTray);
 router.put('/', authenticateToken, canWrite, trayProductsController.updateProductInTray);
 router.delete('/', authenticateToken, canWrite, trayProductsController.deleteProductFromTray);
+router.post('/transfer', authenticateToken, canWrite, trayProductsController.transferTrayProducts);
 
 module.exports = router;
