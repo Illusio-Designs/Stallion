@@ -158,3 +158,22 @@
 :root .cart-page .cart-notice { border-radius: 10px; }
 @media (max-width: 639px) { :root .cart-page .cart-items-header { display: none; } }
 :root .cart-page .summary-section h2, :root .cart-page .summary-section .summary-title { font-family: var(--font-display); font-size: 20px; }
+
+/* ---- About ---- */
+:root .about-page .about-hero { background: #0a0a0a; color: #fff; border: 0; border-radius: 20px; margin: 20px 24px 0; max-width: 1240px; padding: 56px 32px; }
+@media (min-width: 1340px) { :root .about-page .about-hero { margin-inline: auto; } }
+:root .about-page .about-hero h1 { color: #fff; font-family: var(--font-display); font-size: clamp(1.9rem, 4vw, 3rem); }
+:root .about-page .about-hero .about-eyebrow { color: #bdbdbd; }
+:root .about-page .about-hero-lede { color: #d2d2d2; }
+:root .about-page .about-intro-image img { filter: grayscale(1); }
+:root .about-page .about-intro-image, :root .about-page .why-card, :root .about-page .team-member { box-shadow: none; border-radius: 14px; }
+:root .about-page .about-certifications, :root .about-page .about-team { background: #fff; }
+:root .about-page h2 { font-family: var(--font-display); }
+@media (max-width: 640px) { :root .about-page .about-hero { margin: 12px 16px 0; padding: 36px 20px; } }
+
+/* ---- Register ---- */
+:root .register-page .register-container { max-width: 440px; }
+:root .register-page .register-title { font-family: var(--font-display); font-size: 28px; margin-bottom: 10px; }
+:root .register-page .register-subtitle { margin-bottom: 24px; line-height: 1.55; }
+:root .register-page .register-signin { display: inline-flex; width: 100%; justify-content: center; }
+:root .register-page .register-hint { margin: 14px 0 0; color: #595959; font-size: 13px; }
