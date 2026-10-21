@@ -8,7 +8,7 @@ import SalesRevenueChart from '../components/charts/SalesRevenueChart';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
-import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock } from 'react-icons/fi';
 
 // Quick Action button — pure Tailwind (no legacy ui-btn / .btn-col CSS, no
 // inline styles). Colours are set explicitly on the children because the
@@ -52,6 +52,7 @@ const Dashboard = () => {
   const [mySalesmanId, setMySalesmanId] = useState(null);
   const [partyNamesMap, setPartyNamesMap] = useState({});
   const [myPartyCount, setMyPartyCount] = useState(null); // distributor: parties assigned to them
+  const [partiesNoLocation, setPartiesNoLocation] = useState(null); // office view: parties without a saved shop location
 
   // Read once — these don't change during a session
   const [userRole] = useState(() => getUserRole());
@@ -136,6 +137,22 @@ const Dashboard = () => {
         const list = await getPartiesForRole(userRole);
         if (!cancelled) setMyPartyCount(Array.isArray(list) ? list.length : (list?.data?.length ?? null));
       } catch { /* fall back to parties seen in orders */ }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Office view: how many parties still have no saved shop location (salesmen cannot
+  // place visit orders for them). Only managers need this, so field roles skip the call.
+  useEffect(() => {
+    if (['salesman', 'party', 'distributor'].includes(userRole)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getPartiesForRole(userRole);
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        const missing = list.filter((p) => p.is_active !== false && !(p.latitude != null && p.longitude != null)).length;
+        if (!cancelled) setPartiesNoLocation(missing);
+      } catch { /* the panel just omits this line */ }
     })();
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -418,6 +435,22 @@ const Dashboard = () => {
 
   // Only pages the role can really open.
   const go = (path) => () => { window.location.href = path; };
+
+  // "Needs attention": things only a person can decide. Office view only.
+  const isOfficeView = !isSalesman && !isParty && !isDistributor;
+  const attention = [];
+  if (isOfficeView) {
+    const outOfStockCount = products.filter((p) => Number(p.total_qty ?? p.warehouse_qty ?? 0) === 0).length;
+    if (outOfStockCount > 0) {
+      attention.push({ icon: FiAlertTriangle, tone: 'bad', title: `${outOfStockCount} item${outOfStockCount > 1 ? 's' : ''} out of stock`, desc: inventoryAlerts.filter((a) => a.type === 'danger').slice(0, 3).map((a) => a.name || a.model_no).filter(Boolean).join(', ') || 'Check the product list', onClick: go('/dashboard/products') });
+    }
+    if (partiesNoLocation > 0) {
+      attention.push({ icon: FiMapPin, tone: 'warn', title: `${partiesNoLocation} part${partiesNoLocation > 1 ? 'ies have' : 'y has'} no shop location`, desc: 'Salesmen cannot place visit orders for them', onClick: go('/dashboard/party') });
+    }
+    if (stats.openCount > 0) {
+      attention.push({ icon: FiClock, tone: 'info', title: `${stats.openCount} open order${stats.openCount > 1 ? 's' : ''} waiting`, desc: 'Pending, processing or ready to dispatch', onClick: go('/dashboard/orders') });
+    }
+  }
   const quickActions = isParty
     ? [
         { icon: FiShoppingBag, label: 'My Orders', desc: 'Track your orders', primary: true, onClick: go('/dashboard/orders') },
@@ -451,6 +484,29 @@ const Dashboard = () => {
             </div>
           ))}
         </div>
+
+        {attention.length > 0 && (
+          <div className="dash-row">
+            <section className="needs-attention col-span-full bg-surface border border-border rounded-lg p-5" aria-label="Needs attention">
+              <div className="mb-3">
+                <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] m-0">Needs attention</h4>
+                <p className="m-0 mt-1 text-[var(--text-sm)] text-text-muted">Things only a person can decide</p>
+              </div>
+              <div className="needs-attention__list grid grid-cols-3 gap-3 max-[900px]:grid-cols-1">
+                {attention.map((a) => (
+                  <button key={a.title} type="button" onClick={a.onClick} className={`needs-attention__item needs-attention__item--${a.tone}`}>
+                    <span className="needs-attention__icon" aria-hidden="true"><a.icon size={18} /></span>
+                    <span className="needs-attention__text">
+                      <span className="needs-attention__title">{a.title}</span>
+                      <span className="needs-attention__desc">{a.desc}</span>
+                    </span>
+                    <FiChevronRight size={16} aria-hidden="true" className="needs-attention__go" />
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
 
         {!isSalesman && (
         <>
