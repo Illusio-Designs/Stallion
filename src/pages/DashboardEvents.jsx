@@ -1,8 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
-import RowActions from '../components/ui/RowActions';
-import StatusBadge from '../components/ui/StatusBadge';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getEvents,
@@ -36,7 +33,7 @@ const getStatusLabel = (status) => {
 
 const DashboardEvents = () => {
   const confirm = useConfirm();
-  const [dateRange, setDateRange] = useState('Feb 25, 2025 - Mar 25, 2025');
+  const [when, setWhen] = useState('upcoming');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [events, setEvents] = useState([]);
@@ -49,86 +46,6 @@ const DashboardEvents = () => {
     event_location: ''
   });
   const [error, setError] = useState(null);
-
-  const columns = useMemo(() => ([
-    {
-      key: 'event_name',
-      label: 'EVENT NAME',
-      render: (_v, row) => {
-        const d = row.start_date ? new Date(row.start_date) : null;
-        const ok = d && !isNaN(d);
-        return (
-          <div className="ev-name">
-            <span className="ev-date" aria-hidden="true">
-              <b>{ok ? String(d.getDate()).padStart(2, '0') : '--'}</b>
-              <span>{ok ? d.toLocaleDateString('en-IN', { month: 'short' }) : ''}</span>
-            </span>
-            <span>{row.event_name}</span>
-          </div>
-        );
-      }
-    },
-    { 
-      key: 'start_date', 
-      label: 'START DATE',
-      render: (_v, row) => {
-        if (!row.start_date) return 'N/A';
-        try {
-          const date = new Date(row.start_date);
-          return date.toLocaleDateString('en-IN', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
-          });
-        } catch (e) {
-          return row.start_date;
-        }
-      }
-    },
-    { 
-      key: 'end_date', 
-      label: 'END DATE',
-      render: (_v, row) => {
-        if (!row.end_date) return 'N/A';
-        try {
-          const date = new Date(row.end_date);
-          return date.toLocaleDateString('en-IN', { 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
-          });
-        } catch (e) {
-          return row.end_date;
-        }
-      }
-    },
-    { 
-      key: 'event_location', 
-      label: 'LOCATION',
-      render: (_v, row) => {
-        return row.event_location || 'N/A';
-      }
-    },
-    { 
-      key: 'event_status', 
-      label: 'STATUS',
-      render: (_v, row) => {
-        const status = row.event_status || EventStatus.ACTIVE;
-        return <StatusBadge status={status.toLowerCase() === 'active' ? 'completed' : status.toLowerCase()}>{getStatusLabel(status)}</StatusBadge>;
-      }
-    },
-    {
-      key: 'action',
-      label: 'ACTIONS',
-      render: (_v, row) => (
-        <RowActions
-          onEdit={() => openEdit(row)}
-          onDownload={null}
-          onDelete={() => handleDelete(row)}
-        />
-      ),
-    },
-  ]), []);
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -281,60 +198,117 @@ const DashboardEvents = () => {
     }
   };
 
-  const rows = useMemo(() => events, [events]);
+  const parseDay = (v) => {
+    if (!v) return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+  };
+  const isPast = (e) => {
+    const end = parseDay(e.end_date) || parseDay(e.start_date);
+    if (!end) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return end < today;
+  };
+  const sorted = useMemo(() => {
+    const t = (e) => (parseDay(e.start_date) || 0).valueOf();
+    return [...events].sort((a, b) => t(a) - t(b));
+  }, [events]);
+  const upcoming = sorted.filter((e) => !isPast(e));
+  const past = sorted.filter((e) => isPast(e)).reverse();
+  const shown = when === 'upcoming' ? upcoming : past;
+
+  const statusPill = (e) => {
+    const st = String(e.event_status || EventStatus.ACTIVE).toLowerCase();
+    const cls = st === 'active' ? 'ok' : st === 'cancelled' ? 'bad' : 'idle';
+    return <span className={`pill ${cls}`}>{getStatusLabel(st)}</span>;
+  };
+  const detailLine = (e) => {
+    const s = parseDay(e.start_date);
+    const en = parseDay(e.end_date);
+    let days = null;
+    if (s && en) {
+      const n = Math.round((en - s) / 86400000) + 1;
+      if (n >= 1) days = `${n} ${n === 1 ? 'day' : 'days'}`;
+    }
+    return [e.event_location, days].filter(Boolean).join(', ') || 'No location';
+  };
 
   return (
-    <div className="dash-page w-full">
+    <div className="dash-page w-full ev-page">
       <div className="dash-container flex flex-col gap-4">
-        <div className="dash-row grid grid-cols-1 gap-3 min-[560px]:grid-cols-12 min-[560px]:gap-4">
-          <div className="dash-card full col-span-full bg-surface border border-border rounded-lg shadow-sm p-0">
-            {error && !loading ? (
-              <div className="ui-state ui-state--error">
-                <div className="ui-state__icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
-                    <circle cx="12" cy="12" r="9" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                </div>
-                <p className="ui-state__title">Couldn't load events</p>
-                <p className="ui-state__desc">{error}</p>
-                <button className="ui-btn ui-btn--secondary" onClick={fetchEvents}>Try again</button>
-              </div>
-            ) : !loading && events.length === 0 ? (
-              <div className="ui-state ui-state--empty">
-                <div className="ui-state__icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
-                    <rect x="3" y="4" width="18" height="18" rx="2" />
-                    <line x1="16" y1="2" x2="16" y2="6" />
-                    <line x1="8" y1="2" x2="8" y2="6" />
-                    <line x1="3" y1="10" x2="21" y2="10" />
-                  </svg>
-                </div>
-                <p className="ui-state__title">No events yet</p>
-                <p className="ui-state__desc">Create your first event to start managing schedules and locations.</p>
-                <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Event</button>
-              </div>
-            ) : (
-              <TableWithControls
-                title="Event Management"
-                columns={columns}
-                rows={rows}
-                selectable={!loading}
-                onAddNew={() => setOpenAdd(true)}
-                addNewText="Add New Event"
-                onImport={fetchEvents}
-                importText="Refresh"
-                dateRange={dateRange}
-                onDateChange={setDateRange}
-                itemName="Event"
-                loading={loading}
-              />
-            )}
+        <div className="page-head">
+          <div>
+            <h1>Events</h1>
+            <p>Exhibitions and shows where orders are taken as event orders.</p>
+          </div>
+          <div className="page-head__actions">
+            <div className="seg" role="tablist" aria-label="Event period">
+              <button type="button" role="tab" aria-selected={when === 'upcoming'} className={when === 'upcoming' ? 'on' : ''} onClick={() => setWhen('upcoming')}>Upcoming</button>
+              <button type="button" role="tab" aria-selected={when === 'past'} className={when === 'past' ? 'on' : ''} onClick={() => setWhen('past')}>Past</button>
+            </div>
+            <button className="ui-btn ui-btn--secondary" onClick={fetchEvents} disabled={loading}>Refresh</button>
+            <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Event</button>
           </div>
         </div>
+
+        {error && !loading ? (
+          <div className="dash-card ui-state ui-state--error">
+            <div className="ui-state__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                <circle cx="12" cy="12" r="9" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <p className="ui-state__title">Couldn't load events</p>
+            <p className="ui-state__desc">{error}</p>
+            <button className="ui-btn ui-btn--secondary" onClick={fetchEvents}>Try again</button>
+          </div>
+        ) : loading && events.length === 0 ? (
+          <div className="ev-list" aria-busy="true">
+            {[0, 1, 2].map((i) => <div key={i} className="ev-row"><span className="ui-skeleton" style={{ display: 'block', height: 56, width: '100%', borderRadius: 12 }} /></div>)}
+          </div>
+        ) : shown.length === 0 ? (
+          <div className="dash-card ui-state ui-state--empty">
+            <div className="ui-state__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                <rect x="3" y="4" width="18" height="18" rx="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </div>
+            <p className="ui-state__title">{events.length === 0 ? 'No events yet' : (when === 'upcoming' ? 'No upcoming events' : 'No past events')}</p>
+            <p className="ui-state__desc">{events.length === 0 ? 'Create your first event to start managing schedules and locations.' : 'Switch the period above to see the others.'}</p>
+            {events.length === 0 && <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Event</button>}
+          </div>
+        ) : (
+          <div className="ev-list">
+            {shown.map((e) => {
+              const d = parseDay(e.start_date);
+              return (
+                <div className="ev-row" key={e.event_id || e.id || e.event_name}>
+                  <span className="ev-date" aria-hidden="true">
+                    <b>{d ? String(d.getDate()).padStart(2, '0') : '--'}</b>
+                    <span>{d ? d.toLocaleDateString('en-IN', { month: 'short' }) : ''}</span>
+                  </span>
+                  <div className="ev-row__main">
+                    <h3>{e.event_name}</h3>
+                    <p>{detailLine(e)}</p>
+                  </div>
+                  {statusPill(e)}
+                  <div className="ev-row__actions">
+                    <button className="ui-btn ui-btn--secondary" onClick={() => openEdit(e)}>Edit</button>
+                    <button className="ui-btn ui-btn--secondary" onClick={() => handleDelete(e)} disabled={saving}>Delete</button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
-      
+
       {/* Add Event Modal */}
       <AsidePanel
         open={openAdd}

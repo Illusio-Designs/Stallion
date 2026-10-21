@@ -208,3 +208,18 @@ td.rda-empty { padding: 22px 0; }
   :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-value { color: #0a0a0a; }
   :root .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .rda-kpi__delta .up { color: #1e7a3c; text-decoration: none; }
 }
+
+/* ==========================================================================
+   Home additions: field numbers, shop card (phone), Order Overview
+   ========================================================================== */
+.rda-subnums { display: flex; flex-wrap: wrap; gap: 8px 18px; margin-top: 8px; color: #595959; font-size: 13.5px; }
+.rda-subnums b { color: #0a0a0a; font-family: var(--font-display); font-size: 15px; font-weight: 700; }
+.rda-shop { display: none; background: #ffffff; border: 1px solid #e1e1e1; border-radius: 18px; padding: 16px; flex-direction: column; gap: 12px; }
+.rda-shop h3 { margin: 0; font-family: var(--font-display); font-size: 18px; font-weight: 600; color: #0a0a0a; }
+.rda-shop span { color: #595959; font-size: 14px; }
+.rda-shop__at { height: 52px; border-radius: 14px; border: 0; background: #0a0a0a; color: #ffffff; font: inherit; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; }
+.rda-shop__at:hover { background: #1c1c1c; }
+.rda-shop__at:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.25); }
+:root .rda-shop .rda-shop__new { height: 48px; justify-content: center; border-radius: 14px; }
+@media (max-width: 767.98px) { :root .rda-shop { display: flex; } }
+:root .rda-overview .dash-card.full { border: 0; box-shadow: none; padding: 0; background: transparent; }

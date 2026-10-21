@@ -2249,6 +2249,15 @@ const DashboardSuppliers = () => {
           )}
         >
           <form className="ui-form" onSubmit={handleCheckinSubmit}>
+            {editCheckin && (
+              <>
+                <div className="form-group form-group--full">
+                  <label className="ui-label" htmlFor="visit-date-fixed">Visit date</label>
+                  <input id="visit-date-fixed" type="date" className="ui-input" value={String(editCheckin.check_in_date || '').slice(0, 10)} disabled readOnly />
+                </div>
+                <p className="form-group--full visit-fixed-note">Date and party cannot be changed after a visit is saved.</p>
+              </>
+            )}
             <div className="form-group form-group--full">
               <label className="ui-label">Party</label>
               <DropdownSelector
@@ -2260,6 +2269,7 @@ const DashboardSuppliers = () => {
                 onChange={(v) => setCheckinForm(prev => ({ ...prev, party_id: v }))}
                 placeholder="Select Party"
                 className="ui-dropdown-custom--full-width"
+                disabled={!!editCheckin}
               />
               {isSalesman && checkinForm.party_id && (() => {
                 const sp = zoneParties.find(p => (p.party_id || p.id) === checkinForm.party_id);

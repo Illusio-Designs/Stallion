@@ -5,9 +5,10 @@ import TableWithControls from '../components/ui/TableWithControls';
 import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import OrdersPerDayChart from '../components/charts/OrdersPerDayChart';
-import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets } from '../services/apiService';
-import { getUserRole, getUser } from '../services/authService';
-import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiDollarSign, FiPackage } from 'react-icons/fi';
+import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets, getTrays, getIndianCountries, getSalesmen, getAllSalesmanCheckins } from '../services/apiService';
+import { getAllAdminExpenses } from '../services/expenseService';
+import { getUserRole, getUserRoles, getUser } from '../services/authService';
+import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiDollarSign, FiPackage, FiInbox, FiNavigation2 } from 'react-icons/fi';
 
 const Dashboard = () => {
   const [range, setRange] = useState('30d'); // orders chart: today | 7d | 30d | year
@@ -27,6 +28,11 @@ const Dashboard = () => {
   // Read once — these don't change during a session
   const [userRole] = useState(() => getUserRole());
   const [user] = useState(() => getUser());
+  const [userRoles] = useState(() => getUserRoles());
+  const [pendingExpenses, setPendingExpenses] = useState(null); // office: expense claims waiting for approval
+  const [traysOut, setTraysOut] = useState(null); // office: sample trays still with a salesman
+  const [fieldStats, setFieldStats] = useState(null); // office: { active, total, visitsToday }
+  const [coords, setCoords] = useState(null); // salesman: current position (only when the browser allows it)
 
   // The role comes from localStorage, which doesn't exist during SSR, so the
   // server renders with no role (admin-default blocks) while the client renders
@@ -142,6 +148,65 @@ const Dashboard = () => {
         if (!cancelled) setAllTargets(list);
       } catch { /* the table is simply not shown */ }
     })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Office view extras. Each call is made only for the roles that can open that page and fails
+  // silently (the item or number is just left out): no error toast.
+  useEffect(() => {
+    if (['salesman', 'party', 'distributor'].includes(userRole)) return;
+    const has = (...names) => userRoles.some((r) => names.includes(r));
+    let cancelled = false;
+    if (has('admin', 'expense_manager', 'sales_manager')) {
+      (async () => {
+        try {
+          const res = await getAllAdminExpenses();
+          const list = Array.isArray(res) ? res : (res?.data || []);
+          if (!cancelled) setPendingExpenses(list.filter((e) => String(e.status || 'pending').toLowerCase() === 'pending').length);
+        } catch { /* item omitted */ }
+      })();
+    }
+    if (has('admin', 'tray_manager')) {
+      (async () => {
+        try {
+          const list = await getTrays();
+          if (!cancelled) setTraysOut((list || []).filter((t) => String(t.tray_status || '').toLowerCase() === 'assigned').length);
+        } catch { /* item omitted */ }
+      })();
+    }
+    if (has('admin', 'sales_manager')) {
+      (async () => {
+        let active = null;
+        let visitsToday = null;
+        try {
+          const cr = await getIndianCountries();
+          const countries = Array.isArray(cr) ? cr : (cr?.data || []);
+          const lists = await Promise.all(countries.map((c) => getSalesmen(c.id || c.country_id).catch(() => [])));
+          const all = lists.flat().filter(Boolean);
+          active = { on: all.filter((s) => s.is_active !== false).length, total: all.length };
+        } catch { /* number omitted */ }
+        try {
+          const cr = await getAllSalesmanCheckins(100);
+          const rows = Array.isArray(cr) ? cr : (cr?.data || []);
+          const t = new Date().toDateString();
+          visitsToday = rows.filter((c) => { const d = new Date(c.check_in_date || c.created_at); return !isNaN(d.getTime()) && d.toDateString() === t; }).length;
+        } catch { /* number omitted */ }
+        if (!cancelled) setFieldStats({ active, visitsToday });
+      })();
+    }
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Salesman: where am I, only if the browser already lets us (never prompts on load)
+  useEffect(() => {
+    if (userRole !== 'salesman' || typeof navigator === 'undefined' || !navigator.geolocation || !navigator.permissions) return;
+    let cancelled = false;
+    navigator.permissions.query({ name: 'geolocation' }).then((st) => {
+      if (st.state !== 'granted' || cancelled) return;
+      navigator.geolocation.getCurrentPosition(
+        (p) => { if (!cancelled) setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }); },
+        () => {}, { maximumAge: 120000, timeout: 8000 });
+    }).catch(() => {});
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -455,6 +520,12 @@ const Dashboard = () => {
     if (partiesNoLocation > 0) {
       attention.push({ icon: FiMapPin, tone: 'warn', title: `${partiesNoLocation} part${partiesNoLocation > 1 ? 'ies have' : 'y has'} no shop location`, desc: 'Salesmen cannot place visit orders for them', onClick: go('/dashboard/party') });
     }
+    if (pendingExpenses > 0) {
+      attention.push({ icon: FiDollarSign, tone: 'warn', title: `${pendingExpenses} expense claim${pendingExpenses > 1 ? 's' : ''} to approve`, desc: 'Waiting for approval or rejection', onClick: go('/dashboard/expenses') });
+    }
+    if (traysOut > 0) {
+      attention.push({ icon: FiInbox, tone: 'warn', title: `${traysOut} sample tray${traysOut > 1 ? 's' : ''} not returned`, desc: 'Still with a salesman', onClick: go('/dashboard/tray') });
+    }
     if (stats.openCount > 0) {
       attention.push({ icon: FiClock, tone: 'info', title: `${stats.openCount} open order${stats.openCount > 1 ? 's' : ''} waiting`, desc: 'Pending, processing or ready to dispatch', onClick: go('/dashboard/orders') });
     }
@@ -477,6 +548,17 @@ const Dashboard = () => {
         { icon: FiBarChart2, label: 'Report', onClick: go('/dashboard/analytics') },
       ]
     : [];
+  // Salesman phone card: their first party with a saved shop location (distance only if the browser shared it)
+  const shopParty = ownParties.find((p) => p.latitude != null && p.longitude != null) || null;
+  const shopCity = shopParty ? (shopParty.city?.name || shopParty.city_name || (typeof shopParty.city === 'string' ? shopParty.city : '')) : '';
+  let shopKm = null;
+  if (shopParty && coords) {
+    const rad = (x) => (x * Math.PI) / 180;
+    const dLat = rad(Number(shopParty.latitude) - coords.lat);
+    const dLng = rad(Number(shopParty.longitude) - coords.lng);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(coords.lat)) * Math.cos(rad(Number(shopParty.latitude))) * Math.sin(dLng / 2) ** 2;
+    shopKm = Math.round(2 * 6371 * Math.asin(Math.sqrt(a)) * 10) / 10;
+  }
   const ownData = isParty || isDistributor; // their own orders only: no warehouse stock
 
   // Greeting header
@@ -554,6 +636,12 @@ const Dashboard = () => {
           <div>
             <h1>{heading}</h1>
             <p>{subline}</p>
+            {isOfficeView && fieldStats && (fieldStats.active || fieldStats.visitsToday != null) && (
+              <div className="rda-subnums">
+                {fieldStats.active && <span><b>{fieldStats.active.on}</b> / {fieldStats.active.total} salesmen in the field</span>}
+                {fieldStats.visitsToday != null && <span><b>{fieldStats.visitsToday}</b> visit{fieldStats.visitsToday === 1 ? '' : 's'} today</span>}
+              </div>
+            )}
           </div>
           {isOfficeView && (
             <div className="rda-seg" role="group" aria-label="Period">
@@ -589,6 +677,17 @@ const Dashboard = () => {
               </div>
             </section>
           </div>
+        )}
+
+        {isSalesman && shopParty && (
+          <section className="rda-shop" aria-label="Nearest shop">
+            <div>
+              <h3>{shopParty.party_name || shopParty.name}</h3>
+              <span>{[shopCity, shopKm != null ? `${shopKm} km away` : null].filter(Boolean).join(', ') || 'Shop location saved'}</span>
+            </div>
+            <button type="button" className="rda-shop__at" onClick={go('/dashboard/party')}><FiNavigation2 size={18} aria-hidden="true" />I'm at the shop</button>
+            <button type="button" className="rda-btn rda-btn--ghost rda-shop__new" onClick={go('/products')}><FiShoppingCart size={16} aria-hidden="true" />New order</button>
+          </section>
         )}
 
         <div className="dash-row dash-kpis rda-kpis" aria-label="Key figures">
@@ -848,6 +947,27 @@ const Dashboard = () => {
           )}
         </div>
         )}
+
+        {/* Order Overview: the full table with search, sort and paging */}
+        <div className="dash-row rda-overview">
+          <div className="dash-card full">
+            <TableWithControls
+              title="Order Overview"
+              itemName="Order"
+              rows={recentOrders}
+              loading={loading}
+              selectable={false}
+              columns={[
+                { key: 'order_number', label: 'ORDER ID', render: (v, row) => v || `#${String(row.order_id || row.id || '').slice(-6)}` },
+                { key: 'order_type', label: 'ORDER TYPE', render: (v) => (v || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'N/A' },
+                { key: 'party', label: 'PARTY', render: (_, row) => row.party?.party_name || row.party_name || row.party?.name || partyNamesMap[row.party_id] || '-' },
+                { key: 'order_status', label: 'STATUS', render: (v) => { const st = v || 'pending'; return <StatusBadge status={String(st).toLowerCase().replace(/\s+/g, '-')}>{String(st).toUpperCase()}</StatusBadge>; } },
+                { key: 'order_total', label: 'VALUE', render: (v, row) => `₹${parseFloat(v || row.total_value || row.total_amount || 0).toLocaleString('en-IN')}` },
+                { key: 'created_at', label: 'DATE', render: (v, row) => { const d = v || row.order_date; return d ? new Date(d).toLocaleDateString('en-GB') : '-'; } },
+              ]}
+            />
+          </div>
+        </div>
 
         {/* Salesman targets */}
         {isSalesman && (

@@ -1,8 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
-import RowActions from '../components/ui/RowActions';
-import StatusBadge from '../components/ui/StatusBadge';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import PagedMultiSelect from '../components/ui/PagedMultiSelect';
 import { useConfirm } from '../components/ui/ConfirmProvider';
@@ -266,68 +263,126 @@ const DashboardOffers = () => {
     }
   };
 
-  const columns = useMemo(() => ([
-    { key: 'title', label: 'TITLE' },
-    { key: 'offer_type', label: 'TYPE', render: (v) => TYPE_LABELS[v] || v },
-    { key: 'discount', label: 'DISCOUNT', render: (_v, row) => summarise(row) },
-    { key: 'validity', label: 'VALIDITY', render: (_v, row) => `${fmtDate(row.start_date)} → ${fmtDate(row.end_date)}` },
-    { key: 'is_active', label: 'STATUS', render: (v) => (
-      <StatusBadge status={v !== false ? 'completed' : 'default'}>{v !== false ? 'Active' : 'Inactive'}</StatusBadge>
-    ) },
-    { key: 'action', label: 'ACTIONS', render: (_v, row) => (
-      <RowActions onEdit={() => openEdit(row)} onDelete={() => handleDelete(row)} />
-    ) },
-  ]), []);
+  // Active / Inactive switch: optimistic, rolled back if the save fails.
+  const [togglingId, setTogglingId] = useState(null);
+  const handleToggle = async (offer) => {
+    const id = offer.offer_id;
+    if (!id || togglingId === id) return;
+    const next = offer.is_active === false;
+    setTogglingId(id);
+    setOffers((list) => list.map((o) => (o.offer_id === id ? { ...o, is_active: next } : o)));
+    try {
+      await updateOffer(id, {
+        offer_type: offer.offer_type,
+        title: offer.title,
+        is_active: next,
+        priority: Number(offer.priority) || 0,
+        start_date: offer.start_date || null,
+        end_date: offer.end_date || null,
+        config: offer.config || {},
+      });
+      showSuccess('', null, next ? 'Offer is active' : 'Offer switched off', `"${offer.title}" ${next ? 'is now shown to customers.' : 'is hidden. You can switch it back on any time.'}`);
+    } catch (err) {
+      setOffers((list) => list.map((o) => (o.offer_id === id ? { ...o, is_active: !next } : o)));
+      showError('', null, 'Could not update the offer', err?.message || 'Please try again.');
+    } finally {
+      setTogglingId(null);
+    }
+  };
+
+  const validityLine = (o) => {
+    const parts = [summarise(o)];
+    if (o.start_date || o.end_date) {
+      parts.push(o.start_date && o.end_date ? `${fmtDate(o.start_date)} to ${fmtDate(o.end_date)}` : o.start_date ? `From ${fmtDate(o.start_date)}` : `Until ${fmtDate(o.end_date)}`);
+    }
+    return parts.join(' · ');
+  };
 
   const showScope = form.offer_type === 'product' || form.offer_type === 'bogo';
   const showRate = form.offer_type === 'flat' || form.offer_type === 'product';
 
   return (
-    <div className="dash-page w-full">
+    <div className="dash-page w-full offers-page">
       <div className="dash-container flex flex-col gap-4">
-        <div className="dash-row grid grid-cols-1 gap-3 min-[560px]:grid-cols-12 min-[560px]:gap-4">
-          <div className="dash-card full col-span-full bg-surface border border-border rounded-lg shadow-sm p-0">
-            {error && !loading ? (
-              <div className="ui-state ui-state--error">
-                <div className="ui-state__icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
-                    <circle cx="12" cy="12" r="9" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                </div>
-                <p className="ui-state__title">Couldn't load offers</p>
-                <p className="ui-state__desc">{error}</p>
-                <button className="ui-btn ui-btn--secondary" onClick={fetchOffers}>Try again</button>
-              </div>
-            ) : !loading && offers.length === 0 ? (
-              <div className="ui-state ui-state--empty">
-                <div className="ui-state__icon">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
-                    <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z" />
-                    <line x1="7" y1="7" x2="7.01" y2="7" />
-                  </svg>
-                </div>
-                <p className="ui-state__title">No offers yet</p>
-                <p className="ui-state__desc">Create a flat, product-wise or buy-X-get-Y offer for the cart.</p>
-                <button className="ui-btn ui-btn--primary" onClick={openAdd}>Add Offer</button>
-              </div>
-            ) : (
-              <TableWithControls
-                title="Offers"
-                columns={columns}
-                rows={offers}
-                selectable={!loading}
-                onAddNew={openAdd}
-                addNewText="Add Offer"
-                onImport={fetchOffers}
-                importText="Refresh"
-                itemName="Offer"
-                loading={loading}
-              />
-            )}
+        <div className="page-head">
+          <div>
+            <h1>Offers</h1>
+            <p>Discounts shown on the home page and in the cart. Switch one off to hide it without deleting it.</p>
+          </div>
+          <div className="page-head__actions">
+            <button className="ui-btn ui-btn--secondary" onClick={fetchOffers} disabled={loading}>Refresh</button>
+            <button className="ui-btn ui-btn--primary" onClick={openAdd}>Add Offer</button>
           </div>
         </div>
+
+        {error && !loading ? (
+          <div className="dash-card ui-state ui-state--error">
+            <div className="ui-state__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                <circle cx="12" cy="12" r="9" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <p className="ui-state__title">Couldn't load offers</p>
+            <p className="ui-state__desc">{error}</p>
+            <button className="ui-btn ui-btn--secondary" onClick={fetchOffers}>Try again</button>
+          </div>
+        ) : loading && offers.length === 0 ? (
+          <div className="offer-grid" aria-busy="true">
+            {[0, 1].map((i) => <div key={i} className="offer-card ui-skeleton" style={{ height: 220 }} />)}
+          </div>
+        ) : offers.length === 0 ? (
+          <div className="dash-card ui-state ui-state--empty">
+            <div className="ui-state__icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="40" height="40">
+                <path d="M20.59 13.41 13.42 20.58a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z" />
+                <line x1="7" y1="7" x2="7.01" y2="7" />
+              </svg>
+            </div>
+            <p className="ui-state__title">No offers yet</p>
+            <p className="ui-state__desc">Create a flat, product-wise or buy-X-get-Y offer for the cart.</p>
+            <button className="ui-btn ui-btn--primary" onClick={openAdd}>Add Offer</button>
+          </div>
+        ) : (
+          <div className="offer-grid">
+            {offers.map((o) => {
+              const active = o.is_active !== false;
+              const img = o.image_url || o.banner_url || o.image;
+              return (
+                <div className="offer-card" key={o.offer_id}>
+                  {img ? (
+                    <img className="offer-card__img" src={img} alt="" />
+                  ) : (
+                    <div className="offer-card__img offer-card__img--ph">{TYPE_LABELS[o.offer_type] || 'Offer'}</div>
+                  )}
+                  <div className="offer-card__row">
+                    <div className="offer-card__text">
+                      <h3>{o.title}</h3>
+                      <p>{validityLine(o)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={active}
+                      aria-label={`${o.title}: ${active ? 'Active' : 'Inactive'}`}
+                      className={`tgl${active ? ' on' : ''}`}
+                      disabled={togglingId === o.offer_id}
+                      onClick={() => handleToggle(o)}
+                    />
+                  </div>
+                  <div className="offer-card__foot">
+                    <span className={`pill ${active ? 'ok' : 'idle'}`}>{active ? 'Active' : 'Inactive'}</span>
+                    <div className="offer-card__actions">
+                      <button className="ui-btn ui-btn--secondary" onClick={() => openEdit(o)}>Edit</button>
+                      <button className="ui-btn ui-btn--secondary" onClick={() => handleDelete(o)} disabled={saving}>Delete</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <AsidePanel

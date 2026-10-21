@@ -147,7 +147,7 @@ const DashboardTray = () => {
   };
 
   // Refresh the current page (used after add/update/delete).
-  const fetchTrays = () => fetchTraysPage(trayPage);
+  const fetchTrays = () => fetchTraysPage(trayPage, traySearch);
 
   // Assign-to-tray picker: 20 per page with server-side search (model_no/size).
   // Opening the picker / picking a tray loads page 1; typing re-queries the server.

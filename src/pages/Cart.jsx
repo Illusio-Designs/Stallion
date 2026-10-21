@@ -1276,7 +1276,7 @@ const Cart = ({ onPageChange = null }) => {
         <div className="cart-content grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 items-start">
           {/* Shopping Cart Section */}
           <div className="shopping-cart-section bg-surface border border-grey-100 rounded-[20px] p-8 shadow-[0_1px_2px_rgba(16,18,38,0.04),0_18px_44px_-20px_rgba(16,18,38,0.18)] max-md:p-5 max-md:rounded-2xl">
-            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Shopping Cart</h2>
+            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Your cart{cartItems.length > 0 && (<span className="cart-sub">{cartItems.length} {cartItems.length === 1 ? 'model' : 'models'}, {cartItems.reduce((n, it) => n + (Number(it.quantity) || 0), 0)} frames</span>)}</h2>
 
             {cartItems.length === 0 ? (
               <div className="empty-cart flex flex-col items-center text-center gap-3 py-10 px-5">
@@ -1410,7 +1410,7 @@ const Cart = ({ onPageChange = null }) => {
 
           {/* Summary Section */}
           <div className="summary-section bg-surface border border-grey-100 rounded-[20px] p-8 shadow-[0_1px_2px_rgba(16,18,38,0.04),0_18px_44px_-20px_rgba(16,18,38,0.18)] h-fit static lg:sticky lg:top-[calc(var(--header-height)+1.25rem)] max-md:p-5 max-md:rounded-2xl">
-            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Summary</h2>
+            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Place the order</h2>
 
             <div className="summary-form flex flex-col gap-4">
               {/* Order Type Dropdown - Only for Salesman */}
