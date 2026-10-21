@@ -22,6 +22,9 @@ export const ALL_PAGES = {
   SETTINGS: 'settings',
 };
 
+// Pages for a role that is not listed below, so it never sees an empty menu
+const DEFAULT_PAGES = [ALL_PAGES.SETTINGS];
+
 // Role permissions mapping
 export const ROLE_PERMISSIONS = {
   'product_manager': [
@@ -69,6 +72,8 @@ export const ROLE_PERMISSIONS = {
   ],
   'sales_manager': [
     ALL_PAGES.SALESMEN,
+    ALL_PAGES.PARTY,
+    ALL_PAGES.ORDERS,
     ALL_PAGES.SETTINGS,
   ],
   'distributor_manager': [
@@ -114,8 +119,8 @@ export const hasPageAccess = (role, pageId) => {
     return true;
   }
   
-  // Get permissions for the role
-  const permissions = ROLE_PERMISSIONS[normalizedRole] || [];
+  // A role this list does not know still gets Settings, so its menu is never empty.
+  const permissions = ROLE_PERMISSIONS[normalizedRole] || DEFAULT_PAGES;
   
   // Check if page is in permissions list
   return permissions.includes(pageId);
@@ -136,8 +141,8 @@ export const getAccessiblePages = (role) => {
     return Object.values(ALL_PAGES);
   }
   
-  // Return permissions for the role
-  return ROLE_PERMISSIONS[normalizedRole] || [];
+  // Return permissions for the role (unknown roles still get Settings)
+  return ROLE_PERMISSIONS[normalizedRole] || DEFAULT_PAGES;
 };
 
 /**
