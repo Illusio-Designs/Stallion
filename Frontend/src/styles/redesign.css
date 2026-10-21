@@ -122,3 +122,21 @@ h1, h2, h3,
   .ui-table { padding: var(--space-4); }
   .ui-table__footer { padding-left: var(--space-3); padding-right: var(--space-3); }
 }
+
+/* ---- White pages everywhere in the dashboard; sentence-case page card titles ---- */
+.dashboard-layout,
+.dashboard-layout .dashboard-shell,
+.dashboard-layout .dashboard-content { background: #ffffff; }
+.dashboard-layout .support-title,
+.dashboard-layout .settings-title {
+  text-transform: none;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+
+/* ---- Phone header: keep the avatar on screen (hide install and fullscreen) ---- */
+@media (max-width: 520px) {
+  .dashboard-layout .install-app-btn,
+  .dashboard-layout .dashboard-icon-btn[aria-label$="Fullscreen"] { display: none; }
+  .dashboard-layout .dashboard-header-actions { gap: 8px; }
+}
