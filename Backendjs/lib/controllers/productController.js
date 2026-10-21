@@ -855,6 +855,14 @@ class ProductController {
                         continue;
                     }
 
+                    // The quantity must be a whole number of 0 or more.
+                    const qtyNumber = Number(warehouse_qty);
+                    if (!Number.isInteger(qtyNumber) || qtyNumber < 0) {
+                        errors.push({ row: i + 1, model_no, error: 'warehouse_qty must be a whole number of 0 or more' });
+                        errorCount++;
+                        continue;
+                    }
+
                     if (!this.hasData(status)) {
                         status = 'draft';
                     }
@@ -914,9 +922,12 @@ class ProductController {
                         }
                     });
                     if (existingProduct) {
+                        // The sheet's quantity REPLACES the warehouse stock. The total is always
+                        // warehouse + tray, so it is recalculated here (it used to stay stale).
                         const bulkUpdatePayload = {
                             status: status,
-                            warehouse_qty: warehouse_qty,
+                            warehouse_qty: qtyNumber,
+                            total_qty: qtyNumber + (Number(existingProduct.tray_qty) || 0),
                             mrp: mrp,
                             whp: whp,
                             size_mm: size_mm,
@@ -933,7 +944,7 @@ class ProductController {
                             updated_at: new Date(),
                         };
                         const oldSnapshot = existingProduct.toJSON();
-                        Product.update(bulkUpdatePayload, { where: { product_id: existingProduct.product_id } });
+                        await Product.update(bulkUpdatePayload, { where: { product_id: existingProduct.product_id } });
                         await logAudit({
                             req,
                             action: 'update',
@@ -962,9 +973,9 @@ class ProductController {
                         mrp,
                         whp,
                         size_mm,
-                        warehouse_qty,
+                        warehouse_qty: qtyNumber,
                         tray_qty: 0,
-                        total_qty: warehouse_qty,
+                        total_qty: qtyNumber,
                         status,
                         brand_id: brandModel.brand_id,
                         collection_id: collectionModel.collection_id,
@@ -996,7 +1007,7 @@ class ProductController {
 
             return {
                 success: successCount > 0,
-                message: `Bulk upload completed. ${successCount} products created, ${errorCount} errors.`,
+                message: `Bulk upload completed. ${createdProducts.length} created, ${updatedProducts.length} updated (stock replaced by the sheet's quantity), ${errorCount} errors.`,
                 data: {
                     created: createdProducts,
                     errors: errors,
