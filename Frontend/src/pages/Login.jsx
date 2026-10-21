@@ -198,8 +198,18 @@ const Login = ({ onPageChange }) => {
   const handleOTPChange = (index, value) => {
     if (value && !/^\d+$/.test(value)) return;
     if (otpError) setOtpError('');
+    // A phone's code autofill (or a paste) puts the whole code into one box:
+    // spread it over the boxes instead of keeping a single digit.
+    if (value.length > 1) {
+      const digits = value.slice(0, 6 - index).split('');
+      const spread = [...otp];
+      digits.forEach((d, i) => { spread[index + i] = d; });
+      setOtp(spread);
+      otpInputRefs.current[Math.min(index + digits.length, 5)]?.focus();
+      return;
+    }
     const newOtp = [...otp];
-    newOtp[index] = value.slice(-1);
+    newOtp[index] = value;
     setOtp(newOtp);
     if (value && index < 5) {
       otpInputRefs.current[index + 1]?.focus();
@@ -317,6 +327,7 @@ const Login = ({ onPageChange }) => {
               ...userData,
               role: loginResponse.role,
               role_name: loginResponse.role,
+              roles: loginResponse.roles || undefined,
             };
           } else {
             // Fallback to decoded JWT data (least preferred)
@@ -619,7 +630,8 @@ const Login = ({ onPageChange }) => {
 
       // Clear OTP on error
       setOtp(['', '', '', '', '', '']);
-      otpInputRefs.current[0]?.focus();
+      // The boxes are disabled while loading; focus once they are enabled again.
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 50);
     } finally {
       setLoading(false);
     }
@@ -733,7 +745,7 @@ const Login = ({ onPageChange }) => {
                         type="text"
                         inputMode="numeric"
                         autoComplete={index === 0 ? 'one-time-code' : 'off'}
-                        maxLength={1}
+                        maxLength={6}
                         value={digit}
                         onChange={(e) => handleOTPChange(index, e.target.value)}
                         onKeyDown={(e) => handleOTPKeyDown(index, e)}
@@ -758,6 +770,19 @@ const Login = ({ onPageChange }) => {
                   <span className="ui-btn__label">{loading ? 'Verifying…' : 'Verify code'}</span>
                 </button>
                 <div className="resend-otp-container -mt-2 text-center">
+                  <button
+                    type="button"
+                    className="resend-otp-btn cursor-pointer rounded-sm border-none bg-transparent px-3 py-2 text-[length:var(--text-sm)] font-medium text-text-muted underline"
+                    onClick={() => {
+                      destroyOTPWidget();
+                      setShowOTP(false);
+                      setOtp(['', '', '', '', '', '']);
+                      setOtpError('');
+                    }}
+                    disabled={loading}
+                  >
+                    Change number
+                  </button>
                   <button
                     type="button"
                     className="resend-otp-btn cursor-pointer rounded-sm border-none bg-transparent px-3 py-2 text-[length:var(--text-sm)] font-medium text-primary transition-[color,background] duration-200 ease-[ease] hover:enabled:bg-primary-soft hover:enabled:text-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:text-text-subtle motion-reduce:transition-none"

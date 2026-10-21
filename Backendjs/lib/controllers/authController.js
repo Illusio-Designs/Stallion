@@ -1,3 +1,4 @@
+const { pickPrimaryRole } = require('../utils/roleHelpers');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Role = require('../models/Role');
@@ -166,17 +167,20 @@ class AuthController {
                 return res.status(400).json({ error: 'User not found' });
             }
 
-            const userRole = await UserRole.findOne({ where: { user_id: user.user_id } });
-            if (!userRole) {
+            // A user can hold several roles: read all of them and use the main one
+            // (admin, then office roles, then field roles) for the token.
+            const userRoles = await UserRole.findAll({ where: { user_id: user.user_id } });
+            if (!userRoles.length) {
                 return res.status(400).json({ error: 'User role not found' });
             }
-
-            const role = await Role.findOne({ where: { role_id: userRole.role_id } });
-            if (!role) {
+            const roleRows = await Role.findAll({ where: { role_id: userRoles.map((ur) => ur.role_id) } });
+            if (!roleRows.length) {
                 return res.status(400).json({ error: 'Role not found' });
             }
+            const allRoleNames = roleRows.map((r) => r.role_name);
+            const role = roleRows.find((r) => r.role_name === pickPrimaryRole(allRoleNames));
 
-            if (role.role_name.toLowerCase() === 'party') {
+            if (role.role_name.toLowerCase() === 'party' && allRoleNames.length === 1) {
                 const party = await Party.findOne({ where: { user_id: user.user_id } });
                 if (!party || !party.is_active) {
                     return res.status(403).json({ error: 'Party account is deactivated' });
@@ -190,6 +194,7 @@ class AuthController {
                     email: user.email,
                     full_name: user.full_name,
                     role: role.role_name,
+                    roles: allRoleNames,
                 },
                 getJwtSecret(),
                 { expiresIn: '24h' }
@@ -197,7 +202,7 @@ class AuthController {
 
             await user.update({ last_login: new Date() });
 
-            res.status(200).json({ message: 'Login successful', token, role: role.role_name });
+            res.status(200).json({ message: 'Login successful', token, role: role.role_name, roles: allRoleNames });
         } catch (error) {
             console.log(error);
             res.status(500).json({ error: error.message });

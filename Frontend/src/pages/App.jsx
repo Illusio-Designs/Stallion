@@ -124,6 +124,17 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
     }
   }, [initialPage, initialProductId]);
 
+  // Dashboard pages and the cart need a login. Logged-out visitors are sent to
+  // the sign-in page and brought back to the same page afterwards (?returnUrl=).
+  const needsLogin = currentPage === 'cart' || isDashboardPage(currentPage);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    if (!mounted || !needsLogin || isLoggedIn()) return;
+    const here = window.location.pathname + window.location.search;
+    router.replace(`/login?returnUrl=${encodeURIComponent(here)}`);
+  }, [mounted, needsLogin, currentPage]);
+
   // Update URL when page or layout changes
   const handlePageChange = (page, productId = null) => {
     if (page === currentPage && productId === currentProductId) return;
@@ -141,6 +152,10 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   };
 
   const renderPage = () => {
+    // Wait for the login check (and the redirect) instead of flashing the page.
+    if (needsLogin && (!mounted || !isLoggedIn())) {
+      return <Loader isLoading={true} />;
+    }
     // Check if this is a dashboard page that requires role-based access
     const dashboardPages = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'offers', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings', 'expenses'];
     const isDashboardPage = dashboardPages.includes(currentPage);
