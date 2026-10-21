@@ -4,45 +4,13 @@ import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
 import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
-import SalesRevenueChart from '../components/charts/SalesRevenueChart';
-import DropdownSelector from '../components/ui/DropdownSelector';
-import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
+import OrdersPerDayChart from '../components/charts/OrdersPerDayChart';
+import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets } from '../services/apiService';
 import { getUserRole, getUser } from '../services/authService';
-import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock } from 'react-icons/fi';
-
-// Quick Action button — pure Tailwind (no legacy ui-btn / .btn-col CSS, no
-// inline styles). Colours are set explicitly on the children because the
-// unlayered global `button { color: inherit }` reset outranks any layered
-// text-* utility placed on the <button> itself.
-const QuickActionCard = ({ icon: Icon, label, desc, onClick, primary }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`group flex h-full w-full items-center gap-4 rounded-2xl border p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 outline-none focus-visible:shadow-[0_0_0_3px_var(--color-primary-soft),0_0_0_4px_var(--color-primary)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
-      primary
-        ? 'border-transparent bg-primary shadow-[0_10px_28px_-14px_var(--color-primary)] hover:shadow-[0_16px_32px_-12px_var(--color-primary)]'
-        : 'border-border-strong bg-surface shadow-[0_1px_3px_rgba(16,18,38,0.06)] hover:border-primary/40 hover:shadow-[0_12px_26px_-12px_rgba(16,18,38,0.22)]'
-    }`}
-  >
-    <span className={`inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
-      primary ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary group-hover:bg-primary group-hover:text-white'
-    }`}>
-      <Icon size={20} aria-hidden="true" />
-    </span>
-    <span className="min-w-0 flex-1">
-      <span className={`block font-semibold leading-snug tracking-[-0.01em] text-[var(--text-base)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
-      {desc && <span className={`mt-0.5 block text-[var(--text-sm)] leading-snug ${primary ? 'text-white/70' : 'text-text-muted'}`}>{desc}</span>}
-    </span>
-    <FiChevronRight
-      size={18}
-      aria-hidden="true"
-      className={`flex-shrink-0 transition-[transform,color] duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none ${primary ? 'text-white/80' : 'text-text-subtle group-hover:text-primary'}`}
-    />
-  </button>
-);
+import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiDollarSign, FiPackage } from 'react-icons/fi';
 
 const Dashboard = () => {
-  const [period, setPeriod] = useState('Monthly');
+  const [range, setRange] = useState('30d'); // orders chart: today | 7d | 30d | year
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +21,8 @@ const Dashboard = () => {
   const [partyNamesMap, setPartyNamesMap] = useState({});
   const [myPartyCount, setMyPartyCount] = useState(null); // distributor: parties assigned to them
   const [partiesNoLocation, setPartiesNoLocation] = useState(null); // office view: parties without a saved shop location
+  const [ownParties, setOwnParties] = useState([]); // salesman / distributor / party: their own parties (server scoped)
+  const [allTargets, setAllTargets] = useState([]); // office view: every salesman's targets
 
   // Read once — these don't change during a session
   const [userRole] = useState(() => getUserRole());
@@ -128,14 +98,18 @@ const Dashboard = () => {
     fetchData();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // A distributor's own parties (the server scopes this list to them).
+  // The role's own parties (the server scopes this list to them): a distributor's count and
+  // table, a salesman's party table, a party's own record (credit days).
   useEffect(() => {
-    if (userRole !== 'distributor') return;
+    if (!['distributor', 'salesman', 'party'].includes(userRole)) return;
     let cancelled = false;
     (async () => {
       try {
-        const list = await getPartiesForRole(userRole);
-        if (!cancelled) setMyPartyCount(Array.isArray(list) ? list.length : (list?.data?.length ?? null));
+        const res = await getPartiesForRole(userRole);
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        if (cancelled) return;
+        setOwnParties(list);
+        if (userRole === 'distributor') setMyPartyCount(list.length);
       } catch { /* fall back to parties seen in orders */ }
     })();
     return () => { cancelled = true; };
@@ -153,6 +127,20 @@ const Dashboard = () => {
         const missing = list.filter((p) => p.is_active !== false && !(p.latitude != null && p.longitude != null)).length;
         if (!cancelled) setPartiesNoLocation(missing);
       } catch { /* the panel just omits this line */ }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Office view: every salesman's target, for the "Salesmen against target" table.
+  useEffect(() => {
+    if (['salesman', 'party', 'distributor'].includes(userRole)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getAllSalesmanTargets();
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        if (!cancelled) setAllTargets(list);
+      } catch { /* the table is simply not shown */ }
     })();
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -231,66 +219,47 @@ const Dashboard = () => {
     };
   }, [orders]);
 
-  // Sales & Revenue chart for the chosen period. Sales = order value (cancelled
-  // excluded); Revenue = completed orders only.
-  const chartData = useMemo(() => {
-    if (!orders.length) return [];
+  // Orders per day (or hour / month) for the chosen range. Cancelled orders are left out.
+  const ordersChart = useMemo(() => {
     const live = orders.filter((o) => statusOf(o) !== 'cancelled');
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dateOf = (o) => {
-      const d = new Date(o.order_date || o.created_at);
+      const d = new Date(o.created_at || o.order_date);
       return isNaN(d.getTime()) ? null : d;
     };
-    const add = (bucket, o) => {
-      const amount = amountOf(o);
-      bucket.sales += amount;
-      if (statusOf(o) === 'completed') bucket.revenue += amount;
-    };
-
-    if (period === 'Yearly') {
-      const thisYear = new Date().getFullYear();
-      const buckets = [];
-      for (let y = thisYear - 4; y <= thisYear; y++) buckets.push({ label: String(y), year: y, sales: 0, revenue: 0 });
-      live.forEach((o) => {
-        const d = dateOf(o);
-        const b = d && buckets.find((x) => x.year === d.getFullYear());
-        if (b) add(b, o);
-      });
-      return buckets;
-    }
-
-    if (period === 'Weekly') {
-      // The last 8 weeks, each starting on Monday.
-      const monday = (d) => {
-        const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-        x.setDate(x.getDate() - ((x.getDay() + 6) % 7));
-        return x;
-      };
-      const thisWeek = monday(new Date());
-      const buckets = [];
-      for (let i = 7; i >= 0; i--) {
-        const start = new Date(thisWeek);
-        start.setDate(start.getDate() - i * 7);
-        buckets.push({ label: `${start.getDate()} ${monthNames[start.getMonth()]}`, start: start.getTime(), sales: 0, revenue: 0 });
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    let buckets = [];
+    let place;
+    let sub;
+    if (range === 'today') {
+      sub = 'Today, by hour';
+      buckets = Array.from({ length: 24 }, (_, h) => ({ label: String(h), value: 0, current: h === now.getHours(), title: `${h}:00` }));
+      place = (d) => (dayStart(d) === dayStart(now) ? buckets[d.getHours()] : null);
+    } else if (range === 'year') {
+      sub = 'This year, by month';
+      buckets = monthNames.map((m, i) => ({ label: m, value: 0, current: i === now.getMonth(), title: `${m} ${now.getFullYear()}` }));
+      place = (d) => (d.getFullYear() === now.getFullYear() ? buckets[d.getMonth()] : null);
+    } else {
+      const days = range === '7d' ? 7 : 30;
+      sub = `Last ${days} days`;
+      const today = dayStart(now);
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        buckets.push({ key: d.getTime(), label: String(d.getDate()), value: 0, current: i === 0, title: `${d.getDate()} ${monthNames[d.getMonth()]}` });
       }
-      live.forEach((o) => {
-        const d = dateOf(o);
-        if (!d) return;
-        const t = monday(d).getTime();
-        const b = buckets.find((x) => x.start === t);
-        if (b) add(b, o);
-      });
-      return buckets;
+      place = (d) => buckets.find((b) => b.key === dayStart(d)) || null;
     }
-
-    const currentYear = new Date().getFullYear();
-    const buckets = monthNames.map((label) => ({ label, sales: 0, revenue: 0 }));
     live.forEach((o) => {
       const d = dateOf(o);
-      if (d && d.getFullYear() === currentYear) add(buckets[d.getMonth()], o);
+      const b = d && place(d);
+      if (b) b.value += 1;
     });
-    return buckets;
-  }, [orders, period]);
+    buckets.forEach((b) => { b.title = `${b.title}: ${b.value} order${b.value === 1 ? '' : 's'}`; });
+    const total = buckets.reduce((n, b) => n + b.value, 0);
+    return { buckets, sub, total };
+  }, [orders, range]);
 
   // Top selling products — aggregate order_items by product_id across all orders
   const topProductRaw = useMemo(() => {
