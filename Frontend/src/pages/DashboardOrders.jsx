@@ -23,6 +23,7 @@ import {
   getAvailableOffers,
 } from '../services/apiService';
 import { downloadOrderPdf } from '../utils/orderPdf';
+import { downloadCsv } from '../utils/exportCsv';
 import { showSuccess, showError } from '../services/notificationService';
 import { getUserRole, getUser, getUserRoles } from '../services/authService';
 import '../styles/pages/dashboard-orders.css';
@@ -758,7 +759,7 @@ const DashboardOrders = () => {
   };
 
   // Handle update order status
-  const handleUpdateStatus = async (row, newStatus) => {
+  const handleUpdateStatus = async (row, newStatus, overrides = null) => {
     const orderId = row.originalOrder?.order_id || row.originalOrder?.id;
     if (!orderId) {
       showError('Order ID not found');
@@ -772,8 +773,8 @@ const DashboardOrders = () => {
     // dispatched quantity. Validate client-side (toast, panel stays open) so we
     // don't bounce off the backend's 400.
     if (DISPATCH_STATUSES.includes(apiStatus)) {
-      const name = courierName.trim();
-      const tracking = courierTracking.trim();
+      const name = String(overrides?.courierName ?? courierName).trim();
+      const tracking = String(overrides?.courierTracking ?? courierTracking).trim();
       if (!name || !tracking) {
         showError('Courier name and tracking number are required to dispatch this order.');
         return;
@@ -809,15 +810,43 @@ const DashboardOrders = () => {
     try {
       setLoading(true);
       await updateOrderStatus(orderId, payload);
-      showSuccess('Order status updated successfully');
+      showSuccess('Order status updated successfully', null, 'Status updated', `${row.orderId || 'Order'} is now ${String(newStatus).toLowerCase()}.`);
       await fetchOrders();
       closeEditPanel();
+      setViewRow(null);
     } catch (err) {
       const message = err?.response?.data?.message || err?.message || 'Failed to update order status';
-      showError(message);
+      showError(message, null, 'Status not updated', message);
     } finally {
       setLoading(false);
     }
+  };
+
+  // "Mark dispatched" (order detail): same status update as the edit panel. When
+  // the order already has courier details it dispatches straight away; otherwise
+  // the edit panel opens on Dispatch so the courier details can be entered.
+  const handleMarkDispatched = (row) => {
+    const o = row?.originalOrder || {};
+    if (o.courier_name && o.courier_tracking_number) {
+      handleUpdateStatus(row, 'DISPATCH', { courierName: o.courier_name, courierTracking: o.courier_tracking_number });
+    } else {
+      setViewRow(null);
+      openEditPanel(row);
+      setEditStatus('DISPATCH');
+    }
+  };
+
+  const handleExportOrders = () => {
+    downloadCsv('orders', [
+      { label: 'Order', value: r => r.orderId },
+      { label: 'Type', value: r => r.orderType },
+      { label: 'Party', value: r => r.client },
+      { label: 'Salesman', value: r => r.salesman },
+      { label: 'Date', value: r => r.date },
+      { label: 'Quantity', value: r => r.qty },
+      { label: 'Status', value: r => r.status },
+      { label: 'Total', value: r => Number(r.originalOrder?.order_total ?? 0) || 0 },
+    ], filteredRowsByTab);
   };
 
   // Open the edit panel for a row, pre-filling status + any existing courier
@@ -1071,7 +1100,12 @@ const DashboardOrders = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
-        <div className="pg-head"><div><h1>Orders</h1><p>Stock is taken when an order is placed and returned when it is cancelled.</p></div></div>
+        <div className="pg-head">
+          <div><h1>Orders</h1><p>Stock is taken when an order is placed and returned when it is cancelled.</p></div>
+          <div className="pg-head__tools">
+            <button type="button" className="gbtn" onClick={handleExportOrders} disabled={loading || filteredRowsByTab.length === 0}>Export CSV</button>
+          </div>
+        </div>
         {/* Summary Cards */}
         <div className="dash-row orders-summary mb-5">
           <div className="dash-card metric orders-card p-5">
@@ -1154,7 +1188,12 @@ const DashboardOrders = () => {
 
       {/* View Order Modal */}
       <AsidePanel open={!!viewRow} onClose={() => setViewRow(null)} title="Order Details" footer={(
-        <Button onClick={() => setViewRow(null)}>Close</Button>
+        <>
+          {viewRow && canEditOrder && !['DISPATCH', 'COMPLETED', 'CANCEL'].includes(viewRow.status) && (
+            <Button variant="secondary" onClick={() => handleMarkDispatched(viewRow)} disabled={loading}>Mark dispatched</Button>
+          )}
+          <Button onClick={() => setViewRow(null)}>Close</Button>
+        </>
       )}>
         {viewRow && (() => {
           const order = viewRow.originalOrder;
