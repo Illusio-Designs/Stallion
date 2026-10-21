@@ -61,6 +61,11 @@ const User = sequelize.define('User', {
     type: DataTypes.DATE,
     allowNull: true
   },
+  // Tokens issued before this moment are rejected (set on logout)
+  tokens_valid_from: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
   role_id: {
     type: DataTypes.UUID,
     allowNull: false,

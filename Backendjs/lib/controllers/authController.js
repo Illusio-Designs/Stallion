@@ -62,7 +62,7 @@ class AuthController {
             if (!user) {
                 return res.status(400).json({ error: 'User not found' });
             }
-            await user.update({ last_login: null });
+            await user.update({ last_login: null, tokens_valid_from: new Date() });
             res.status(200).json({ message: 'Logged out successfully' });
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -80,7 +80,7 @@ class AuthController {
             if (!user) {
                 return res.status(400).json({ error: 'User not found' });
             }
-            const newToken = jwt.sign({ userId: user.user_id }, getJwtSecret(), { expiresIn: '1h' });
+            const newToken = jwt.sign({ userId: user.user_id }, getJwtSecret(), { expiresIn: '24h' });
             await user.update({ last_login: new Date() });
             res.status(200).json({ token: newToken });
         } catch (error) {

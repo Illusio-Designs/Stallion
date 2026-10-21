@@ -47,6 +47,22 @@ export const setAuth = (user, token) => {
 // lost; it is still cleared if a different person logs in on this device.
 export const logout = ({ keepCart = false } = {}) => {
   if (typeof window === 'undefined') return;
+  // Tell the server to cancel this login (not needed when the session just expired)
+  if (!keepCart) {
+    const oldToken = localStorage.getItem('token');
+    if (oldToken) {
+      const envUrl = process.env.NEXT_PUBLIC_API_URL || 'https://stallion.nishree.com';
+      const base = envUrl.replace(/\/$/, '');
+      const url = `${base.includes('/api') ? base : `${base}/api`}/auth/logout`;
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: oldToken }),
+        keepalive: true,
+        credentials: 'omit',
+      }).catch(() => {});
+    }
+  }
   // Drop all cached API data so the next user never sees the previous session's data
   clearCache();
   // The cart belongs to the person who filled it: the next user on this device
