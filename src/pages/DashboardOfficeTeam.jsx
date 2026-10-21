@@ -316,7 +316,7 @@ const DashboardOfficeTeam = () => {
       <span className={`ui-badge ${row.isActive ? 'ui-badge--success' : 'ui-badge--danger'}`}>{v}</span>
     ) },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
-      <RowActions onEdit={() => setEditRow(row)} onDelete={() => handleDelete(row)} />
+      <RowActions onEdit={() => setEditRow(row)}/>
     ) },
   ]), []);
 

@@ -591,7 +591,6 @@ const DashboardTray = () => {
                       {meta && <span className="tray-meta">{meta}</span>}
                       <div className="tray-card__actions">
                         <button className="ui-btn ui-btn--secondary" onClick={() => openEdit(t)}>Open</button>
-                        <button className="ui-btn ui-btn--secondary" onClick={() => handleDelete(t)} disabled={saving}>Delete</button>
                       </div>
                     </div>
                   );

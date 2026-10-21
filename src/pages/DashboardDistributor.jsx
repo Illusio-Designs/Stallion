@@ -518,7 +518,7 @@ const DashboardDistributor = () => {
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions 
         onEdit={() => handleEdit(row)} 
-        onDelete={() => handleDelete(row)} 
+
       />
     ) },
   ]), []);

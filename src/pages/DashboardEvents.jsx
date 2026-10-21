@@ -300,7 +300,6 @@ const DashboardEvents = () => {
                   {statusPill(e)}
                   <div className="ev-row__actions">
                     <button className="ui-btn ui-btn--secondary" onClick={() => openEdit(e)}>Edit</button>
-                    <button className="ui-btn ui-btn--secondary" onClick={() => handleDelete(e)} disabled={saving}>Delete</button>
                   </div>
                 </div>
               );

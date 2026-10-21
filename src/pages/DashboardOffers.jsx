@@ -375,7 +375,6 @@ const DashboardOffers = () => {
                     <span className={`pill ${active ? 'ok' : 'idle'}`}>{active ? 'Active' : 'Inactive'}</span>
                     <div className="offer-card__actions">
                       <button className="ui-btn ui-btn--secondary" onClick={() => openEdit(o)}>Edit</button>
-                      <button className="ui-btn ui-btn--secondary" onClick={() => handleDelete(o)} disabled={saving}>Delete</button>
                     </div>
                   </div>
                 </div>

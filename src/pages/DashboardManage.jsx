@@ -542,7 +542,7 @@ const DashboardManage = () => {
         { key: 'action', label: 'ACTION', render: (_v, row) => (
           <RowActions 
             onEdit={() => handleEdit(row)} 
-            onDelete={() => handleDelete(row)} 
+
           />
         ) },
       ];
@@ -552,7 +552,7 @@ const DashboardManage = () => {
         { key: 'name', label: 'NAME' },
         ...(ATTRIBUTE_TABS[activeTab].hasBrand ? [{ key: 'details', label: 'BRAND' }] : []),
         { key: 'action', label: 'ACTION', render: (_v, row) => (
-          <RowActions onEdit={() => handleEdit(row)} onDelete={() => handleDelete(row)} />
+          <RowActions onEdit={() => handleEdit(row)}/>
         ) },
       ];
     }
@@ -564,7 +564,7 @@ const DashboardManage = () => {
       { key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions 
           onEdit={() => handleEdit(row)} 
-          onDelete={() => handleDelete(row)} 
+
         />
       ) },
     ];
