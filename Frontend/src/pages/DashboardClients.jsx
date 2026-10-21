@@ -1463,11 +1463,11 @@ const DashboardClients = () => {
         const canRemoveLocation = !!editRow && hasLocationSet
           && (isAdmin || userRole === 'party_manager' || userRole === 'sales_manager');
         return (
-          <div className="form-group form-group--full rounded-lg border border-border bg-surface-muted p-3">
+          <div className="form-group form-group--full rounded-xl border border-border bg-surface p-4">
             <label className="ui-label">Party Location (visit geofence)</label>
             <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
               {isVerified
-                ? `✅ Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. The strict 50m geofence is active for visit orders and check-ins.${canRemoveLocation ? ' If it is wrong, press “Remove location” and capture it again.' : ' If it is wrong, ask a manager to remove it.'}`
+                ? `Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. The strict 50m geofence is active for visit orders and check-ins.${canRemoveLocation ? ' If it is wrong, press “Remove location” and capture it again.' : ' If it is wrong, ask a manager to remove it.'}`
                 : 'Stand at the shop and tap below to lock the exact spot — the 50m geofence turns on once it is verified.'}
             </p>
             <div className="flex flex-wrap items-center gap-2">

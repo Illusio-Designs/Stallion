@@ -1163,6 +1163,10 @@ const DashboardOrders = () => {
                   <span className="ord-field__value">{viewRow.client || '—'}</span>
                 </div>
                 <div className="ord-field">
+                  <span className="ord-field__label">Placed By</span>
+                  <span className="ord-field__value">{viewRow.salesman || '—'}</span>
+                </div>
+                <div className="ord-field">
                   <span className="ord-field__label">Order Date</span>
                   <span className="ord-field__value">{orderDate}</span>
                 </div>
@@ -1177,6 +1181,10 @@ const DashboardOrders = () => {
                   <span className="ord-field__value ord-field__value--strong">{viewRow.value || '—'}</span>
                 </div>
               </div>
+
+              {!canEditOrder && (
+                <p className="ord-view__lock">Only admin and order managers can edit or cancel an order.</p>
+              )}
 
               {viewRow.clientAddress && (
                 <div>
@@ -1433,7 +1441,7 @@ const DashboardOrders = () => {
                   {locationLoading
                     ? 'Getting your location…'
                     : latitude !== null && longitude !== null
-                      ? `📍 Location captured (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`
+                      ? `Location captured (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`
                       : locationError
                         ? `Location needed for visit orders: ${locationError}`
                         : 'Visit orders require your location — allow the browser prompt.'}
