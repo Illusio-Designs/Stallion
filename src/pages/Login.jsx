@@ -182,13 +182,14 @@ const Login = ({ onPageChange }) => {
       const errorDataMessage = (error.errorData?.error || error.errorData?.message || error.errorData?.msg || '').toLowerCase();
       const errorText = JSON.stringify(error.errorData || {}).toLowerCase();
       
-      if (error.statusCode === 400 || 
-          errorMessage.includes('user not found') || 
+      // Only a real "user not found" gets that explanation; any other error shows what the
+      // server actually said (for example a limit on code requests).
+      if (errorMessage.includes('user not found') || 
           errorDataMessage.includes('user not found') ||
           errorText.includes('user not found')) {
         showError('User not found. Please ensure your phone number is registered. If you were just created by an administrator, please wait a few moments and try again, or contact your administrator.');
       } else {
-        showError(error.message || 'Something went wrong. Please try again.');
+        showError(errorDataMessage ? (error.errorData?.error || error.errorData?.message || error.errorData?.msg) : (error.message || 'Something went wrong. Please try again.'));
       }
     } finally {
       setLoading(false);
