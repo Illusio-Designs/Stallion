@@ -8,14 +8,14 @@
    ============================================================ */
 :root {
   /* ---- Brand (monochrome: black & white) ---- */
-  --color-primary: #16171d;             /* near-black — header/sidebar/footer, buttons */
-  --color-primary-hover: #2b2d38;
-  --color-primary-active: #0b0c10;
+  --color-primary: #0a0a0a;             /* ink black — sidebar, buttons */
+  --color-primary-hover: #1c1c1c;
+  --color-primary-active: #000000;
   --color-primary-soft: #f3f4f5;        /* light grey surface for selected/hover states */
   --color-primary-soft-hover: #e8e9ea;
   /* Accent = same near-black (monochrome, no colour) */
-  --color-accent: #16171d;
-  --color-accent-hover: #2b2d38;
+  --color-accent: #0a0a0a;
+  --color-accent-hover: #1c1c1c;
   --color-accent-soft: #eeeff0;
 
   /* ---- Neutral grey ramp (true neutral, no tint) ---- */
@@ -41,14 +41,14 @@
   --color-info-soft: var(--color-primary-soft);
 
   /* ---- Surfaces & borders ---- */
-  --color-bg: var(--color-grey-50);
+  --color-bg: #ffffff;
   --color-surface: #ffffff;
   --color-surface-muted: var(--color-grey-100);
   --color-border: #e9eaeb;              /* hairline, soft */
   --color-border-strong: #dcdddf;
 
   /* ---- Text ---- */
-  --color-text: #16171d;                /* near-black primary */
+  --color-text: #0a0a0a;                /* near-black primary */
   --color-text-muted: #6a6b6f;          /* secondary */
   --color-text-subtle: #909194;         /* tertiary / meta / placeholder */
   --color-text-on-primary: #ffffff;
@@ -89,7 +89,7 @@
   /* ---- Radius (one system) ---- */
   --radius-sm: 6px;
   --radius-md: 8px;
-  --radius-lg: 12px;
+  --radius-lg: 14px;
   --radius-xl: 16px;
   --radius-pill: 999px;
 
@@ -226,7 +226,8 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --font-spoof: 'Spoof Trial', sans-serif;
+  --font-spoof: 'Figtree', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Figtree', 'Segoe UI', sans-serif;
   color-scheme: light only;
 }
 
@@ -300,12 +301,12 @@
 body {
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: 'Spoof Trial', sans-serif;
+  font-family: var(--font-spoof);
   color-scheme: light only;
 }
 
 * {
-  font-family: 'Spoof Trial', sans-serif;
+  font-family: var(--font-spoof);
   /* Subtle, calm scrollbar (Firefox) */
   scrollbar-width: thin;
   scrollbar-color: var(--color-grey-300) transparent;

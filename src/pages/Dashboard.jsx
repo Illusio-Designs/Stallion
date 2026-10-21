@@ -440,7 +440,7 @@ const Dashboard = () => {
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
-        <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
+        <div className="dash-row dash-kpis grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
           {kpis.map((k) => (
             <div key={k.label} className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
               <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">{k.label}</h4>
