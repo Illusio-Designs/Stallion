@@ -1,1 +1,21 @@
 /* Redesign area e: own rules for this area only (unlayered, outranks Tailwind utilities). */
+
+/* ---- Home ---- */
+:root .hero-section { padding-top: calc(var(--header-height) + 20px) !important; margin-top: 0 !important; }
+:root .hero-section .hero-content { padding: 56px !important; }
+:root .hero-section .hero-content h1 { max-width: 18ch; font-size: clamp(2rem, 4.4vw, 3.4rem) !important; margin-bottom: 16px; }
+:root .hero-section .hero-content p { font-size: 17px !important; margin-bottom: 28px !important; }
+:root .hero-section .banner-slider .slider-image { border-radius: 14px; }
+:root .home-page .b2b-advantage-title { text-align: left; font-size: 28px; max-width: 1240px; margin: 0 auto 20px; }
+:root .home-page .b2b-advantage-section { padding: 24px 0 56px; }
+:root .home-page .b2b-advantage-container { max-width: 1240px; width: calc(100% - 96px); gap: 16px; padding: 24px; background: transparent; border: 0; }
+:root .home-page .b2b-advantage-card { border: 1px solid #e1e1e1; border-radius: 14px; padding: 24px 16px; background: #fff; }
+:root .home-page .b2b-icon { width: 56px; height: 56px; margin-bottom: 14px; border-radius: 12px; }
+:root .home-page .b2b-icon svg { width: 26px; height: 26px; }
+:root .home-page .b2b-advantage-card h3 { font-family: var(--font-display); font-weight: 600; font-size: 18px; }
+:root .about-section .about-content h2 { font-size: 28px; font-family: var(--font-display); }
+@media (max-width: 860px) {
+  :root .hero-section .hero-content { padding: 32px 22px !important; }
+  :root .home-page .b2b-advantage-container { width: calc(100% - 32px); padding: 0; grid-template-columns: 1fr; }
+  :root .home-page .b2b-advantage-title { padding: 0 16px; }
+}
