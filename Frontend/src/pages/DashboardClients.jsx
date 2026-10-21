@@ -285,18 +285,9 @@ const DashboardClients = () => {
         }
       }
 
-      // Filter by zone for salesman and distributor
-      let filteredParties = validParties;
-      const currentUser = getUser(); // Get fresh user data inside the callback
-      if ((isSalesman || isDistributor) && currentUser?.zone_preference) {
-        const userZone = String(currentUser.zone_preference).trim();
-        filteredParties = validParties.filter(party => {
-          const partyZoneId = party.zone_id || party.zoneId;
-          if (!partyZoneId) return false;
-          return String(partyZoneId).trim() === userZone;
-        });
-        console.log('[fetchPartiesForCountry] Filtered parties by zone:', userZone, 'Total:', validParties.length, 'Filtered:', filteredParties.length);
-      }
+      // Which parties a user sees is decided by the server from the working state (salesman)
+      // or the assigned distributor, so parties without a zone are still shown.
+      const filteredParties = validParties;
 
       // Ensure all parties have consistent ID field and preserve all fields including state/city/zone
       const normalizedParties = filteredParties.map(party => {
@@ -413,18 +404,6 @@ const DashboardClients = () => {
       filteredParties = parties.filter(Boolean);
     }
 
-    // Filter by zone for salesman and distributor
-    const currentUser = getUser(); // Get fresh user data
-    if ((isSalesman || isDistributor) && currentUser?.zone_preference && filteredParties.length > 0) {
-      const userZone = String(currentUser.zone_preference).trim();
-      const beforeZoneFilter = filteredParties.length;
-      filteredParties = filteredParties.filter(party => {
-        const partyZoneId = party.zone_id || party.zoneId;
-        if (!partyZoneId) return false;
-        return String(partyZoneId).trim() === userZone;
-      });
-      console.log('[rows] Zone filter applied:', userZone, 'Before:', beforeZoneFilter, 'After:', filteredParties.length);
-    }
 
 
     return filteredParties.map(party => {
