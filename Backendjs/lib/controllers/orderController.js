@@ -23,6 +23,7 @@ const DistributorZones = require('../models/DistributorZones');
 const { resolveDistributorIdForParty } = require('../utils/distributorMatch');
 const { canManageOrders, normalizeRole } = require('../utils/roleHelpers');
 const { resolveUserScope, canViewAllOrders } = require('../utils/scopeHelpers');
+const { salesmanCoversState } = require('../utils/workingStates');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 const orderPartyInclude = {
@@ -571,12 +572,12 @@ class OrderController {
                 if (isSalesmanRequired) salesman_id = userScope.salesmanId;
                 // ...and only for parties that belong to them.
                 if (party_id) {
-                    const ownParty = await Party.findOne({ where: { party_id }, attributes: ['party_id', 'salesman_id'] });
+                    const ownParty = await Party.findOne({ where: { party_id }, attributes: ['party_id', 'state_id'] });
                     if (!ownParty) {
                         return res.status(404).json({ error: 'Party not found' });
                     }
-                    if (ownParty.salesman_id !== userScope.salesmanId) {
-                        return res.status(403).json({ error: 'This party is not assigned to you, so you cannot place an order for it.' });
+                    if (!(await salesmanCoversState(userScope.salesmanId, ownParty.state_id))) {
+                        return res.status(403).json({ error: 'This party is outside the states you work in, so you cannot place an order for it.' });
                     }
                 }
             }
