@@ -69,3 +69,9 @@
 :root .dash-row > .dash-card.full[style*="max-width: 360px"] {
   border: 0; box-shadow: none; background: transparent; padding: 0;
 }
+
+/* Tablet: the old per-column max-widths (made for ellipsis) made the cells overlap now that
+   values are shown in full. Let the cells size to their content; the card scrolls sideways. */
+@media (min-width: 768px) and (max-width: 1100px) {
+  :root .dash-card .ui-table tbody td:nth-child(n) { max-width: none; }
+}
