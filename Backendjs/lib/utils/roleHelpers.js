@@ -22,6 +22,20 @@ const PARTY_CREATE_ROLES = ['admin', 'party_manager', 'sales_manager', 'salesman
 const PRODUCT_ADMIN_ROLES = ['admin', 'product_manager'];
 const USER_ADMIN_ROLES = ['admin'];
 
+// Order used to pick one "main" role for a user who holds several: admin first,
+// then the office roles, then salesman, distributor and party.
+const ROLE_RANK = ['admin', 'sales_manager', 'order_manager', 'party_manager', 'distributor_manager',
+    'product_manager', 'tray_manager', 'expense_manager', 'reports_manager',
+    'salesman', 'distributor', 'party'];
+
+function pickPrimaryRole(roleNames) {
+    const rank = (r) => {
+        const i = ROLE_RANK.indexOf(String(r).toLowerCase());
+        return i === -1 ? ROLE_RANK.length : i;
+    };
+    return [...(roleNames || [])].sort((a, b) => rank(a) - rank(b))[0] || null;
+}
+
 function normalizeRole(roleName) {
     return roleName ? String(roleName).toLowerCase() : null;
 }
@@ -91,6 +105,7 @@ module.exports = {
     ORDER_ADMIN_ROLES,
     normalizeRole,
     hasRole,
+    pickPrimaryRole,
     isRole,
     isOfficeRole,
     canManageInventory,

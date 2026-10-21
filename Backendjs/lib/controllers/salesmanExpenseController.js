@@ -1,7 +1,7 @@
 const SalesmanExpense = require('../models/SalesmanExpense');
 const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
-const { normalizeRole, isAdmin } = require('../utils/roleHelpers');
+const { normalizeRole, isAdmin, hasRole } = require('../utils/roleHelpers');
 const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 
 // Expense types: 1 food, 2 travel (with a mode), 3 city tour, 4 toll (with a message), 5 hotel, 6 other.
@@ -177,7 +177,7 @@ class SalesmanExpenseController {
             }
 
             const salesmanId = await resolveSalesmanIdForUser(req.user.user_id);
-            const isOwner = normalizeRole(req.userRoleName) === 'salesman'
+            const isOwner = hasRole(req.userRoleNames, 'salesman')
                 && existingExpense.salesman_id === salesmanId;
             const isOffice = isAdmin(req.userRoleNames);
 
@@ -293,7 +293,7 @@ class SalesmanExpenseController {
             }
 
             const salesmanId = await resolveSalesmanIdForUser(req.user.user_id);
-            const isOwner = normalizeRole(req.userRoleName) === 'salesman' && salesmanExpense.salesman_id === salesmanId;
+            const isOwner = hasRole(req.userRoleNames, 'salesman') && salesmanExpense.salesman_id === salesmanId;
             if (!isOwner && !isAdmin(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }

@@ -3,6 +3,7 @@ const User = require('../models/User');
 const UserRole = require('../models/UserRole');
 const Role = require('../models/Role');
 const { getJwtSecret } = require('../utils/jwtSecret');
+const { pickPrimaryRole } = require('../utils/roleHelpers');
 
 async function attachUserRole(req) {
     // A member can hold several roles. Attach EVERY role name so authorization
@@ -25,8 +26,9 @@ async function attachUserRole(req) {
         return;
     }
 
-    const adminRole = roleNames.find((r) => String(r).toLowerCase() === 'admin');
-    req.userRoleName = adminRole || roleNames[0];
+    // Same answer every time for a user with several roles (admin first, then office
+    // roles, then salesman, distributor, party); the database order is not fixed.
+    req.userRoleName = pickPrimaryRole(roleNames);
 }
 
 // A token is revoked when it was issued before the user's last logout.

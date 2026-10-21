@@ -12,16 +12,16 @@ async function resolveUserScope(userId, roleName) {
         salesmanId: null,
     };
 
-    if (role === 'party') {
-        const party = await Party.findOne({ where: { user_id: userId } });
-        scope.partyId = party ? party.party_id : null;
-    } else if (role === 'distributor') {
-        const distributor = await Distributor.findOne({ where: { user_id: userId } });
-        scope.distributorId = distributor ? distributor.distributor_id : null;
-    } else if (role === 'salesman') {
-        const salesman = await Salesman.findOne({ where: { user_id: userId } });
-        scope.salesmanId = salesman ? salesman.salesman_id : null;
-    }
+    // A user can hold several roles (a sales manager who is also a salesman), so
+    // find every profile the user has — not only the one matching the main role.
+    const [party, distributor, salesman] = await Promise.all([
+        Party.findOne({ where: { user_id: userId } }),
+        Distributor.findOne({ where: { user_id: userId } }),
+        Salesman.findOne({ where: { user_id: userId } }),
+    ]);
+    scope.partyId = party ? party.party_id : null;
+    scope.distributorId = distributor ? distributor.distributor_id : null;
+    scope.salesmanId = salesman ? salesman.salesman_id : null;
 
     return scope;
 }
