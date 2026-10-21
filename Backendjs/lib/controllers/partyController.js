@@ -225,6 +225,11 @@ class PartyController {
 
             const roleName = role.role_name.toLowerCase();
 
+            // A party must not see the other parties in its zone.
+            if (roleName === 'party') {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+
             // Based on role, get zone_id from appropriate model
             if (roleName === 'party') {
                 // Get zone_id from Party model
@@ -1090,6 +1095,21 @@ class PartyController {
             const resolved = await resolveStateId(state_id);
             if (!resolved) {
                 return res.status(404).json({ error: `State not found: ${state_id}` });
+            }
+            // Managers see every state. A salesman or distributor only sees the states they
+            // work in. Everyone else (a party, for example) gets nothing.
+            if (!canManageParties(req.userRoleNames)) {
+                const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                let allowed = false;
+                if (hasRole(req.userRoleNames, 'salesman') && scope.salesmanId) {
+                    allowed = await salesmanCoversState(scope.salesmanId, resolved);
+                }
+                if (!allowed && hasRole(req.userRoleNames, 'distributor') && scope.distributorId) {
+                    allowed = await distributorCoversState(scope.distributorId, resolved);
+                }
+                if (!allowed) {
+                    return res.status(403).json({ error: 'Access denied' });
+                }
             }
             const body = await listWithOptionalPagination(Party, req, {
                 where: mergeWhere({ state_id: resolved }, partyActiveFilter(req.userRoleNames)),
