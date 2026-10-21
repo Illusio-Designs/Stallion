@@ -470,9 +470,34 @@ const Dashboard = () => {
       ];
   const ownData = isParty || isDistributor; // their own orders only: no warehouse stock
 
+  // Salesman: one ring for the current targets. Cancelled orders still count toward a
+  // target (that is the salesman's effort), so this uses the server's completed_amount.
+  const targetTotal = targets.reduce((n, t) => n + Number(t.target_amount || 0), 0);
+  const targetDone = targets.reduce((n, t) => n + Number(t.completed_amount || 0), 0);
+  const targetPct = targetTotal > 0 ? Math.round((targetDone / targetTotal) * 100) : 0;
+  const RING_C = 2 * Math.PI * 34;
+
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
+        {isSalesman && targets.length > 0 && (
+          <div className="dash-row">
+            <section className="target-ring col-span-full" aria-label="Target progress">
+              <svg className="target-ring__svg" width="88" height="88" viewBox="0 0 84 84" role="img" aria-label={`${targetPct} percent of target reached`}>
+                <circle cx="42" cy="42" r="34" fill="none" stroke="#3b3b3b" strokeWidth="9" />
+                <circle cx="42" cy="42" r="34" fill="none" stroke="#ffffff" strokeWidth="9" strokeLinecap="round"
+                  strokeDasharray={`${Math.min(1, targetDone / (targetTotal || 1)) * RING_C} ${RING_C}`} transform="rotate(-90 42 42)" />
+                <text x="42" y="47" textAnchor="middle" fill="#ffffff" fontSize="16" fontWeight="700" style={{ fontFamily: 'var(--font-display)' }}>{targetPct}%</text>
+              </svg>
+              <div className="target-ring__text">
+                <span className="target-ring__label">Target</span>
+                <span className="target-ring__big">{money(targetDone)}</span>
+                <span className="target-ring__sub">of {money(targetTotal)}. Cancelled orders still count.</span>
+              </div>
+            </section>
+          </div>
+        )}
+
         <div className="dash-row dash-kpis grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
           {kpis.map((k) => (
             <div key={k.label} className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">

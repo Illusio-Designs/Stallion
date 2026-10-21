@@ -228,3 +228,28 @@ input[type="file"]::file-selector-button {
   font-size: 13px;
   cursor: pointer;
 }
+
+/* ---- Salesman dashboard: target ring ---- */
+.target-ring {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 18px 20px;
+  border-radius: 16px;
+  background: #0a0a0a;
+  color: #ffffff;
+}
+.target-ring__svg { flex: none; }
+.target-ring__text { display: flex; flex-direction: column; min-width: 0; }
+.target-ring__label { font-size: 12px; letter-spacing: 0.1em; text-transform: uppercase; color: #bdbdbd; }
+.target-ring__big { font-family: var(--font-display); font-size: 30px; font-weight: 700; line-height: 1.1; }
+.target-ring__sub { font-size: 13px; color: #bdbdbd; }
+
+/* When the black target ring is shown, the first number card goes back to white. */
+.dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child {
+  background: #ffffff;
+  border-color: #e1e1e1;
+}
+.dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child h4 { color: #595959; }
+.dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-value { color: #0a0a0a; }
+.dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-sub { color: #595959; }
