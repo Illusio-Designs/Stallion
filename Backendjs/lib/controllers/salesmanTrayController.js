@@ -85,13 +85,13 @@ class SalesmanTrayController {
                 updated_at: new Date(),
             }, { where: { tray_id: salesmanTray.tray_id } });
             const snapshot = salesmanTray.toJSON();
-            await SalesmanTray.destroy({ where: { id } });
+            await SalesmanTray.destroy({ where: { id: salesmanTray.id } });
             await logAudit({
                 req,
                 action: 'delete',
                 description: 'Salesman tray deleted',
                 tableName: 'salesman_tray',
-                recordId: id,
+                recordId: salesmanTray.id,
                 oldValues: snapshot,
                 newValues: null,
             });
