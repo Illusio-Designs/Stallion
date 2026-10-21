@@ -820,7 +820,14 @@ class PartyController {
                 return res.status(404).json({ error: 'Party not found' });
             }
             const snapshot = party.toJSON();
-            await party.destroy();
+            try {
+                await party.destroy();
+            } catch (err) {
+                if (err.name === 'SequelizeForeignKeyConstraintError') {
+                    return res.status(409).json({ error: 'This party has orders, so it cannot be deleted. Mark it inactive instead.' });
+                }
+                throw err;
+            }
             await logAudit({
                 req,
                 action: 'delete',
