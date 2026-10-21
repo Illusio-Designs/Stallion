@@ -309,13 +309,18 @@ class ProductController {
             if (!product) {
                 return res.status(404).json({ error: 'Product not found' });
             }
-            const brand = await Brand.findOne({ where: { brand_id: brand_id } });
-            if (!brand) {
-                return res.status(404).json({ error: 'Brand not found' });
+            // Check brand and collection only when the request changes them.
+            if (brand_id !== undefined && brand_id !== null && brand_id !== '') {
+                const brand = await Brand.findOne({ where: { brand_id: brand_id } });
+                if (!brand) {
+                    return res.status(404).json({ error: 'Brand not found' });
+                }
             }
-            const collection = await Collection.findOne({ where: { collection_id: collection_id } });
-            if (!collection) {
-                return res.status(404).json({ error: 'Collection not found' });
+            if (collection_id !== undefined && collection_id !== null && collection_id !== '') {
+                const collection = await Collection.findOne({ where: { collection_id: collection_id } });
+                if (!collection) {
+                    return res.status(404).json({ error: 'Collection not found' });
+                }
             }
             const oldSnapshot = product.toJSON();
             // Optional integer FKs: empty/0/invalid -> null (0 is not a valid FK).
@@ -335,8 +340,8 @@ class ProductController {
                 whp: whp !== undefined ? whp : product.whp,
                 size_mm: size_mm !== undefined ? (size_mm || null) : product.size_mm,
                 status: status !== undefined ? status : product.status,
-                brand_id: brand_id !== undefined ? brand_id : product.brand_id,
-                collection_id: collection_id !== undefined ? collection_id : product.collection_id,
+                brand_id: brand_id ? brand_id : product.brand_id,
+                collection_id: collection_id ? collection_id : product.collection_id,
                 updated_at: new Date(),
             };
 
