@@ -15,7 +15,13 @@ function isOfferActive(offer, now = new Date()) {
     const start = offer.start_date ? new Date(offer.start_date) : null;
     const end = offer.end_date ? new Date(offer.end_date) : null;
     if (start && now < start) return false;
-    if (end && now > end) return false;
+    if (end) {
+        // An end date picked without a time (midnight) means the whole of that day.
+        const midnight = (end.getHours() === 0 && end.getMinutes() === 0 && end.getSeconds() === 0)
+            || (end.getUTCHours() === 0 && end.getUTCMinutes() === 0 && end.getUTCSeconds() === 0);
+        if (midnight) end.setTime(end.getTime() + 24 * 60 * 60 * 1000 - 1);
+        if (now > end) return false;
+    }
     return true;
 }
 
