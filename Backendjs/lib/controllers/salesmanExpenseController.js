@@ -1,8 +1,29 @@
 const SalesmanExpense = require('../models/SalesmanExpense');
 const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
-const { normalizeRole, isOfficeRole } = require('../utils/roleHelpers');
+const { normalizeRole, isAdmin } = require('../utils/roleHelpers');
 const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
+
+// Expense types: 1 food, 2 travel (with a mode), 3 city tour, 4 toll (with a message), 5 hotel, 6 other.
+// 'fuel' only exists on old rows.
+const EXPENSE_TYPES = ['food', 'travel', 'city_tour', 'toll', 'hotel', 'other'];
+const TRAVEL_MODES = ['bus', 'train', 'rapido', 'auto', 'cab', 'metro', 'bike', 'own_vehicle', 'other'];
+
+// Checks the type and its extra field. Returns an error message or null.
+function validateExpenseDetails({ expense_type, travel_mode, toll_message }, { isNew }) {
+    if (expense_type === undefined) return null;
+    const allowed = isNew ? EXPENSE_TYPES : [...EXPENSE_TYPES, 'fuel'];
+    if (!allowed.includes(expense_type)) {
+        return `Expense type must be one of: ${EXPENSE_TYPES.join(', ')}`;
+    }
+    if (expense_type === 'travel' && !TRAVEL_MODES.includes(travel_mode)) {
+        return `Choose how you travelled: ${TRAVEL_MODES.join(', ')}`;
+    }
+    if (expense_type === 'toll' && !(typeof toll_message === 'string' && toll_message.trim())) {
+        return 'Write a short message for the toll expense';
+    }
+    return null;
+}
 
 // A user's expenses belong to the salesman record linked to their login. The
 // record is the proof, so this does not depend on which role happens to be listed
@@ -36,7 +57,7 @@ class SalesmanExpenseController {
 
     async getAdminSalesmanExpenses(req, res) {
         try {
-            if (!isOfficeRole(req.userRoleNames)) {
+            if (!isAdmin(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const pagination = parsePaginationParams(req);
@@ -60,7 +81,7 @@ class SalesmanExpenseController {
 
     async getAllAdminSalesmanExpenses(req, res) {
         try {
-            if (!isOfficeRole(req.userRoleNames)) {
+            if (!isAdmin(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const pagination = parsePaginationParams(req);
@@ -107,7 +128,11 @@ class SalesmanExpenseController {
             if (!salesmanId) {
                 return res.status(404).json({ error: 'Salesman record not found for this user' });
             }
-            const { remarks, kilometers, expense_date, expense_amount, expense_description, expense_type, images } = req.body;
+            const { remarks, kilometers, expense_date, expense_amount, expense_description, expense_type, images, travel_mode, toll_message } = req.body;
+            const detailsError = validateExpenseDetails({ expense_type: expense_type === undefined ? null : expense_type, travel_mode, toll_message }, { isNew: true });
+            if (detailsError) {
+                return res.status(400).json({ error: detailsError });
+            }
             const salesmanExpense = await SalesmanExpense.create({
                 remarks,
                 kilometers,
@@ -115,6 +140,8 @@ class SalesmanExpenseController {
                 expense_amount,
                 expense_description,
                 expense_type,
+                travel_mode: expense_type === 'travel' ? travel_mode : null,
+                toll_message: expense_type === 'toll' ? String(toll_message).trim().slice(0, 500) : null,
                 images,
                 salesman_id: salesmanId,
                 status: 'pending',
@@ -152,13 +179,19 @@ class SalesmanExpenseController {
             const salesmanId = await resolveSalesmanIdForUser(req.user.user_id);
             const isOwner = normalizeRole(req.userRoleName) === 'salesman'
                 && existingExpense.salesman_id === salesmanId;
-            const isOffice = isOfficeRole(req.userRoleNames);
+            const isOffice = isAdmin(req.userRoleNames);
 
             if (!isOwner && !isOffice) {
                 return res.status(403).json({ error: 'Access denied' });
             }
 
-            const { remarks, kilometers, status, expense_date, expense_amount, expense_description, expense_type } = req.body;
+            const { remarks, kilometers, status, expense_date, expense_amount, expense_description, expense_type, travel_mode, toll_message } = req.body;
+            if (expense_type !== undefined) {
+                const updateError = validateExpenseDetails({ expense_type, travel_mode, toll_message }, { isNew: false });
+                if (updateError) {
+                    return res.status(400).json({ error: updateError });
+                }
+            }
             const oldSnapshot = existingExpense.toJSON();
             const updatePayload = {
                 remarks: remarks !== undefined ? remarks : existingExpense.remarks,
@@ -167,6 +200,8 @@ class SalesmanExpenseController {
                 expense_amount: expense_amount !== undefined ? expense_amount : existingExpense.expense_amount,
                 expense_description: expense_description !== undefined ? expense_description : existingExpense.expense_description,
                 expense_type: expense_type !== undefined ? expense_type : existingExpense.expense_type,
+                travel_mode: expense_type !== undefined ? (expense_type === 'travel' ? travel_mode : null) : existingExpense.travel_mode,
+                toll_message: expense_type !== undefined ? (expense_type === 'toll' ? String(toll_message).trim().slice(0, 500) : null) : existingExpense.toll_message,
                 updated_at: new Date(),
             };
 
@@ -259,7 +294,7 @@ class SalesmanExpenseController {
 
             const salesmanId = await resolveSalesmanIdForUser(req.user.user_id);
             const isOwner = normalizeRole(req.userRoleName) === 'salesman' && salesmanExpense.salesman_id === salesmanId;
-            if (!isOwner && !isOfficeRole(req.userRoleNames)) {
+            if (!isOwner && !isAdmin(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
 

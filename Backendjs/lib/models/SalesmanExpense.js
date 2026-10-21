@@ -31,7 +31,8 @@ const SalesmanExpense = sequelize.define('SalesmanExpense', {
         allowNull: true
     },
     expense_type: {
-        type: DataTypes.ENUM('fuel', 'hotel', 'travel', 'other'),
+        // 'fuel' is kept only so old rows still load; new expenses use the other types.
+        type: DataTypes.ENUM('fuel', 'hotel', 'travel', 'other', 'food', 'city_tour', 'toll'),
         allowNull: false
     },
     images: {
@@ -45,6 +46,16 @@ const SalesmanExpense = sequelize.define('SalesmanExpense', {
     },
     kilometers: {
         type: DataTypes.INTEGER,
+        allowNull: true
+    },
+    // Travel only: how the salesman travelled (bus, train, rapido, ...).
+    travel_mode: {
+        type: DataTypes.STRING(30),
+        allowNull: true
+    },
+    // Toll only: the note the salesman writes about the toll.
+    toll_message: {
+        type: DataTypes.TEXT,
         allowNull: true
     },
     remarks: {
