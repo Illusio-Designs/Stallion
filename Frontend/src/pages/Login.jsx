@@ -1,8 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
 import '../styles/pages/Login.css';
 import { showLoginSuccess, showError, showSuccess } from '../services/notificationService';
 import { setAuth, isLoggedIn, getUserRoles, getUser } from '../services/authService';
@@ -666,14 +664,19 @@ const Login = ({ onPageChange }) => {
   };
 
   return (
-    <div className="login-page relative flex min-h-screen flex-col bg-[var(--color-primary-active)]">
-      <Header onPageChange={handlePageChange} currentPage="login" />
-      <div className="login-background absolute left-0 top-0 z-0 w-full">
-        <img src="/images/banners/loginbg.webp" alt="Login Background" className="login-bg-image h-auto w-full object-cover opacity-45" />
-        <div className="login-gradient-overlay absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(18,14,77,0)_0%,var(--color-primary-active)_92%)]"></div>
-      </div>
-      <div className="login-content relative z-[2] flex flex-1 items-center justify-center px-4 py-10 md:py-16">
-        <div className="login-container box-border w-full max-w-[440px] rounded-xl border border-border bg-surface px-5 py-6 shadow-xl sm:px-6 sm:py-8 md:px-10 md:py-12">
+    <div className="login-page auth-split">
+      <section className="auth-panel">
+        <button type="button" className="auth-brand" onClick={() => handlePageChange('')} aria-label="Stallion Eyewear home">
+          <img src="/images/logo/logo.webp" alt="Stallion Eyewear" className="auth-brand-logo" />
+        </button>
+        <div className="auth-panel-main">
+          <p className="auth-headline">Frames, delivered to every counter.</p>
+          <p className="auth-panel-text">Sign in with your phone number. We send a 6 digit code by SMS.</p>
+        </div>
+        <p className="auth-panel-foot">Salesmen, parties, distributors and the office team all sign in here.</p>
+      </section>
+      <div className="login-content auth-form-side">
+        <div className="login-container">
           {!showOTP ? (
             <>
               <h1 className="login-title m-0 mb-2 text-center text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Sign in</h1>
@@ -770,7 +773,6 @@ const Login = ({ onPageChange }) => {
           )}
         </div>
       </div>
-      <Footer />
     </div>
   );
 };

@@ -5,12 +5,12 @@
   overflow: hidden;
   vertical-align: middle;
   border-radius: var(--radius-sm);
-  background-color: var(--color-grey-200);
+  background-color: #ececec;
   background-image: linear-gradient(
     90deg,
-    var(--color-grey-200) 0,
-    var(--color-grey-100) 40px,
-    var(--color-grey-200) 80px
+    #ececec 0,
+    #f6f6f6 40px,
+    #ececec 80px
   );
   background-size: 600px 100%;
   background-repeat: no-repeat;

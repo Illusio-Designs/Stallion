@@ -23,6 +23,7 @@
 .dashboard-title {
   font-size: var(--text-md);
   color: var(--color-text);
+  font-family: var(--font-display);
   font-weight: var(--font-weight-semibold);
   white-space: nowrap;
   overflow: hidden;
@@ -41,9 +42,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
-  padding: var(--space-2) var(--space-4);
-  min-height: 40px;
-  border-radius: var(--radius-md);
+  padding: 0 18px;
+  min-height: 44px;
+  border-radius: 11px;
   background: var(--color-primary);
   color: var(--color-text-on-primary);
   font-size: var(--text-sm);
@@ -62,8 +63,8 @@
        colour (0,1,0) and tints the label + icon indigo — invisible on the
        indigo fill. .dashboard-back-shop:hover is 0,2,0, so it wins. */
     color: var(--color-text-on-primary);
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
+    box-shadow: none;
+    transform: none;
   }
 }
 .dashboard-back-shop:focus-visible {
@@ -82,15 +83,19 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background: var(--color-surface-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid #e1e1e1;
+  border-radius: 11px;
+  height: 44px;
+  padding: 0 14px;
+  flex: 1 1 220px;
+  min-width: 0;
+  max-width: 420px;
   transition: border-color var(--transition), box-shadow var(--transition);
 }
 .dashboard-search-bar:focus-within {
   border-color: var(--color-primary);
-  box-shadow: var(--focus-ring);
+  box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.13);
   background: var(--color-surface);
 }
 .dashboard-search-bar input {
@@ -115,24 +120,44 @@
   gap: var(--space-2);
 }
 
-.dashboard-icon-btn {
-  background: transparent;
-  border: none;
-  width: 40px;
-  height: 40px;
-  border-radius: var(--radius-pill);
+.dashboard-icon-btn,
+.dashboard-menu-btn,
+.dashboard-sidebar-toggle {
+  background: var(--color-surface);
+  border: 1px solid #e1e1e1;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  margin-left: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: var(--color-text-muted);
-  transition: background var(--transition), color var(--transition);
+  color: var(--color-text);
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+.dashboard-menu-btn,
+.dashboard-sidebar-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
 }
 @media (hover: hover) {
-  .dashboard-icon-btn:hover {
-    background: var(--color-surface-muted);
+  .dashboard-icon-btn:hover,
+  .dashboard-menu-btn:hover,
+  .dashboard-sidebar-toggle:hover {
+    background: var(--color-surface);
+    border-color: #0a0a0a;
     color: var(--color-text);
   }
+}
+/* Tailwind hidden / md:hidden on these two lose to the display above. */
+@media (min-width: 768px) {
+  .dashboard-menu-btn { display: none; }
+}
+@media (max-width: 767.98px) {
+  .dashboard-sidebar-toggle { display: none; }
 }
 .dashboard-icon-btn:focus-visible {
   outline: none;
@@ -157,7 +182,7 @@
   bottom: -36px;
   left: 50%;
   transform: translateX(-50%) translateY(-6px);
-  background: var(--color-grey-900);
+  background: #0a0a0a;
   color: var(--color-text-on-primary);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
@@ -196,10 +221,10 @@
 
 /* Avatar */
 .dashboard-avatar-btn {
-  background: var(--color-primary-soft);
-  border: 1px solid var(--color-border);
-  width: 40px;
-  height: 40px;
+  background: #0a0a0a;
+  border: 1px solid #0a0a0a;
+  width: 44px;
+  height: 44px;
   border-radius: var(--radius-pill);
   display: inline-flex;
   align-items: center;
@@ -210,7 +235,7 @@
 }
 @media (hover: hover) {
   .dashboard-avatar-btn:hover {
-    border-color: var(--color-border-strong);
+    border-color: #3b3b3b;
   }
 }
 .dashboard-avatar-btn:focus-visible {
@@ -225,8 +250,9 @@
 }
 .dashboard-avatar-initials {
   font-size: var(--text-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-primary);
+  font-weight: var(--font-weight-bold);
+  color: #ffffff;
+  font-family: var(--font-display);
   line-height: 1;
 }
 
@@ -241,8 +267,8 @@
   min-width: 184px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-lg);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(10, 10, 10, 0.12);
   padding: var(--space-1);
   z-index: 100;
 }
@@ -288,6 +314,12 @@
   .dashboard-search-bar {
     display: none;
   }
+  /* Keep the bar from overflowing a 390px viewport. */
+  .dashboard-header-content { gap: var(--space-2); }
+  .dashboard-header-actions { gap: var(--space-2); }
+  .dashboard-action-icons { gap: 6px; }
+  .dashboard-icon-btn, .dashboard-avatar-btn { width: 40px; height: 40px; }
+  .dashboard-title { min-width: 0; }
 }
 
 /* Hide the header Back-to-Shop below md — it lives in the hamburger drawer on
@@ -317,4 +349,14 @@
   .dashboard-user-dropdown .dropdown-item {
     transition: none;
   }
+}
+
+/* PWA install button shares the icon-button look but may carry a label. */
+.dashboard-icon-btn.install-app-btn {
+  width: auto;
+  min-width: 44px;
+  padding: 0 12px;
+}
+@media (max-width: 767.98px) {
+  .dashboard-icon-btn.install-app-btn { min-width: 40px; padding: 0 8px; }
 }

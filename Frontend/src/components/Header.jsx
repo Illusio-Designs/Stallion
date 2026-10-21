@@ -231,6 +231,10 @@ const Header = ({ onPageChange, currentPage }) => {
         {/* mobile backdrop */}
         <div className={`mobile-backdrop fixed inset-0 z-[1002] transition-[background,backdrop-filter] duration-300 ease-[ease] motion-reduce:transition-none ${isMenuOpen ? 'open pointer-events-auto' : 'pointer-events-none'}`} onClick={() => setIsMenuOpen(false)} aria-hidden="true" />
 
+        <div className="logo flex cursor-pointer items-center rounded-sm focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)]" onClick={() => onPageChange ? onPageChange('') : window.location.href = '/'}>
+          <img src="/images/logo/logo.webp" alt="Stallion Eyewear" className="logo-image block h-11 w-[124px] object-contain" />
+        </div>
+
         <nav
           ref={drawerRef}
           className={`nav-menu items-center gap-8 ${isMenuOpen ? 'mobile open' : 'hidden md:flex'}`}
@@ -266,10 +270,6 @@ const Header = ({ onPageChange, currentPage }) => {
             </a>
           ))}
         </nav>
-        
-        <div className="logo flex cursor-pointer items-center rounded-sm focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)]" onClick={() => onPageChange ? onPageChange('') : window.location.href = '/'}>
-          <img src="/images/logo/logo.webp" alt="Stallion Eyewear" className="logo-image block h-11 w-[124px] object-contain" />
-        </div>
 
         <div className="header-actions flex items-center gap-2 md:gap-5">
           <div className="search-bar relative hidden items-center rounded-pill border border-border-strong bg-grey-100 px-4 py-2 transition-[background,border-color,box-shadow] duration-200 ease-[ease] hover:bg-grey-200 focus-within:border-border-strong focus-within:bg-grey-200 focus-within:shadow-[0_0_0_3px_rgba(0,0,0,0.12)] sm:flex sm:min-w-[150px] md:min-w-[220px]">
@@ -286,22 +286,24 @@ const Header = ({ onPageChange, currentPage }) => {
             </form>
           </div>
           <div className="action-icons flex items-center gap-2">
-            <button type="button" className="icon-btn cart-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text transition-[background,transform] duration-200 ease-[ease] hover:bg-grey-100 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] active:scale-[0.94]" onClick={() => onPageChange('cart')} aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}>
-              <FiShoppingCart size={28} aria-hidden="true" />
+            <button type="button" className="hd-btn hd-btn--ghost cart-btn" onClick={() => onPageChange('cart')} aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}>
+              <FiShoppingCart size={18} aria-hidden="true" />
+              <span className="hd-btn__text">Cart</span>
               {cartCount > 0 && (
-                <span className="cart-badge absolute right-0.5 top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill border-2 border-primary bg-accent px-[5px] text-[length:var(--text-xs)] font-bold leading-none text-text-on-accent" aria-hidden="true">{cartCount > 99 ? '99+' : cartCount}</span>
+                <span className="cart-badge" aria-hidden="true">{cartCount > 99 ? '99+' : cartCount}</span>
               )}
             </button>
             <div className="user-menu-container relative" ref={dropdownRef}>
               <button
                 type="button"
-                className="icon-btn user-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text transition-[background,transform] duration-200 ease-[ease] hover:bg-grey-100 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] active:scale-[0.94]"
+                className="hd-btn hd-btn--solid user-btn"
                 onClick={handleUserIconClick}
                 aria-label={loggedIn ? 'User menu' : 'Login'}
                 aria-haspopup={loggedIn ? 'menu' : undefined}
                 aria-expanded={loggedIn ? isUserDropdownOpen : undefined}
               >
-                <FiUser size={28} aria-hidden="true" />
+                <FiUser size={18} aria-hidden="true" />
+                <span className="hd-btn__text">{loggedIn ? 'Dashboard' : 'Sign in'}</span>
               </button>
               {loggedIn && isUserDropdownOpen && (
                 <div className="user-dropdown absolute right-0 top-[calc(100%+0.5rem)] z-[1001] min-w-[184px] max-[768px]:min-w-[168px] overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg" role="menu">

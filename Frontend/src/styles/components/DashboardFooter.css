@@ -2,7 +2,7 @@
 .dashboard-footer {
   background: var(--color-surface);
   border-top: 1px solid var(--color-border);
-  min-height: 54px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   margin-top: auto;
@@ -21,7 +21,7 @@
 
 .dashboard-footer .dashboard-footer-content .dashboard-copyright {
   font-size: var(--text-xs);
-  color: var(--color-text-subtle);
+  color: #595959;
   text-align: center;
 }
 
