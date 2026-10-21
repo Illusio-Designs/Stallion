@@ -307,8 +307,14 @@ const DashboardOfficeTeam = () => {
     { key: 'phoneNumber', label: 'PHONE NUMBER' },
     { key: 'email', label: 'EMAIL' },
     { key: 'address', label: 'ADDRESS' },
-    { key: 'role', label: 'ROLE' },
-    { key: 'status', label: 'STATUS' },
+    { key: 'role', label: 'ROLES', render: (v) => (
+      <span className="ot-roles">
+        {String(v || '').split(', ').filter(Boolean).map((r) => <span key={r} className="ot-chip">{r}</span>)}
+      </span>
+    ) },
+    { key: 'status', label: 'STATUS', render: (v, row) => (
+      <span className={`ui-badge ${row.isActive ? 'ui-badge--success' : 'ui-badge--danger'}`}>{v}</span>
+    ) },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions onEdit={() => setEditRow(row)} onDelete={() => handleDelete(row)} />
     ) },

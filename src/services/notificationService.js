@@ -10,57 +10,63 @@ const CartIcon = () => (
 // Notifications use goey-toast: the toast morphs out of a small pill into a soft
 // blob, shows the message, then folds back. <GooeyToaster /> is mounted once in
 // ToastContainerProvider. Every notification in the app goes through these helpers.
-const DURATION = 4000;
+const DURATION = 5000;
 const text = (message) => (typeof message === 'string' ? message : String(message ?? ''));
-const opts = (icon) => ({ duration: DURATION, ...(icon ? { icon } : {}) });
+
+// Each toast has a short title and a description line (the longer message). Calls that
+// only pass a message get a plain title for their type, and the message becomes the
+// description, so every notification reads the same way.
+const TYPE_TITLE = { success: 'Done', error: 'Something went wrong', info: 'Note', warning: 'Please check' };
+const show = (type, message, icon, title, description) => {
+  const body = text(message);
+  const heading = title || TYPE_TITLE[type];
+  // Short, self-explanatory messages (under ~28 chars) stay as the title on their own.
+  const short = !title && body.length <= 28;
+  gooeyToast[type](short ? body : heading, {
+    duration: DURATION,
+    ...(short ? (description ? { description } : {}) : { description: description || body }),
+    ...(icon ? { icon } : {}),
+  });
+};
 
 // Success notification
-export const showSuccess = (message, icon = null) => {
-  gooeyToast.success(text(message), opts(icon));
-};
+export const showSuccess = (message, icon = null, title = null, description = null) => show('success', message, icon, title, description);
 
 // Error notification
-export const showError = (message, icon = null) => {
-  gooeyToast.error(text(message), opts(icon));
-};
+export const showError = (message, icon = null, title = null, description = null) => show('error', message, icon, title, description);
 
 // Info notification
-export const showInfo = (message, icon = null) => {
-  gooeyToast.info(text(message), opts(icon));
-};
+export const showInfo = (message, icon = null, title = null, description = null) => show('info', message, icon, title, description);
 
 // Warning notification
-export const showWarning = (message, icon = null) => {
-  gooeyToast.warning(text(message), opts(icon));
-};
+export const showWarning = (message, icon = null, title = null, description = null) => show('warning', message, icon, title, description);
 
 // Login success
 export const showLoginSuccess = () => {
-  showSuccess('Login successful! Welcome back.');
+  showSuccess('', null, 'Welcome back', 'You are signed in.');
 };
 
 // Logout success
 export const showLogoutSuccess = () => {
-  showInfo('Logged out successfully.');
+  showInfo('', null, 'Signed out', 'See you again soon.');
 };
 
 // Add to cart success
 export const showAddToCartSuccess = (productName, quantity) => {
-  showSuccess(`${productName} added to cart (Qty: ${quantity})`, <CartIcon />);
+  showSuccess('', <CartIcon />, 'Added to cart', `${productName} (Qty: ${quantity})`);
 };
 
 // Remove from cart success
 export const showRemoveFromCartSuccess = (productName) => {
-  showInfo(`${productName} removed from cart`, <CartIcon />);
+  showInfo('', <CartIcon />, 'Removed from cart', `${productName} was taken out of your cart.`);
 };
 
 // Update cart quantity success
 export const showCartUpdateSuccess = (productName, quantity) => {
-  showInfo(`${productName} quantity updated to ${quantity}`, <CartIcon />);
+  showInfo('', <CartIcon />, 'Cart updated', `${productName} quantity is now ${quantity}.`);
 };
 
 // Place order success
 export const showPlaceOrderSuccess = () => {
-  showSuccess('Order placed successfully! Thank you for your purchase.');
+  showSuccess('', null, 'Order placed', 'Thank you for your purchase.');
 };
-
