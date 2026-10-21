@@ -920,7 +920,7 @@ const DashboardManage = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
-        <div className="pg-head"><div><h1>Manage</h1><p>The lists behind every dropdown. Countries, states, cities and zones are admin only; product lists also open to product managers.</p></div></div>
+        <div className="pg-head"><div><h1>Manage</h1><p>The lists behind every dropdown: countries, states, cities and zones.</p></div></div>
         <div className="dash-row">
           <div className="order-tabs-container col-span-full flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm [scrollbar-color:var(--color-grey-300)_transparent] [scrollbar-width:thin]">
             {tabs.map(tab => (
