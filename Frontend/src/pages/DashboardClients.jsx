@@ -358,15 +358,23 @@ const DashboardClients = () => {
   }, [selectedCountryFilter, defaultCountryResolved, fetchPartiesForCountry]);
 
   const columns = useMemo(() => ([
-    { key: 'party_name', label: 'PARTY NAME' },
-    { key: 'trade_name', label: 'TRADE NAME' },
-    { key: 'contact_person', label: 'CONTACT PERSON' },
-    { key: 'phone', label: 'PHONE' },
     {
-      key: 'status', label: 'STATUS', render: (_v, row) => (
-        <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>{row.isActive ? 'Active' : 'Inactive'}</StatusBadge>
+      key: 'party_name', label: 'PARTY', render: (v, row) => (
+        <span className="party-who">
+          <span className="party-who__pic" aria-hidden="true">{String(v || '?').trim().charAt(0).toUpperCase()}</span>
+          <span className="party-who__name">{v}</span>
+          {!row.isActive && <span className="party-who__off">Inactive</span>}
+        </span>
       )
     },
+    { key: 'cityLabel', label: 'CITY' },
+    { key: 'salesmanLabel', label: 'SALESMAN' },
+    {
+      key: 'locationLabel', label: 'LOCATION', render: (v, row) => (
+        <span className={`loc-pill loc-pill--${row.locationState}`}>{v}</span>
+      )
+    },
+    { key: 'creditLabel', label: 'CREDIT', render: (v) => <span className="party-credit">{v}</span> },
     {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
@@ -425,6 +433,13 @@ const DashboardClients = () => {
         ...party,
         id: partyId, // Ensure ID is preserved with consistent field name
         isActive: party.is_active !== false,
+        cityLabel: (typeof party.city === 'string' ? party.city : party.city?.name) || party.city_name || '—',
+        salesmanLabel: party.salesman?.full_name || party.salesman?.salesman_name || party.salesman_name || '—',
+        locationState: party.location_source === 'verified' ? 'ok'
+          : (Number.isFinite(Number(party.latitude)) && party.latitude !== null && Number.isFinite(Number(party.longitude)) && party.longitude !== null ? 'warn' : 'idle'),
+        locationLabel: party.location_source === 'verified' ? 'Verified at shop'
+          : (Number.isFinite(Number(party.latitude)) && party.latitude !== null && Number.isFinite(Number(party.longitude)) && party.longitude !== null ? 'Address only' : 'Not set'),
+        creditLabel: `${Number(party.credit_days) || 0} days`,
       };
     });
   }, [parties, selectedCountryFilter, isSalesman, isDistributor]);
@@ -1229,6 +1244,7 @@ const DashboardClients = () => {
 
   const renderPartyFormFields = () => (
     <>
+      <div className="form-group form-group--full party-form__section"><h5>Party details</h5></div>
       <div className="form-group">
         <label className="ui-label">Party Name *</label>
         <input
@@ -1282,6 +1298,16 @@ const DashboardClients = () => {
           }}
         />
       </div>
+      <div className="form-group">
+        <label className="ui-label">Preferred Courier *</label>
+        <input
+          className="ui-input"
+          placeholder="Preferred Courier"
+          value={formData.prefered_courier}
+          onChange={(e) => handleInputChange('prefered_courier', e.target.value)}
+        />
+      </div>
+      <div className="form-group form-group--full party-form__section"><h5>Address</h5></div>
       <div className="form-group">
         <label className="ui-label">Address *</label>
         <input
@@ -1399,9 +1425,11 @@ const DashboardClients = () => {
           onChange={(e) => handleInputChange('pincode', e.target.value)}
         />
       </div>
+      <div className="form-group form-group--full party-form__section"><h5>GST, PAN and credit</h5></div>
       <div className="form-group">
         <label className="ui-label">GSTIN</label>
         <input
+          disabled={!!editRow && !isPartyManager}
           className="ui-input"
           placeholder="GSTIN"
           value={formData.gstin}
@@ -1411,6 +1439,7 @@ const DashboardClients = () => {
       <div className="form-group">
         <label className="ui-label">PAN</label>
         <input
+          disabled={!!editRow && !isPartyManager}
           className="ui-input"
           placeholder="PAN"
           value={formData.pan}
@@ -1420,6 +1449,7 @@ const DashboardClients = () => {
       <div className="form-group">
         <label className="ui-label">Credit Days</label>
         <input
+          disabled={!!editRow && !isPartyManager}
           className="ui-input"
           type="number"
           placeholder="Credit Days"
@@ -1428,15 +1458,11 @@ const DashboardClients = () => {
           min="0"
         />
       </div>
-      <div className="form-group">
-        <label className="ui-label">Preferred Courier *</label>
-        <input
-          className="ui-input"
-          placeholder="Preferred Courier"
-          value={formData.prefered_courier}
-          onChange={(e) => handleInputChange('prefered_courier', e.target.value)}
-        />
-      </div>
+      {!isPartyManager && (
+        <div className="form-group form-group--full">
+          <p className="ord-view__lock party-form__lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Login status, credit days, GSTIN and PAN can be changed by admin, party and sales managers only.</span></p>
+        </div>
+      )}
       {editRow && isAdmin && (
         <div className="form-group form-group--full">
           <label className="flex cursor-pointer items-center gap-2">
@@ -1463,8 +1489,11 @@ const DashboardClients = () => {
         const canRemoveLocation = !!editRow && hasLocationSet
           && (isAdmin || userRole === 'party_manager' || userRole === 'sales_manager');
         return (
-          <div className="form-group form-group--full rounded-xl border border-border bg-surface p-4">
-            <label className="ui-label">Party Location (visit geofence)</label>
+          <div className="form-group form-group--full party-loc">
+            <label className="ui-label">Shop location (visit geofence)</label>
+            <div className="party-loc__chip">
+              <span className={`loc-pill loc-pill--${isVerified ? 'ok' : hasLocationSet ? 'warn' : 'idle'}`}>{isVerified ? 'Verified at shop' : hasLocationSet ? 'Address only' : 'Not set'}</span>
+            </div>
             <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
               {isVerified
                 ? `Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. The strict 50m geofence is active for visit orders and check-ins.${canRemoveLocation ? ' If it is wrong, press “Remove location” and capture it again.' : ' If it is wrong, ask a manager to remove it.'}`
@@ -1515,6 +1544,7 @@ const DashboardClients = () => {
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}
+                <b className="order-tab__count">{tab === 'All' ? rows.length : tab === 'Activate' ? rows.filter(r => r.isActive).length : rows.filter(r => !r.isActive).length}</b>
               </button>
             ))}
           </div>
