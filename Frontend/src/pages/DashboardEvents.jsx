@@ -45,7 +45,8 @@ const DashboardEvents = () => {
     end_date: new Date().toISOString().split('T')[0],
     event_location: ''
   });
-  const [error, setError] = useState(null);
+  const [error, setError] = useState(null);       // the list could not load
+  const [formError, setFormError] = useState(null); // a problem in the open form
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -76,28 +77,28 @@ const DashboardEvents = () => {
 
   const handleSubmitNew = async () => {
     if (!form.event_name.trim()) {
-      setError('Event name is required');
+      setFormError('Event name is required');
       return;
     }
     if (!form.start_date) {
-      setError('Start date is required');
+      setFormError('Start date is required');
       return;
     }
     if (!form.end_date) {
-      setError('End date is required');
+      setFormError('End date is required');
       return;
     }
     if (!form.event_location.trim()) {
-      setError('Event location is required');
+      setFormError('Event location is required');
       return;
     }
     if (new Date(form.start_date) > new Date(form.end_date)) {
-      setError('End date must be after start date');
+      setFormError('End date must be after start date');
       return;
     }
     
     setSaving(true);
-    setError(null);
+    setFormError(null);
     try {
       const eventData = {
         event_name: form.event_name.trim(),
@@ -112,7 +113,7 @@ const DashboardEvents = () => {
       resetForm();
     } catch (err) {
       const message = err.message || 'Failed to create event';
-      setError(message);
+      setFormError(message);
       showError(message);
     } finally {
       setSaving(false);
@@ -120,6 +121,7 @@ const DashboardEvents = () => {
   };
 
   const openEdit = (row) => {
+    setFormError(null);
     setEditRow(row);
     const startDate = row.start_date ? new Date(row.start_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
     const endDate = row.end_date ? new Date(row.end_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
@@ -135,28 +137,28 @@ const DashboardEvents = () => {
     const eventId = editRow?.event_id || editRow?.id;
     if (!eventId) return;
     if (!form.event_name.trim()) {
-      setError('Event name is required');
+      setFormError('Event name is required');
       return;
     }
     if (!form.start_date) {
-      setError('Start date is required');
+      setFormError('Start date is required');
       return;
     }
     if (!form.end_date) {
-      setError('End date is required');
+      setFormError('End date is required');
       return;
     }
     if (!form.event_location.trim()) {
-      setError('Event location is required');
+      setFormError('Event location is required');
       return;
     }
     if (new Date(form.start_date) > new Date(form.end_date)) {
-      setError('End date must be after start date');
+      setFormError('End date must be after start date');
       return;
     }
     
     setSaving(true);
-    setError(null);
+    setFormError(null);
     try {
       const eventData = {
         event_name: form.event_name.trim(),
@@ -171,7 +173,7 @@ const DashboardEvents = () => {
       resetForm();
     } catch (err) {
       const message = err.message || 'Failed to update event';
-      setError(message);
+      setFormError(message);
       showError(message);
     } finally {
       setSaving(false);
@@ -184,14 +186,12 @@ const DashboardEvents = () => {
     const confirmed = await confirm(`Delete event "${row.event_name}"?`);
     if (!confirmed) return;
     setSaving(true);
-    setError(null);
     try {
       await deleteEvent(eventId);
       showSuccess('Event deleted successfully');
       await fetchEvents();
     } catch (err) {
       const message = err.message || 'Failed to delete event';
-      setError(message);
       showError(message);
     } finally {
       setSaving(false);
@@ -315,17 +315,18 @@ const DashboardEvents = () => {
         onClose={() => {
           setOpenAdd(false);
           resetForm();
-          setError(null);
+          setFormError(null);
         }}
         title="Add New Event"
         footer={(
           <>
-            <button className="ui-btn ui-btn--secondary" onClick={() => { resetForm(); setOpenAdd(false); setError(null); }}>Cancel</button>
+            <button className="ui-btn ui-btn--secondary" onClick={() => { resetForm(); setOpenAdd(false); setFormError(null); }}>Cancel</button>
             <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleSubmitNew}>Save</button>
           </>
         )}
       >
         <div className="ui-form grid grid-cols-1 gap-4 min-[560px]:grid-cols-2">
+          {formError && <p className="ui-field-error col-span-full" role="alert">{formError}</p>}
           <div className="form-group flex flex-col gap-2">
             <label className="ui-label text-sm font-medium text-text">Event Name <span className="text-[red]">*</span></label>
             <input
@@ -371,17 +372,18 @@ const DashboardEvents = () => {
         onClose={() => {
           setEditRow(null);
           resetForm();
-          setError(null);
+          setFormError(null);
         }}
         title="Edit Event"
         footer={(
           <>
-            <button className="ui-btn ui-btn--secondary" onClick={() => { setEditRow(null); resetForm(); setError(null); }}>Cancel</button>
+            <button className="ui-btn ui-btn--secondary" onClick={() => { setEditRow(null); resetForm(); setFormError(null); }}>Cancel</button>
             <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleUpdate}>Update</button>
           </>
         )}
       >
         <div className="ui-form grid grid-cols-1 gap-4 min-[560px]:grid-cols-2">
+          {formError && <p className="ui-field-error col-span-full" role="alert">{formError}</p>}
           <div className="form-group flex flex-col gap-2">
             <label className="ui-label text-sm font-medium text-text">Event Name <span className="text-[red]">*</span></label>
             <input

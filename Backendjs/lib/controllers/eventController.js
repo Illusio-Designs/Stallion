@@ -2,6 +2,18 @@ const { logAudit } = require('../utils/auditLogger');
 const Event = require('../models/event');
 const { EventStatus } = require('../constants/enums');
 const { UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
+// past = already ended, ongoing = started and not ended, upcoming = not started.
+// An end date picked without a time (midnight) lasts through that whole day.
+function computeEventStatus(start, end, now = new Date()) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const midnight = endDate.getHours() === 0 && endDate.getMinutes() === 0 && endDate.getSeconds() === 0;
+    const endsAt = midnight ? endDate.getTime() + 24 * 60 * 60 * 1000 - 1 : endDate.getTime();
+    if (now.getTime() > endsAt) return EventStatus.PAST;
+    if (now >= startDate) return EventStatus.ONGOING;
+    return EventStatus.UPCOMING;
+}
+
 class EventController {
     async getEvents(req, res) {
         try {
@@ -9,16 +21,7 @@ class EventController {
             // UPDATE per event on every request), then return a bounded list.
             const events = await Event.findAll({ order: [['end_date', 'DESC']], limit: UNPAGINATED_CAP });
             for (const event of events) {
-                let eventStatus;
-                const startDate = new Date(event.start_date);
-                const endDate = new Date(event.end_date);
-                if (startDate < new Date()) {
-                    eventStatus = EventStatus.PAST;
-                } else if (startDate > new Date() && endDate < new Date()) {
-                    eventStatus = EventStatus.ONGOING;
-                } else {
-                    eventStatus = EventStatus.UPCOMING;
-                }
+                const eventStatus = computeEventStatus(event.start_date, event.end_date);
                 if (event.event_status !== eventStatus) {
                     event.event_status = eventStatus;
                     await event.save();
@@ -42,14 +45,7 @@ class EventController {
             if (startDate > endDate) {
                 return res.status(400).json({ error: 'Start date must be before end date' });
             }
-            let eventStatus;
-            if (startDate < new Date()) {
-                eventStatus = EventStatus.PAST;
-            } else if ((startDate > new Date() && endDate < new Date()) || startDate == new Date()) {
-                eventStatus = EventStatus.ONGOING;
-            } else {
-                eventStatus = EventStatus.UPCOMING;
-            }
+            const eventStatus = computeEventStatus(startDate, endDate);
 
             const event = await Event.create({
                 event_name,
@@ -84,49 +80,12 @@ class EventController {
                 return res.status(404).json({ error: 'Event not found' });
             }
             const { event_name, start_date, end_date, event_location } = req.body;
-            let eventStatus;
-            if (start_date && end_date) {
-                const startDate = new Date(start_date);
-                const endDate = new Date(end_date);
-                if (startDate > endDate) {
-                    return res.status(400).json({ error: 'Start date must be before end date' });
-                }
-                if (startDate < new Date()) {
-                    eventStatus = EventStatus.PAST;
-                } else if ((startDate > new Date() && endDate < new Date()) || startDate == new Date()) {
-                    eventStatus = EventStatus.ONGOING;
-                } else {
-                    eventStatus = EventStatus.UPCOMING;
-                }
+            const nextStart = start_date ? new Date(start_date) : new Date(event.start_date);
+            const nextEnd = end_date ? new Date(end_date) : new Date(event.end_date);
+            if (nextStart > nextEnd) {
+                return res.status(400).json({ error: 'Start date must be before end date' });
             }
-            if (start_date && start_date != event.start_date) {
-                const startDate = new Date(start_date);
-                const endDate = new Date(event.end_date);
-                if (startDate > endDate) {
-                    return res.status(400).json({ error: 'Start date must be before end date' });
-                }
-                if (startDate < new Date()) {
-                    eventStatus = EventStatus.PAST;
-                } else if ((startDate > new Date() && endDate < new Date()) || startDate == new Date()) {
-                    eventStatus = EventStatus.ONGOING;
-                } else {
-                    eventStatus = EventStatus.UPCOMING;
-                }
-            }
-            if (end_date && end_date != event.end_date) {
-                const startDate = new Date(event.start_date);
-                const endDate = new Date(end_date);
-                if (startDate > endDate) {
-                    return res.status(400).json({ error: 'Start date must be before end date' });
-                }
-                if (endDate < new Date()) {
-                    eventStatus = EventStatus.PAST;
-                } else if ((startDate > new Date() && endDate < new Date()) || startDate == new Date()) {
-                    eventStatus = EventStatus.ONGOING;
-                } else {
-                    eventStatus = EventStatus.UPCOMING;
-                }
-            }
+            const eventStatus = computeEventStatus(nextStart, nextEnd);
             const oldSnapshot = event.toJSON();
             const payload = {
                 event_name: event_name || event.event_name,
