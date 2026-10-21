@@ -1165,10 +1165,7 @@ const DashboardOrders = () => {
                   </svg>
                 </div>
                 <p className="ui-state__title">No orders yet</p>
-                <p className="ui-state__desc">Orders you create will show up here. Get started by creating your first order.</p>
-                <div className="ui-state__actions">
-                  <button className="ui-btn ui-btn--primary" onClick={() => setCreateModalOpen(true)}>Create Order</button>
-                </div>
+                <p className="ui-state__desc">Orders placed from the shop will show up here.</p>
               </div>
             ) : (
               <TableWithControls
