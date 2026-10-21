@@ -467,6 +467,7 @@ const DashboardExpenses = () => {
   return (
     <div className="dash-page">
       <div className="dash-container exp-page">
+        <div className="pg-head"><div><h1>Expenses</h1><p>Salesmen submit claims with bills. Admin and expense managers review them.</p></div></div>
         {/* Summary Cards */}
         <div className="dash-row expenses-summary grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="dash-card p-5 lg:p-6">

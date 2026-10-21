@@ -2460,6 +2460,7 @@ const DashboardProducts = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
+        <div className="pg-head"><div><h1>Products</h1><p>Admin and product managers can change products. Everyone can browse them.</p></div></div>
         {error && (
           <div className="dash-row">
             <div className="dash-card full">

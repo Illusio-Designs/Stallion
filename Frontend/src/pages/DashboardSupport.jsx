@@ -28,6 +28,7 @@ const DashboardSupport = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
+        <div className="pg-head"><div><h1>Support</h1><p>Send a question to the Stallion team.</p></div></div>
         <div className="dash-row">
           <div className="dash-card full support p-5 min-[481px]:p-6">
             <div className="support-header flex items-end justify-between gap-4 mb-5 min-[481px]:mb-6">

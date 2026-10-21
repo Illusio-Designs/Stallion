@@ -1071,6 +1071,7 @@ const DashboardOrders = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
+        <div className="pg-head"><div><h1>Orders</h1><p>Stock is taken when an order is placed and returned when it is cancelled.</p></div></div>
         {/* Summary Cards */}
         <div className="dash-row orders-summary mb-5">
           <div className="dash-card metric orders-card p-5">

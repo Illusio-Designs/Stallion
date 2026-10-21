@@ -374,6 +374,7 @@ const AnalyticsReports = () => {
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
+        <div className="pg-head"><div><h1>Reports</h1><p>Sales and orders for the period you pick. Cancelled orders count toward salesman targets.</p></div></div>
 
         {/* Tab navigation */}
         <div className="dash-row">
