@@ -1417,29 +1417,37 @@ const Cart = ({ onPageChange = null }) => {
               {isSalesman && (
                 <div className="form-group flex flex-col gap-2">
                   <label htmlFor="order-type" className="form-label text-[length:var(--text-sm)] font-medium text-text">Order Type</label>
-                  <DropdownSelector
-                    className="ui-dropdown-custom--full-width"
-                    placeholder="Select Order Type"
-                    options={[
-                      { value: '', label: 'Select Order Type' },
-                      { value: 'visit_order', label: 'Visit Order' },
-                      { value: 'whatsapp_order', label: 'WhatsApp Order' },
-                      { value: 'event_order', label: 'Event Order' },
-                    ]}
-                    value={orderType}
-                    onChange={(newOrderType) => {
-                      setOrderType(newOrderType);
-                      // Reset party and event when order type changes
-                      setSelectedParty("");
-                      setSelectedEvent("");
-                      // Reset country (not needed for salesman, but clean up state)
-                      setSelectedCountry("");
-                      // Clear events if switching away from event_order
-                      if (newOrderType !== 'event_order') {
-                        setEvents([]);
-                      }
-                    }}
-                  />
+                  <div className="cart-radio-group" role="radiogroup" aria-label="Order type">
+                    {[
+                      { value: 'visit_order', label: 'Visit order, at the shop' },
+                      { value: 'whatsapp_order', label: 'WhatsApp order' },
+                      { value: 'event_order', label: 'Event order' },
+                    ].map((opt) => (
+                      <label key={opt.value} className={`cart-radio${orderType === opt.value ? ' is-on' : ''}`}>
+                        <input
+                          type="radio"
+                          name="order-type"
+                          value={opt.value}
+                          checked={orderType === opt.value}
+                          onChange={() => {
+                            const newOrderType = opt.value;
+                            setOrderType(newOrderType);
+                            // Reset party and event when order type changes
+                            setSelectedParty("");
+                            setSelectedEvent("");
+                            // Reset country (not needed for salesman, but clean up state)
+                            setSelectedCountry("");
+                            // Clear events if switching away from event_order
+                            if (newOrderType !== 'event_order') {
+                              setEvents([]);
+                            }
+                          }}
+                        />
+                        <span className="cart-radio-dot" aria-hidden="true"></span>
+                        {opt.label}
+                      </label>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -1518,8 +1526,9 @@ const Cart = ({ onPageChange = null }) => {
                   {isSalesman && orderType === 'visit_order' && selectedParty && (() => {
                     const sp = parties.find(p => (p.id || p.party_id) === selectedParty);
                     const verified = sp && sp.location_source === 'verified';
+                    const farAway = verified && ((visitDistance && visitDistance.error) || (visitDistance && visitDistance.meters != null && visitDistance.meters > GEOFENCE_RADIUS_M));
                     return (
-                      <div className="flex flex-col gap-1.5">
+                      <div className={`flex flex-col gap-1.5 cart-notice ${(!verified || farAway) ? 'cart-notice--bad' : ''}`}>
                         <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
                           {verified
                             ? `Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 50m geofence active.`
@@ -1637,12 +1646,12 @@ const Cart = ({ onPageChange = null }) => {
             </div>
 
             {outOfStockItems.length > 0 && !isOfficeOnly && (
-              <p className="mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-error" role="alert">
+              <p className="cart-notice cart-notice--bad mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-error" role="alert">
                 Remove the out-of-stock {outOfStockItems.length === 1 ? 'item' : 'items'} from your cart to continue.
               </p>
             )}
             {isOfficeOnly && (
-              <p className="mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-text-muted" role="note">
+              <p className="cart-notice mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-text-muted" role="note">
                 Your account type cannot place orders from the cart. To create an order, go to{' '}
                 <a href="/dashboard/orders" className="font-semibold text-primary underline">Dashboard &gt; Orders</a>.
               </p>

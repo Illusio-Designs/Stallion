@@ -17,13 +17,12 @@
 :root .ord-muted { color: #595959; }
 :root .ord-amount { font-weight: 600; color: #0a0a0a; font-variant-numeric: tabular-nums; }
 :root .dash-card .ui-table tbody td:has(.ord-amount) { text-align: right; }
-:root .dash-card .ui-table thead th:nth-last-child(2):not(:first-child) { }
+:root .dash-card .ui-table:has(.ord-amount) thead th:nth-last-child(2),
+:root .dash-card .ui-table:has(.party-credit) thead th:nth-last-child(2) { text-align: right; }
 
 /* Order details panel */
 :root .ord-view__lock { display: flex; align-items: flex-start; gap: 10px; }
 :root .ord-view__lock svg { flex: none; margin-top: 2px; }
-:root .ord-field { padding: 10px 0; border-top: 1px solid #e1e1e1; }
-:root .ord-view__summary { gap: 0 16px; }
 
 /* Party table: avatar + name */
 :root .party-who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; color: #0a0a0a; }
@@ -63,4 +62,10 @@
 
 @media (max-width: 640px) {
   :root .order-tabs-container { flex-wrap: nowrap; overflow-x: auto; }
+}
+
+/* Party country filter: plain label above the field (React renders the inline style without a space) */
+:root .dash-row > .dash-card.full[style*="max-width:360px"],
+:root .dash-row > .dash-card.full[style*="max-width: 360px"] {
+  border: 0; box-shadow: none; background: transparent; padding: 0;
 }

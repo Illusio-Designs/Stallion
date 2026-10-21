@@ -51,7 +51,23 @@ const DashboardEvents = () => {
   const [error, setError] = useState(null);
 
   const columns = useMemo(() => ([
-    { key: 'event_name', label: 'EVENT NAME' },
+    {
+      key: 'event_name',
+      label: 'EVENT NAME',
+      render: (_v, row) => {
+        const d = row.start_date ? new Date(row.start_date) : null;
+        const ok = d && !isNaN(d);
+        return (
+          <div className="ev-name">
+            <span className="ev-date" aria-hidden="true">
+              <b>{ok ? String(d.getDate()).padStart(2, '0') : '--'}</b>
+              <span>{ok ? d.toLocaleDateString('en-IN', { month: 'short' }) : ''}</span>
+            </span>
+            <span>{row.event_name}</span>
+          </div>
+        );
+      }
+    },
     { 
       key: 'start_date', 
       label: 'START DATE',
@@ -98,7 +114,7 @@ const DashboardEvents = () => {
       label: 'STATUS',
       render: (_v, row) => {
         const status = row.event_status || EventStatus.ACTIVE;
-        return <StatusBadge status={status.toLowerCase()}>{getStatusLabel(status)}</StatusBadge>;
+        return <StatusBadge status={status.toLowerCase() === 'active' ? 'completed' : status.toLowerCase()}>{getStatusLabel(status)}</StatusBadge>;
       }
     },
     {

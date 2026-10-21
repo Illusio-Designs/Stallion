@@ -1,1 +1,21 @@
 /* Redesign area d: own rules for this area only (unlayered, outranks Tailwind utilities). */
+
+/* ===== Salesmen: name with initials avatar, target progress ===== */
+.sm-who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; color: #0a0a0a; white-space: nowrap; }
+.sm-pic {
+  width: 32px; height: 32px; border-radius: 50%; flex: none;
+  display: inline-grid; place-items: center;
+  background: #f4f4f4; border: 1px solid #e1e1e1; color: #0a0a0a;
+  font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
+}
+.prog { display: block; height: 8px; border-radius: 99px; background: #e1e1e1; overflow: hidden; min-width: 90px; }
+.prog > i { display: block; height: 100%; border-radius: 99px; background: #0a0a0a; }
+.sm-prog { display: inline-flex; align-items: center; gap: 10px; min-width: 130px; }
+.sm-prog .prog { flex: 1; }
+.sm-prog__n { font-size: 12.5px; font-weight: 600; color: #595959; min-width: 34px; text-align: right; }
+.sm-target-cards { width: 100%; }
+.sm-target-cards .dash-card.metric:first-child { background: #ffffff; border-color: #e1e1e1; }
+.sm-target-cards .dash-card.metric:first-child h4 { color: #595959; }
+.sm-target-cards .dash-card.metric:first-child .metric-value { color: #0a0a0a; }
+.sm-target-cards .dash-card.metric:first-child .metric-sub { color: #595959; }
+.sm-target-cards .metric-sub .prog { margin-top: 6px; }

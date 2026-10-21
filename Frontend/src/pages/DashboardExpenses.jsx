@@ -3,6 +3,7 @@ import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
+import Tabs from '../components/ui/Tabs';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
@@ -362,15 +363,17 @@ const DashboardExpenses = () => {
       { key: 'date', label: 'DATE' },
       ...(shouldShowAdminFeatures ? [{ key: 'salesman', label: 'SALESMAN' }] : []),
       { key: 'type', label: 'TYPE' },
-      { key: 'description', label: 'DESCRIPTION' },
-      { key: 'amount', label: 'AMOUNT' },
-      { key: 'kilometers', label: 'KILOMETERS' },
+      { key: 'kilometers', label: 'KM' },
       { 
         key: 'status', 
         label: 'STATUS', 
-        render: (v) => <StatusBadge status={String(v).toLowerCase()}>{v.toUpperCase()}</StatusBadge> 
+        render: (v) => {
+          const k = String(v).toLowerCase();
+          const label = k.charAt(0).toUpperCase() + k.slice(1);
+          return <StatusBadge status={k === 'approved' ? 'completed' : k}>{label}</StatusBadge>;
+        }
       },
-      { key: 'remarks', label: 'REMARKS' },
+      { key: 'amount', label: 'AMOUNT', render: (v) => <b className="exp-amount">{v}</b> },
       { 
         key: 'action', 
         label: 'ACTION', 
@@ -463,7 +466,7 @@ const DashboardExpenses = () => {
 
   return (
     <div className="dash-page">
-      <div className="dash-container">
+      <div className="dash-container exp-page">
         {/* Summary Cards */}
         <div className="dash-row expenses-summary grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="dash-card p-5 lg:p-6">
@@ -491,13 +494,24 @@ const DashboardExpenses = () => {
           </div>
         </div>
 
+        {/* Status filter chips */}
+        <Tabs
+          className="exp-chips mb-4"
+          active={activeTab}
+          onChange={setActiveTab}
+          tabs={['All', 'Pending', 'Approved', 'Rejected'].map((t) => ({
+            value: t,
+            label: `${t} ${t === 'All' ? rows.length : rows.filter((r) => r.status.toLowerCase() === t.toLowerCase()).length}`,
+          }))}
+        />
+
         {/* Expenses Table */}
         <div className="dash-card">
           <div className="card-header flex flex-col items-stretch md:flex-row md:items-center md:justify-between gap-4 p-6 border-b border-border">
             <h3 className="m-0 text-center md:text-left text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{shouldShowAdminFeatures ? 'All Salesman Expenses' : 'My Expenses'}</h3>
             {shouldShowSalesmanFeatures && (
               <Button onClick={() => setCreateModalOpen(true)}>
-                + Add Expense
+                New expense
               </Button>
             )}
           </div>
@@ -533,7 +547,7 @@ const DashboardExpenses = () => {
               </p>
               {shouldShowSalesmanFeatures && (
                 <button className="ui-btn ui-btn--primary" onClick={() => setCreateModalOpen(true)}>
-                  + Add Expense
+                  New expense
                 </button>
               )}
             </div>
@@ -544,7 +558,7 @@ const DashboardExpenses = () => {
               loading={loading}
               activeTab={activeTab}
               onTabChange={setActiveTab}
-              tabs={['All', 'Pending', 'Approved']}
+              tabs={['All', 'Pending', 'Approved', 'Rejected']}
               searchPlaceholder="Search expenses..."
             />
           )}
@@ -558,7 +572,7 @@ const DashboardExpenses = () => {
           setCreateModalOpen(false);
           resetCreateForm();
         }}
-        title="Add New Expense"
+        title="New expense"
       >
         <div className="modal-form flex flex-col gap-4">
           <div className="form-group flex flex-col gap-2">

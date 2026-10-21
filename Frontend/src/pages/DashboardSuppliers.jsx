@@ -733,7 +733,7 @@ const DashboardSuppliers = () => {
         getParties().then(data => setAllPartiesLookup(Array.isArray(data) ? data : [])).catch(() => { });
       }
     }
-    if (mainTab === 'Targets') fetchTargets();
+    if (mainTab === 'Targets' || (mainTab === 'Salesmen' && !isSalesman)) fetchTargets();
   }, [mainTab]);
 
   // For salesman: load zone parties on mount
@@ -776,9 +776,43 @@ const DashboardSuppliers = () => {
     return map;
   }, [salesmen]);
 
+  // Display only: achieved / target per salesman from the targets list (admin loads it with the list).
+  const salesmanTargetPct = useMemo(() => {
+    const sums = {};
+    (targets || []).forEach(t => {
+      const id = t.salesman_id;
+      if (!id) return;
+      sums[id] = sums[id] || { done: 0, goal: 0 };
+      sums[id].done += Number(t.completed_amount) || 0;
+      sums[id].goal += Number(t.target_amount) || 0;
+    });
+    const out = {};
+    Object.keys(sums).forEach(id => {
+      if (sums[id].goal > 0) out[id] = Math.round((sums[id].done / sums[id].goal) * 100);
+    });
+    return out;
+  }, [targets]);
+
   const columns = useMemo(() => ([
-    { key: 'employee_code', label: 'EMPLOYEE CODE' },
-    { key: 'full_name', label: 'NAME' },
+    {
+      key: 'full_name', label: 'NAME', render: (v) => (
+        <span className="sm-who">
+          <span className="sm-pic" aria-hidden="true">
+            {String(v || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+          </span>
+          {v}
+        </span>
+      )
+    },
+    { key: 'employee_code', label: 'CODE' },
+    {
+      key: 'zones', label: 'ZONES', render: (_v, row) => {
+        const names = (Array.isArray(row.zones) ? row.zones : [])
+          .map(z => (z && typeof z === 'object') ? (z.zone_name || z.name || '') : '')
+          .filter(Boolean);
+        return names.length ? names.join(', ') : '-';
+      }
+    },
     { key: 'phone', label: 'PHONE' },
     { key: 'email', label: 'EMAIL' },
     {
@@ -796,6 +830,18 @@ const DashboardSuppliers = () => {
       )
     },
     {
+      key: 'target', label: 'TARGET', render: (_v, row) => {
+        const pct = salesmanTargetPct[row.id || row.salesman_id];
+        if (pct == null) return <span className="text-text-subtle">-</span>;
+        return (
+          <span className="sm-prog" title={`${pct}% of target`}>
+            <span className="prog" role="img" aria-label={`${pct} percent of target`}><i style={{ width: `${Math.min(100, pct)}%` }} /></span>
+            <span className="sm-prog__n">{pct}%</span>
+          </span>
+        );
+      }
+    },
+    {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
           onEdit={() => handleEdit(row)}
@@ -803,7 +849,7 @@ const DashboardSuppliers = () => {
         />
       )
     },
-  ]), []);
+  ]), [salesmanTargetPct]);
 
   const rows = useMemo(() => {
     let filteredSalesmen = [];
@@ -1699,6 +1745,21 @@ const DashboardSuppliers = () => {
         )}
 
         {/* Targets Table - admin only */}
+        {!isSalesman && mainTab === 'Targets' && targets.length > 0 && (() => {
+          const goal = targets.reduce((n, t) => n + (Number(t.target_amount) || 0), 0);
+          const done = targets.reduce((n, t) => n + (Number(t.completed_amount) || 0), 0);
+          const pct = goal > 0 ? Math.round((done / goal) * 100) : 0;
+          const inr = (n) => `₹${Math.round(n).toLocaleString('en-IN')}`;
+          return (
+            <div className="dash-row">
+              <div className="dash-kpis sm-target-cards">
+                <div className="dash-card metric"><h4>Achieved</h4><div className="metric-value">{inr(done)}</div><div className="metric-sub">of {inr(goal)} target</div></div>
+                <div className="dash-card metric"><h4>Due</h4><div className="metric-value">{inr(Math.max(0, goal - done))}</div><div className="metric-sub">still to reach</div></div>
+                <div className="dash-card metric"><h4>Percent</h4><div className="metric-value">{pct}%</div><div className="metric-sub"><span className="prog" role="img" aria-label={`${pct} percent`}><i style={{ width: `${Math.min(100, pct)}%` }} /></span></div></div>
+              </div>
+            </div>
+          );
+        })()}
         {!isSalesman && mainTab === 'Targets' && (
           <div className="dash-row">
             <div className="dash-card full">
