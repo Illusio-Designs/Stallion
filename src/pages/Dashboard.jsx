@@ -1,4 +1,5 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Skeleton from '../components/ui/Skeleton';
 import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
@@ -10,7 +11,26 @@ import { getAllAdminExpenses } from '../services/expenseService';
 import { getUserRole, getUserRoles, getUser } from '../services/authService';
 import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiDollarSign, FiPackage, FiInbox, FiNavigation2 } from 'react-icons/fi';
 
+// A link that switches pages inside the app instead of reloading the whole page.
+const AppLink = ({ href, children, ...rest }) => {
+  const router = useRouter();
+  return (
+    <a
+      href={href}
+      {...rest}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return; // let "open in new tab" work
+        e.preventDefault();
+        router.push(href);
+      }}
+    >
+      {children}
+    </a>
+  );
+};
+
 const Dashboard = () => {
+  const router = useRouter();
   const [range, setRange] = useState('30d'); // orders chart: today | 7d | 30d | year
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
@@ -507,7 +527,8 @@ const Dashboard = () => {
       ];
 
   // Only pages the role can really open.
-  const go = (path) => () => { window.location.href = path; };
+  // Switch pages inside the app (no full page reload).
+  const go = (path) => () => { router.push(path); };
 
   // "Needs attention": things only a person can decide. Office view only.
   const isOfficeView = !isSalesman && !isParty && !isDistributor;
@@ -610,7 +631,7 @@ const Dashboard = () => {
     <section className="rda-card" aria-label={title}>
       <div className="rda-card__head">
         <div><h3>{title}</h3>{sub && <p>{sub}</p>}</div>
-        <a href="/dashboard/orders" className="rda-link">{linkLabel}</a>
+        <AppLink href="/dashboard/orders" className="rda-link">{linkLabel}</AppLink>
       </div>
       <div className="rda-tw">
         <table className="rda-table">
@@ -750,7 +771,7 @@ const Dashboard = () => {
               <section className="rda-card" aria-label="Salesmen against target">
                 <div className="rda-card__head">
                   <div><h3>Salesmen against target</h3><p>By order value</p></div>
-                  <a href="/dashboard/salesmen" className="rda-link">All salesmen</a>
+                  <AppLink href="/dashboard/salesmen" className="rda-link">All salesmen</AppLink>
                 </div>
                 <div className="rda-tw">
                   <table className="rda-table">
@@ -786,7 +807,7 @@ const Dashboard = () => {
             <section className="rda-card" aria-label="My parties">
               <div className="rda-card__head">
                 <div><h3>My parties</h3><p>Open one to capture its shop location</p></div>
-                <a href="/dashboard/party" className="rda-link">All parties</a>
+                <AppLink href="/dashboard/party" className="rda-link">All parties</AppLink>
               </div>
               <div className="rda-tw">
                 <table className="rda-table">
@@ -801,7 +822,7 @@ const Dashboard = () => {
                           <td><b>{p.party_name || p.name}</b></td>
                           <td>{p.city?.name || p.city_name || (typeof p.city === 'string' ? p.city : '') || '-'}</td>
                           <td><span className={`rda-pill ${has ? 'ok' : 'idle'}`}>{has ? 'Saved' : 'Missing'}</span></td>
-                          <td className="r"><a href="/dashboard/party" className="rda-btn rda-btn--sm rda-btn--ghost">{has ? 'View' : 'Add'}</a></td>
+                          <td className="r"><AppLink href="/dashboard/party" className="rda-btn rda-btn--sm rda-btn--ghost">{has ? 'View' : 'Add'}</AppLink></td>
                         </tr>
                       );
                     })}
@@ -823,7 +844,7 @@ const Dashboard = () => {
             <section className="rda-card" aria-label="My parties">
               <div className="rda-card__head">
                 <div><h3>My parties</h3></div>
-                <a href="/dashboard/party" className="rda-link">All parties</a>
+                <AppLink href="/dashboard/party" className="rda-link">All parties</AppLink>
               </div>
               <div className="rda-tw">
                 <table className="rda-table">
