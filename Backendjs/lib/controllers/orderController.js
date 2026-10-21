@@ -182,6 +182,14 @@ function resolveOrderDateRangeFilter(req) {
 }
 
 
+// An error we expect and can explain to the user in plain words.
+class OrderError extends Error {
+    constructor(message, status = 400) {
+        super(message);
+        this.status = status;
+    }
+}
+
 class OrderController {
 
     async getMyOrders(req, res) {
@@ -561,6 +569,14 @@ class OrderController {
             const orderOperationsToCreate = [];
 
             await sequelize.transaction(async (transaction) => {
+                // Lock all products in one fixed order so two carts cannot block each other.
+                await Product.findAll({
+                    where: { product_id: order_items.map((it) => it.product_id) },
+                    order: [['product_id', 'ASC']],
+                    attributes: ['product_id'],
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
+                });
                 for (let i = 0; i < order_items.length; i++) {
                     const item = order_items[i];
                     const product = await Product.findOne({
@@ -569,15 +585,15 @@ class OrderController {
                         lock: transaction.LOCK.UPDATE,
                     });
                     if (!product) {
-                        throw new Error(`Product not found: ${item.product_id}`);
+                        throw new OrderError('One of the products in your cart is no longer available. Please remove it and try again.', 404);
                     }
                     if (product.total_qty < item.quantity) {
-                        throw new Error(`${product.model_no} Product quantity is not available in warehouse`);
+                        throw new OrderError(`Sorry, ${product.model_no} does not have enough stock for this quantity.`, 409);
                     }
 
                     const unitPrice = parseFloat(product.whp);
                     if (Number.isNaN(unitPrice) || unitPrice < 0) {
-                        throw new Error(`Invalid WHP for product ${product.model_no}`);
+                        throw new OrderError(`${product.model_no} has no price set yet, so it cannot be ordered.`, 400);
                     }
 
                     const warehouse_qty = product.warehouse_qty;
@@ -624,7 +640,7 @@ class OrderController {
                             }
                         }
                         if (remainingQty > 0) {
-                            throw new Error(`${product.model_no} insufficient tray stock`);
+                            throw new OrderError(`Sorry, ${product.model_no} does not have enough stock for this quantity.`, 409);
                         }
                         orderOperationData = {
                             warehouse_reduced_qty: warehouse_qty,
@@ -752,9 +768,17 @@ class OrderController {
             res.status(201).json(req._createdOrder);
         } catch (error) {
             console.error('Error creating order:', error);
-            const message = error.message || 'Failed to create order';
-            const status = message.includes('not found') ? 404 : message.includes('Cannot') || message.includes('another') ? 403 : 400;
-            res.status(status).json({ error: message });
+            if (error instanceof OrderError) {
+                return res.status(error.status).json({ error: error.message });
+            }
+            const code = error && (error.original?.code || error.parent?.code);
+            if (code === 'ER_LOCK_DEADLOCK' || code === 'ER_LOCK_WAIT_TIMEOUT') {
+                return res.status(409).json({ error: 'Many orders are being placed right now. Please try again in a moment.' });
+            }
+            if (error && error.name === 'SequelizeValidationError') {
+                return res.status(400).json({ error: 'Some order details are missing or not valid. Please check and try again.' });
+            }
+            res.status(500).json({ error: 'Something went wrong on our side. Your order was not placed. Please try again.' });
         }
     }
 
