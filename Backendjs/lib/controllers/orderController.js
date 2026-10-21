@@ -20,6 +20,7 @@ const sequelize = require('../constants/database');
 const { Op } = require('sequelize');
 const salesmanTargetsController = require('./salesmanTargetsController');
 const DistributorZones = require('../models/DistributorZones');
+const { resolveDistributorIdForParty } = require('../utils/distributorMatch');
 const { canManageOrders, normalizeRole } = require('../utils/roleHelpers');
 const { resolveUserScope, canViewAllOrders } = require('../utils/scopeHelpers');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
@@ -488,6 +489,14 @@ class OrderController {
                     return res.status(400).json({ error: 'Party is inactive' });
                 }
             }
+            // Every order that belongs to a party (visit, event, WhatsApp, party order) is
+            // given the distributor that works in the party's state, so the distributor
+            // sees all of its state's orders. Distributor's own orders keep their own id.
+            let matchedDistributorId = null;
+            if (isPartyRequired && party_id) {
+                const matchParty = await Party.findOne({ where: { party_id } });
+                matchedDistributorId = await resolveDistributorIdForParty(matchParty);
+            }
             if (isSalesmanRequired) {
                 // If salesman_id is not provided, find it from the user_id
                 if (!salesman_id) {
@@ -702,8 +711,10 @@ class OrderController {
                 if (isPartyRequired && party_id) {
                     orderData.party_id = party_id;
                 }
-                if (isDistributorRequired && distributor_id) {
-                    orderData.distributor_id = distributor_id;
+                const finalDistributorId = matchedDistributorId
+                    || ((isDistributorRequired || zone_id) ? distributor_id : null);
+                if (finalDistributorId) {
+                    orderData.distributor_id = finalDistributorId;
                 }
                 if (isSalesmanRequired && salesman_id) {
                     orderData.salesman_id = salesman_id;
