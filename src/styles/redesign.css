@@ -16,28 +16,28 @@ h1, h2, h3,
 .dash-card { border-radius: 14px; }
 
 /* ---- Sidebar: ink black, white text ---- */
-.dashboard-sidebar {
+:root .dashboard-sidebar {
   background: #0a0a0a;
   color: #d2d2d2;
   border-right: 1px solid #0a0a0a;
 }
-.dashboard-sidebar .sidebar-logo-img { filter: brightness(0) invert(1); }
-.dashboard-sidebar-nav a { color: #d2d2d2; }
-.dashboard-sidebar-nav a:hover { background: #1c1c1c; color: #ffffff; }
-.dashboard-sidebar-nav a.active,
-.dashboard-sidebar.collapsed .dashboard-sidebar-nav a.active {
+:root .dashboard-sidebar.expanded .sidebar-logo-img { filter: invert(1); } /* dark art on an opaque white file */
+:root .dashboard-sidebar-nav a { color: #d2d2d2; }
+:root .dashboard-sidebar-nav a:hover { background: #1c1c1c; color: #ffffff; }
+:root .dashboard-sidebar-nav a.active,
+:root .dashboard-sidebar.collapsed .dashboard-sidebar-nav a.active {
   background: #1c1c1c;
   color: #ffffff;
 }
-.dashboard-sidebar-nav a.active::before { display: none; }
-.dashboard-sidebar-nav a:focus-visible { box-shadow: 0 0 0 2px #ffffff; }
-.dashboard-sidebar-footer { border-top-color: #1c1c1c; }
-.dashboard-sidebar .sidebar-toggle { color: #bdbdbd; }
-.dashboard-sidebar .sidebar-toggle:hover { background: #1c1c1c; color: #ffffff; }
-.dashboard-sidebar .sidebar-mobile-close { color: #d2d2d2; }
-.dashboard-sidebar .sidebar-mobile-close:hover { background: #1c1c1c; color: #ffffff; }
+:root .dashboard-sidebar-nav a.active::before { display: none; }
+:root .dashboard-sidebar-nav a:focus-visible { box-shadow: 0 0 0 2px #ffffff; }
+:root .dashboard-sidebar-footer { border-top-color: #1c1c1c; }
+:root .dashboard-sidebar .sidebar-toggle { color: #bdbdbd; }
+:root .dashboard-sidebar .sidebar-toggle:hover { background: #1c1c1c; color: #ffffff; }
+:root .dashboard-sidebar .sidebar-mobile-close { color: #d2d2d2; }
+:root .dashboard-sidebar .sidebar-mobile-close:hover { background: #1c1c1c; color: #ffffff; }
 /* The mobile "Back to Shop" button is a black fill; on the black sidebar it turns white. */
-.dashboard-sidebar a[aria-label="Back to Shop"] {
+:root .dashboard-sidebar a[aria-label="Back to Shop"] {
   background: #ffffff;
   color: #0a0a0a !important;
 }
@@ -121,4 +121,40 @@ h1, h2, h3,
   .dashboard-content { overflow-x: clip; }
   .ui-table { padding: var(--space-4); }
   .ui-table__footer { padding-left: var(--space-3); padding-right: var(--space-3); }
+}
+
+/* ---- White pages everywhere in the dashboard; sentence-case page card titles ---- */
+.dashboard-layout,
+.dashboard-layout .dashboard-shell,
+.dashboard-layout .dashboard-content { background: #ffffff; }
+.dashboard-layout .support-title,
+.dashboard-layout .settings-title {
+  text-transform: none;
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+
+/* ---- Phone header: keep the avatar on screen (hide install and fullscreen) ---- */
+@media (max-width: 520px) {
+  .dashboard-layout .install-app-btn,
+  .dashboard-layout .dashboard-icon-btn[aria-label$="Fullscreen"] { display: none; }
+  .dashboard-layout .dashboard-header-actions { gap: 8px; }
+}
+
+/* Tables: show full values (the card scrolls sideways) instead of clipping them with an
+   ellipsis, and keep body text ink black. dashboard-suppliers.css applied this clipping to
+   every table in the dashboard, not only the Salesmen ones. */
+:root .dash-card .ui-table tbody td {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+:root .dash-card .ui-table tbody td:nth-child(n + 3) { color: var(--color-text); }
+
+/* Country filter on Party, Salesmen and Distributor: a plain label above the field, no inner box */
+.dash-row > .dash-card.full[style*="max-width: 360px"] {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
 }

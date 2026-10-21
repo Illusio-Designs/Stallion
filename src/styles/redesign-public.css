@@ -144,7 +144,7 @@
 }
 .filter-chip { border-radius: 999px; border-color: #e1e1e1; }
 .products-state { border-radius: 14px; box-shadow: none; border-color: #e1e1e1; }
-.products-grid-container {
+div.products-grid-container.grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
@@ -233,7 +233,7 @@
   border-radius: 8px;
 }
 .auth-brand:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.5); }
-.auth-brand-logo { height: 44px; width: auto; display: block; filter: brightness(0) invert(1); }
+.auth-brand-logo { height: 44px; width: auto; display: block; filter: invert(1); }
 .auth-headline {
   font-family: var(--font-display);
   font-size: 44px;
@@ -288,3 +288,108 @@
   .products-main .products-header h2 { font-size: 24px; }
   .footer-content { padding-left: 16px; padding-right: 16px; }
 }
+
+/* Stock badge sits on the image corner: a white chip with a coloured dot. */
+.product-card .pc-badge {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  z-index: 2;
+  height: 28px;
+  padding: 0 11px 0 9px;
+  background: #ffffff;
+  color: #0a0a0a;
+  border: 1px solid #e1e1e1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  font-size: 12px;
+  line-height: 1;
+}
+.product-card .pc-badge.pc-pill--ok::before { background: #0b7a53; }
+.product-card .pc-badge.pc-pill--idle::before { background: #8c8c8c; }
+.product-card .pc-badge.pc-pill--bad { color: #b3261e; border-color: #f0b9b4; }
+.product-card .pc-badge.pc-pill--bad::before { background: #b3261e; }
+.product-card .pc-row { display: block; min-height: 0; margin-top: 2px; }
+
+/* ---- Compact, SaaS-style product cards ---------------------------------- */
+div.products-grid-container.grid {
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 12px;
+}
+.product-card {
+  padding: 10px;
+  border-radius: 12px;
+  box-shadow: none;
+  transition: border-color 0.15s ease;
+}
+.product-card:hover { transform: none; box-shadow: none; border-color: #0a0a0a; }
+.product-card .product-image { border-radius: 8px; }
+.products-grid-container .product-card .product-image { height: 132px; }
+.product-card .product-image img { height: 100%; width: 100%; object-fit: contain; }
+.product-card > .product-name,
+.product-card > .pc-row,
+.product-card > .pc-actions { margin-left: 4px; margin-right: 4px; }
+.products-grid-container .product-card .product-name {
+  font-size: 14px;
+  min-height: 0;
+  height: auto;
+  margin-top: 10px;
+  margin-bottom: 2px;
+  -webkit-line-clamp: 1;
+}
+.product-card .pc-price { margin-bottom: 0; gap: 6px; }
+.product-card .pc-price-label { font-size: 10.5px; }
+.product-card .pc-price-now { font-size: 14px; }
+.product-card .pc-price-mrp { font-size: 12px; }
+.product-card .pc-actions { margin-top: 8px; margin-bottom: 4px; gap: 6px; }
+.product-card .pc-qty { height: 34px; border-radius: 9px; }
+.product-card .pc-qty-btn { width: 26px; }
+.product-card .pc-qty-value { min-width: 22px; font-size: 13px; }
+.product-card .pc-add-btn,
+.product-card .pc-actions > button:last-child { height: 34px; border-radius: 9px; }
+.product-card .pc-view-fab { width: 30px; height: 30px; right: 8px; top: 8px; }
+.product-card .pc-badge { left: 8px; top: 8px; height: 24px; font-size: 11px; padding: 0 9px 0 8px; }
+
+/* ---- Home: About section as a clean two-column block (grey photo, no wash-out) ---- */
+.about-section .about-container {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 56px 48px;
+  gap: 48px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+}
+.about-section .about-image { width: 100% !important; height: 380px; border-radius: 16px; background: #f4f4f4; }
+.about-section .about-image img { width: 100% !important; height: 100%; object-fit: cover; opacity: 1; filter: grayscale(1); }
+.about-section .about-image-overlay,
+.about-section .about-goggles-icon { display: none; }
+.about-section .about-content { margin-left: 0 !important; padding: 0; }
+@media (max-width: 860px) {
+  .about-section .about-container { grid-template-columns: minmax(0, 1fr); padding: 32px 16px; gap: 24px; }
+  .about-section .about-image { height: 240px; }
+}
+
+/* Footer: white, and the (white-background) logo blends in instead of showing a box. */
+.footer { background: #ffffff; }
+.footer img[src*="logo"] { mix-blend-mode: multiply; }
+footer.footer, footer.footer > *, .footer .footer-background { background: #ffffff !important; }
+.footer-background::after { display: none; }
+
+/* ---- Cart: white page, flat cards, regular 44px buttons ---- */
+.cart-page { background: #ffffff; }
+.cart-page .shopping-cart-section,
+.cart-page .summary-section,
+.cart-page .summary-section-x {
+  border-radius: 14px;
+  box-shadow: none;
+  border: 1px solid #e1e1e1;
+}
+.cart-page .summary-section { padding: 24px; }
+.cart-page .checkout-btn {
+  min-height: 44px;
+  border-radius: 11px;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 14px;
+  box-shadow: none;
+}
+.cart-page .checkout-btn:hover:enabled { transform: none; }
