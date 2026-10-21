@@ -22,7 +22,7 @@ import {
   getAllSalesmanTargets,
   getAllZones,
   getCities,
-  getCountries,
+  getIndianCountries,
   getMyOrders,
   getMyParties,
   getParties,
@@ -339,7 +339,7 @@ const DashboardSuppliers = () => {
 
   const fetchCountries = async () => {
     try {
-      const countriesData = await getCountries();
+      const countriesData = await getIndianCountries();
       setCountries(countriesData || []);
     } catch (error) {
       if (!error.message?.toLowerCase().includes('token expired') &&
