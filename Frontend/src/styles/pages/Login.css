@@ -1,86 +1,36 @@
 /* ============================================================
-   Login / Auth Page
-   Brand: deep indigo + amber. Tokens only.
+   Login / Auth Page: split screen (black panel + white form).
+   Shared split rules live in redesign-public.css. Tokens only.
    ============================================================ */
 
 .login-page {
+  min-height: 100vh;
+  background: #ffffff;
+}
+
+.login-container {
+  width: 100%;
+  max-width: 400px;
   display: flex;
   flex-direction: column;
-  position: relative;
-  background-color: var(--color-primary-active);
-  min-height: 100vh;
-}
-
-.login-page > header {
-  position: relative;
-  z-index: 3;
-}
-
-.login-background {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  z-index: 0;
-}
-
-.login-bg-image {
-  width: 100%;
-  height: auto;
-  object-fit: cover;
-  opacity: 0.45;
-}
-
-.login-gradient-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    180deg,
-    rgba(0, 0, 0, 0) 0%,
-    var(--color-primary-active) 92%
-  );
-  z-index: 1;
-}
-
-.login-content {
-  position: relative;
-  z-index: 2;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-16) var(--space-4);
-}
-
-/* ---- Card ---- */
-.login-container {
-  background: var(--color-surface);
-  padding: var(--space-12) var(--space-10);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-xl);
-  width: 100%;
-  max-width: 440px;
-  box-sizing: border-box;
 }
 
 .login-title {
-  font-size: var(--text-2xl);
-  line-height: var(--leading-tight);
+  font-size: 28px;
+  line-height: 1.15;
   font-weight: var(--font-weight-bold);
   color: var(--color-text);
-  text-align: center;
-  margin: 0 0 var(--space-2) 0;
-  letter-spacing: -0.02em;
+  text-align: left;
+  margin: 0 0 var(--space-1) 0;
+  letter-spacing: -0.015em;
 }
 
 .login-subtitle {
   font-size: var(--text-base);
   line-height: var(--leading-normal);
-  color: var(--color-text-muted);
-  text-align: center;
-  margin: 0 0 var(--space-8) 0;
-  font-weight: var(--font-weight-normal);
+  color: #595959;
+  text-align: left;
+  margin: 0 0 var(--space-6) 0;
 }
 
 .login-phone-hint {
@@ -92,7 +42,7 @@
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-5);
 }
 
 .login-input-group {
@@ -101,7 +51,6 @@
   gap: var(--space-2);
 }
 
-/* Full-width primary submit reusing .ui-btn primitives */
 .login-submit {
   width: 100%;
 }
@@ -133,7 +82,7 @@
 
 .login-input-group .phone-intl .react-international-phone-input {
   width: 100%;
-  font-family: 'Spoof Trial', sans-serif;
+  font-family: var(--font-spoof);
 }
 
 .login-input-group .phone-intl .react-international-phone-country-selector-button {
@@ -168,7 +117,7 @@
   border-radius: var(--radius-md) !important;
   box-shadow: var(--shadow-lg) !important;
   padding: var(--space-1) !important;
-  font-family: 'Spoof Trial', sans-serif !important;
+  font-family: var(--font-spoof) !important;
   z-index: 1200 !important;
 }
 .react-international-phone-country-selector-dropdown__list-item {
@@ -179,7 +128,7 @@
   border: 1px solid var(--color-border-strong) !important;
   border-radius: var(--radius-sm) !important;
   padding: var(--space-2) var(--space-3) !important;
-  font-family: 'Spoof Trial', sans-serif !important;
+  font-family: var(--font-spoof) !important;
 }
 
 /* ============================================================
@@ -195,13 +144,14 @@
   flex: 1 1 0;
   min-width: 0;
   height: 52px;
+  border-radius: 10px;
   text-align: center;
   font-size: var(--text-xl);
   font-weight: var(--font-weight-semibold);
-  font-family: 'Spoof Trial', sans-serif;
+  font-family: var(--font-display);
   color: var(--color-text);
   border: 1px solid var(--color-border-strong);
-  border-radius: var(--radius-md);
+  border-radius: 10px;
   background: var(--color-surface);
   transition: border-color var(--transition), box-shadow var(--transition);
 }
@@ -245,7 +195,7 @@
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
   font-weight: var(--font-weight-medium);
-  font-family: 'Spoof Trial', sans-serif;
+  font-family: var(--font-spoof);
   color: var(--color-primary);
   cursor: pointer;
   transition: color var(--transition), background var(--transition);
@@ -266,36 +216,7 @@
   cursor: not-allowed;
 }
 
-/* ---- Footer ---- */
-.login-page > footer {
-  position: relative;
-  z-index: 2;
-}
-
-/* ============================================================
-   Responsive
-   ============================================================ */
-@media (max-width: 768px) {
-  .login-content {
-    padding: var(--space-10) var(--space-4);
-  }
-
-  .login-container {
-    padding: var(--space-8) var(--space-6);
-  }
-}
-
 @media (max-width: 400px) {
-  .login-container {
-    padding: var(--space-6) var(--space-5);
-  }
-
-  .login-title {
-    font-size: var(--text-xl);
-  }
-
-  .otp-input {
-    height: 46px;
-    font-size: var(--text-lg);
-  }
+  .otp-container { gap: 6px; }
+  .otp-input { height: 46px; font-size: var(--text-lg); }
 }

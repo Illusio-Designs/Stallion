@@ -1,6 +1,6 @@
 /* =========================================================================
    Product Detail Page
-   Dark indigo immersive canvas (brand). White cards float on top.
+   White canvas, ink-black actions, hairline cards.
    All values come from design tokens (globals.css). Hairline borders +
    soft layered shadows; one radius system; 4/8 spacing rhythm.
    NOTE: .view-toggle / .view-toggle-btn are also used by Breadcrumb.jsx —
@@ -8,7 +8,7 @@
    ========================================================================= */
 
 .product-detail-page {
-  background: var(--color-primary-active);
+  background: #ffffff;
   padding: var(--space-8) 5%;
   min-height: calc(100vh - 200px);
 }
@@ -25,8 +25,8 @@
 }
 
 .go-to-cart-btn {
-  background: var(--color-surface);
-  color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
   padding: var(--space-3) var(--space-8);
   border: none;
   border-radius: var(--radius-md);
@@ -37,13 +37,13 @@
 }
 
 .go-to-cart-btn:hover {
-  background: var(--color-primary);
+  background: var(--color-primary-hover);
   color: var(--color-text-on-primary);
 }
 
 .go-to-cart-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25);
 }
 
 /* ---- View toggle (shared with Breadcrumb) -------------------------------- */
@@ -556,7 +556,9 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   padding: var(--space-6);
-  box-shadow: var(--shadow-lg);
+  border: 1px solid #e1e1e1;
+  background: #f4f4f4;
+  box-shadow: none;
 }
 
 .main-product-image img {
@@ -573,7 +575,7 @@
 
 .product-title {
   font-size: var(--text-2xl);
-  color: var(--color-text-on-primary);
+  color: var(--color-text);
   margin: 0;
   font-weight: var(--font-weight-semibold);
   line-height: var(--leading-tight);
@@ -590,7 +592,7 @@
   height: 32px;
   padding: 0;
   border-radius: var(--radius-pill);
-  border: 1px solid rgba(255, 255, 255, 0.35);
+  border: 1px solid #c9c9c9;
   cursor: pointer;
   transition: transform var(--transition-fast), box-shadow var(--transition);
 }
@@ -605,11 +607,11 @@
 
 .color-swatch:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25);
 }
 
 .main-product-info .color-swatch.active {
-  box-shadow: 0 0 0 2px var(--color-primary-active),
+  box-shadow: 0 0 0 2px #ffffff,
     0 0 0 4px var(--color-accent);
 }
 
@@ -627,7 +629,7 @@
 
 .price-label {
   font-size: var(--text-sm);
-  color: rgba(255, 255, 255, 0.7);
+  color: var(--color-text-muted);
   font-weight: var(--font-weight-normal);
   text-transform: uppercase;
   letter-spacing: var(--tracking-label);
@@ -636,13 +638,13 @@
 
 .price-value {
   font-size: var(--text-xl);
-  color: var(--color-text-on-primary);
+  color: var(--color-text);
   font-weight: var(--font-weight-semibold);
 }
 
 .price-item:last-child .price-value {
   font-size: var(--text-lg);
-  color: var(--color-accent);
+  color: var(--color-text);
 }
 
 .main-selector-action-row {
@@ -693,7 +695,7 @@
 
 .thumbnail:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25);
 }
 
 .thumbnail.active {
@@ -705,7 +707,7 @@
    show a visible focus ring so the two states never cancel out. */
 .thumbnail.active:focus-visible {
   box-shadow: 0 0 0 2px var(--color-accent),
-    0 0 0 5px rgba(255, 255, 255, 0.45);
+    0 0 0 5px rgba(0, 0, 0, 0.25);
 }
 
 .thumbnail img {

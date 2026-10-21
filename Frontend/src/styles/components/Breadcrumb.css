@@ -1,6 +1,7 @@
 /* Breadcrumb Styles */
 .breadcrumb {
-  background: var(--color-primary);
+  background: #ffffff;
+  border-bottom: 1px solid #e1e1e1;
   /* Clear the fixed header (var(--header-height)) so the breadcrumb sits
      below the nav with a gap, instead of sliding underneath it. */
   padding: calc(var(--header-height) + var(--space-4)) 5% var(--space-4);
@@ -34,7 +35,7 @@
   list-style: none;
   font-size: var(--text-md);
   line-height: var(--leading-snug);
-  color: rgba(255, 255, 255, 0.7);
+  color: #595959;
   min-width: 0;
   flex-wrap: wrap;
 }
@@ -56,7 +57,7 @@
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
-  color: rgba(255, 255, 255, 0.92);
+  color: #0a0a0a;
   background: none;
   border: none;
   padding: var(--space-1) var(--space-2);
@@ -67,24 +68,24 @@
 }
 
 button.breadcrumb-item:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.1);
+  color: #0a0a0a;
+  background: #f4f4f4;
 }
 
 button.breadcrumb-item:active {
-  background: rgba(255, 255, 255, 0.16);
+  background: #e9e9e9;
 }
 
 button.breadcrumb-item:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.65);
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.35);
 }
 
 /* Current page: muted, non-interactive, allowed to wrap fully. */
 .breadcrumb-item.active {
   max-width: none;
   white-space: normal;
-  color: rgba(255, 255, 255, 0.6);
+  color: #595959;
   font-weight: var(--font-weight-semibold);
   cursor: default;
 }
@@ -92,7 +93,7 @@ button.breadcrumb-item:focus-visible {
 .breadcrumb-separator {
   display: inline-flex;
   align-items: center;
-  color: rgba(255, 255, 255, 0.45);
+  color: #8c8c8c;
   flex-shrink: 0;
 }
 
@@ -108,11 +109,11 @@ button.breadcrumb-item:focus-visible {
   align-items: center;
   justify-content: center;
   min-height: 40px;
-  background: var(--color-surface);
-  color: var(--color-primary);
+  background: var(--color-primary);
+  color: #ffffff;
   padding: var(--space-2) var(--space-6);
   border: none;
-  border-radius: var(--radius-md);
+  border-radius: 11px;
   font-family: inherit;
   font-size: var(--text-base);
   font-weight: var(--font-weight-semibold);
@@ -122,8 +123,8 @@ button.breadcrumb-item:focus-visible {
 }
 
 .continue-shopping-btn:hover {
-  background: var(--color-accent);
-  color: var(--color-text-on-accent);
+  background: var(--color-primary-hover);
+  color: #ffffff;
 }
 
 .continue-shopping-btn:active {
@@ -132,7 +133,7 @@ button.breadcrumb-item:focus-visible {
 
 .continue-shopping-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.65);
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.25);
 }
 
 .breadcrumb-with-continue .breadcrumb-container {
