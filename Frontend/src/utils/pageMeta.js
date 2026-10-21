@@ -15,7 +15,7 @@ const DEFAULT_DESC =
 export function metadataForSlug(slug) {
   const seg = Array.isArray(slug) ? slug : [];
   const first = seg[0] || '';
-  const noindex = ['dashboard', 'login', 'register', 'cart'].includes(first);
+  const noindex = ['dashboard', 'login', 'cart'].includes(first);
 
   let title = SITE;
   let description = DEFAULT_DESC;
@@ -44,7 +44,6 @@ export function metadataForSlug(slug) {
       title = `Your Cart | ${SITE}`;
       break;
     case 'login':
-    case 'register':
       title = `Sign in | ${SITE}`;
       break;
     case 'dashboard':

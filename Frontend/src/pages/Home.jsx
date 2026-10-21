@@ -141,7 +141,7 @@ const Home = ({ onPageChange }) => {
           >
             Shop Now
           </button>
-          <a className="hero-secondary-cta" href="/register">Open an account</a>
+          <a className="hero-secondary-cta" href="/login">Sign in</a>
           </div>
         </div>
         <div className="banner-slider relative w-full overflow-hidden bg-surface pb-10">

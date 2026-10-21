@@ -185,6 +185,11 @@ class SalesmanExpenseController {
                 return res.status(403).json({ error: 'Access denied' });
             }
 
+            // Once approved, the expense is locked for everyone (amount, type, bills, status).
+            if (String(existingExpense.status).toLowerCase() === 'approved') {
+                return res.status(409).json({ error: 'This expense is approved, so it is locked and cannot be changed.' });
+            }
+
             const { remarks, kilometers, status, expense_date, expense_amount, expense_description, expense_type, travel_mode, toll_message } = req.body;
             if (expense_type !== undefined) {
                 const updateError = validateExpenseDetails({ expense_type, travel_mode, toll_message }, { isNew: false });
@@ -257,6 +262,9 @@ class SalesmanExpenseController {
             if (!salesmanExpense) {
                 return res.status(404).json({ error: 'Salesman expense not found' });
             }
+            if (String(salesmanExpense.status).toLowerCase() === 'approved') {
+                return res.status(409).json({ error: 'This expense is approved, so it is locked and cannot be changed.' });
+            }
             const oldSnapshot = salesmanExpense.toJSON();
             const imagesPayload = { images };
 
@@ -298,6 +306,9 @@ class SalesmanExpenseController {
                 return res.status(403).json({ error: 'Access denied' });
             }
 
+            if (String(salesmanExpense.status).toLowerCase() === 'approved') {
+                return res.status(409).json({ error: 'This expense is approved, so it is locked and cannot be deleted.' });
+            }
             const snapshot = salesmanExpense.toJSON();
             await salesmanExpense.destroy();
             await logAudit({

@@ -1,76 +1,17 @@
 /**
  * Expense Service
- * API service for salesman expense endpoints
+ * API calls for salesman expenses. Uses the shared API client like every other
+ * service, so errors, login expiry and request headers behave the same way.
  */
 
-import { getToken } from './authService';
-import { showError } from './notificationService';
+import { apiRequest, fetchAllPages, getBaseURL, getHeaders, handleResponse } from './api/client';
 
-const getBaseURL = () => {
-  const envUrl = process.env.NEXT_PUBLIC_API_URL;
-  if (envUrl) {
-    let url = envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
-    if (!url.includes('/api')) {
-      url = `${url}/api`;
-    }
-    return url;
-  }
-  return 'https://stallion.nishree.com/api';
-};
+const BASE = '/salesman_expenses';
 
-const getHeaders = (includeAuth = true) => {
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-
-  if (includeAuth) {
-    const token = getToken();
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
-    }
-  }
-
-  return headers;
-};
-
-const handleResponse = async (response) => {
-  const contentType = response.headers.get('content-type');
-  const isJson = contentType && contentType.includes('application/json');
-
-  if (!response.ok) {
-    let errorMessage = 'An error occurred';
-    
-    try {
-      if (isJson) {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorData.message || errorData.msg || errorMessage;
-      } else {
-        const textResponse = await response.text();
-        errorMessage = textResponse || response.statusText || `HTTP ${response.status} Error`;
-      }
-    } catch (parseError) {
-      errorMessage = response.statusText || `HTTP ${response.status} Error`;
-    }
-    
-    const error = new Error(errorMessage);
-    error.statusCode = response.status;
-    throw error;
-  }
-
-  const text = await response.text();
-  if (!text || text.trim() === '' || text.trim() === 'null') {
-    return { message: 'Success' };
-  }
-  
-  if (isJson) {
-    try {
-      return JSON.parse(text);
-    } catch (jsonParseError) {
-      return { message: 'Success' };
-    }
-  }
-  
-  return text;
+// "Nothing found" comes back as 404; for a list that just means empty.
+const emptyOn404 = (err) => {
+  if (err && err.statusCode === 404) return [];
+  throw err;
 };
 
 /**
@@ -78,147 +19,62 @@ const handleResponse = async (response) => {
  * @returns {Promise<Array>} Array of expense objects
  */
 export const getSalesmanExpenses = async () => {
-  const baseUrl = getBaseURL();
-  const fullUrl = `${baseUrl}/salesman_expenses/`;
-  
-  const response = await fetch(fullUrl, {
-    method: 'GET',
-    headers: getHeaders(true),
-    credentials: 'omit',
-  });
-  
-  // Handle 404 as empty array (no expenses found)
-  if (response.status === 404) {
-    return [];
+  try {
+    return await apiRequest(`${BASE}/`, { method: 'GET', includeAuth: true, silent: true });
+  } catch (err) {
+    return emptyOn404(err);
   }
-  
-  return await handleResponse(response);
 };
 
 /**
  * Create salesman expense
- * @param {Object} expenseData - Expense data
- * @param {string} expenseData.expense_date - Expense date (ISO format)
- * @param {number} expenseData.expense_amount - Expense amount
- * @param {string} expenseData.expense_description - Expense description
- * @param {string} expenseData.expense_type - Expense type (travel, hotel, fuel, etc.)
- * @param {Array} expenseData.images - Array of image URLs
- * @param {string} expenseData.remarks - Remarks (optional)
+ * @param {Object} expenseData - date, amount, description, type (food, travel, city_tour,
+ *   toll, hotel, other), travel_mode (travel), toll_message (toll), kilometers, images
  * @returns {Promise<Object>} Created expense object
  */
-export const createSalesmanExpense = async (expenseData) => {
-  const baseUrl = getBaseURL();
-  const fullUrl = `${baseUrl}/salesman_expenses/`;  // Keep trailing slash as in Postman
-  
-  const response = await fetch(fullUrl, {
-    method: 'POST',
-    headers: getHeaders(true),
-    credentials: 'omit',
-    body: JSON.stringify(expenseData),
-  });
-  
-  return await handleResponse(response);
-};
+export const createSalesmanExpense = async (expenseData) =>
+  apiRequest(`${BASE}/`, { method: 'POST', body: expenseData, includeAuth: true });
 
 /**
- * Upload expense images
+ * Upload expense bill images
  * @param {File[]} files - Array of image files
  * @returns {Promise<Object>} Response with uploaded image paths
  */
 export const uploadExpenseImages = async (files) => {
-  const baseUrl = getBaseURL();
-  const fullUrl = `${baseUrl}/salesman_expenses/upload-images`;
-  
   const formData = new FormData();
-  files.forEach(file => {
-    formData.append('bill_file', file);
-  });
-  
-  const token = getToken();
-  const headers = {};
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-  
-  const response = await fetch(fullUrl, {
+  files.forEach((file) => formData.append('bill_file', file));
+  // The shared client sends JSON only, so files use its headers and response handling directly.
+  const response = await fetch(`${getBaseURL()}${BASE}/upload-images`, {
     method: 'POST',
-    headers,
+    headers: getHeaders(true),
     credentials: 'omit',
     body: formData,
   });
-  
-  return await handleResponse(response);
+  return handleResponse(response);
 };
 
 /**
- * Update salesman expense
- * @param {string} expenseId - Expense ID
- * @param {Object} updateData - Data to update
- * @param {string} updateData.status - Status (pending, approved, rejected)
- * @param {string} updateData.remarks - Remarks (optional)
+ * Update salesman expense (status and remarks are for admin; an approved expense is locked)
  * @returns {Promise<Object>} Updated expense object
  */
-export const updateSalesmanExpense = async (expenseId, updateData) => {
-  const baseUrl = getBaseURL();
-  const fullUrl = `${baseUrl}/salesman_expenses/${expenseId}`;
-  
-  const response = await fetch(fullUrl, {
-    method: 'PUT',
-    headers: getHeaders(true),
-    credentials: 'omit',
-    body: JSON.stringify(updateData),
-  });
-  
-  return await handleResponse(response);
-};
+export const updateSalesmanExpense = async (expenseId, updateData) =>
+  apiRequest(`${BASE}/${expenseId}`, { method: 'PUT', body: updateData, includeAuth: true });
 
 /**
  * Delete salesman expense
- * @param {string} expenseId - Expense ID
  * @returns {Promise<Object>} Response with message
  */
-export const deleteSalesmanExpense = async (expenseId) => {
-  const baseUrl = getBaseURL();
-  const fullUrl = `${baseUrl}/salesman_expenses/${expenseId}`;
-  
-  const response = await fetch(fullUrl, {
-    method: 'DELETE',
-    headers: getHeaders(true),
-    credentials: 'omit',
-  });
-  
-  return await handleResponse(response);
-};
+export const deleteSalesmanExpense = async (expenseId) =>
+  apiRequest(`${BASE}/${expenseId}`, { method: 'DELETE', includeAuth: true });
 
 /**
- * Get all expenses for admin view
- * @returns {Promise<Array>} Array of all expense objects from all salesmen
+ * Get all expenses for the admin view (all salesmen)
+ * @returns {Promise<Array>} Array of expense objects
  */
 export const getAllAdminExpenses = async () => {
-  const baseUrl = getBaseURL();
-  // Backend `/admin/all` is server-paginated: it REQUIRES page+limit (400 if
-  // missing) and returns `{ data, pagination }` instead of a bare array. Use a
-  // single load-all call (large limit) and unwrap `.data`, matching the
-  // fetchAllPages pattern used by the other list getters.
-  // Backend caps `limit` at 100, so walk the pages (bounded) and concatenate.
-  const fetchPageNo = async (page) => {
-    const fullUrl = `${baseUrl}/salesman_expenses/admin/all?page=${page}&limit=100`;
-    const response = await fetch(fullUrl, {
-      method: 'GET',
-      headers: getHeaders(true),
-      credentials: 'omit',
-    });
-    // Handle 404 as empty (no expenses found)
-    if (response.status === 404) return { data: [], pagination: { totalPages: 0 } };
-    return handleResponse(response);
-  };
-  const listOf = (r) => (Array.isArray(r) ? r : (r && Array.isArray(r.data) ? r.data : []));
-
-  const first = await fetchPageNo(1);
-  let all = listOf(first);
-  const totalPages = Number(first && first.pagination && first.pagination.totalPages) || 1;
-  for (let page = 2; page <= Math.min(totalPages, 50); page += 1) {
-    all = all.concat(listOf(await fetchPageNo(page)));
+  try {
+    return await fetchAllPages(`${BASE}/admin/all`, { method: 'GET', includeAuth: true, silent: true });
+  } catch (err) {
+    return emptyOn404(err);
   }
-  return all;
 };
