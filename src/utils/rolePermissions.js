@@ -37,7 +37,6 @@ export const ROLE_PERMISSIONS = {
     ALL_PAGES.SETTINGS,
   ],
   'expense_manager': [
-    ALL_PAGES.EXPENSES,
     ALL_PAGES.ANALYTICS,
     ALL_PAGES.SETTINGS,
   ],
@@ -70,7 +69,6 @@ export const ROLE_PERMISSIONS = {
   ],
   'sales_manager': [
     ALL_PAGES.SALESMEN,
-    ALL_PAGES.EXPENSES,
     ALL_PAGES.SETTINGS,
   ],
   'distributor_manager': [
