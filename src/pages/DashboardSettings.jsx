@@ -552,6 +552,7 @@ const DashboardSettings = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
+        <div className="pg-head"><div><h1>Settings</h1><p>Your profile. Everyone can change their own.</p></div></div>
         <div className="dash-row">
           <div className="dash-card full settings p-4 min-[561px]:p-6">
             <div className="settings-header flex flex-wrap items-end justify-between gap-4 mb-5 min-[561px]:mb-6">

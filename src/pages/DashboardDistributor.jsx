@@ -981,6 +981,7 @@ const DashboardDistributor = () => {
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
+        <div className="pg-head"><div><h1>Distributors</h1><p>Admin and distributor managers add and edit distributors. Each one serves its own parties.</p></div></div>
         <div className="dash-row grid grid-cols-1 gap-4 sm:grid-cols-12">
           <div className="dash-card full col-span-1 p-0 sm:col-span-12 dist-wrap">
             <div className="p-4 pb-0 dist-filter" style={{ maxWidth: 392 }}>

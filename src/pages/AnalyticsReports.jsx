@@ -18,11 +18,27 @@ import {
 const REPORT_LIMIT = 20; // page size; more rows load on demand via "Load more"
 import { getUser, getUserRole } from '../services/authService';
 import { showError } from '../services/notificationService';
+import { downloadCsv } from '../utils/exportCsv';
 
 const TABS = [
   { key: 'targets', label: 'Target Achievement' },
   { key: 'checkins', label: 'Visit Report' },
 ];
+
+const PERIODS = [
+  { key: '7d', label: '7 days' },
+  { key: 'month', label: 'This month' },
+  { key: 'year', label: 'Year' },
+];
+// Start of the chosen period (end is always now).
+const periodStart = (key) => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (key === '7d') d.setDate(d.getDate() - 6);
+  else if (key === 'month') d.setDate(1);
+  else { d.setMonth(0); d.setDate(1); }
+  return d;
+};
 
 const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const fmtDate = (d) =>
@@ -105,6 +121,7 @@ const AnalyticsReports = () => {
   const [visitPage, setVisitPage] = useState(1);
   const [visitMore, setVisitMore] = useState({ checkins: false, orders: false });
   const [loadingMore, setLoadingMore] = useState(false);
+  const [period, setPeriod] = useState('year');
 
   const userRole = useMemo(() => getUserRole(), []);
   const user = useMemo(() => getUser(), []);
@@ -265,19 +282,35 @@ const AnalyticsReports = () => {
     return null;
   };
 
+  // Period filter (by date): targets that overlap the period, visits inside it.
+  const periodRange = useMemo(() => ({ from: periodStart(period), to: new Date() }), [period]);
+  const periodTargets = useMemo(() => targets.filter((t) => {
+    if (!t.start_date && !t.end_date) return true;
+    const s = t.start_date ? new Date(t.start_date) : null;
+    const e = t.end_date ? new Date(t.end_date) : null;
+    if (e && !isNaN(e) && e < periodRange.from) return false;
+    if (s && !isNaN(s) && s > periodRange.to) return false;
+    return true;
+  }), [targets, periodRange]);
+  const periodCheckins = useMemo(() => checkins.filter((c) => {
+    if (!c.check_in_date) return true;
+    const d = new Date(c.check_in_date);
+    return isNaN(d) || (d >= periodRange.from && d <= periodRange.to);
+  }), [checkins, periodRange]);
+
   // ---- Target summary (real data) ----
   const summary = useMemo(() => {
-    const total = targets.reduce((s, t) => s + (Number(t.target_amount) || 0), 0);
-    const achieved = targets.reduce((s, t) => s + (Number(t.completed_amount) || 0), 0);
+    const total = periodTargets.reduce((s, t) => s + (Number(t.target_amount) || 0), 0);
+    const achieved = periodTargets.reduce((s, t) => s + (Number(t.completed_amount) || 0), 0);
     const due = Math.max(0, total - achieved);
     const pct = total > 0 ? Math.round((achieved / total) * 100) : 0;
     return { total, achieved, due, pct };
-  }, [targets]);
+  }, [periodTargets]);
 
   // Achieved amount per salesman (display only, from the same targets list).
   const bySalesman = useMemo(() => {
     const sums = {};
-    targets.forEach((t) => {
+    periodTargets.forEach((t) => {
       const id = t.salesman_id || 'na';
       sums[id] = (sums[id] || 0) + (Number(t.completed_amount) || 0);
     });
@@ -286,7 +319,7 @@ const AnalyticsReports = () => {
     const max = list.reduce((m, r) => Math.max(m, r.amount), 0);
     return list.map((r) => ({ ...r, pct: max > 0 ? Math.round((r.amount / max) * 100) : 0 }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [targets, salesmen]);
+  }, [periodTargets, salesmen]);
 
   const targetColumns = useMemo(() => ([
     { key: 'salesman', label: 'SALESMAN', width: '150px' },
@@ -298,7 +331,7 @@ const AnalyticsReports = () => {
     { key: 'status', label: 'STATUS', width: '110px', render: (v) => <StatusBadge status={String(v).toLowerCase()}>{String(v).toUpperCase()}</StatusBadge> },
   ]), []);
 
-  const targetRows = useMemo(() => targets.map((t, i) => {
+  const targetRows = useMemo(() => periodTargets.map((t, i) => {
     const target = Number(t.target_amount) || 0;
     const achieved = Number(t.completed_amount) || 0;
     return {
@@ -312,7 +345,7 @@ const AnalyticsReports = () => {
       status: t.target_status || 'pending',
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [targets, salesmen]);
+  }), [periodTargets, salesmen]);
 
   const checkinColumns = useMemo(() => ([
     { key: 'type', label: 'TYPE', render: (v) => (
@@ -340,7 +373,7 @@ const AnalyticsReports = () => {
     { key: 'reason', label: 'REASON' },
   ]), []);
 
-  const checkinRows = useMemo(() => [...checkins]
+  const checkinRows = useMemo(() => [...periodCheckins]
     .sort((a, b) => new Date(b.check_in_date || 0) - new Date(a.check_in_date || 0))
     .map((c, i) => ({
       id: c.id || i,
@@ -355,7 +388,33 @@ const AnalyticsReports = () => {
       reason: (c.type === 'ordered' ? (c.order_notes || c.check_in_remarks) : c.check_in_remarks) || '—',
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [checkins, salesmen, parties]);
+    [periodCheckins, salesmen, parties]);
+
+  const exportVisible = () => {
+    if (activeTab === 'targets') {
+      downloadCsv('target-achievement', [
+        { label: 'Salesman', value: (r) => r.salesman },
+        { label: 'Period', value: (r) => r.period },
+        { label: 'Order type', value: (r) => r.type },
+        { label: 'Target', value: (r) => r.target },
+        { label: 'Achieved', value: (r) => r.achieved },
+        { label: 'Progress %', value: (r) => Math.round(r.progress) },
+        { label: 'Status', value: (r) => r.status },
+      ], targetRows);
+    } else {
+      downloadCsv('visit-report', [
+        { label: 'Type', value: (r) => (r.type === 'ordered' ? 'Order' : 'Visit') },
+        { label: 'Salesman', value: (r) => r.salesman },
+        { label: 'Party', value: (r) => r.party },
+        { label: 'Date', value: (r) => r.date },
+        { label: 'Quantity', value: (r) => r.qty },
+        { label: 'Amount', value: (r) => r.amount },
+        { label: 'Reason', value: (r) => r.reason },
+      ], checkinRows);
+    }
+  };
+  const visibleCount = activeTab === 'targets' ? targetRows.length : checkinRows.length;
+  const periodLabel = PERIODS.find((p) => p.key === period)?.label || '';
 
   const backendDown = (
     <div className="ui-state ui-state--error">
@@ -374,6 +433,17 @@ const AnalyticsReports = () => {
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
+        <div className="pg-head">
+          <div><h1>Reports</h1><p>{fmtDate(periodRange.from)} to {fmtDate(periodRange.to)}. Cancelled orders count toward salesman targets.</p></div>
+          <div className="pg-head__tools">
+            <div className="seg rep-seg" role="group" aria-label="Period">
+              {PERIODS.map((p) => (
+                <button key={p.key} type="button" aria-pressed={period === p.key} className={period === p.key ? 'on' : ''} onClick={() => setPeriod(p.key)}>{p.label}</button>
+              ))}
+            </div>
+            <button type="button" className="ui-btn ui-btn--secondary rep-export" onClick={exportVisible} disabled={loading || visibleCount === 0}>Export CSV</button>
+          </div>
+        </div>
 
         {/* Tab navigation */}
         <div className="dash-row">
@@ -430,8 +500,8 @@ const AnalyticsReports = () => {
               <div className="dash-card full">
                 {loadError && !loading ? backendDown : (!loading && targetRows.length === 0) ? (
                   <div className="ui-state ui-state--empty">
-                    <p className="ui-state__title">No targets yet</p>
-                    <p className="ui-state__desc">Salesman targets and their achievement will show here once created.</p>
+                    <p className="ui-state__title">{targets.length ? `No targets in ${periodLabel.toLowerCase()}` : 'No targets yet'}</p>
+                    <p className="ui-state__desc">{targets.length ? 'Pick a longer period to see more.' : 'Salesman targets and their achievement will show here once created.'}</p>
                   </div>
                 ) : (
                   <TableWithControls title="Target Achievement" columns={targetColumns} rows={targetRows} itemName="Target" loading={loading} selectable={false} />
@@ -447,8 +517,8 @@ const AnalyticsReports = () => {
             <div className="dash-card full">
               {loadError && !loading ? backendDown : (!loading && checkinRows.length === 0) ? (
                 <div className="ui-state ui-state--empty">
-                  <p className="ui-state__title">No visit reports yet</p>
-                  <p className="ui-state__desc">Salesman visit reports (with party and location) will show here.</p>
+                  <p className="ui-state__title">{checkins.length ? `No visits in ${periodLabel.toLowerCase()}` : 'No visit reports yet'}</p>
+                  <p className="ui-state__desc">{checkins.length ? 'Pick a longer period to see more.' : 'Salesman visit reports (with party and location) will show here.'}</p>
                 </div>
               ) : (
                 <>

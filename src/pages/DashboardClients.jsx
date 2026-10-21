@@ -1535,6 +1535,7 @@ const DashboardClients = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
+        <div className="pg-head"><div><h1>Parties</h1><p>Each shop's location is captured once, at the shop, and reused for orders and visits.</p></div></div>
         <div className="dash-row">
           <div className="order-tabs-container">
             {['All', 'Activate', 'Deactivate'].map(tab => (

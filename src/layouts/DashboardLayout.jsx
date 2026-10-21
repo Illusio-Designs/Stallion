@@ -112,7 +112,7 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
 
       <div
         className={`dashboard-shell flex min-h-screen min-w-0 flex-1 flex-col ml-0 transition-[margin-left] duration-200 ease-[ease] motion-reduce:transition-none ${
-          effectiveCollapsed ? 'md:ml-16' : 'md:ml-60'
+          effectiveCollapsed ? 'md:ml-[76px]' : 'md:ml-60'
         }`}
       >
         <DashboardHeader

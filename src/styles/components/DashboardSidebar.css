@@ -15,7 +15,7 @@
   overflow: visible;
 }
 .dashboard-sidebar.collapsed {
-  width: 64px;
+  width: 76px;
 }
 .dashboard-sidebar.expanded {
   width: 240px;
@@ -221,7 +221,7 @@
 
 .sidebar-tooltip--fixed {
   position: fixed !important;
-  left: 76px !important;
+  left: 84px !important;
   top: 0;
   transform: translateY(-50%) !important;
   margin-left: 0 !important;

@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
-import TableWithControls from '../components/ui/TableWithControls';
-import StatusBadge from '../components/ui/StatusBadge';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   addProductToTray,
@@ -66,10 +64,39 @@ const getStatusColor = (status) => {
   }
 };
 
+// Display-only helpers for the tray cards (use whatever the row carries).
+const trayCount = (t) => {
+  const v = t.product_count ?? t.products_count ?? t.frames_count ?? t.total_products ?? t.item_count;
+  const n = Number(v);
+  return v == null || v === '' || Number.isNaN(n) ? null : n;
+};
+const trayHolder = (t) => t.salesman_name || t.holder_name || t.assigned_to_name || t.salesman?.full_name || null;
+const traySince = (t) => {
+  const d = t.assigned_at || t.assigned_since || t.assigned_on;
+  if (!d) return null;
+  const dt = new Date(d);
+  return Number.isNaN(dt.getTime()) ? null : dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+};
+const trayState = (t) => {
+  const st = String(t.tray_status || '').toLowerCase();
+  if (st === TrayStatus.CLOSED) return 'closed';
+  const due = t.due_date || t.return_by;
+  if (st === 'overdue' || t.is_overdue || t.overdue || (st === TrayStatus.ASSIGNED && due && new Date(due) < new Date())) return 'overdue';
+  if (st === TrayStatus.ASSIGNED) return 'assigned';
+  return 'available';
+};
+const TRAY_PILL = {
+  available: ['ok', 'Available'],
+  assigned: ['info', 'With a salesman'],
+  overdue: ['bad', 'Overdue'],
+  closed: ['idle', 'Closed'],
+};
+
 const DashboardTray = () => {
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('all-trays');
-  const [dateRange, setDateRange] = useState('Feb 25, 2025 - Mar 25, 2025');
+  const [trayFilter, setTrayFilter] = useState('all');
+  const [traySearch, setTraySearch] = useState('');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [trays, setTrays] = useState([]);
@@ -94,32 +121,6 @@ const DashboardTray = () => {
   const [editingProduct, setEditingProduct] = useState(null);
   const [editProductStatus, setEditProductStatus] = useState(TrayProductStatus.ALLOTED);
   const [openEditProduct, setOpenEditProduct] = useState(false);
-
-  const columns = useMemo(() => ([
-    { key: 'tray_name', label: 'SAMPLE NAME' },
-    {
-      key: 'tray_status',
-      label: 'STATUS',
-      render: (_v, row) => {
-        const status = row.tray_status || '';
-        if (status === TrayStatus.AVAILABLE) return <StatusBadge status="completed">Available</StatusBadge>;
-        if (status === TrayStatus.ASSIGNED) return <StatusBadge status="dispatch">With a salesman</StatusBadge>;
-        if (status === TrayStatus.CLOSED) return <StatusBadge status="default">Closed</StatusBadge>;
-        return <StatusBadge status="default">{status ? status.charAt(0).toUpperCase() + status.slice(1) : 'N/A'}</StatusBadge>;
-      }
-    },
-    {
-      key: 'action',
-      label: 'ACTIONS',
-      render: (_v, row) => (
-        <RowActions
-          onEdit={() => openEdit(row)}
-          onDownload={null}
-          onDelete={() => handleDelete(row)}
-        />
-      ),
-    },
-  ]), []);
 
   // Server-paginated trays: 20 per page, fetched per page (and on search).
   const fetchTraysPage = async (page = 1, search = '') => {
@@ -408,7 +409,28 @@ const DashboardTray = () => {
     setOpenEditProduct(false);
   };
 
-  const rows = useMemo(() => trays, [trays]);
+  const trayChips = useMemo(() => {
+    const counts = { all: trays.length, available: 0, assigned: 0, overdue: 0, closed: 0 };
+    trays.forEach((t) => { counts[trayState(t)] += 1; });
+    const chips = [
+      { key: 'all', label: 'All', count: counts.all },
+      { key: 'available', label: 'Available', count: counts.available },
+      { key: 'assigned', label: 'With a salesman', count: counts.assigned },
+      { key: 'overdue', label: 'Overdue', count: counts.overdue },
+    ];
+    if (counts.closed > 0) chips.push({ key: 'closed', label: 'Closed', count: counts.closed });
+    return chips;
+  }, [trays]);
+  const visibleTrays = useMemo(
+    () => (trayFilter === 'all' ? trays : trays.filter((t) => trayState(t) === trayFilter)),
+    [trays, trayFilter],
+  );
+  const traySearchTimer = useRef(null);
+  const handleTraySearch = (term) => {
+    setTraySearch(term);
+    if (traySearchTimer.current) clearTimeout(traySearchTimer.current);
+    traySearchTimer.current = setTimeout(() => fetchTraysPage(1, term), 350);
+  };
 
   // Reset selected tray when switching tabs
   useEffect(() => {
@@ -429,6 +451,19 @@ const DashboardTray = () => {
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-[var(--space-4)]">
+        <div className="page-head tray-head">
+          <div>
+            <h1>Sample trays</h1>
+            <p>Admin and tray managers manage trays. Sales managers can assign them to salesmen.</p>
+          </div>
+          {activeTab === 'all-trays' && (
+            <div className="page-head__actions">
+              <button className="ui-btn ui-btn--secondary" onClick={fetchTrays} disabled={loading}>Refresh</button>
+              <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Tray</button>
+            </div>
+          )}
+        </div>
+
         {/* Tab Navigation */}
         <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
           <div className="order-tabs-container col-span-full flex w-full gap-[var(--space-2)] overflow-x-auto rounded-lg border border-border bg-surface px-[var(--space-3)] py-[var(--space-2)] shadow-sm">
@@ -449,43 +484,97 @@ const DashboardTray = () => {
 
         {/* Tab Content */}
         {activeTab === 'all-trays' && (
-          <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
-            <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
-              <TableWithControls
-                title="Sample Management"
-                columns={columns}
-                rows={rows}
-                selectable={!loading}
-                onAddNew={() => setOpenAdd(true)}
-                addNewText="Add New Tray"
-                onImport={fetchTrays}
-                importText="Refresh"
-                dateRange={dateRange}
-                onDateChange={setDateRange}
-                itemName="Sample"
-                loading={loading}
-                serverPagination
-                serverPage={trayPage}
-                serverPageCount={trayPageCount}
-                serverPageSize={20}
-                serverTotal={trayTotal}
-                onServerPageChange={(p) => fetchTraysPage(p)}
+          <div className="tray-view">
+            <div className="tray-toolbar">
+              <div className="chips" role="tablist" aria-label="Filter trays">
+                {trayChips.map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={trayFilter === c.key}
+                    className={`chip${trayFilter === c.key ? ' on' : ''}`}
+                    onClick={() => setTrayFilter(c.key)}
+                  >
+                    {c.label} <b>{c.count}</b>
+                  </button>
+                ))}
+              </div>
+              <input
+                type="search"
+                className="ui-input tray-search"
+                placeholder="Search trays"
+                aria-label="Search trays"
+                value={traySearch}
+                onChange={(e) => handleTraySearch(e.target.value)}
               />
-              {error && !loading && (
-                <div className="ui-state ui-state--error">
-                  <div className="ui-state__icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="12" />
-                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
-                  </div>
-                  <p className="ui-state__title">Couldn't load trays</p>
-                  <p className="ui-state__desc">{error}</p>
-                  <button className="ui-btn ui-btn--secondary" onClick={fetchTrays}>Try again</button>
-                </div>
-              )}
             </div>
+
+            {error && !loading ? (
+              <div className="ui-state ui-state--error">
+                <div className="ui-state__icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">Couldn't load trays</p>
+                <p className="ui-state__desc">{error}</p>
+                <button className="ui-btn ui-btn--secondary" onClick={fetchTrays}>Try again</button>
+              </div>
+            ) : loading && trays.length === 0 ? (
+              <div className="tray-grid" aria-busy="true">
+                {[0, 1, 2].map((i) => <div key={i} className="tray-card ui-skeleton" style={{ height: 190 }} />)}
+              </div>
+            ) : visibleTrays.length === 0 ? (
+              <div className="ui-state ui-state--empty">
+                <p className="ui-state__title">{trays.length === 0 ? 'No trays yet' : 'No trays in this view'}</p>
+                <p className="ui-state__desc">{trays.length === 0 ? 'Add a tray to start grouping sample frames.' : 'Try another filter.'}</p>
+                {trays.length === 0 && <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Tray</button>}
+              </div>
+            ) : (
+              <div className="tray-grid">
+                {visibleTrays.map((t) => {
+                  const state = trayState(t);
+                  const [pillCls, pillLabel] = TRAY_PILL[state];
+                  const n = trayCount(t);
+                  const holder = trayHolder(t);
+                  const since = traySince(t);
+                  const total = n == null ? 0 : Math.max(12, n);
+                  const meta = [
+                    n != null ? `${n} ${n === 1 ? 'frame' : 'frames'}` : null,
+                    holder ? `With ${holder}${since ? `, since ${since}` : ''}` : (state === 'available' ? 'In the office' : null),
+                  ].filter(Boolean).join(' · ');
+                  return (
+                    <div key={t.tray_id || t.id || t.tray_name} className="tray-card">
+                      <div className="tray-card__top">
+                        <h3>{t.tray_name || 'Untitled tray'}</h3>
+                        <span className={`pill ${pillCls}`}>{pillLabel}</span>
+                      </div>
+                      {n != null && (
+                        <div className="tray-slots" aria-hidden="true">
+                          {Array.from({ length: total }).map((_, i) => <i key={i} className={i < n ? '' : 'e'} />)}
+                        </div>
+                      )}
+                      {meta && <span className="tray-meta">{meta}</span>}
+                      <div className="tray-card__actions">
+                        <button className="ui-btn ui-btn--secondary" onClick={() => openEdit(t)}>Open</button>
+                        <button className="ui-btn ui-btn--secondary" onClick={() => handleDelete(t)} disabled={saving}>Delete</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {trayPageCount > 1 && (
+              <div className="tray-pager">
+                <button className="ui-btn ui-btn--secondary" disabled={loading || trayPage <= 1} onClick={() => fetchTraysPage(trayPage - 1, traySearch)}>Previous</button>
+                <span>Page {trayPage} of {trayPageCount} · {trayTotal} trays</span>
+                <button className="ui-btn ui-btn--secondary" disabled={loading || trayPage >= trayPageCount} onClick={() => fetchTraysPage(trayPage + 1, traySearch)}>Next</button>
+              </div>
+            )}
           </div>
         )}
 

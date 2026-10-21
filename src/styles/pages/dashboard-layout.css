@@ -17,7 +17,7 @@
   transition: margin-left var(--transition) ease;
 }
 .dashboard-layout.collapsed .dashboard-shell {
-  margin-left: 64px;
+  margin-left: 76px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -82,7 +82,7 @@
    Tablet
    ========================================================================== */
 
-/* Tablet (iPad): 768 to 1100px. The sidebar is the 64px icon rail by default
+/* Tablet (iPad): 768 to 1100px. The sidebar is the 76px icon rail by default
    (see DashboardLayout), so give the page the width back and make everything
    comfortable for a finger. */
 @media (min-width: 768px) and (max-width: 1100px) {

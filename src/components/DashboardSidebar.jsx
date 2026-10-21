@@ -108,7 +108,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
       className={`dashboard-sidebar ${isCollapsed ? 'collapsed' : 'expanded'} ${
         isMobileOpen ? 'mobile-open max-md:translate-x-0' : 'max-md:-translate-x-full'
       } fixed left-0 top-0 z-[1000] flex h-dvh flex-col overflow-visible bg-surface text-text border-r border-border transition-transform duration-200 ease-[ease] motion-reduce:transition-none md:translate-x-0 ${
-        isCollapsed ? 'w-16 md:w-16' : 'w-60'
+        isCollapsed ? 'w-[76px] md:w-[76px]' : 'w-60'
       }`}
     >
       <div
@@ -236,7 +236,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
       {isCollapsed && tooltipState.show && (
         <span
           role="tooltip"
-          className="sidebar-tooltip sidebar-tooltip--fixed pointer-events-none fixed left-[76px] z-[10000] -translate-y-1/2 whitespace-nowrap rounded-sm bg-grey-900 px-2 py-1 text-[length:var(--text-xs)] text-text-on-primary shadow-md after:absolute after:left-[-5px] after:top-1/2 after:-translate-y-1/2 after:border-[5px] after:border-solid after:border-transparent after:border-r-grey-900 after:content-['']"
+          className="sidebar-tooltip sidebar-tooltip--fixed pointer-events-none fixed left-[84px] z-[10000] -translate-y-1/2 whitespace-nowrap rounded-sm bg-grey-900 px-2 py-1 text-[length:var(--text-xs)] text-text-on-primary shadow-md after:absolute after:left-[-5px] after:top-1/2 after:-translate-y-1/2 after:border-[5px] after:border-solid after:border-transparent after:border-r-grey-900 after:content-['']"
           style={{ top: `${tooltipState.top}px` }}
         >
           {tooltipState.text}

@@ -1554,6 +1554,7 @@ const DashboardSuppliers = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
+        <div className="pg-head"><div><h1>Salesmen</h1><p>Admin and sales managers add and edit salesmen. Documents are visible to them only.</p></div></div>
         {/* Main tabs */}
         <div className="dash-row">
           <div className="order-tabs-container">

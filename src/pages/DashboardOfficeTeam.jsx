@@ -582,6 +582,7 @@ const DashboardOfficeTeam = () => {
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
+        <div className="pg-head"><div><h1>Office team</h1><p>Admin only. A member can hold several roles and sees the pages of all of them.</p></div></div>
         <div className="dash-row grid grid-cols-12 gap-4">
           <div className="order-tabs-container col-span-full flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm">
             {['All', 'Activate', 'Deactivate'].map(tab => (
