@@ -6,6 +6,7 @@ import "../styles/redesign-b.css";
 import "../styles/redesign-c.css";
 import "../styles/redesign-d.css";
 import "../styles/redesign-e.css";
+import "../styles/redesign-g.css";
 import LoaderProvider from "../components/LoaderProvider";
 import ToastContainerProvider from "../components/ToastContainerProvider";
 import ErrorBoundary from "../components/ErrorBoundary";
