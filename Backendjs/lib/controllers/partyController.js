@@ -22,8 +22,9 @@ const SalesmanStates = require('../models/SalesmanStates');
 const DistributorStates = require('../models/DistributorStates');
 const { resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
-const { canManageParties, canCreateParty, normalizeRole, partyActiveFilter, denyInactiveParty, isAdmin } = require('../utils/roleHelpers');
+const { hasRole, canManageParties, canCreateParty, normalizeRole, partyActiveFilter, denyInactiveParty, isAdmin } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
+const { salesmanCoversState, distributorCoversState } = require('../utils/workingStates');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse, listWithOptionalPagination } = require('../utils/listSearchHelpers');
 
 class PartyController {
@@ -99,7 +100,7 @@ class PartyController {
                 const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
                 const role = normalizeRole(req.userRoleName);
                 const allowed = (role === 'party' && scope.partyId === id)
-                    || (role === 'salesman' && party.salesman_id === scope.salesmanId)
+                    || (role === 'salesman' && await salesmanCoversState(scope.salesmanId, party.state_id))
                     || (role === 'distributor' && party.distributor_id === scope.distributorId);
                 if (!allowed) {
                     return res.status(403).json({ error: 'Access denied' });
@@ -342,10 +343,30 @@ class PartyController {
                 return res.status(404).json({ error: `State not found: ${state_id}` });
             }
 
+            // A salesman or distributor can only add parties in the states they work in.
+            if (!canManageParties(req.userRoleNames)) {
+                const creatorScope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                if (creatorScope.salesmanId && hasRole(req.userRoleNames, 'salesman')) {
+                    if (!(await salesmanCoversState(creatorScope.salesmanId, resolvedStateId))) {
+                        return res.status(403).json({ error: 'You can only add parties in the states you work in.' });
+                    }
+                } else if (creatorScope.distributorId && hasRole(req.userRoleNames, 'distributor')) {
+                    if (!(await distributorCoversState(creatorScope.distributorId, resolvedStateId))) {
+                        return res.status(403).json({ error: 'You can only add parties in the states you work in.' });
+                    }
+                }
+            }
+
             // Auto-assign distributor & salesman from whoever covers this state.
             // A value explicitly passed in the body always wins (manual override).
             let finalDistributorId = distributor_id || null;
             let finalSalesmanId = salesman_id || null;
+            if (!canManageParties(req.userRoleNames)) {
+                // The person who adds the party is its default salesman / distributor.
+                const me = await resolveUserScope(req.user.user_id, req.userRoleName);
+                if (!finalSalesmanId && me.salesmanId && hasRole(req.userRoleNames, 'salesman')) finalSalesmanId = me.salesmanId;
+                if (!finalDistributorId && me.distributorId && hasRole(req.userRoleNames, 'distributor')) finalDistributorId = me.distributorId;
+            }
             if (!finalDistributorId) {
                 const ds = await DistributorStates.findOne({ where: { state_id: resolvedStateId } });
                 if (ds) finalDistributorId = ds.distributor_id;
