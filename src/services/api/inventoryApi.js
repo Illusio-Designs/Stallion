@@ -192,6 +192,18 @@ export const deleteProductFromTray = async (trayProductData) => {
   });
 };
 
+/**
+ * Move pieces out of a tray: back to the warehouse (no to_tray_id) or into another tray.
+ * @param {Array<{from_tray_id, product_id, qty?, to_tray_id?}>} transfers
+ */
+export const transferTrayProducts = async (transfers) => {
+  return apiRequest('/tray_products/transfer', {
+    method: 'POST',
+    body: { transfers },
+    includeAuth: true,
+  });
+};
+
 // ==================== EVENT ENDPOINTS ====================
 
 /**
