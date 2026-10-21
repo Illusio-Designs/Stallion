@@ -4,18 +4,18 @@ const { logAudit } = require('../utils/auditLogger');
 const { normalizeRole, isOfficeRole } = require('../utils/roleHelpers');
 const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 
-async function resolveSalesmanIdForUser(userId, roleName) {
-    if (normalizeRole(roleName) === 'salesman') {
-        const salesman = await Salesman.findOne({ where: { user_id: userId } });
-        return salesman ? salesman.salesman_id : null;
-    }
-    return null;
+// A user's expenses belong to the salesman record linked to their login. The
+// record is the proof, so this does not depend on which role happens to be listed
+// first when a person holds several roles (that made multi-role salesmen fail).
+async function resolveSalesmanIdForUser(userId) {
+    const salesman = await Salesman.findOne({ where: { user_id: userId } });
+    return salesman ? salesman.salesman_id : null;
 }
 
 class SalesmanExpenseController {
     async getSalesmanExpenses(req, res) {
         try {
-            const salesmanId = await resolveSalesmanIdForUser(req.user.user_id, req.userRoleName);
+            const salesmanId = await resolveSalesmanIdForUser(req.user.user_id);
             if (!salesmanId) {
                 return res.status(404).json({ error: 'Salesman record not found for this user' });
             }
@@ -103,7 +103,7 @@ class SalesmanExpenseController {
 
     async createSalesmanExpense(req, res) {
         try {
-            const salesmanId = await resolveSalesmanIdForUser(req.user.user_id, req.userRoleName);
+            const salesmanId = await resolveSalesmanIdForUser(req.user.user_id);
             if (!salesmanId) {
                 return res.status(404).json({ error: 'Salesman record not found for this user' });
             }
@@ -149,7 +149,7 @@ class SalesmanExpenseController {
                 return res.status(404).json({ error: 'Salesman expense not found' });
             }
 
-            const salesmanId = await resolveSalesmanIdForUser(req.user.user_id, req.userRoleName);
+            const salesmanId = await resolveSalesmanIdForUser(req.user.user_id);
             const isOwner = normalizeRole(req.userRoleName) === 'salesman'
                 && existingExpense.salesman_id === salesmanId;
             const isOffice = isOfficeRole(req.userRoleNames);
@@ -196,7 +196,7 @@ class SalesmanExpenseController {
 
     async uploadImages(req, res) {
         try {
-            const salesmanId = await resolveSalesmanIdForUser(req.user.user_id, req.userRoleName);
+            const salesmanId = await resolveSalesmanIdForUser(req.user.user_id);
             if (!salesmanId) {
                 return res.status(404).json({ error: 'Salesman record not found for this user' });
             }
@@ -252,7 +252,7 @@ class SalesmanExpenseController {
                 return res.status(404).json({ error: 'Salesman expense not found' });
             }
 
-            const salesmanId = await resolveSalesmanIdForUser(req.user.user_id, req.userRoleName);
+            const salesmanId = await resolveSalesmanIdForUser(req.user.user_id);
             const isOwner = normalizeRole(req.userRoleName) === 'salesman' && salesmanExpense.salesman_id === salesmanId;
             if (!isOwner && !isOfficeRole(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
