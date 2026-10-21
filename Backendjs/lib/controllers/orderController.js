@@ -773,6 +773,12 @@ class OrderController {
             // sequence). We still capture the previous status to guard the
             // cancellation inventory reversal below against running twice.
             const currentStatus = order.order_status;
+            // A cancelled order stays cancelled. Its stock was already returned, and
+            // moving it back would leave the shelf count too high because nothing takes
+            // the stock out again. To order the same frames again, place a new order.
+            if (currentStatus === OrderStatus.CANCELLED && order_status !== OrderStatus.CANCELLED) {
+                return res.status(400).json({ error: 'A cancelled order cannot be reopened. Place a new order instead.' });
+            }
             if (order_status === OrderStatus.DISPATCHED || order_status === OrderStatus.PARTIALLY_DISPATCHED) {
                 if (!courier_name || !courier_tracking_number) {
                     return res.status(400).json({ error: 'Courier name and tracking number are required' });
