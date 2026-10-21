@@ -668,7 +668,7 @@ const DashboardSettings = () => {
           </div>
 
           {isAdmin && (
-            <div className="dash-card full settings p-4 min-[561px]:p-6 mt-6 border border-error/40">
+            <div className="dash-card full settings p-4 min-[561px]:p-6 mt-6 border border-error/40 settings-danger">
               <div className="settings-header mb-4">
                 <h4 className="settings-title m-0 text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.01em] font-semibold text-error">Danger Zone</h4>
                 <p className="settings-subtitle mt-1 mb-0 text-text-muted text-[length:var(--text-base)] leading-[var(--leading-normal)]">

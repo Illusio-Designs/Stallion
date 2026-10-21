@@ -40,3 +40,49 @@
   display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px;
   background: #f4f4f4; border: 1px solid #e1e1e1; color: #0a0a0a; font-size: 12px; font-weight: 600; white-space: nowrap;
 }
+
+/* Multi-role dropdown (Office team, Salesmen zones): real small checkboxes, not stretched inputs */
+:root .ui-dropdown-custom__option .ui-checkbox {
+  width: 18px; height: 18px; min-height: 0; padding: 0; flex: none; border-radius: 5px;
+  accent-color: #0a0a0a;
+}
+
+/* ===== Reports: horizontal bar list (grey track, black fill) ===== */
+:root .dash-card.full.an-bars { padding: 20px; }
+.an-bars__title { margin: 0 0 6px; font-size: 18px; font-weight: 700; }
+.an-bars__list { list-style: none; margin: 0; padding: 0; }
+.an-bars__row { display: flex; align-items: center; gap: 12px; padding: 8px 0; }
+.an-bars__name { width: 150px; flex: none; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.an-bars__row .prog { flex: 1; min-width: 40px; }
+.an-bars__val { width: 90px; flex: none; text-align: right; font-size: 14px; font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) {
+  .an-bars__name { width: 96px; }
+  .an-bars__val { width: 76px; font-size: 13px; }
+}
+/* Chart colours: black and grey only */
+:root .srchart__bar--sales { fill: #0a0a0a; }
+:root .srchart__bar--revenue { fill: #b5b5b5; }
+:root .srchart__legend-item--sales::before { background: #0a0a0a; }
+:root .srchart__legend-item--revenue::before { background: #b5b5b5; }
+:root .analytics-card.metric { border-color: #e1e1e1; border-radius: 14px; box-shadow: none; }
+:root .analytics-card .metric-value { font-size: 28px; }
+@media (max-width: 639.98px) {
+  :root .analytics-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root .analytics-summary > .analytics-card { grid-column: auto; padding: 16px; }
+  :root .analytics-card .metric-value { font-size: 22px; }
+}
+
+/* ===== Support: quick answers ===== */
+.support-faq__list { margin: 12px 0 0; display: flex; flex-direction: column; }
+.support-faq__item { padding: 14px 0; border-top: 1px solid #e1e1e1; }
+.support-faq__item:first-child { border-top: 0; padding-top: 6px; }
+.support-faq__item dt { font-weight: 700; color: #0a0a0a; font-size: 15px; }
+.support-faq__item dd { margin: 4px 0 0; color: #595959; font-size: 14px; line-height: 1.5; }
+:root .support-form textarea.ui-input { min-height: 120px; }
+
+/* ===== Settings: danger zone in red, round profile photo ===== */
+:root .dash-card.settings-danger { border-color: #e9b5b0; background: #fffafa; }
+:root .dash-card.settings-danger .settings-title { color: #b3261e; }
+:root .dash-card.settings-danger .settings-title::before { content: none; }
+:root .settings-avatar__preview { border-radius: 50%; overflow: hidden; }
+:root .support-faq .support-title { color: #0a0a0a; }

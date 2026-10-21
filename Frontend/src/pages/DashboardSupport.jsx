@@ -32,7 +32,7 @@ const DashboardSupport = () => {
           <div className="dash-card full support p-5 min-[481px]:p-6">
             <div className="support-header flex items-end justify-between gap-4 mb-5 min-[481px]:mb-6">
               <div>
-                <h4 className="support-title m-0 text-[var(--text-lg)] leading-tight tracking-[-0.01em] font-semibold text-text">Contact Support</h4>
+                <h4 className="support-title m-0 text-[var(--text-lg)] leading-tight tracking-[-0.01em] font-semibold text-text">Contact support</h4>
                 <p className="support-subtitle mt-2 mb-0 text-text-muted text-[var(--text-sm)] leading-snug">Send us your query and we will get back to you.</p>
               </div>
             </div>
@@ -55,6 +55,25 @@ const DashboardSupport = () => {
                 <Button type="submit">Send</Button>
               </div>
             </form>
+          </div>
+        </div>
+        <div className="dash-row">
+          <div className="dash-card full support support-faq p-5 min-[481px]:p-6">
+            <h4 className="support-title m-0">Quick answers</h4>
+            <dl className="support-faq__list">
+              <div className="support-faq__item">
+                <dt>I did not get my code</dt>
+                <dd>Wait 30 seconds, then tap Resend. You can resend 3 times in 15 minutes.</dd>
+              </div>
+              <div className="support-faq__item">
+                <dt>I cannot place a visit order</dt>
+                <dd>You must be within 50 m of the shop, and the shop location must be saved first.</dd>
+              </div>
+              <div className="support-faq__item">
+                <dt>A page says Access denied</dt>
+                <dd>Your role cannot change that data. Ask an admin.</dd>
+              </div>
+            </dl>
           </div>
         </div>
       </div>

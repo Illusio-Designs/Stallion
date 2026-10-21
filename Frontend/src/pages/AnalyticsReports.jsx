@@ -46,7 +46,7 @@ const titleCase = (s) =>
 // Inline achievement progress bar
 const Progress = ({ pct }) => {
   const v = Math.max(0, Math.min(100, Math.round(pct)));
-  const color = v >= 100 ? 'var(--color-success)' : v >= 50 ? 'var(--color-primary)' : 'var(--color-warning)';
+  const color = v >= 50 ? '#0a0a0a' : '#8c8c8c';
   return (
     <div className="flex items-center gap-2 min-w-[120px]">
       <div className="flex-1 h-[6px] rounded-[999px] bg-[var(--color-grey-200)] overflow-hidden">
@@ -274,6 +274,20 @@ const AnalyticsReports = () => {
     return { total, achieved, due, pct };
   }, [targets]);
 
+  // Achieved amount per salesman (display only, from the same targets list).
+  const bySalesman = useMemo(() => {
+    const sums = {};
+    targets.forEach((t) => {
+      const id = t.salesman_id || 'na';
+      sums[id] = (sums[id] || 0) + (Number(t.completed_amount) || 0);
+    });
+    const list = Object.keys(sums).map((id) => ({ id, name: salesmanName(id === 'na' ? null : id), amount: sums[id] }))
+      .sort((a, b) => b.amount - a.amount).slice(0, 8);
+    const max = list.reduce((m, r) => Math.max(m, r.amount), 0);
+    return list.map((r) => ({ ...r, pct: max > 0 ? Math.round((r.amount / max) * 100) : 0 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [targets, salesmen]);
+
   const targetColumns = useMemo(() => ([
     { key: 'salesman', label: 'SALESMAN', width: '150px' },
     { key: 'period', label: 'PERIOD', width: '200px' },
@@ -394,6 +408,23 @@ const AnalyticsReports = () => {
                 </div>
               ))}
             </div>
+
+            {!loading && bySalesman.length > 0 && (
+              <div className="dash-row">
+                <div className="dash-card full an-bars">
+                  <h3 className="an-bars__title">Achieved by salesman</h3>
+                  <ul className="an-bars__list">
+                    {bySalesman.map((r) => (
+                      <li key={r.id} className="an-bars__row">
+                        <span className="an-bars__name">{r.name}</span>
+                        <span className="prog" role="img" aria-label={`${r.name}: ${money(r.amount)}`}><i style={{ width: `${r.pct}%` }} /></span>
+                        <b className="an-bars__val">{money(r.amount)}</b>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )}
 
             <div className="dash-row">
               <div className="dash-card full">
