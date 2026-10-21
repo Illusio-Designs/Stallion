@@ -983,7 +983,7 @@ const DashboardSuppliers = () => {
           onClick={() => handleInputChange('is_active', !active)}
           className="inline-flex items-center gap-3 cursor-pointer select-none border-0 bg-transparent p-0"
         >
-          <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${active ? 'bg-success' : 'bg-border-strong'}`}>
+          <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${active ? 'bg-primary' : 'bg-border-strong'}`}>
             <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${active ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </span>
           <span className={`text-[length:var(--text-sm)] font-semibold ${active ? 'text-success' : 'text-text-muted'}`}>
