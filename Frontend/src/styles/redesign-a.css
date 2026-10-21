@@ -141,7 +141,7 @@ td.rda-empty { padding: 22px 0; }
 :root .dashboard-sidebar-nav a:focus-visible { box-shadow: 0 0 0 2px #ffffff; }
 :root .dashboard-sidebar-footer { padding: 12px; }
 /* Tooltips on the rail: black chip with a hairline, readable against the black rail */
-:root .sidebar-tooltip--fixed { background: #ffffff; color: #0a0a0a; border: 1px solid #e1e1e1; font-weight: 600; box-shadow: 0 8px 24px -8px rgba(10, 10, 10, 0.35); border-radius: 8px; padding: 6px 10px; left: 72px !important; }
+:root .sidebar-tooltip--fixed { background: #ffffff; color: #0a0a0a; border: 1px solid #e1e1e1; font-weight: 600; box-shadow: 0 8px 24px -8px rgba(10, 10, 10, 0.35); border-radius: 8px; padding: 6px 10px; left: 84px !important; }
 :root .sidebar-tooltip--fixed::after { border-right-color: #ffffff; }
 /* Phone drawer: wide enough for the labels, black like the desktop sidebar */
 @media (max-width: 767.98px) {
