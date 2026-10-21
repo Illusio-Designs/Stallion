@@ -371,7 +371,6 @@ const DashboardClients = () => {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
           onEdit={canEditParty ? () => handleEdit(row) : undefined}
-          onDelete={isPartyManager ? () => handleDelete(row) : undefined}
         />
       )
     },
