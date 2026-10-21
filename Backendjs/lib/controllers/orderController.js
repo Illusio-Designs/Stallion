@@ -795,9 +795,25 @@ class OrderController {
             // Reverse stock only when an order first transitions INTO cancelled,
             // not on a cancelled -> cancelled no-op (which would reverse twice).
             if (order_status === OrderStatus.CANCELLED && currentStatus !== OrderStatus.CANCELLED) {
-                await sequelize.transaction(async (transaction) => {
-                    await reverseOrderOperation(order.order_id, transaction);
+                // Two people can press Cancel at the same moment. Lock the order row and
+                // read its status again INSIDE the transaction: the second request waits
+                // here, then sees "cancelled" and returns the stock zero times, not twice.
+                const outcome = await sequelize.transaction(async (transaction) => {
+                    const locked = await Order.findOne({
+                        where: { order_id: order.order_id },
+                        transaction,
+                        lock: transaction.LOCK.UPDATE,
+                    });
+                    if (!locked || locked.order_status === OrderStatus.CANCELLED) return 'already';
+                    await reverseOrderOperation(locked.order_id, transaction);
+                    locked.order_status = OrderStatus.CANCELLED;
+                    locked.updated_at = new Date();
+                    await locked.save({ transaction });
+                    return 'done';
                 });
+                if (outcome === 'already') {
+                    return res.status(409).json({ error: 'This order was just cancelled by someone else.' });
+                }
             }
             order.order_status = order_status;
             order.updated_at = new Date();
@@ -832,10 +848,22 @@ class OrderController {
             if (!order) {
                 return res.status(404).json({ error: 'Order not found' });
             }
-            if (order.order_status !== OrderStatus.CANCELLED && order.order_status !== OrderStatus.COMPLETED) {
-                await sequelize.transaction(async (transaction) => {
-                    await reverseOrderOperation(order.order_id, transaction);
+            // Lock the order and re-read its status inside the transaction so a double click
+            // (or a cancel at the same moment) cannot return the stock twice.
+            const alreadyGone = await sequelize.transaction(async (transaction) => {
+                const locked = await Order.findOne({
+                    where: { order_id: order.order_id },
+                    transaction,
+                    lock: transaction.LOCK.UPDATE,
                 });
+                if (!locked) return true;
+                if (locked.order_status !== OrderStatus.CANCELLED && locked.order_status !== OrderStatus.COMPLETED) {
+                    await reverseOrderOperation(locked.order_id, transaction);
+                }
+                return false;
+            });
+            if (alreadyGone) {
+                return res.status(404).json({ error: 'Order not found' });
             }
             const snapshot = order.toJSON();
             // Clear the rows that reference this order before deleting it,
