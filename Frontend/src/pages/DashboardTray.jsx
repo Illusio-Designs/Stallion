@@ -7,6 +7,7 @@ import {
   addProductToTray,
   deleteProductFromTray,
   deleteTray,
+  transferTrayProducts,
   getBrands,
   getCollections,
   getProductsPage,
@@ -22,7 +23,8 @@ import '../styles/pages/dashboard.css';
 const TrayStatus = {
   AVAILABLE: 'available',
   ASSIGNED: 'assigned',
-  CLOSED: 'closed'
+  CLOSED: 'closed',
+  INACTIVE: 'inactive'
 };
 
 const TrayProductStatus = {
@@ -80,6 +82,7 @@ const traySince = (t) => {
 const trayState = (t) => {
   const st = String(t.tray_status || '').toLowerCase();
   if (st === TrayStatus.CLOSED) return 'closed';
+  if (st === TrayStatus.INACTIVE) return 'inactive';
   const due = t.due_date || t.return_by;
   if (st === 'overdue' || t.is_overdue || t.overdue || (st === TrayStatus.ASSIGNED && due && new Date(due) < new Date())) return 'overdue';
   if (st === TrayStatus.ASSIGNED) return 'assigned';
@@ -90,6 +93,7 @@ const TRAY_PILL = {
   assigned: ['info', 'With a salesman'],
   overdue: ['bad', 'Overdue'],
   closed: ['idle', 'Closed'],
+  inactive: ['idle', 'Inactive (salesman left)'],
 };
 
 const DashboardTray = () => {
@@ -390,6 +394,33 @@ const DashboardTray = () => {
       await fetchTrays(); // Refresh tray list
     } catch (err) {
       const message = err.message || 'Failed to remove product from tray';
+      setError(message);
+      showError(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Move a piece to the warehouse or into another tray (toTrayId '' = warehouse).
+  const handleMoveProduct = async (trayProduct, toTrayId) => {
+    if (!trayProduct?.product_id || !selectedTray || toTrayId === undefined || toTrayId === null) return;
+    const target = toTrayId === '' ? 'the warehouse' : 'the selected tray';
+    const confirmed = await confirm(`Move this piece to ${target}?`);
+    if (!confirmed) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await transferTrayProducts([{
+        from_tray_id: selectedTray,
+        product_id: trayProduct.product_id,
+        ...(toTrayId ? { to_tray_id: toTrayId } : {}),
+      }]);
+      showSuccess(toTrayId ? 'Moved to the other tray' : 'Moved back to the warehouse');
+      const items = await getProductsInTray(selectedTray);
+      setTrayProducts(Array.isArray(items) ? items : []);
+      await fetchTrays();
+    } catch (err) {
+      const message = err.message || 'Failed to move the piece';
       setError(message);
       showError(message);
     } finally {
@@ -887,10 +918,27 @@ const DashboardTray = () => {
                                     </span>
                                   </td>
                                   <td className="p-3">
-                                    <RowActions
-                                      onEdit={() => startEditProduct(tp)}
-                                      onDelete={() => handleRemoveProduct(tp)}
-                                    />
+                                    <div className="flex items-center gap-2">
+                                      <select
+                                        className="ui-input"
+                                        aria-label="Move this piece to"
+                                        value=""
+                                        disabled={saving}
+                                        onChange={(e) => handleMoveProduct(tp, e.target.value === '__warehouse' ? '' : e.target.value)}
+                                      >
+                                        <option value="" disabled>Move to…</option>
+                                        <option value="__warehouse">Warehouse</option>
+                                        {trays
+                                          .filter((t) => (t.tray_id || t.id) !== selectedTray && t.tray_status !== 'inactive')
+                                          .map((t) => (
+                                            <option key={t.tray_id || t.id} value={t.tray_id || t.id}>{t.tray_name || t.name}</option>
+                                          ))}
+                                      </select>
+                                      <RowActions
+                                        onEdit={() => startEditProduct(tp)}
+                                        onDelete={() => handleRemoveProduct(tp)}
+                                      />
+                                    </div>
                                   </td>
                                 </tr>
                               );

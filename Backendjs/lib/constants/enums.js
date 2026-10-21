@@ -1,7 +1,9 @@
 const TrayStatus = {
     AVAILABLE: 'available',
     ASSIGNED: 'assigned',
-    CLOSED: 'closed'
+    CLOSED: 'closed',
+    // The owner (a salesman) has left and the tray is empty. It comes back when they rejoin.
+    INACTIVE: 'inactive'
 };
 
 const TrayProductStatus = {

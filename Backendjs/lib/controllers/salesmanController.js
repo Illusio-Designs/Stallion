@@ -2,6 +2,7 @@ const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const Tray = require('../models/Tray');
 const { TrayStatus } = require('../constants/enums');
+const { syncSalesmanTrays } = require('../utils/trayLifecycle');
 const SalesmanTray = require('../models/SalesmanTray');
 const SalesmanZones = require('../models/SalesmanZones');
 const Zone = require('../models/Zone');
@@ -464,6 +465,9 @@ class SalesmanController {
                     await SalesmanStates.create({ salesman_id: id, state_id: stId });
                 }
             }
+            if (is_active !== undefined && is_active !== null) {
+                await syncSalesmanTrays(id);
+            }
             await logAudit({
                 req,
                 action: 'update',
@@ -484,33 +488,10 @@ class SalesmanController {
         }
     }
 
+    // A salesman is never deleted: orders, check-ins, targets, expenses and the tray all
+    // refer to them. When a salesman leaves, make them inactive instead.
     async deleteSalesman(req, res) {
-        try {
-            const id = req.params.id;
-            if (!id) {
-                return res.status(400).json({ error: 'Salesman ID is required' });
-            }
-            const salesman = await Salesman.findOne({ where: { salesman_id: id } });
-            if (!salesman) {
-                return res.status(404).json({ error: 'Salesman not found' });
-            }
-            const snapshot = salesman.toJSON();
-            await SalesmanZones.destroy({ where: { salesman_id: id } });
-            await SalesmanStates.destroy({ where: { salesman_id: id } });
-            await salesman.destroy();
-            await logAudit({
-                req,
-                action: 'delete',
-                description: 'Salesman deleted',
-                tableName: 'salesmen',
-                recordId: id,
-                oldValues: snapshot,
-                newValues: null,
-            });
-            res.status(200).json({ message: 'Salesman deleted successfully' });
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        }
+        return res.status(409).json({ error: 'A salesman cannot be deleted because their records are kept. Make the salesman inactive instead.' });
     }
 
     // Salesmen whose working states include the given state (name or id).
