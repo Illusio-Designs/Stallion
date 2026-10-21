@@ -140,3 +140,21 @@ h1, h2, h3,
   .dashboard-layout .dashboard-icon-btn[aria-label$="Fullscreen"] { display: none; }
   .dashboard-layout .dashboard-header-actions { gap: 8px; }
 }
+
+/* Tables: show full values (the card scrolls sideways) instead of clipping them with an
+   ellipsis, and keep body text ink black. dashboard-suppliers.css applied this clipping to
+   every table in the dashboard, not only the Salesmen ones. */
+:root .dash-card .ui-table tbody td {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+}
+:root .dash-card .ui-table tbody td:nth-child(n + 3) { color: var(--color-text); }
+
+/* Country filter on Party, Salesmen and Distributor: a plain label above the field, no inner box */
+.dash-row > .dash-card.full[style*="max-width: 360px"] {
+  border: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+}
