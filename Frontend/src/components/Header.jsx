@@ -269,6 +269,19 @@ const Header = ({ onPageChange, currentPage }) => {
               {item.text}
             </a>
           ))}
+          {/* Account links live in the menu on phones (the header keeps only Cart and Menu). */}
+          {isMenuOpen && (
+            <div className="drawer-account mt-2 flex flex-col gap-1 border-t border-border pt-3 md:hidden">
+              {loggedIn ? (
+                <>
+                  <a href="/dashboard" onClick={(e) => { e.preventDefault(); setIsMenuOpen(false); handleDashboardClick(); }}>My Dashboard</a>
+                  <a href="/login" onClick={(e) => { e.preventDefault(); setIsMenuOpen(false); handleLogout(); }}>Logout</a>
+                </>
+              ) : (
+                <a href="/login" onClick={(e) => { e.preventDefault(); setIsMenuOpen(false); if (onPageChange) onPageChange('login'); else window.location.href = '/login'; }}>Sign in</a>
+              )}
+            </div>
+          )}
         </nav>
 
         <div className="header-actions flex items-center gap-2 md:gap-5">

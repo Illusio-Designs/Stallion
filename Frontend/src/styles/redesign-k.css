@@ -1,0 +1,31 @@
+/* Phone header: two big round buttons, no bottom bar.
+   Shop header: Cart + Menu. Dashboard header: Menu + Profile. */
+@media (max-width: 767px) {
+  /* Shop header */
+  :root .header-actions { gap: 10px; }
+  :root .header-actions .user-menu-container { display: none; }
+  :root .header-actions .cart-btn,
+  :root .header-actions .icon-btn.menu-btn {
+    width: 48px; height: 48px; min-width: 48px; padding: 0; border-radius: 999px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: var(--color-surface, #fff); color: #0a0a0a; border: 1.5px solid #0a0a0a;
+    position: relative;
+  }
+  :root .header-actions .cart-btn .hd-btn__text { display: none; }
+  :root .header-actions .cart-btn svg { width: 24px; height: 24px; }
+  :root .header-actions .icon-btn.menu-btn { background: #0a0a0a; color: #fff; }
+  :root .header-actions .icon-btn.menu-btn svg { width: 26px; height: 26px; }
+  :root .header-actions .cart-btn .cart-badge { position: absolute; top: -4px; right: -4px; }
+  :root .nav-menu .drawer-account a { display: block; padding: 12px 4px; font-weight: 600; }
+
+  /* Dashboard header */
+  :root .dashboard-header-content { min-height: 64px; }
+  :root .dashboard-menu-btn {
+    width: 48px; height: 48px; border-radius: 999px; background: #0a0a0a; color: #fff; margin-left: 0;
+  }
+  :root .dashboard-menu-btn svg { width: 26px; height: 26px; }
+  :root .dashboard-action-icons > :not(.dashboard-user-menu) { display: none !important; }
+  :root .dashboard-back-shop { display: none !important; }
+  :root .dashboard-avatar-btn { width: 48px; height: 48px; border: 1.5px solid #0a0a0a; background: #fff; }
+  :root .dashboard-avatar-btn .dashboard-avatar-initials { font-size: 16px; }
+}
