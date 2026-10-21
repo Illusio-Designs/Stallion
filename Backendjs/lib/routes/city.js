@@ -1,6 +1,7 @@
 
 
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const cityController = require('../controllers/cityController');
 const { authenticateToken } = require('../middleware/auth');
@@ -13,6 +14,6 @@ router.get('/:id', authenticateToken, cityController.getCityById);
 router.post('/get', authenticateToken, cityController.getCities);
 router.post('/', authenticateToken, canWrite, cityController.createCity);
 router.put('/:id', authenticateToken, canWrite, cityController.updateCity);
-router.delete('/:id', authenticateToken, canWrite, cityController.deleteCity);
+router.delete('/:id', authenticateToken, noDelete('A city'));
 
 module.exports = router;

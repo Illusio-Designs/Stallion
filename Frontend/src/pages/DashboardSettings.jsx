@@ -696,14 +696,6 @@ const DashboardSettings = () => {
                 <div className="settings-actions flex flex-wrap items-center justify-end gap-3">
                   <Button
                     type="button"
-                    variant="secondary"
-                    onClick={handleDeleteAllParties}
-                    disabled={deletingParties || wiping || wipeConfirmText !== WIPE_CONFIRM_PHRASE}
-                  >
-                    {deletingParties ? 'Deleting…' : 'Delete all parties'}
-                  </Button>
-                  <Button
-                    type="button"
                     variant="danger"
                     onClick={handleWipeData}
                     disabled={wiping || deletingParties || wipeConfirmText !== WIPE_CONFIRM_PHRASE}

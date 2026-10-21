@@ -2037,7 +2037,7 @@ const DashboardProducts = () => {
       key: 'action', label: 'ACTION', width: '100px', render: (_v, row) => (
         <RowActions
           onEdit={() => handleEdit(row)}
-          onDelete={() => handleDelete(row)}
+
           onUpload={(!row.data?.image_url && activeTab === 'Unuploaded Media Gallery')
             ? () => handleAttachImage(row)
             : undefined}
@@ -2622,7 +2622,6 @@ const DashboardProducts = () => {
                           status={item.type}
                           deletable={item.type !== 'assigned'}
                           loading={loading}
-                          onDelete={handleDelete}
                         />
                       );
                     })}

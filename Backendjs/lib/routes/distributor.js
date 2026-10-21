@@ -1,5 +1,6 @@
 
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const distributorController = require('../controllers/distributorController');
 const { authenticateToken } = require('../middleware/auth');
@@ -15,6 +16,6 @@ router.get('/:id', authenticateToken, distributorController.getDistributorById);
 router.post('/', authenticateToken, canWrite, distributorController.createDistributor);
 router.post('/get', authenticateToken, distributorController.getDistributors);
 router.put('/:id', authenticateToken, canWrite, distributorController.updateDistributor);
-router.delete('/:id', authenticateToken, canWrite, distributorController.deleteDistributor);
+router.delete('/:id', authenticateToken, noDelete('A distributor'));
 
 module.exports = router;

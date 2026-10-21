@@ -1670,7 +1670,7 @@ const DashboardSuppliers = () => {
                     { key: 'target_description', label: 'DESCRIPTION' },
                     ...(!isSalesman ? [{
                       key: 'action', label: 'ACTION', render: (_v, row) => (
-                        <RowActions onEdit={() => handleTargetEdit(row)} onDelete={() => handleTargetDelete(row)} />
+                        <RowActions onEdit={() => handleTargetEdit(row)}/>
                       )
                     }] : []),
                   ]}

@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const collectionController = require('../controllers/collectionController');
 const { authenticateToken } = require('../middleware/auth');
@@ -10,6 +11,6 @@ const canWrite = checkRole(['admin', 'product_manager']);
 router.get('/', collectionController.getCollections);
 router.post('/', authenticateToken, canWrite, collectionController.createCollection);
 router.put('/:id', authenticateToken, canWrite, collectionController.updateCollection);
-router.delete('/:id', authenticateToken, canWrite, collectionController.deleteCollection);
+router.delete('/:id', authenticateToken, noDelete('A collection'));
 
 module.exports = router;

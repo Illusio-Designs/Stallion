@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const genderController = require('../controllers/genderController');
 const { authenticateToken } = require('../middleware/auth');
@@ -11,6 +12,6 @@ router.get('/', authenticateToken, genderController.getGenders);
 router.get('/:id', authenticateToken, genderController.getGenderById);
 router.post('/', authenticateToken, canWrite, genderController.createGender);
 router.put('/:id', authenticateToken, canWrite, genderController.updateGender);
-router.delete('/:id', authenticateToken, canWrite, genderController.deleteGender);
+router.delete('/:id', authenticateToken, noDelete('A gender'));
 
 module.exports = router;

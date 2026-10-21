@@ -592,7 +592,6 @@ const DashboardOrders = () => {
         onEdit={canEditOrder ? () => openEditPanel(row) : undefined}
         onDownload={() => handleDownload(row)}
         // Delete is admin-only (the backend also enforces canManageOrders).
-        onDelete={isAdmin ? () => handleDelete(row) : undefined}
       />
     ) },
   ]), [isAdmin, canEditOrder]);

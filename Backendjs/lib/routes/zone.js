@@ -1,5 +1,6 @@
 
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const zoneController = require('../controllers/zoneController');
 const { authenticateToken } = require('../middleware/auth');
@@ -13,6 +14,6 @@ router.post('/get', authenticateToken, zoneController.getZones);
 router.post('/my', authenticateToken, zoneController.getMyZones);
 router.post('/', authenticateToken, canWrite, zoneController.createZone);
 router.put('/:id', authenticateToken, canWrite, zoneController.updateZone);
-router.delete('/:id', authenticateToken, canWrite, zoneController.deleteZone);
+router.delete('/:id', authenticateToken, noDelete('A zone'));
 
 module.exports = router;

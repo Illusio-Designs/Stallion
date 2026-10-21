@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const lensColorsController = require('../controllers/lensColorsController');
 const { authenticateToken } = require('../middleware/auth');
@@ -11,6 +12,6 @@ router.get('/', authenticateToken, lensColorsController.getLensColors);
 router.get('/:id', authenticateToken, lensColorsController.getLensColorById);
 router.post('/', authenticateToken, canWrite, lensColorsController.createLensColor);
 router.put('/:id', authenticateToken, canWrite, lensColorsController.updateLensColor);
-router.delete('/:id', authenticateToken, canWrite, lensColorsController.deleteLensColor);
+router.delete('/:id', authenticateToken, noDelete('A lens colour'));
 
 module.exports = router;

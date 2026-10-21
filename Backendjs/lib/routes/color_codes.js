@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const colorCodesController = require('../controllers/colorCodesController');
 const { authenticateToken } = require('../middleware/auth');
@@ -10,6 +11,6 @@ const canWrite = checkRole(['admin', 'product_manager']);
 router.get('/', authenticateToken, colorCodesController.getColorCodes);
 router.post('/', authenticateToken, canWrite, colorCodesController.createColorCode);
 router.put('/:id', authenticateToken, canWrite, colorCodesController.updateColorCode);
-router.delete('/:id', authenticateToken, canWrite, colorCodesController.deleteColorCode);
+router.delete('/:id', authenticateToken, noDelete('A colour code'));
 
 module.exports = router;

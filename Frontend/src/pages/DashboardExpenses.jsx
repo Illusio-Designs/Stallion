@@ -484,20 +484,6 @@ const DashboardExpenses = () => {
                 </button>
               </>
             )}
-            {shouldShowSalesmanFeatures && row.originalExpense.status !== 'approved' && (
-              <button
-                className="ui-btn ui-btn--ghost ui-btn--sm has-tt"
-                onClick={() => handleDelete(row)}
-                disabled={loading}
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <path d="M3 6h18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M19 6l-.868 13.142A2 2 0 0 1 16.018 21H7.982a2 2 0 0 1-2.114-1.858L5 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span className="ui-tt">Delete</span>
-              </button>
-            )}
           </div>
         ) 
       },

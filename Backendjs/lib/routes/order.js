@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
 const { authenticateToken } = require('../middleware/auth');
@@ -8,7 +9,7 @@ router.get('/', authenticateToken, orderController.getOrders);
 router.post('/quote', authenticateToken, orderController.quoteOrder);
 router.post('/', authenticateToken, orderController.createOrder);
 router.put('/:id', authenticateToken, orderController.updateOrderStatus);
-router.delete('/:id', authenticateToken, orderController.deleteOrder);
+router.delete('/:id', authenticateToken, noDelete('An order'));
 
 
 module.exports = router;
