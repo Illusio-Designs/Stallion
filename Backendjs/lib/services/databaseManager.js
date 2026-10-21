@@ -41,6 +41,9 @@ class DatabaseManager {
             // MUST run first or init crash-loops with "Unknown column 'country_id'").
             await this.ensureUserLocationColumns();
             await this.ensurePartyBillingColumns();
+            // Logout support: tokens issued before this time are rejected. Must exist before any
+            // User query, because the User model selects it.
+            await this.ensureColumn('users', 'tokens_valid_from', 'DATETIME NULL');
 
             // Define table schemas
             const schemas = {
@@ -585,6 +588,29 @@ class DatabaseManager {
             );
         } catch (error) {
             console.log('⚠️ ensurePartyBillingColumns warning:', error.message);
+        }
+    }
+
+    /**
+     * Add a column to an existing table when it is missing (idempotent). Used for the
+     * manually managed tables (users, ...) that Sequelize's alter-sync does not touch.
+     */
+    static async ensureColumn(tableName, columnName, definition) {
+        try {
+            const [rows] = await sequelize.query(`
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND column_name = ?
+                LIMIT 1
+            `, { replacements: [tableName, columnName] });
+            if (rows.length === 0) {
+                await sequelize.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${definition}`);
+                console.log(`✅ Added column ${tableName}.${columnName}`);
+            }
+        } catch (error) {
+            console.log(`⚠️ Could not ensure column ${tableName}.${columnName}:`, error.message);
         }
     }
 
