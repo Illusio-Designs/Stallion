@@ -5,7 +5,7 @@ import Skeleton from '../components/ui/Skeleton';
 import { getFeaturedProducts, getCollections } from '../services/apiService';
 import { isLoggedIn } from '../services/authService';
 import { productPath } from '../utils/dashboardRoutes';
-import { FiPackage, FiCreditCard, FiGlobe } from 'react-icons/fi';
+import { FiPackage, FiCreditCard, FiGlobe } from '../components/icons/hugeicons';
 
 const Home = ({ onPageChange }) => {
   const [activeFilter, setActiveFilter] = useState('ALL');

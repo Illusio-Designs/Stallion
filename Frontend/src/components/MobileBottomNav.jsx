@@ -1,31 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { getCartCount, registerCartListener } from '../services/cartService';
 import { isLoggedIn } from '../services/authService';
+import { FiHome, FiShoppingBag, FiShoppingCart, FiUser } from './icons/hugeicons';
 
 // Bottom navigation for the storefront on phones (hidden ≥ md). It uses the same
 // look as the dashboard's bottom bar.
 const ICONS = {
-  home: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 10.5 12 3l9 7.5" /><path d="M5 9.5V21h14V9.5" />
-    </svg>
-  ),
-  shop: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <path d="M3 9h18l-1.5 11.5a1 1 0 0 1-1 .5H5.5a1 1 0 0 1-1-.5L3 9Z" /><path d="M8 9V6a4 4 0 0 1 8 0v3" />
-    </svg>
-  ),
-  cart: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-      <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
-    </svg>
-  ),
-  user: (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="12" cy="8" r="4" /><path d="M4 21c0-4 3.6-7 8-7s8 3 8 7" />
-    </svg>
-  ),
+  home: <FiHome size={23} aria-hidden="true" />,
+  shop: <FiShoppingBag size={23} aria-hidden="true" />,
+  cart: <FiShoppingCart size={23} aria-hidden="true" />,
+  user: <FiUser size={23} aria-hidden="true" />,
 };
 
 const MobileBottomNav = ({ onPageChange, currentPage }) => {

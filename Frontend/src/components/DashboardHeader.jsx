@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import '../styles/components/DashboardHeader.css';
-import { FiMaximize, FiMinimize, FiBell, FiMenu, FiSearch, FiSidebar, FiX } from 'react-icons/fi';
+import { FiMaximize, FiMinimize, FiBell, FiMenu, FiSearch, FiSidebar, FiX } from './icons/hugeicons';
 import Tooltip from './ui/Tooltip';
 import InstallAppButton from './InstallAppButton';
 import { resolveProfileImageUrl } from '../utils/profileImage';

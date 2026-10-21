@@ -1,20 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  FiGrid, FiPackage, FiShoppingCart, FiDollarSign, FiInbox, FiCalendar,
+  FiGrid, FiPackage, FiShoppingCart, FiInbox, FiCalendar,
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
-  FiHelpCircle, FiSettings, FiTag, FiMenu,
-} from 'react-icons/fi';
+  FiHelpCircle, FiSettings, FiTag,
+} from './icons/hugeicons';
+import RupeeIcon from './icons/RupeeIcon';
 import { getUserRoles } from '../services/authService';
 import { filterMenuItemsByRoles } from '../utils/rolePermissions';
 
 // Floating pill-style bottom navigation for the dashboard on phones
 // (hidden ≥ md), mirroring the storefront nav. Shows the top role-allowed
-// destinations plus a "Menu" button that opens the full sidebar drawer.
+// destinations. The full page list opens from the Menu button in the header.
 const ICONS = {
   dashboard: FiGrid,
   'dashboard-products': FiPackage,
   orders: FiShoppingCart,
-  expenses: FiDollarSign,
+  expenses: RupeeIcon,
   tray: FiInbox,
   events: FiCalendar,
   offers: FiTag,
@@ -49,7 +50,7 @@ const ALL_ITEMS = [
 // Short labels for the compact pill.
 const SHORT = { 'dashboard-products': 'Products', analytics: 'Reports', 'office-team': 'Team' };
 
-const DashboardBottomNav = ({ onPageChange, currentPage, onOpenMenu }) => {
+const DashboardBottomNav = ({ onPageChange, currentPage }) => {
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   // Union of every role the member holds (multi-role support).
@@ -58,7 +59,7 @@ const DashboardBottomNav = ({ onPageChange, currentPage, onOpenMenu }) => {
 
   const primary = useMemo(() => {
     const items = userRoles.length ? filterMenuItemsByRoles(ALL_ITEMS, userRoles) : ALL_ITEMS;
-    return items.slice(0, 4);
+    return items.slice(0, 5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolesKey]);
 
@@ -86,16 +87,6 @@ const DashboardBottomNav = ({ onPageChange, currentPage, onOpenMenu }) => {
           </button>
         );
       })}
-      {/* Menu — opens the full sidebar drawer with every destination. */}
-      <button
-        type="button"
-        onClick={onOpenMenu}
-        aria-label="Open menu"
-        className="inline-flex flex-col items-center justify-center"
-      >
-        <FiMenu size={21} aria-hidden="true" />
-        <span className="dashboard-bottom-nav__label">Menu</span>
-      </button>
     </nav>
   );
 };

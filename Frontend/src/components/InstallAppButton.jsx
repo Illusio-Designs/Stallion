@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { FiDownload, FiX, FiShare } from 'react-icons/fi';
+import { FiDownload, FiX, FiShare } from './icons/hugeicons';
 
 // "Add to Home Screen" for the dashboard.
 //  - Chrome / Edge / Android: the browser fires `beforeinstallprompt`; we keep it

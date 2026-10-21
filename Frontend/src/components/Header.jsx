@@ -4,7 +4,7 @@ import { getCartCount, registerCartListener } from '../services/cartService';
 import { isLoggedIn, logout as authLogout, getUser } from '../services/authService';
 import { resolveProfileImageUrl } from '../utils/profileImage';
 import { showLogoutSuccess } from '../services/notificationService';
-import { FiSearch, FiShoppingCart, FiUser, FiMenu, FiX } from 'react-icons/fi';
+import { FiSearch, FiShoppingCart, FiUser, FiMenu, FiX } from './icons/hugeicons';
 
 const Header = ({ onPageChange, currentPage }) => {
   const [isScrolled, setIsScrolled] = useState(false);
