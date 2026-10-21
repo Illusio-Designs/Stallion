@@ -262,8 +262,8 @@ class DistributorController {
                 gstin: gstin || distributor.gstin,
                 pan: pan || distributor.pan,
                 territory: territory || distributor.territory,
-                commission_rate: commission_rate || distributor.commission_rate,
-                is_active: is_active || distributor.is_active,
+                commission_rate: (commission_rate !== undefined && commission_rate !== null && commission_rate !== '') ? commission_rate : distributor.commission_rate,
+                is_active: (is_active !== undefined && is_active !== null) ? is_active : distributor.is_active,
                 updated_at: new Date(),
                 updated_by: user.user_id
             };
