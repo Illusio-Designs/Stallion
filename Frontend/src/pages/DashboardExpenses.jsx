@@ -17,8 +17,34 @@ import {
   deleteSalesmanExpense
 } from '../services/expenseService';
 import { showSuccess, showError } from '../services/notificationService';
-import { getUserRole, getUser } from '../services/authService';
+import { getUserRole, getUserRoles, getUser } from '../services/authService';
 import '../styles/pages/dashboard-expenses.css';
+
+
+const EXPENSE_TYPE_OPTIONS = [
+  { value: 'food', label: 'Food' },
+  { value: 'travel', label: 'Travel' },
+  { value: 'city_tour', label: 'City tour' },
+  { value: 'toll', label: 'Toll' },
+  { value: 'hotel', label: 'Hotel' },
+  { value: 'other', label: 'Other' },
+];
+const TRAVEL_MODE_OPTIONS = [
+  { value: 'bus', label: 'Bus' },
+  { value: 'train', label: 'Train' },
+  { value: 'rapido', label: 'Rapido' },
+  { value: 'auto', label: 'Auto' },
+  { value: 'cab', label: 'Cab' },
+  { value: 'metro', label: 'Metro' },
+  { value: 'bike', label: 'Bike' },
+  { value: 'own_vehicle', label: 'Own vehicle' },
+  { value: 'other', label: 'Other' },
+];
+const labelOf = (opts, v) => opts.find((o) => o.value === v)?.label || (v ? v.charAt(0).toUpperCase() + v.slice(1).replace(/_/g, ' ') : 'N/A');
+const typeLabel = (e) => {
+  const base = labelOf(EXPENSE_TYPE_OPTIONS, e.expense_type);
+  return e.expense_type === 'travel' && e.travel_mode ? `${base} · ${labelOf(TRAVEL_MODE_OPTIONS, e.travel_mode)}` : base;
+};
 
 const DashboardExpenses = () => {
   const confirm = useConfirm();
@@ -39,14 +65,20 @@ const DashboardExpenses = () => {
   const userRole = getUserRole();
   const user = getUser();
   
-  // More flexible role checking
+  // Who sees which view. Only the admin reviews EVERY salesman's claims (approve / reject).
+  // Only a salesman files and tracks their own. Other roles do not get this page at all.
+  // A person with several roles gets the review view if any of them is admin.
+  const REVIEWER_ROLES = ['admin', 'administrator'];
+  const allRoles = (typeof getUserRoles === 'function' ? getUserRoles() : []).map((r) => String(r || '').toLowerCase().trim());
   const normalizedRole = userRole?.toLowerCase()?.trim();
-  const isAdmin = mounted && (normalizedRole === 'admin' || normalizedRole === 'administrator');
+  const isAdmin = mounted && (REVIEWER_ROLES.includes(normalizedRole) || allRoles.some((r) => REVIEWER_ROLES.includes(r)));
   const isSalesman = normalizedRole === 'salesman' || normalizedRole === 'sales' || normalizedRole === 'salesperson';
-  
-  // Safety check: if not explicitly admin, treat as salesman for this page
+
   const shouldShowAdminFeatures = isAdmin;
-  const shouldShowSalesmanFeatures = !isAdmin; // Anyone who's not admin can add expenses
+  const shouldShowSalesmanFeatures = !isAdmin; // only salesmen reach this page without a reviewer role
+
+  // Bill photos are saved by the server as /uploads/bills/<file> (same-origin through the proxy).
+  const billSrc = (img) => (/^https?:/.test(img) || String(img).startsWith('/uploads') ? img : `${getBaseURL()}/${img}`);
 
   // Helper function for base URL
   const getBaseURL = () => {
@@ -65,7 +97,9 @@ const DashboardExpenses = () => {
     expense_date: new Date().toISOString().split('T')[0],
     expense_amount: '',
     expense_description: '',
-    expense_type: 'travel',
+    expense_type: 'food',
+    travel_mode: '',
+    toll_message: '',
     kilometers: '',
     images: []
   });
@@ -159,7 +193,7 @@ const DashboardExpenses = () => {
           `Salesman ${expense.salesman_id?.substring(0, 8)}...` || 
           'Unknown'
         ) : undefined,
-        type: expense.expense_type?.toUpperCase() || 'N/A',
+        type: typeLabel(expense),
         description: expense.expense_description || 'N/A',
         amount: `₹${parseFloat(expense.expense_amount || 0).toLocaleString('en-IN')}`,
         kilometers: expense.kilometers ? `${expense.kilometers} km` : '-',
@@ -204,9 +238,12 @@ const DashboardExpenses = () => {
         return;
       }
 
-      // Validate kilometers for fuel expenses
-      if (createFormData.expense_type === 'fuel' && !createFormData.kilometers) {
-        showError('Kilometers is required for fuel expenses');
+      if (createFormData.expense_type === 'travel' && !createFormData.travel_mode) {
+        showError('Please choose how you travelled (bus, train, Rapido ...)');
+        return;
+      }
+      if (createFormData.expense_type === 'toll' && !createFormData.toll_message.trim()) {
+        showError('Please add a toll message (which toll, where)');
         return;
       }
 
@@ -251,8 +288,11 @@ const DashboardExpenses = () => {
         images: imageUrls
       };
 
-      // Add kilometers if provided and expense type is fuel or travel
-      if (createFormData.kilometers && ['fuel', 'travel'].includes(createFormData.expense_type)) {
+      if (createFormData.expense_type === 'travel') expenseData.travel_mode = createFormData.travel_mode;
+      if (createFormData.expense_type === 'toll') expenseData.toll_message = createFormData.toll_message.trim();
+
+      // Kilometers are optional for travel and city tour
+      if (createFormData.kilometers && ['travel', 'city_tour'].includes(createFormData.expense_type)) {
         expenseData.kilometers = parseInt(createFormData.kilometers);
       }
 
@@ -276,7 +316,9 @@ const DashboardExpenses = () => {
       expense_date: new Date().toISOString().split('T')[0],
       expense_amount: '',
       expense_description: '',
-      expense_type: 'travel',
+      expense_type: 'food',
+      travel_mode: '',
+      toll_message: '',
       kilometers: '',
       images: []
     });
@@ -590,18 +632,41 @@ const DashboardExpenses = () => {
           <div className="form-group flex flex-col gap-2">
             <label className="text-[length:var(--text-sm)] font-medium text-text">Expense Type *</label>
             <DropdownSelector
-              options={[
-                { value: 'travel', label: 'Travel' },
-                { value: 'hotel', label: 'Hotel' },
-                { value: 'fuel', label: 'Fuel' },
-                { value: 'other', label: 'Other' },
-              ]}
+              options={EXPENSE_TYPE_OPTIONS}
               value={createFormData.expense_type}
-              onChange={(value) => setCreateFormData({ ...createFormData, expense_type: value })}
+              onChange={(value) => setCreateFormData({ ...createFormData, expense_type: value, travel_mode: '', toll_message: '' })}
               searchable={false}
               className="ui-dropdown-custom--full-width"
             />
           </div>
+
+          {createFormData.expense_type === 'travel' && (
+            <div className="form-group flex flex-col gap-2">
+              <label className="text-[length:var(--text-sm)] font-medium text-text">Mode *</label>
+              <DropdownSelector
+                options={TRAVEL_MODE_OPTIONS}
+                value={createFormData.travel_mode}
+                onChange={(value) => setCreateFormData({ ...createFormData, travel_mode: value })}
+                placeholder="Bus, train, Rapido ..."
+                searchable={false}
+                className="ui-dropdown-custom--full-width"
+              />
+            </div>
+          )}
+
+          {createFormData.expense_type === 'toll' && (
+            <div className="form-group flex flex-col gap-2">
+              <label className="text-[length:var(--text-sm)] font-medium text-text">Toll message *</label>
+              <input
+                className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] placeholder:text-text-subtle transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)]"
+                type="text"
+                maxLength={500}
+                placeholder="Which toll, from where to where"
+                value={createFormData.toll_message}
+                onChange={(e) => setCreateFormData({ ...createFormData, toll_message: e.target.value })}
+              />
+            </div>
+          )}
 
           <div className="form-group flex flex-col gap-2">
             <label className="text-[length:var(--text-sm)] font-medium text-text">Amount *</label>
@@ -615,17 +680,16 @@ const DashboardExpenses = () => {
             />
           </div>
 
-          {/* Show kilometers field for fuel and travel expenses */}
-          {['fuel', 'travel'].includes(createFormData.expense_type) && (
+          {/* Kilometers are optional for travel and city tour */}
+          {['travel', 'city_tour'].includes(createFormData.expense_type) && (
             <div className="form-group flex flex-col gap-2">
-              <label className="text-[length:var(--text-sm)] font-medium text-text">Kilometers {createFormData.expense_type === 'fuel' ? '*' : ''}</label>
+              <label className="text-[length:var(--text-sm)] font-medium text-text">Kilometers (optional)</label>
               <input
                 className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] placeholder:text-text-subtle transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
                 type="number"
                 placeholder="Enter kilometers"
                 value={createFormData.kilometers}
                 onChange={(e) => setCreateFormData({ ...createFormData, kilometers: e.target.value })}
-                required={createFormData.expense_type === 'fuel'}
               />
             </div>
           )}
@@ -712,8 +776,15 @@ const DashboardExpenses = () => {
 
             <div className="detail-row flex justify-between items-start gap-4 py-3 border-b border-border last:border-b-0">
               <strong className="font-medium text-text-muted min-w-[120px]">Type:</strong>
-              <span className="flex-1 text-right text-text tabular-nums">{selectedExpense.expense_type?.toUpperCase()}</span>
+              <span className="flex-1 text-right text-text tabular-nums">{typeLabel(selectedExpense)}</span>
             </div>
+
+            {selectedExpense.toll_message && (
+              <div className="detail-row flex justify-between items-start gap-4 py-3 border-b border-border last:border-b-0">
+                <strong className="font-medium text-text-muted min-w-[120px]">Toll message:</strong>
+                <span className="flex-1 text-right text-text">{selectedExpense.toll_message}</span>
+              </div>
+            )}
 
             <div className="detail-row flex justify-between items-start gap-4 py-3 border-b border-border last:border-b-0">
               <strong className="font-medium text-text-muted min-w-[120px]">Amount:</strong>
@@ -753,10 +824,10 @@ const DashboardExpenses = () => {
                   {selectedExpense.images.map((img, idx) => (
                     <div key={idx} className="image-preview-container group relative cursor-pointer rounded-lg overflow-hidden border border-border transition-[box-shadow,border-color] duration-[var(--transition)] hover:border-border-strong hover:shadow-sm focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
                       <img
-                        src={img.startsWith('http') ? img : `${getBaseURL()}/${img}`}
+                        src={billSrc(img)}
                         alt={`Bill ${idx + 1}`}
                         className="bill-preview block w-full h-[100px] md:h-[150px] object-cover transition-transform duration-[var(--transition)] group-hover:scale-[1.04]"
-                        onClick={() => window.open(img.startsWith('http') ? img : `${getBaseURL()}/${img}`, '_blank')}
+                        onClick={() => window.open(billSrc(img), '_blank')}
                       />
                       <div className="image-preview-overlay absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-[var(--transition)] bg-[rgba(24,18,101,0.72)] text-text-on-primary text-[length:var(--text-sm)] font-medium text-center p-2 group-hover:opacity-100 group-focus-visible:opacity-100">
                         <span>Click to view full size</span>
