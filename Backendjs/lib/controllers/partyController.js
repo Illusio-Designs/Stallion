@@ -27,6 +27,23 @@ const { resolveUserScope } = require('../utils/scopeHelpers');
 const { salesmanCoversState, distributorCoversState } = require('../utils/workingStates');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse, listWithOptionalPagination } = require('../utils/listSearchHelpers');
 
+// PAN and GSTIN are tax identifiers: only managers (and the party itself) see them. A salesman or
+// distributor still gets the name, phone and address they need for visits and orders.
+const PARTY_SECRET_FIELDS = ['pan', 'gstin'];
+function hidePartySecrets(req, data) {
+    if (canManageParties(req.userRoleNames)) return data;
+    const strip = (row) => {
+        if (!row) return row;
+        const plain = typeof row.toJSON === 'function' ? row.toJSON() : { ...row };
+        if (String(plain.user_id || '') === String(req.user && req.user.user_id)) return plain; // the party's own record
+        PARTY_SECRET_FIELDS.forEach((f) => { delete plain[f]; });
+        return plain;
+    };
+    if (Array.isArray(data)) return data.map(strip);
+    if (data && Array.isArray(data.data)) return { ...data, data: data.data.map(strip) };
+    return strip(data);
+}
+
 class PartyController {
     async getPartie(req, res) {
         try {
@@ -107,7 +124,7 @@ class PartyController {
                 }
             }
 
-            res.status(200).json(party);
+            res.status(200).json(hidePartySecrets(req, party));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -175,7 +192,7 @@ class PartyController {
                 limit: pagination.limit,
                 offset: pagination.offset,
             });
-            res.status(200).json(buildPaginatedResponse(parties, pagination, count));
+            res.status(200).json(hidePartySecrets(req, buildPaginatedResponse(parties, pagination, count)));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -194,7 +211,7 @@ class PartyController {
                 where: mergeWhere({ salesman_id: salesman_id }, partyActiveFilter(req.userRoleNames)),
                 order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
-            res.status(200).json(body);
+            res.status(200).json(hidePartySecrets(req, body));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -312,7 +329,7 @@ class PartyController {
                 where: mergeWhere({ zone_id: zone_id }, partyActiveFilter(roleName)),
                 order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
-            res.status(200).json(body);
+            res.status(200).json(hidePartySecrets(req, body));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -1115,7 +1132,7 @@ class PartyController {
                 where: mergeWhere({ state_id: resolved }, partyActiveFilter(req.userRoleNames)),
                 order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
-            res.status(200).json(body);
+            res.status(200).json(hidePartySecrets(req, body));
         } catch (error) {
             res.status(error.statusCode || 500).json({ error: error.message });
         }

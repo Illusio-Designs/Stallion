@@ -57,14 +57,12 @@ class ZoneController {
             // Based on role, get zone_id from appropriate model
             if (roleName === 'party') {
                 // Get zone_id from Party model
-                const party = await Party.findOne({
-                    where: {
-                        [Op.or]: [
-                            { email: user.email },
-                            { phone: user.phone }
-                        ]
-                    }
-                });
+                // Match this user's own party. Only use email/phone when they have a value: an empty
+                // email would otherwise match some other party that has no email.
+                const ownConditions = [{ user_id: user.user_id }];
+                if (user.email) ownConditions.push({ email: user.email });
+                if (user.phone) ownConditions.push({ phone: user.phone });
+                const party = await Party.findOne({ where: { [Op.or]: ownConditions } });
 
                 if (!party) {
                     return res.status(404).json({ error: 'Party record not found for this user' });
