@@ -3,6 +3,7 @@ import DropdownSelector from '../components/ui/DropdownSelector';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import TableWithControls from '../components/ui/TableWithControls';
+import StatusBadge from '../components/ui/StatusBadge';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   addProductToTray,
@@ -101,10 +102,10 @@ const DashboardTray = () => {
       label: 'STATUS',
       render: (_v, row) => {
         const status = row.tray_status || '';
-        if (status === TrayStatus.AVAILABLE) return 'AVAILABLE';
-        if (status === TrayStatus.ASSIGNED) return 'ASSIGNED';
-        if (status === TrayStatus.CLOSED) return 'CLOSED';
-        return status.toUpperCase();
+        if (status === TrayStatus.AVAILABLE) return <StatusBadge status="completed">Available</StatusBadge>;
+        if (status === TrayStatus.ASSIGNED) return <StatusBadge status="dispatch">With a salesman</StatusBadge>;
+        if (status === TrayStatus.CLOSED) return <StatusBadge status="default">Closed</StatusBadge>;
+        return <StatusBadge status="default">{status ? status.charAt(0).toUpperCase() + status.slice(1) : 'N/A'}</StatusBadge>;
       }
     },
     {

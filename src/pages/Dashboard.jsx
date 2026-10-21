@@ -196,6 +196,14 @@ const Dashboard = () => {
       return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
     });
     const totalSales = currentMonthOrders.reduce((sum, o) => sum + amountOf(o), 0);
+    const prevMonth = new Date(currentYear, currentMonth - 1, 1);
+    const lastMonthSales = live
+      .filter((o) => {
+        if (!o.order_date) return false;
+        const d = new Date(o.order_date);
+        return d.getMonth() === prevMonth.getMonth() && d.getFullYear() === prevMonth.getFullYear();
+      })
+      .reduce((sum, o) => sum + amountOf(o), 0);
     const totalRevenue = live.reduce((sum, o) => sum + amountOf(o), 0);
 
     const completedCount = live.filter((o) => statusOf(o) === 'completed').length;
@@ -210,6 +218,7 @@ const Dashboard = () => {
 
     return {
       totalSales,
+      lastMonthSales,
       totalOrders: baseOrders.length,
       completedCount,
       openCount: openOrders.length,
@@ -378,28 +387,58 @@ const Dashboard = () => {
   );
 
   const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+  // Short money for the big numbers: 18.4L, 1.2Cr (the full value stays in the title).
+  const shortMoney = (n) => {
+    const v = Number(n || 0);
+    if (v >= 1e7) return { sym: '₹', num: `${(v / 1e7).toFixed(2).replace(/\.?0+$/, '')}Cr` };
+    if (v >= 1e5) return { sym: '₹', num: `${(v / 1e5).toFixed(2).replace(/\.?0+$/, '')}L` };
+    return { sym: '₹', num: v.toLocaleString('en-IN') };
+  };
   const partiesCount = isDistributor && myPartyCount != null ? myPartyCount : stats.activeClients;
+  const noLocation = ownParties.filter((p) => p.is_active !== false && !(p.latitude != null && p.longitude != null)).length;
+  const ownParty = isParty ? (ownParties[0] || null) : null;
+
+  // Role-aware targets: a salesman's own, for the ring and for the first number card.
+  const targetTotal = targets.reduce((n, t) => n + Number(t.target_amount || 0), 0);
+  const targetDone = targets.reduce((n, t) => n + Number(t.completed_amount || 0), 0);
+  const targetPct = targetTotal > 0 ? Math.round((targetDone / targetTotal) * 100) : 0;
+  const RING_C = 2 * Math.PI * 34;
 
   // The four headline numbers, worded for whoever is looking at the page.
+  // money: true => shown as a short rupee value (₹ 18.4L); icon is display only.
+  let monthDelta = null;
+  if (stats.lastMonthSales > 0) {
+    const pct = ((stats.totalSales - stats.lastMonthSales) / stats.lastMonthSales) * 100;
+    monthDelta = { text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, dir: pct >= 0 ? 'up' : 'dn' };
+  }
   const kpis = isParty
     ? [
-        { label: 'Spent This Month', value: money(stats.totalSales), sub: "This month's orders, cancelled excluded" },
-        { label: 'My Orders', value: `${stats.totalOrders} Orders`, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
-        { label: 'Open Orders', value: stats.openCount, sub: 'Waiting to be completed' },
-        { label: 'Total Spent', value: money(stats.totalRevenue), sub: `Across ${stats.totalOrders} orders` },
+        { icon: FiDollarSign, label: 'Ordered this month', money: stats.totalSales, sub: "This month's orders, cancelled excluded" },
+        { icon: FiShoppingBag, label: 'Open orders', value: stats.openCount, sub: 'Waiting to be completed' },
+        ownParty && ownParty.credit_days != null
+          ? { icon: FiClock, label: 'Credit days', value: ownParty.credit_days, sub: 'Set by your manager' }
+          : { icon: FiShoppingBag, label: 'My orders', value: stats.totalOrders, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
+        { icon: FiDollarSign, label: 'Total spent', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
       ]
     : isDistributor
     ? [
-        { label: 'Sales This Month', value: money(stats.totalSales), sub: "Your parties' orders this month" },
-        { label: 'Orders', value: `${stats.totalOrders} Orders`, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
-        { label: 'My Parties', value: partiesCount, sub: 'Parties assigned to you' },
-        { label: 'Total Value', value: money(stats.totalRevenue), sub: `Across ${stats.totalOrders} orders` },
+        { icon: FiDollarSign, label: 'Sales this month', money: stats.totalSales, sub: "Your parties' orders this month" },
+        { icon: FiUsers, label: 'My parties', value: partiesCount, sub: 'Parties assigned to you' },
+        { icon: FiShoppingBag, label: 'Open orders', value: stats.openCount, sub: `Of ${stats.totalOrders} orders` },
+        { icon: FiDollarSign, label: 'Total value', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
+      ]
+    : isSalesman
+    ? [
+        { icon: FiDollarSign, label: 'My sales', money: stats.totalSales, sub: targetTotal > 0 ? `${targetPct}% of ${money(targetTotal)} target` : "This month's orders", subTone: targetTotal > 0 ? 'up' : null },
+        { icon: FiShoppingBag, label: 'My orders', value: stats.totalOrders, sub: `${stats.openCount} open | ${stats.completedCount} completed` },
+        { icon: FiUsers, label: 'My parties', value: ownParties.length || stats.activeClients, sub: ownParties.length ? (noLocation > 0 ? `${noLocation} without a shop location` : 'All have a shop location') : 'Parties you ordered for' },
+        { icon: FiDollarSign, label: 'Total value', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
       ]
     : [
-        { label: 'Total Sales (This Month)', value: money(stats.totalSales), sub: "This month's confirmed sales" },
-        { label: 'Total Orders', value: `${stats.totalOrders} Orders`, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
-        { label: 'Active Clients', value: stats.activeClients, sub: 'Optical Stores + Enterprises' },
-        { label: 'Total Revenue', value: money(stats.totalRevenue), sub: `Across ${stats.totalOrders} orders (cancelled excluded)` },
+        { icon: FiDollarSign, label: 'Sales this month', money: stats.totalSales, sub: "This month's confirmed sales", delta: monthDelta, deltaText: 'than last month' },
+        { icon: FiShoppingBag, label: 'Total orders', value: stats.totalOrders, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
+        { icon: FiUsers, label: 'Active clients', value: stats.activeClients, sub: 'Optical Stores + Enterprises' },
+        { icon: FiDollarSign, label: 'Total revenue', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders (cancelled excluded)` },
       ];
 
   // Only pages the role can really open.
@@ -420,35 +459,118 @@ const Dashboard = () => {
       attention.push({ icon: FiClock, tone: 'info', title: `${stats.openCount} open order${stats.openCount > 1 ? 's' : ''} waiting`, desc: 'Pending, processing or ready to dispatch', onClick: go('/dashboard/orders') });
     }
   }
+  // Shortcuts that sit in the greeting header (first one is the black button).
   const quickActions = isParty
     ? [
-        { icon: FiShoppingBag, label: 'My Orders', desc: 'Track your orders', primary: true, onClick: go('/dashboard/orders') },
-        { icon: FiShoppingCart, label: 'Place an Order', desc: 'Browse the catalogue', onClick: go('/products') },
-        { icon: FiUser, label: 'My Profile', desc: 'Account settings', onClick: go('/dashboard/settings') },
+        { icon: FiShoppingCart, label: 'Order frames', primary: true, onClick: go('/products') },
+        { icon: FiShoppingBag, label: 'My orders', onClick: go('/dashboard/orders') },
       ]
     : isDistributor
     ? [
-        { icon: FiShoppingBag, label: 'Orders', desc: "Your parties' orders", primary: true, onClick: go('/dashboard/orders') },
-        { icon: FiUsers, label: 'My Parties', desc: 'Parties assigned to you', onClick: go('/dashboard/party') },
-        { icon: FiShoppingCart, label: 'Place an Order', desc: 'Browse the catalogue', onClick: go('/products') },
+        { icon: FiShoppingCart, label: 'Place an order', primary: true, onClick: go('/products') },
+        { icon: FiUsers, label: 'My parties', onClick: go('/dashboard/party') },
       ]
-    : [
-        { icon: FiShoppingCart, label: 'View All Orders', desc: 'All orders', primary: true, onClick: go('/dashboard/orders') },
-        { icon: FiBarChart2, label: 'View Report', desc: 'Sales analytics', onClick: go('/dashboard/analytics') },
-        { icon: FiTag, label: 'Manage Offers', desc: 'Discounts and offers', onClick: go('/dashboard/offers') },
-      ];
+    : isSalesman
+    ? [
+        { icon: FiMapPin, label: 'Add visit', primary: true, onClick: go('/dashboard/salesmen') },
+        { icon: FiShoppingBag, label: 'My orders', onClick: go('/dashboard/orders') },
+        { icon: FiBarChart2, label: 'Report', onClick: go('/dashboard/analytics') },
+      ]
+    : [];
   const ownData = isParty || isDistributor; // their own orders only: no warehouse stock
 
-  // Salesman: one ring for the current targets. Cancelled orders still count toward a
-  // target (that is the salesman's effort), so this uses the server's completed_amount.
-  const targetTotal = targets.reduce((n, t) => n + Number(t.target_amount || 0), 0);
-  const targetDone = targets.reduce((n, t) => n + Number(t.completed_amount || 0), 0);
-  const targetPct = targetTotal > 0 ? Math.round((targetDone / targetTotal) * 100) : 0;
-  const RING_C = 2 * Math.PI * 34;
+  // Greeting header
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const todayText = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  const fullName = String(user?.full_name || user?.name || '').trim();
+  const firstName = fullName.split(/\s+/)[0] || '';
+  const companyName = (ownParty && (ownParty.party_name || ownParty.name)) || user?.party_name || user?.distributor_name || fullName;
+  const heading = isSalesman
+    ? `Hi ${firstName || 'there'}`
+    : (isParty || isDistributor)
+    ? (companyName || 'Welcome')
+    : `${greeting}${firstName ? `, ${firstName}` : ''}`;
+  const subline = isSalesman
+    ? 'Only your own parties, orders and visits are shown here.'
+    : isParty
+    ? 'Your own orders and account only.'
+    : isDistributor
+    ? 'Only your own parties and their orders are shown.'
+    : `${todayText}.${stats.openCount > 0 ? ` ${stats.openCount} order${stats.openCount > 1 ? 's are' : ' is'} still open.` : ''}`;
+
+  const RANGES = [['today', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['year', 'Year']];
+  const partyOf = (row) => row.party?.party_name || row.party_name || row.party?.name || partyNamesMap[row.party_id] || '-';
+  const orderRef = (row) => row.order_number || `#${String(row.order_id || row.id || '').slice(-6)}`;
+  const statusPill = (v) => { const st = v || 'pending'; return <StatusBadge status={String(st).toLowerCase().replace(/\s+/g, '-')}>{String(st).charAt(0).toUpperCase() + String(st).slice(1).toLowerCase()}</StatusBadge>; };
+  const initialsOf = (name) => String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+
+  // Salesmen against target (office view): this month's targets, one row per salesman.
+  const targetRows = (() => {
+    const by = {};
+    allTargets.forEach((t) => {
+      const id = t.salesman_id || t.salesman_name;
+      if (!id) return;
+      const row = by[id] || (by[id] = { id, name: t.salesman_name || 'Salesman', target: 0, done: 0 });
+      row.target += Number(t.target_amount || 0);
+      row.done += Number(t.completed_amount || 0);
+    });
+    return Object.values(by).filter((r) => r.target > 0).sort((a, b) => (b.done / b.target) - (a.done / a.target)).slice(0, 6);
+  })();
+
+  const latestOrders = recentOrders.slice(0, 6);
+  const ordersCard = (title, sub, linkLabel, cols) => (
+    <section className="rda-card" aria-label={title}>
+      <div className="rda-card__head">
+        <div><h3>{title}</h3>{sub && <p>{sub}</p>}</div>
+        <a href="/dashboard/orders" className="rda-link">{linkLabel}</a>
+      </div>
+      <div className="rda-tw">
+        <table className="rda-table">
+          <thead><tr>{cols.map((c) => <th key={c.h} className={c.r ? 'r' : ''}>{c.h}</th>)}</tr></thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={cols.length}><Skeleton width="100%" height={24} /></td></tr>
+            ) : latestOrders.length === 0 ? (
+              <tr><td colSpan={cols.length} className="rda-empty">{loadError ? 'Could not load orders.' : 'No orders yet.'}</td></tr>
+            ) : latestOrders.map((o) => (
+              <tr key={o.order_id || o.id || o.order_number}>
+                {cols.map((c) => <td key={c.h} className={`${c.r ? 'r' : ''} ${c.mono ? 'mono' : ''}`}>{c.cell(o)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
 
   return (
-    <div className="dash-page w-full">
+    <div className="dash-page w-full rda-page">
       <div className="dash-container flex flex-col gap-4">
+        <div className="rda-head">
+          <div>
+            <h1>{heading}</h1>
+            <p>{subline}</p>
+          </div>
+          {isOfficeView && (
+            <div className="rda-seg" role="group" aria-label="Period">
+              {RANGES.map(([k, label]) => (
+                <button key={k} type="button" className={range === k ? 'on' : ''} aria-pressed={range === k} onClick={() => setRange(k)}>{label}</button>
+              ))}
+            </div>
+          )}
+          {quickActions.length > 0 && (
+            <div className="rda-actions">
+              {quickActions.map((q) => (
+                <button key={q.label} type="button" onClick={q.onClick} className={q.primary ? 'rda-btn' : 'rda-btn rda-btn--ghost'}>
+                  <q.icon size={16} aria-hidden="true" />{q.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {isSalesman && targets.length > 0 && (
           <div className="dash-row">
             <section className="target-ring col-span-full" aria-label="Target progress">
@@ -467,26 +589,43 @@ const Dashboard = () => {
           </div>
         )}
 
-        <div className="dash-row dash-kpis grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
-          {kpis.map((k) => (
-            <div key={k.label} className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-              <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">{k.label}</h4>
-              <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
-                {loading ? <Skeleton width={90} height={24} /> : k.value}
+        <div className="dash-row dash-kpis rda-kpis" aria-label="Key figures">
+          {kpis.map((k) => {
+            const sm = k.money != null ? shortMoney(k.money) : null;
+            return (
+              <div key={k.label} className="dash-card metric rda-kpi">
+                <div className="rda-kpi__lab"><span>{k.label}</span><k.icon size={18} aria-hidden="true" /></div>
+                <div className="metric-value rda-kpi__num" title={k.money != null ? money(k.money) : undefined}>
+                  {loading ? <Skeleton width={90} height={28} /> : sm ? <><small>{sm.sym}</small>{sm.num}</> : k.value}
+                </div>
+                <div className="metric-sub rda-kpi__delta">
+                  {k.delta && <span className={k.delta.dir}>{k.delta.text}</span>}
+                  {k.subTone ? <span className={k.subTone}>{k.sub}</span> : (k.deltaText && k.delta ? k.deltaText : k.sub)}
+                </div>
               </div>
-              <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">{k.sub}</div>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        {attention.length > 0 && (
-          <div className="dash-row">
-            <section className="needs-attention col-span-full bg-surface border border-border rounded-lg p-5" aria-label="Needs attention">
-              <div className="mb-3">
-                <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] m-0">Needs attention</h4>
-                <p className="m-0 mt-1 text-[var(--text-sm)] text-text-muted">Things only a person can decide</p>
+        {isOfficeView && (
+          <div className="rda-cols">
+            <section className="rda-card" aria-label="Orders per day">
+              <div className="rda-card__head">
+                <div><h3>Orders per day</h3><p>{ordersChart.sub}. Cancelled orders are not counted.</p></div>
+                <div className="rda-legend" aria-hidden="true">
+                  <span><i style={{ background: '#c2c2c2' }} />Earlier</span>
+                  <span><i style={{ background: '#0a0a0a' }} />{range === 'today' ? 'Now' : range === 'year' ? 'This month' : 'Today'}</span>
+                </div>
               </div>
-              <div className="needs-attention__list grid grid-cols-3 gap-3 max-[900px]:grid-cols-1">
+              <OrdersPerDayChart data={ordersChart.buckets} height={215} ariaLabel={`Bar chart of orders. ${ordersChart.total} orders. ${ordersChart.sub}.`} />
+            </section>
+
+            <section className="needs-attention rda-card" aria-label="Needs attention">
+              <div className="rda-card__head">
+                <div><h3>Needs attention</h3><p>Things only a person can decide</p></div>
+              </div>
+              <div className="needs-attention__list">
+                {attention.length === 0 && <p className="rda-empty">{loading ? 'Checking...' : 'Nothing needs your attention right now.'}</p>}
                 {attention.map((a) => (
                   <button key={a.title} type="button" onClick={a.onClick} className={`needs-attention__item needs-attention__item--${a.tone}`}>
                     <span className="needs-attention__icon" aria-hidden="true"><a.icon size={18} /></span>
@@ -502,39 +641,128 @@ const Dashboard = () => {
           </div>
         )}
 
-        {!isSalesman && (
-        <>
-          {/* Quick Actions — full-width row of 3 cards (2-up / 1-up on smaller screens) */}
-          <div className="dash-row grid grid-cols-12 gap-4">
-            <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5 max-md:p-4">
-              <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
-              <div className="grid grid-cols-3 items-stretch gap-3 max-[720px]:grid-cols-2 max-[560px]:grid-cols-1">
-                {quickActions.map((q) => (
-                  <QuickActionCard key={q.label} icon={q.icon} label={q.label} desc={q.desc} primary={q.primary} onClick={q.onClick} />
-                ))}
-              </div>
-            </div>
+        {isOfficeView && (
+          <div className={`rda-cols rda-cols--even${targetRows.length === 0 ? ' rda-cols--one' : ''}`}>
+            {targetRows.length > 0 && (
+              <section className="rda-card" aria-label="Salesmen against target">
+                <div className="rda-card__head">
+                  <div><h3>Salesmen against target</h3><p>By order value</p></div>
+                  <a href="/dashboard/salesmen" className="rda-link">All salesmen</a>
+                </div>
+                <div className="rda-tw">
+                  <table className="rda-table">
+                    <thead><tr><th>Salesman</th><th>Target</th><th>Progress</th><th className="r">Done</th></tr></thead>
+                    <tbody>
+                      {targetRows.map((r) => {
+                        const pct = Math.round((r.done / r.target) * 100);
+                        return (
+                          <tr key={r.id}>
+                            <td><div className="rda-who"><span className="rda-pic">{initialsOf(r.name)}</span>{r.name}</div></td>
+                            <td>{shortMoney(r.target).sym} {shortMoney(r.target).num}</td>
+                            <td><div className="rda-prog" role="img" aria-label={`${pct} percent`}><i className={pct >= 100 ? 'hit' : ''} style={{ width: `${Math.min(100, pct)}%` }} /></div></td>
+                            <td className="r">{pct}%</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+            {ordersCard('Latest orders', 'Newest first', 'All orders', [
+              { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
+              { h: 'Party', cell: partyOf },
+              { h: 'Status', cell: (o) => statusPill(o.order_status) },
+              { h: 'Amount', r: true, cell: (o) => money(amountOf(o)) },
+            ])}
           </div>
-          {/* Sales & Revenue — full width, below Quick Actions */}
-          <div className="dash-row grid grid-cols-12 gap-4 mt-4">
-            <div className="col-span-full min-h-[320px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
-              <div className="chart-header flex items-center justify-between mb-[10px]">
-                <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] m-0">{ownData ? 'Your Orders' : 'Sales & Revenue'}</h4>
-                <DropdownSelector
-                  options={[
-                    { value: 'Monthly', label: 'Monthly' },
-                    { value: 'Weekly', label: 'Weekly' },
-                    { value: 'Yearly', label: 'Yearly' },
-                  ]}
-                  value={period}
-                  onChange={(value) => setPeriod(value)}
-                  searchable={false}
-                />
+        )}
+
+        {isSalesman && (
+          <div className="rda-cols rda-cols--even">
+            <section className="rda-card" aria-label="My parties">
+              <div className="rda-card__head">
+                <div><h3>My parties</h3><p>Open one to capture its shop location</p></div>
+                <a href="/dashboard/party" className="rda-link">All parties</a>
               </div>
-              <SalesRevenueChart data={chartData} height={240} />
-            </div>
+              <div className="rda-tw">
+                <table className="rda-table">
+                  <thead><tr><th>Party</th><th>City</th><th>Location</th><th className="r">Action</th></tr></thead>
+                  <tbody>
+                    {ownParties.length === 0 ? (
+                      <tr><td colSpan={4} className="rda-empty">{loading ? 'Loading...' : 'No parties yet.'}</td></tr>
+                    ) : ownParties.slice(0, 5).map((p) => {
+                      const has = p.latitude != null && p.longitude != null;
+                      return (
+                        <tr key={p.party_id || p.id}>
+                          <td><b>{p.party_name || p.name}</b></td>
+                          <td>{p.city?.name || p.city_name || (typeof p.city === 'string' ? p.city : '') || '-'}</td>
+                          <td><span className={`rda-pill ${has ? 'ok' : 'idle'}`}>{has ? 'Saved' : 'Missing'}</span></td>
+                          <td className="r"><a href="/dashboard/party" className="rda-btn rda-btn--sm rda-btn--ghost">{has ? 'View' : 'Add'}</a></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            {ordersCard('My latest orders', null, 'All orders', [
+              { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
+              { h: 'Party', cell: partyOf },
+              { h: 'Status', cell: (o) => statusPill(o.order_status) },
+              { h: 'Amount', r: true, cell: (o) => money(amountOf(o)) },
+            ])}
           </div>
-        </>
+        )}
+
+        {isDistributor && (
+          <div className="rda-cols rda-cols--even">
+            <section className="rda-card" aria-label="My parties">
+              <div className="rda-card__head">
+                <div><h3>My parties</h3></div>
+                <a href="/dashboard/party" className="rda-link">All parties</a>
+              </div>
+              <div className="rda-tw">
+                <table className="rda-table">
+                  <thead><tr><th>Party</th><th>City</th><th className="r">Orders</th></tr></thead>
+                  <tbody>
+                    {ownParties.length === 0 ? (
+                      <tr><td colSpan={3} className="rda-empty">{loading ? 'Loading...' : 'No parties yet.'}</td></tr>
+                    ) : ownParties.slice(0, 6).map((p) => {
+                      const pid = p.party_id || p.id;
+                      return (
+                        <tr key={pid}>
+                          <td><b>{p.party_name || p.name}</b></td>
+                          <td>{p.city?.name || p.city_name || (typeof p.city === 'string' ? p.city : '') || '-'}</td>
+                          <td className="r">{orders.filter((o) => String(o.party_id || o.party?.id || '') === String(pid)).length}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            {ordersCard('Orders from my parties', null, 'All orders', [
+              { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
+              { h: 'Party', cell: partyOf },
+              { h: 'Status', cell: (o) => statusPill(o.order_status) },
+            ])}
+          </div>
+        )}
+
+        {isParty && (
+          <>
+            {ordersCard('My orders', null, 'All orders', [
+              { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
+              { h: 'Placed', cell: (o) => { const d = o.created_at || o.order_date; return d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '-'; } },
+              { h: 'Status', cell: (o) => statusPill(o.order_status) },
+              { h: 'Amount', r: true, cell: (o) => <b>{money(amountOf(o))}</b> },
+            ])}
+            <div className="rda-lock">
+              <FiClock size={16} aria-hidden="true" />
+              <span>Credit days, GSTIN and PAN are changed by your manager. Contact your salesman to update them.</span>
+            </div>
+          </>
         )}
 
         {!isSalesman && (
@@ -619,65 +847,29 @@ const Dashboard = () => {
         </div>
         )}
 
-      </div>
-
-      {/* Quick Actions (salesman) */}
-      {isSalesman && (
-        <div className="dash-row mt-4">
-          <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5 max-md:p-4">
-            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
-            <div className="grid grid-cols-3 items-stretch gap-3 max-[720px]:grid-cols-2 max-[560px]:grid-cols-1">
-              <QuickActionCard icon={FiMapPin} label="Add Visit" desc="Log a party visit" primary onClick={() => { window.location.href = '/dashboard/salesmen'; }} />
-              <QuickActionCard icon={FiShoppingBag} label="My Orders" desc="View your orders" onClick={() => { window.location.href = '/dashboard/orders'; }} />
-              <QuickActionCard icon={FiBarChart2} label="View Report" desc="Targets & analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
+        {/* Salesman targets */}
+        {isSalesman && (
+          <div className="dash-row">
+            <div className="dash-card full">
+              <TableWithControls
+                title="My Targets"
+                itemName="Target"
+                rows={targets}
+                loading={targetsLoading}
+                selectable={false}
+                columns={[
+                  { key: 'target_amount', label: 'TARGET AMOUNT', render: (v) => `₹${parseFloat(v || 0).toLocaleString('en-IN')}` },
+                  { key: 'start_date', label: 'START DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                  { key: 'end_date', label: 'END DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                  { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
+                  { key: 'target_status', label: 'STATUS', render: (v) => <StatusBadge status={(v || 'pending') === 'pending' ? 'pending' : 'completed'}>{v || 'pending'}</StatusBadge> },
+                  { key: 'target_description', label: 'DESCRIPTION', render: (v) => v || '-' },
+                  { key: 'target_remarks', label: 'REMARKS', render: (v) => v || '-' },
+                ]}
+              />
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Salesman Targets - before Order Overview */}
-      {isSalesman && (
-        <div className="dash-row mt-4">
-          <div className="dash-card full">
-            <TableWithControls
-              title="My Targets"
-              itemName="Target"
-              rows={targets}
-              loading={targetsLoading}
-              selectable={false}
-              columns={[
-                { key: 'target_amount', label: 'TARGET AMOUNT', render: (v) => `₹${parseFloat(v || 0).toLocaleString('en-IN')}` },
-                { key: 'start_date', label: 'START DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
-                { key: 'end_date', label: 'END DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
-                { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
-                { key: 'target_status', label: 'STATUS', render: (v) => <StatusBadge status={(v || 'pending') === 'pending' ? 'pending' : 'completed'}>{v || 'pending'}</StatusBadge> },
-                { key: 'target_description', label: 'DESCRIPTION', render: (v) => v || '-' },
-                { key: 'target_remarks', label: 'REMARKS', render: (v) => v || '-' },
-              ]}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Order Overview */}
-      <div className="dash-row mt-4">
-        <div className="dash-card full">
-          <TableWithControls
-            title="Order Overview"
-            itemName="Order"
-            rows={recentOrders}
-            loading={loading}
-            selectable={false}
-            columns={[
-              { key: 'order_number', label: 'ORDER ID', render: (v, row) => v || `#${String(row.order_id || row.id || '').slice(-6)}` },
-              { key: 'order_type', label: 'ORDER TYPE', render: (v) => (v || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'N/A' },
-              { key: 'party', label: 'PARTY', render: (_, row) => row.party?.party_name || row.party_name || row.party?.name || partyNamesMap[row.party_id] || '-' },
-              { key: 'order_status', label: 'STATUS', render: (v) => { const s = v || 'pending'; return <StatusBadge status={String(s).toLowerCase().replace(/\s+/g, '-')}>{String(s).toUpperCase()}</StatusBadge>; } },
-              { key: 'order_total', label: 'VALUE', render: (v, row) => `₹${parseFloat(v || row.total_value || row.total_amount || 0).toLocaleString('en-IN')}` },
-              { key: 'created_at', label: 'DATE', render: (v, row) => { const d = v || row.order_date; return d ? new Date(d).toLocaleDateString('en-GB') : '-'; } },
-            ]}
-          />
-        </div>
+        )}
       </div>
     </div>
   );

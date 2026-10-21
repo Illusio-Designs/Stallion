@@ -1,1 +1,14 @@
 /* Redesign area c: own rules for this area only (unlayered, outranks Tailwind utilities). */
+
+/* ---- Expenses ---- */
+:root .exp-page .expenses-summary { margin-bottom: 20px; }
+:root .exp-page .exp-chips { margin: 0 0 16px; padding: 0; }
+:root .exp-page .dash-card > .card-header { padding: 20px 24px 8px; border: 0; }
+:root .exp-page .dash-card .ui-table-container { border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+:root .exp-page .exp-amount { font-variant-numeric: tabular-nums; }
+
+/* ---- Events: black date tile ---- */
+:root .ev-name { display: flex; align-items: center; gap: 12px; font-weight: 600; color: #0a0a0a; }
+:root .ev-date { flex: none; width: 46px; height: 50px; border-radius: 10px; background: #0a0a0a; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; }
+:root .ev-date b { font-family: var(--font-display); font-size: 17px; font-weight: 700; }
+:root .ev-date span { font-size: 10px; text-transform: uppercase; letter-spacing: .06em; opacity: .75; }

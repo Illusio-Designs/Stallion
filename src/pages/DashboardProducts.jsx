@@ -5,6 +5,7 @@ import RowActions from '../components/ui/RowActions';
 import { Skeleton } from '../components/ui/Skeleton';
 import MediaImageCard from '../components/ui/MediaImageCard';
 import TableWithControls from '../components/ui/TableWithControls';
+import StatusBadge from '../components/ui/StatusBadge';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   bulkUploadProducts,
@@ -2015,13 +2016,25 @@ const DashboardProducts = () => {
       render: (_v, row) => <ProductThumb product={row.data} alt={row.model_no} />,
     },
     { key: 'model_no', label: 'MODEL NO', width: '120px' },
+    { key: 'brand', label: 'BRAND', width: '120px' },
+    { key: 'collection', label: 'COLLECTION', width: '130px' },
     { key: 'color_code_name', label: 'COLOR CODE', width: '120px' },
     { key: 'warehouse_qty', label: 'WAREHOUSE QTY', width: '140px' },
     { key: 'tray_qty', label: 'TRAY QTY', width: '110px' },
-    { key: 'total_qty', label: 'TOTAL QTY', width: '110px' },
-    { key: 'status', label: 'STATUS', width: '100px' },
-    { key: 'brand', label: 'BRAND', width: '120px' },
-    { key: 'collection', label: 'COLLECTION', width: '130px' },
+    { key: 'total_qty', label: 'STOCK', width: '90px' },
+    {
+      key: 'status', label: 'STATUS', width: '120px',
+      render: (v, row) => {
+        const st = String(v || '').toLowerCase();
+        const qty = Number(row.total_qty) || 0;
+        if (st === 'active' && qty <= 0) return <StatusBadge status="cancelled">Sold out</StatusBadge>;
+        if (st === 'active' && qty <= 5) return <StatusBadge status="pending">Low stock</StatusBadge>;
+        if (st === 'active') return <StatusBadge status="completed">Active</StatusBadge>;
+        const label = st ? st.charAt(0).toUpperCase() + st.slice(1) : 'Draft';
+        return <StatusBadge status="default">{label}</StatusBadge>;
+      },
+    },
+    { key: 'whp_formatted', label: 'PRICE', width: '110px', render: (v) => <b>{v}</b> },
     {
       key: 'action', label: 'ACTION', width: '120px', render: (_v, row) => (
         <RowActions

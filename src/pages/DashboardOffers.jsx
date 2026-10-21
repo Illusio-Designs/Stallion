@@ -272,7 +272,7 @@ const DashboardOffers = () => {
     { key: 'discount', label: 'DISCOUNT', render: (_v, row) => summarise(row) },
     { key: 'validity', label: 'VALIDITY', render: (_v, row) => `${fmtDate(row.start_date)} → ${fmtDate(row.end_date)}` },
     { key: 'is_active', label: 'STATUS', render: (v) => (
-      <StatusBadge status={v !== false ? 'active' : 'cancelled'}>{v !== false ? 'ACTIVE' : 'INACTIVE'}</StatusBadge>
+      <StatusBadge status={v !== false ? 'completed' : 'default'}>{v !== false ? 'Active' : 'Inactive'}</StatusBadge>
     ) },
     { key: 'action', label: 'ACTIONS', render: (_v, row) => (
       <RowActions onEdit={() => openEdit(row)} onDelete={() => handleDelete(row)} />
