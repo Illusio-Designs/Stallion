@@ -441,7 +441,7 @@ const AnalyticsReports = () => {
                 <button key={p.key} type="button" aria-pressed={period === p.key} className={period === p.key ? 'on' : ''} onClick={() => setPeriod(p.key)}>{p.label}</button>
               ))}
             </div>
-            <button type="button" className="ui-btn ui-btn--secondary rep-export" onClick={exportVisible} disabled={loading || visibleCount === 0}>Export CSV</button>
+            <button type="button" className="gbtn rep-export" onClick={exportVisible} disabled={loading || visibleCount === 0}>Export CSV</button>
           </div>
         </div>
 
