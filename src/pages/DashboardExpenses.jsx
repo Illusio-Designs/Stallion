@@ -484,7 +484,7 @@ const DashboardExpenses = () => {
                 </button>
               </>
             )}
-            {shouldShowSalesmanFeatures && (
+            {shouldShowSalesmanFeatures && row.originalExpense.status !== 'approved' && (
               <button
                 className="ui-btn ui-btn--ghost ui-btn--sm has-tt"
                 onClick={() => handleDelete(row)}

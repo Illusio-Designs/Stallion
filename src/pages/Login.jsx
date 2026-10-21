@@ -720,7 +720,6 @@ const Login = ({ onPageChange }) => {
                 >
                   <span className="ui-btn__label">{loading ? 'Sending code…' : 'Send code'}</span>
                 </button>
-                <p className="auth-alt">New here? <a href="/register">Request an account</a></p>
               </form>
             </>
           ) : (

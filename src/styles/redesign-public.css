@@ -255,8 +255,7 @@ div.products-grid-container.grid {
   background: #ffffff;
   min-width: 0;
 }
-.auth-split .login-container,
-.auth-split .register-container {
+.auth-split .login-container {
   background: transparent;
   border: 0;
   border-radius: 0;

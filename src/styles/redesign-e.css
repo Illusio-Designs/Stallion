@@ -77,7 +77,7 @@
 :root .auth-split .otp-input:focus { border-color: #0a0a0a; box-shadow: 0 0 0 3px rgba(0,0,0,.12); outline: none; }
 :root .auth-alt { margin: 4px 0 0; font-size: 14px; color: #595959; }
 :root .auth-alt a { color: #0a0a0a; font-weight: 600; text-decoration: underline; }
-:root .auth-split .login-container, :root .auth-split .register-container { width: 100%; max-width: 400px; }
+:root .auth-split .login-container { width: 100%; max-width: 400px; }
 
 /* ---- About ---- */
 :root .about-page .about-hero .about-hero-lede { color: #bdbdbd; }
@@ -171,9 +171,3 @@
 :root .about-page h2 { font-family: var(--font-display); }
 @media (max-width: 640px) { :root .about-page .about-hero { margin: 12px 16px 0; padding: 36px 20px; } }
 
-/* ---- Register ---- */
-:root .register-page .register-container { max-width: 440px; }
-:root .register-page .register-title { font-family: var(--font-display); font-size: 28px; margin-bottom: 10px; }
-:root .register-page .register-subtitle { margin-bottom: 24px; line-height: 1.55; }
-:root .register-page .register-signin { display: inline-flex; width: 100%; justify-content: center; }
-:root .register-page .register-hint { margin: 14px 0 0; color: #595959; font-size: 13px; }

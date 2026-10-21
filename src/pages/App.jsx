@@ -28,7 +28,6 @@ import { pageKeyToPath, pathToDashboardPage, isDashboardPage, parseProductPath }
 // bundle and is applied on first paint (no unstyled flash on reload / direct
 // navigation). Dashboard pages stay lazy (behind auth) to keep this bundle lean.
 import Login from './Login';
-import Register from './Register';
 import Home from './Home';
 import About from './About';
 import Cart from './Cart';
@@ -92,7 +91,7 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   
   // Helper to determine layout from page
   const getLayoutFromPage = (page) => {
-    if (['login', 'register'].includes(page)) {
+    if (page === 'login') {
       return 'auth';
     } else if (isDashboardPage(page)) {
       return 'dashboard';
@@ -184,8 +183,6 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
       // Auth Pages
       case 'login':
         return <Login onPageChange={handlePageChange} />;
-      case 'register':
-        return <Register />;
       
       // Public Pages
       case '':
