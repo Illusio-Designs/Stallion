@@ -659,6 +659,7 @@ const DashboardOrders = () => {
         orderType: orderTypeDisplay,
         client: partyName,
         clientAddress: partyAddress,
+        partyCity: (typeof order.party?.city === 'string' ? order.party.city : order.party?.city?.name) || order.party_city || '',
         clientBillingAddress: partyBillingAddress,
         salesman: salesmanLabel,
         date: orderDate,
@@ -696,6 +697,16 @@ const DashboardOrders = () => {
 
     return result;
   }, [rows, activeTab, dateFrom, dateTo]);
+
+  // Counts shown on the status chips
+  const tabCounts = useMemo(() => {
+    const out = { All: orders.length };
+    ['Pending', 'Processing', 'Hold by Sample', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].forEach((t) => {
+      const api = mapUITabToApiStatus(t);
+      out[t] = orders.filter((o) => o.order_status?.toLowerCase() === api).length;
+    });
+    return out;
+  }, [orders]);
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -1036,14 +1047,16 @@ const DashboardOrders = () => {
   const handleDownload = (row) => downloadOrderPdf(row, products);
 
   const columns = useMemo(() => ([
-    { key: 'orderId', label: 'ORDER ID' },
-    { key: 'orderType', label: 'ORDER TYPE' },
-    { key: 'client', label: 'PARTY NAME' },
+    { key: 'orderId', label: 'ORDER', render: (v, row) => (
+      <span className="ord-cell"><b className="ord-cell__id">{v}</b>{row.orderType && row.orderType !== 'N/A' && <span className="ord-cell__sub">{row.orderType}</span>}</span>
+    ) },
+    { key: 'client', label: 'PARTY', render: (v, row) => (
+      <span className="ord-cell"><b>{v}</b>{row.partyCity && <span className="ord-cell__sub">{row.partyCity}</span>}</span>
+    ) },
     { key: 'salesman', label: 'SALESMAN' },
-    { key: 'date', label: 'DATE' },
-    { key: 'qty', label: 'QTY' },
+    { key: 'date', label: 'PLACED', render: (v) => <span className="ord-muted">{v}</span> },
     { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase().replace(/\s+/g, '-')}>{v}</StatusBadge> },
-    { key: 'value', label: 'VALUE' },
+    { key: 'value', label: 'AMOUNT', render: (v) => <b className="ord-amount">{v}</b> },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions
         onView={() => setViewRow(row)}
@@ -1089,6 +1102,7 @@ const DashboardOrders = () => {
                 onClick={() => setActiveTab(tab)}
               >
                 {tab}
+                <b className="order-tab__count">{tabCounts[tab] ?? 0}</b>
               </button>
             ))}
           </div>
@@ -1166,6 +1180,12 @@ const DashboardOrders = () => {
                   <span className="ord-field__label">Placed By</span>
                   <span className="ord-field__value">{viewRow.salesman || '—'}</span>
                 </div>
+                {(order?.distance_meters ?? order?.distance_at_checkout) != null && (
+                  <div className="ord-field">
+                    <span className="ord-field__label">Distance at checkout</span>
+                    <span className="ord-field__value">{Math.round(Number(order?.distance_meters ?? order?.distance_at_checkout))} m</span>
+                  </div>
+                )}
                 <div className="ord-field">
                   <span className="ord-field__label">Order Date</span>
                   <span className="ord-field__value">{orderDate}</span>
@@ -1183,7 +1203,7 @@ const DashboardOrders = () => {
               </div>
 
               {!canEditOrder && (
-                <p className="ord-view__lock">Only admin and order managers can edit or cancel an order.</p>
+                <p className="ord-view__lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Only admin and order managers can edit or cancel this order.</span></p>
               )}
 
               {viewRow.clientAddress && (
