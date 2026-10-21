@@ -49,6 +49,8 @@ export const logout = ({ keepCart = false } = {}) => {
   if (typeof window === 'undefined') return;
   // Tell the server to cancel this login (not needed when the session just expired)
   if (!keepCart) {
+    // Lets the token monitor know this is a normal logout, not an expired session.
+    window.__manualLogout = true;
     const oldToken = localStorage.getItem('token');
     if (oldToken) {
       const envUrl = process.env.NEXT_PUBLIC_API_URL || 'https://stallion.nishree.com';
