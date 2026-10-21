@@ -1428,6 +1428,18 @@ const DashboardSuppliers = () => {
       showError('Please set the next visit date.');
       return;
     }
+    if (new Date(checkinForm.out_time) <= new Date(checkinForm.in_time)) {
+      showError('Out time must be after in time.');
+      return;
+    }
+    {
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      if (checkinForm.next_visit_date < todayStr) {
+        showError('Next visit date cannot be in the past.');
+        return;
+      }
+    }
     try {
       setCheckinsLoading(true);
       // Auto-capture location and date for salesman
@@ -2293,11 +2305,11 @@ const DashboardSuppliers = () => {
             </div>
             <div className="form-group">
               <label className="ui-label">Out Time <span className="text-error">*</span></label>
-              <input type="datetime-local" className="ui-input" value={checkinForm.out_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, out_time: e.target.value }))} />
+              <input type="datetime-local" className="ui-input" min={checkinForm.in_time || undefined} value={checkinForm.out_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, out_time: e.target.value }))} />
             </div>
             <div className="form-group form-group--full">
               <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
-              <input type="date" className="ui-input" value={checkinForm.next_visit_date} onChange={(e) => setCheckinForm(prev => ({ ...prev, next_visit_date: e.target.value }))} />
+              <input type="date" className="ui-input" min={new Date().toISOString().slice(0, 10)} value={checkinForm.next_visit_date} onChange={(e) => setCheckinForm(prev => ({ ...prev, next_visit_date: e.target.value }))} />
             </div>
             <div className="form-group form-group--full">
               <label className="ui-label">Remarks</label>
@@ -2357,6 +2369,10 @@ const DashboardSuppliers = () => {
               options={[
                 { value: '', label: 'Overall (no specific type)' },
                 { value: 'party_order', label: 'Party Order' },
+                { value: 'visit_order', label: 'Visit Order' },
+                { value: 'whatsapp_order', label: 'WhatsApp Order' },
+                { value: 'event_order', label: 'Event Order' },
+                { value: 'distributor_order', label: 'Distributor Order' },
               ]}
               value={targetForm.order_type}
               onChange={(v) => setTargetForm(prev => ({ ...prev, order_type: v }))}
