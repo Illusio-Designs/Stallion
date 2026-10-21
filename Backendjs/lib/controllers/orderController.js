@@ -543,8 +543,8 @@ class OrderController {
                     return res.status(400).json({ error: 'Product ID must be a string' });
                 }
                 // if quantity is not a number, return error
-                if (typeof item.quantity !== 'number' || item.quantity <= 0) {
-                    return res.status(400).json({ error: 'Quantity must be a positive number' });
+                if (typeof item.quantity !== 'number' || !Number.isInteger(item.quantity) || item.quantity <= 0) {
+                    return res.status(400).json({ error: 'Quantity must be a whole number, 1 or more.' });
                 }
                 const product = await Product.findOne({ where: { product_id: item.product_id } });
                 if (!product) {
@@ -562,6 +562,17 @@ class OrderController {
             }
             if (isSalesmanRequired && salesman_id && userScope.role === 'salesman' && userScope.salesmanId !== salesman_id) {
                 return res.status(403).json({ error: 'Cannot create orders for another salesman' });
+            }
+
+            // The same product on two lines becomes one line, so an offer is worked out once.
+            {
+                const merged = new Map();
+                for (const it of order_items) {
+                    const prev = merged.get(it.product_id);
+                    if (prev) prev.quantity += it.quantity;
+                    else merged.set(it.product_id, { ...it });
+                }
+                order_items.splice(0, order_items.length, ...merged.values());
             }
 
             let orderTotal = 0;
@@ -705,7 +716,13 @@ class OrderController {
                 }
                 const priced = applyOfferToItems(appliedOfferModel, resolvedOrderItems);
 
-                const orderNumber = generateUniqueOrderNumber();
+                // Pick a number that no existing order already has.
+                let orderNumber = generateUniqueOrderNumber();
+                for (let tries = 0; tries < 5; tries++) {
+                    const clash = await Order.findOne({ where: { order_number: orderNumber }, attributes: ['order_id'], transaction });
+                    if (!clash) break;
+                    orderNumber = generateUniqueOrderNumber();
+                }
                 const orderData = {
                     order_number: orderNumber,
                     order_date,
@@ -825,7 +842,19 @@ class OrderController {
                 if (!partial_dispatch_qty) {
                     return res.status(400).json({ error: 'Partial dispatch quantity is required' });
                 }
-                order.partial_dispatch_qty = partial_dispatch_qty;
+                const dispatchQty = Number(partial_dispatch_qty);
+                let orderedQty = 0;
+                try {
+                    const its = typeof order.order_items === 'string' ? JSON.parse(order.order_items) : order.order_items;
+                    orderedQty = (Array.isArray(its) ? its : []).reduce((sum, it) => sum + (Number(it && (it.quantity ?? it.qty)) || 0), 0);
+                } catch (e) { orderedQty = 0; }
+                if (!Number.isInteger(dispatchQty) || dispatchQty < 1) {
+                    return res.status(400).json({ error: 'Dispatched quantity must be a whole number, 1 or more.' });
+                }
+                if (orderedQty && dispatchQty > orderedQty) {
+                    return res.status(400).json({ error: `Dispatched quantity cannot be more than the ordered quantity (${orderedQty}).` });
+                }
+                order.partial_dispatch_qty = dispatchQty;
             }
             // Reverse stock only when an order first transitions INTO cancelled,
             // not on a cancelled -> cancelled no-op (which would reverse twice).
@@ -949,6 +978,18 @@ class OrderController {
                     quantity: Number(i.quantity) || 0,
                     price: priceById.get(String(i.product_id)),
                 }));
+            if (resolvedItems.some((i) => !Number.isInteger(i.quantity) || i.quantity <= 0)) {
+                return res.status(400).json({ error: 'Quantity must be a whole number, 1 or more.' });
+            }
+            {
+                const merged = new Map();
+                for (const it of resolvedItems) {
+                    const prev = merged.get(it.product_id);
+                    if (prev) prev.quantity += it.quantity;
+                    else merged.set(it.product_id, it);
+                }
+                resolvedItems.splice(0, resolvedItems.length, ...merged.values());
+            }
 
             const offerLines = resolvedItems.map(i => ({ product_id: i.product_id, qty: i.quantity, unit_price: i.price }));
             let offer = null;
