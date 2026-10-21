@@ -48,7 +48,7 @@ export const showLoginSuccess = () => {
 
 // Logout success
 export const showLogoutSuccess = () => {
-  showInfo('', null, 'Signed out', 'See you again soon.');
+  showSuccess('', null, 'Logged out successfully', 'You have been signed out safely. See you again soon.');
 };
 
 // Add to cart success
