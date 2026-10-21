@@ -59,7 +59,7 @@ const MobileBottomNav = ({ onPageChange, currentPage }) => {
 
   // Same bar as the dashboard (labelled icons, active item underlined): see .dashboard-bottom-nav.
   return (
-    <nav className="dashboard-bottom-nav md:hidden fixed z-[1000]" aria-label="Primary">
+    <nav className="dashboard-bottom-nav shop-bottom-nav md:hidden fixed z-[1000]" aria-label="Primary">
       {items.map((it) => {
         const active = it.match.includes(currentPage);
         return (

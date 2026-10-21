@@ -7,3 +7,24 @@
 :root .profile-avatar-btn:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
 :root .profile-avatar-initials { font-size: 15px; font-weight: 700; letter-spacing: .02em; line-height: 1; }
 :root .profile-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Shop bottom bar has 4 items: spread them over the full width. */
+:root .shop-bottom-nav { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* Shop header on phones: Cart, Profile and Menu are the same round size. */
+@media (max-width: 767px) {
+  :root .header-actions { gap: 10px; }
+  :root .header-actions .cart-btn,
+  :root .header-actions .icon-btn.menu-btn,
+  :root .header-actions .profile-avatar-btn {
+    width: 46px; height: 46px; min-width: 46px; padding: 0; border-radius: 999px; flex: none;
+    display: inline-flex; align-items: center; justify-content: center; position: relative;
+  }
+  :root .header-actions .cart-btn,
+  :root .header-actions .icon-btn.menu-btn { background: #ffffff; color: #0a0a0a; border: 1.5px solid #0a0a0a; }
+  :root .header-actions .cart-btn .hd-btn__text { display: none; }
+  :root .header-actions .cart-btn svg { width: 23px; height: 23px; }
+  :root .header-actions .icon-btn.menu-btn svg { width: 24px; height: 24px; }
+  :root .header-actions .cart-btn .cart-badge { position: absolute; top: -5px; right: -5px; }
+  :root .header-actions .hd-btn--solid.user-btn { height: 46px; border-radius: 999px; }
+}
