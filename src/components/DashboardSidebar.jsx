@@ -1,10 +1,11 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import '../styles/components/DashboardSidebar.css';
 import {
-  FiGrid, FiPackage, FiShoppingCart, FiDollarSign, FiInbox, FiCalendar,
+  FiGrid, FiPackage, FiShoppingCart, FiInbox, FiCalendar,
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
   FiHelpCircle, FiSettings, FiChevronsLeft, FiX, FiShoppingBag, FiTag,
 } from 'react-icons/fi';
+import RupeeIcon from './icons/RupeeIcon';
 import { getUserRoles } from '../services/authService';
 import { filterMenuItemsByRoles } from '../utils/rolePermissions';
 
@@ -52,7 +53,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     dashboard: FiGrid,
     'dashboard-products': FiPackage,
     orders: FiShoppingCart,
-    expenses: FiDollarSign,
+    expenses: RupeeIcon,
     tray: FiInbox,
     events: FiCalendar,
     offers: FiTag,

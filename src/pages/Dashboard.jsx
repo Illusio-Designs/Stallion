@@ -9,7 +9,8 @@ import OrdersPerDayChart from '../components/charts/OrdersPerDayChart';
 import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets, getTrays, getIndianCountries, getSalesmen, getAllSalesmanCheckins } from '../services/apiService';
 import { getAllAdminExpenses } from '../services/expenseService';
 import { getUserRole, getUserRoles, getUser } from '../services/authService';
-import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiDollarSign, FiPackage, FiInbox, FiNavigation2 } from 'react-icons/fi';
+import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiPackage, FiInbox, FiNavigation2 } from 'react-icons/fi';
+import RupeeIcon from '../components/icons/RupeeIcon';
 
 // A link that switches pages inside the app instead of reloading the whole page.
 const AppLink = ({ href, children, ...rest }) => {
@@ -498,32 +499,32 @@ const Dashboard = () => {
   }
   const kpis = isParty
     ? [
-        { icon: FiDollarSign, label: 'Ordered this month', money: stats.totalSales, sub: "This month's orders, cancelled excluded" },
+        { icon: RupeeIcon, label: 'Ordered this month', money: stats.totalSales, sub: "This month's orders, cancelled excluded" },
         { icon: FiShoppingBag, label: 'Open orders', value: stats.openCount, sub: 'Waiting to be completed' },
         ownParty && ownParty.credit_days != null
           ? { icon: FiClock, label: 'Credit days', value: ownParty.credit_days, sub: 'Set by your manager' }
           : { icon: FiShoppingBag, label: 'My orders', value: stats.totalOrders, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
-        { icon: FiDollarSign, label: 'Total spent', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
+        { icon: RupeeIcon, label: 'Total spent', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
       ]
     : isDistributor
     ? [
-        { icon: FiDollarSign, label: 'Sales this month', money: stats.totalSales, sub: "Your parties' orders this month" },
+        { icon: RupeeIcon, label: 'Sales this month', money: stats.totalSales, sub: "Your parties' orders this month" },
         { icon: FiUsers, label: 'My parties', value: partiesCount, sub: 'Parties assigned to you' },
         { icon: FiShoppingBag, label: 'Open orders', value: stats.openCount, sub: `Of ${stats.totalOrders} orders` },
-        { icon: FiDollarSign, label: 'Total value', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
+        { icon: RupeeIcon, label: 'Total value', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
       ]
     : isSalesman
     ? [
-        { icon: FiDollarSign, label: 'My sales', money: stats.totalSales, sub: targetTotal > 0 ? `${targetPct}% of ${money(targetTotal)} target` : "This month's orders", subTone: targetTotal > 0 ? 'up' : null },
+        { icon: RupeeIcon, label: 'My sales', money: stats.totalSales, sub: targetTotal > 0 ? `${targetPct}% of ${money(targetTotal)} target` : "This month's orders", subTone: targetTotal > 0 ? 'up' : null },
         { icon: FiShoppingBag, label: 'My orders', value: stats.totalOrders, sub: `${stats.openCount} open | ${stats.completedCount} completed` },
         { icon: FiUsers, label: 'My parties', value: ownParties.length || stats.activeClients, sub: ownParties.length ? (noLocation > 0 ? `${noLocation} without a shop location` : 'All have a shop location') : 'Parties you ordered for' },
-        { icon: FiDollarSign, label: 'Total value', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
+        { icon: RupeeIcon, label: 'Total value', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
       ]
     : [
-        { icon: FiDollarSign, label: 'Sales this month', money: stats.totalSales, sub: "This month's confirmed sales", delta: monthDelta, deltaText: 'than last month' },
+        { icon: RupeeIcon, label: 'Sales this month', money: stats.totalSales, sub: "This month's confirmed sales", delta: monthDelta, deltaText: 'than last month' },
         { icon: FiShoppingBag, label: 'Total orders', value: stats.totalOrders, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
         { icon: FiUsers, label: 'Active clients', value: stats.activeClients, sub: 'Optical Stores + Enterprises' },
-        { icon: FiDollarSign, label: 'Total revenue', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders (cancelled excluded)` },
+        { icon: RupeeIcon, label: 'Total revenue', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders (cancelled excluded)` },
       ];
 
   // Only pages the role can really open.
@@ -542,7 +543,7 @@ const Dashboard = () => {
       attention.push({ icon: FiMapPin, tone: 'warn', title: `${partiesNoLocation} part${partiesNoLocation > 1 ? 'ies have' : 'y has'} no shop location`, desc: 'Salesmen cannot place visit orders for them', onClick: go('/dashboard/party') });
     }
     if (pendingExpenses > 0) {
-      attention.push({ icon: FiDollarSign, tone: 'warn', title: `${pendingExpenses} expense claim${pendingExpenses > 1 ? 's' : ''} to approve`, desc: 'Waiting for approval or rejection', onClick: go('/dashboard/expenses') });
+      attention.push({ icon: RupeeIcon, tone: 'warn', title: `${pendingExpenses} expense claim${pendingExpenses > 1 ? 's' : ''} to approve`, desc: 'Waiting for approval or rejection', onClick: go('/dashboard/expenses') });
     }
     if (traysOut > 0) {
       attention.push({ icon: FiInbox, tone: 'warn', title: `${traysOut} sample tray${traysOut > 1 ? 's' : ''} not returned`, desc: 'Still with a salesman', onClick: go('/dashboard/tray') });
