@@ -133,6 +133,7 @@ const Home = ({ onPageChange }) => {
         <div className="hero-content relative z-[2] box-border w-full max-w-[900px] px-5 pb-16 pt-[calc(var(--header-height)+var(--space-8))] text-center text-text lg:max-w-[760px] lg:px-5 lg:pb-12 lg:pt-16">
           <h1 className="mb-5 text-[length:clamp(2rem,5vw,3.5rem)] font-medium leading-[1.2] tracking-[-0.02em] text-text">Wholesale Sunglasses &amp; Frames For Retailers &amp; Opticians</h1>
           <p className="mx-auto mb-8 max-w-[680px] text-[length:clamp(1rem,2vw,1.25rem)] leading-[1.5] text-text-muted">Premium sunglasses and optical frames, supplied in bulk to retailers, opticians and distributors — with competitive wholesale pricing and reliable supply.</p>
+          <div className="hero-actions">
           <button
             type="button"
             className="cta-button inline-flex min-h-[48px] cursor-pointer items-center justify-center rounded-md bg-accent px-8 py-3 text-[length:var(--text-md)] font-semibold tracking-[0.02em] text-text-on-accent shadow-sm transition duration-200 ease-[ease] hover:bg-accent-hover hover:shadow-md focus-visible:shadow-[var(--focus-ring)] focus-visible:outline-none active:scale-[0.98]"
@@ -140,6 +141,8 @@ const Home = ({ onPageChange }) => {
           >
             Shop Now
           </button>
+          <a className="hero-secondary-cta" href="/register">Open an account</a>
+          </div>
         </div>
         <div className="banner-slider relative w-full overflow-hidden bg-surface pb-10">
         <div className="infinite-slider relative z-[2] w-full overflow-hidden">
