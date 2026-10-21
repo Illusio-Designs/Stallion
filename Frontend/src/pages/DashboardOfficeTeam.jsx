@@ -7,7 +7,7 @@ import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import PagedMultiSelect from '../components/ui/PagedMultiSelect';
 import { useConfirm } from '../components/ui/ConfirmProvider';
-import { createUser, updateUserById, getRoles, getUsers, deleteUser, getCountries, getStates, getCities } from '../services/apiService';
+import { createUser, updateUserById, getRoles, getUsers, deleteUser, getIndianCountries, getStates, getCities } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 
 const DashboardOfficeTeam = () => {
@@ -80,7 +80,7 @@ const DashboardOfficeTeam = () => {
 
   // Fetch countries once on mount for the cascade dropdowns
   useEffect(() => {
-    getCountries()
+    getIndianCountries()
       .then(r => setCountries(Array.isArray(r) ? r : (r?.data || [])))
       .catch(() => {});
   }, []);
@@ -756,7 +756,7 @@ const DashboardOfficeTeam = () => {
                 handleInputChange('city_id', '');
                 fetchStates(value);
               }}
-              onOpen={() => { if (!countries.length) getCountries().then(r => setCountries(Array.isArray(r) ? r : (r?.data || []))).catch(() => {}); }}
+              onOpen={() => { if (!countries.length) getIndianCountries().then(r => setCountries(Array.isArray(r) ? r : (r?.data || []))).catch(() => {}); }}
               placeholder="Select Country"
               className="ui-dropdown-custom--full-width"
             />
@@ -911,7 +911,7 @@ const DashboardOfficeTeam = () => {
                 setEditFormData(prev => ({ ...prev, country_id: value, state_id: '', city_id: '' }));
                 fetchStates(value);
               }}
-              onOpen={() => { if (!countries.length) getCountries().then(r => setCountries(Array.isArray(r) ? r : (r?.data || []))).catch(() => {}); }}
+              onOpen={() => { if (!countries.length) getIndianCountries().then(r => setCountries(Array.isArray(r) ? r : (r?.data || []))).catch(() => {}); }}
               placeholder="Select Country"
               className="ui-dropdown-custom--full-width"
             />

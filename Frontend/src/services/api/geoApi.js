@@ -15,6 +15,21 @@ export const getCountries = async () => {
 };
 
 /**
+ * Countries for forms and filters: India only (the business operates in India).
+ * The Manage page keeps using getCountries so admins can still see every country.
+ */
+export const getIndianCountries = async () => {
+  const res = await getCountries();
+  const list = Array.isArray(res) ? res : (res?.data || []);
+  const india = list.filter((c) => {
+    const name = String(c?.name || '').trim().toLowerCase();
+    const code = String(c?.code || '').trim().toUpperCase();
+    return name === 'india' || code === 'IN';
+  });
+  return Array.isArray(res) ? india : { ...res, data: india };
+};
+
+/**
  * Create country
  * @param {Object} countryData - Country data
  * @param {string} countryData.name - Country name

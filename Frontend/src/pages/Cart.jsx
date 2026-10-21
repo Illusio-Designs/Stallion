@@ -21,7 +21,7 @@ import {
   getMyParties,
   getPartyById,
   getEvents,
-  getCountries,
+  getIndianCountries,
   getStates,
   getDistributors,
   createOrder,
@@ -213,7 +213,7 @@ const Cart = ({ onPageChange = null }) => {
     try {
       let list = countries;
       if (!list || list.length === 0) {
-        list = await getCountries().catch(() => []);
+        list = await getIndianCountries().catch(() => []);
         setCountries(list || []);
       }
       const india = (list || []).find(c =>
@@ -800,7 +800,7 @@ const Cart = ({ onPageChange = null }) => {
             // Fetch countries first
             let countriesList = countries;
             if (!countriesList || countriesList.length === 0) {
-              countriesList = await getCountries();
+              countriesList = await getIndianCountries();
               setCountries(countriesList);
             }
             

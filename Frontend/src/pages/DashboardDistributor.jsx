@@ -11,7 +11,7 @@ import {
   createDistributor,
   updateDistributor,
   deleteDistributor,
-  getCountries,
+  getIndianCountries,
   getStates,
   getCities,
   getAllZones,
@@ -284,7 +284,7 @@ const DashboardDistributor = () => {
   const fetchCountries = async () => {
     if (countries.length > 0) return;
     try {
-      const countriesData = await getCountries();
+      const countriesData = await getIndianCountries();
       setCountries(countriesData || []);
     } catch (error) {
       if (!error.message?.toLowerCase().includes('token expired') &&

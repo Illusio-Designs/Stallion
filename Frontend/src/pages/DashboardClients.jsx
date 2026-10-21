@@ -12,7 +12,7 @@ import {
   createParty,
   deleteParty,
   getCities,
-  getCountries,
+  getIndianCountries,
   getPartiesForRole,
   getStates,
   getZones,
@@ -98,7 +98,7 @@ const DashboardClients = () => {
   const fetchCountries = async () => {
     if (countries.length > 0) return;
     try {
-      const countriesData = await getCountries();
+      const countriesData = await getIndianCountries();
       setCountries(countriesData || []);
     } catch (error) {
       console.error('Failed to load countries:', error);

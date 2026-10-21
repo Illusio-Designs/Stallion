@@ -19,7 +19,7 @@ import {
   getProductsPage,
   getProductsByIds,
   getSalesmanById,
-  getCountries,
+  getIndianCountries,
   getAvailableOffers,
 } from '../services/apiService';
 import { downloadOrderPdf } from '../utils/orderPdf';
@@ -298,7 +298,7 @@ const DashboardOrders = () => {
   const loadCountries = useCallback(async () => {
     if (countries.length > 0) return;
     try {
-      const countriesData = await getCountries();
+      const countriesData = await getIndianCountries();
       setCountries(countriesData || []);
     } catch (err) {
       console.error('Failed to load countries:', err);
