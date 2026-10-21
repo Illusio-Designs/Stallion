@@ -22,8 +22,35 @@ import {
   createZone,
   updateZone,
   deleteZone,
+  getBrands, createBrand, updateBrand, deleteBrand,
+  getCollections, createCollection, updateCollection, deleteCollection,
+  getShapes, createShape, updateShape, deleteShape,
+  getFrameColors, createFrameColor, updateFrameColor, deleteFrameColor,
+  getFrameMaterials, createFrameMaterial, updateFrameMaterial, deleteFrameMaterial,
+  getFrameTypes, createFrameType, updateFrameType, deleteFrameType,
+  getGenders, createGender, updateGender, deleteGender,
+  getLensColors, createLensColor, updateLensColor, deleteLensColor,
+  getLensMaterials, createLensMaterial, updateLensMaterial, deleteLensMaterial,
+  getColorCodes, createColorCode, updateColorCode, deleteColorCode,
 } from '../services/apiService';
 import '../styles/pages/dashboard-orders.css';
+
+// Master-data attribute tabs. Each maps to existing attributesApi list/create/update/delete calls.
+const attr = (idKey, field, label, list, create, update, del, extra = {}) => ({ idKey, field, label, list, create, update, del, ...extra });
+const ATTRIBUTE_TABS = {
+  Brand: attr('brand_id', 'brand_name', 'Brand Name', getBrands, createBrand, updateBrand, deleteBrand),
+  Collection: attr('collection_id', 'collection_name', 'Collection Name', getCollections, createCollection, updateCollection, deleteCollection, { hasBrand: true }),
+  Shape: attr('shape_id', 'shape_name', 'Shape Name', getShapes, createShape, updateShape, deleteShape),
+  'Frame Colour': attr('frame_color_id', 'frame_color', 'Frame Colour', getFrameColors, createFrameColor, updateFrameColor, deleteFrameColor),
+  'Frame Material': attr('frame_material_id', 'frame_material', 'Frame Material', getFrameMaterials, createFrameMaterial, updateFrameMaterial, deleteFrameMaterial),
+  'Frame Type': attr('frame_type_id', 'frame_type', 'Frame Type', getFrameTypes, createFrameType, updateFrameType, deleteFrameType),
+  Gender: attr('gender_id', 'gender_name', 'Gender Name', getGenders, createGender, updateGender, deleteGender),
+  'Lens Colour': attr('lens_color_id', 'lens_color', 'Lens Colour', getLensColors, createLensColor, updateLensColor, deleteLensColor),
+  'Lens Material': attr('lens_material_id', 'lens_material', 'Lens Material', getLensMaterials, createLensMaterial, updateLensMaterial, deleteLensMaterial),
+  'Colour Code': attr('color_code_id', 'color_code', 'Colour Code', getColorCodes, createColorCode, updateColorCode, deleteColorCode),
+};
+const GEO_TABS = ['Country', 'State', 'City', 'Zone'];
+const attrRowId = (cfg, item) => item[cfg.idKey] ?? item.id;
 
 const DashboardManage = () => {
   const confirm = useConfirm();
@@ -39,6 +66,8 @@ const DashboardManage = () => {
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
   const [allZones, setAllZones] = useState([]); // all zones unfiltered
+  const [attrRows, setAttrRows] = useState([]);
+  const [brandList, setBrandList] = useState([]);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -56,6 +85,8 @@ const DashboardManage = () => {
     city_id: '',
     description: '',
     zone_code: '',
+    attr_value: '',
+    brand_id: '',
   });
 
   // Options for dropdowns
@@ -346,8 +377,18 @@ const DashboardManage = () => {
           }
           break;
 
-        default:
+        default: {
+          const cfg = ATTRIBUTE_TABS[tab];
+          if (cfg) {
+            const [list, brands] = await Promise.all([
+              cfg.list(),
+              cfg.hasBrand ? getBrands().catch(() => []) : Promise.resolve([]),
+            ]);
+            setAttrRows(list || []);
+            if (cfg.hasBrand) setBrandList(brands || []);
+          }
           break;
+        }
       }
     } catch (error) {
       if (!error.message?.toLowerCase().includes('token expired') && 
@@ -473,8 +514,22 @@ const DashboardManage = () => {
       });
     });
 
+    const cfg = ATTRIBUTE_TABS[activeTab];
+    if (cfg) {
+      attrRows.forEach(item => {
+        const brand = cfg.hasBrand ? brandList.find(b => b.brand_id === item.brand_id) : null;
+        allRows.push({
+          id: attrRowId(cfg, item),
+          type: activeTab,
+          name: item[cfg.field] ?? '',
+          details: cfg.hasBrand ? (item.brand?.brand_name || item.brand_name || brand?.brand_name || 'N/A') : '',
+          data: item,
+        });
+      });
+    }
+
     return allRows;
-  }, [countries, states, cities, allZones]);
+  }, [countries, states, cities, allZones, attrRows, brandList, activeTab]);
 
   const columns = useMemo(() => {
     // Different columns for different tabs
@@ -492,6 +547,15 @@ const DashboardManage = () => {
         ) },
       ];
     }
+    if (ATTRIBUTE_TABS[activeTab]) {
+      return [
+        { key: 'name', label: 'NAME' },
+        ...(ATTRIBUTE_TABS[activeTab].hasBrand ? [{ key: 'details', label: 'BRAND' }] : []),
+        { key: 'action', label: 'ACTION', render: (_v, row) => (
+          <RowActions onEdit={() => handleEdit(row)} onDelete={() => handleDelete(row)} />
+        ) },
+      ];
+    }
     // Default columns for other tabs
     return [
       { key: 'type', label: 'TYPE' },
@@ -506,12 +570,7 @@ const DashboardManage = () => {
     ];
   }, [activeTab]);
 
-  const tabs = useMemo(() => ([
-    'Country',
-    'State',
-    'City',
-    'Zone',
-  ]), []);
+  const tabs = useMemo(() => ([...GEO_TABS, ...Object.keys(ATTRIBUTE_TABS)]), []);
 
   const filteredRowsByTab = useMemo(() => {
     let filtered = rows.filter(row => row.type === activeTab);
@@ -556,6 +615,8 @@ const DashboardManage = () => {
       city_id: '',
       description: '',
       zone_code: '',
+      attr_value: '',
+      brand_id: '',
     });
   };
 
@@ -578,6 +639,8 @@ const DashboardManage = () => {
       city_id: data.city_id || '',
       description: data.description || '',
       zone_code: data.zone_code || '',
+      attr_value: ATTRIBUTE_TABS[type] ? (data[ATTRIBUTE_TABS[type].field] ?? '') : '',
+      brand_id: data.brand_id || '',
     };
 
     setFormData(editData);
@@ -615,6 +678,8 @@ const DashboardManage = () => {
         case 'Zone':
           await deleteZone(row.id);
           break;
+        default:
+          if (ATTRIBUTE_TABS[row.type]) await ATTRIBUTE_TABS[row.type].del(row.id);
       }
       await fetchDataForTab(activeTab);
       setError(null); // Clear any previous errors
@@ -702,6 +767,18 @@ const DashboardManage = () => {
             await createZone(dataToSend);
           }
           break;
+        default: {
+          const cfg = ATTRIBUTE_TABS[type];
+          if (cfg) {
+            const payload = { [cfg.field]: formData.attr_value };
+            if (cfg.hasBrand) payload.brand_id = formData.brand_id;
+            if (editRow) {
+              await cfg.update(editRow.id, payload);
+            } else {
+              await cfg.create(payload);
+            }
+          }
+        }
       }
       
       await fetchDataForTab(activeTab);
@@ -912,17 +989,44 @@ const DashboardManage = () => {
           </>
         );
 
-      default:
-        return null;
+      default: {
+        const cfg = ATTRIBUTE_TABS[type];
+        if (!cfg) return null;
+        return (
+          <>
+            {cfg.hasBrand && (
+              <div className="form-group form-group--full">
+                <label className="ui-label">Brand *</label>
+                <DropdownSelector
+                  options={brandList.map(b => ({ value: b.brand_id, label: b.brand_name }))}
+                  value={formData.brand_id}
+                  onChange={(value) => handleInputChange('brand_id', value)}
+                  placeholder="Select brand"
+                />
+              </div>
+            )}
+            <div className="form-group form-group--full">
+              <label className="ui-label">{cfg.label} *</label>
+              <input
+                className="ui-input"
+                placeholder={`Enter ${cfg.label.toLowerCase()}`}
+                value={formData.attr_value}
+                onChange={(e) => handleInputChange('attr_value', e.target.value)}
+                required
+              />
+            </div>
+          </>
+        );
+      }
     }
   };
 
   return (
     <div className="dash-page">
       <div className="dash-container">
-        <div className="pg-head"><div><h1>Manage</h1><p>The lists behind every dropdown: countries, states, cities and zones.</p></div></div>
+        <div className="pg-head"><div><h1>Manage</h1><p>The lists behind every dropdown: locations, brands, shapes, frames, lenses and more.</p></div></div>
         <div className="dash-row">
-          <div className="order-tabs-container col-span-full flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm [scrollbar-color:var(--color-grey-300)_transparent] [scrollbar-width:thin]">
+          <div className="order-tabs-container manage-tabs col-span-full flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm [scrollbar-color:var(--color-grey-300)_transparent] [scrollbar-width:thin]">
             {tabs.map(tab => (
               <button
                 key={tab}

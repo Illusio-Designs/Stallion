@@ -1,0 +1,9 @@
+/* Salesmen table: fit 1280px without horizontal scroll (wrap instead of nowrap). */
+:root .sm-fit .sm-who { white-space: normal; align-items: center; }
+:root .sm-fit .sm-who__txt, :root .sm-fit .sm-contact { display: flex; flex-direction: column; min-width: 0; }
+:root .sm-fit .sm-sub { display: block; font-size: 12px; font-weight: 400; color: #595959; overflow-wrap: anywhere; }
+@media (min-width: 1024px) {
+  :root .sm-fit .ui-table table { width: 100%; min-width: 0; table-layout: auto; }
+  :root .sm-fit .ui-table tbody td { white-space: normal; overflow-wrap: anywhere; }
+  :root .sm-fit .ui-table thead th { white-space: nowrap; }
+}

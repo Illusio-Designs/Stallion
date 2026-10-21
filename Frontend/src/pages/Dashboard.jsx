@@ -548,17 +548,19 @@ const Dashboard = () => {
         { icon: FiBarChart2, label: 'Report', onClick: go('/dashboard/analytics') },
       ]
     : [];
-  // Salesman phone card: their first party with a saved shop location (distance only if the browser shared it)
-  const shopParty = ownParties.find((p) => p.latitude != null && p.longitude != null) || null;
-  const shopCity = shopParty ? (shopParty.city?.name || shopParty.city_name || (typeof shopParty.city === 'string' ? shopParty.city : '')) : '';
-  let shopKm = null;
-  if (shopParty && coords) {
+  // Salesman "I'm at the shop" card: the nearest party with a saved location when the browser shared
+  // where they are, else the first one. The capture itself happens on the Party page.
+  const kmBetween = (p) => {
     const rad = (x) => (x * Math.PI) / 180;
-    const dLat = rad(Number(shopParty.latitude) - coords.lat);
-    const dLng = rad(Number(shopParty.longitude) - coords.lng);
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(coords.lat)) * Math.cos(rad(Number(shopParty.latitude))) * Math.sin(dLng / 2) ** 2;
-    shopKm = Math.round(2 * 6371 * Math.asin(Math.sqrt(a)) * 10) / 10;
-  }
+    const dLat = rad(Number(p.latitude) - coords.lat);
+    const dLng = rad(Number(p.longitude) - coords.lng);
+    const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(coords.lat)) * Math.cos(rad(Number(p.latitude))) * Math.sin(dLng / 2) ** 2;
+    return 2 * 6371 * Math.asin(Math.sqrt(a));
+  };
+  const located = ownParties.filter((p) => p.latitude != null && p.longitude != null);
+  const shopParty = (coords && located.length ? [...located].sort((x, y) => kmBetween(x) - kmBetween(y))[0] : located[0]) || null;
+  const shopCity = shopParty ? (shopParty.city?.name || shopParty.city_name || (typeof shopParty.city === 'string' ? shopParty.city : '')) : '';
+  const shopKm = shopParty && coords ? Math.round(kmBetween(shopParty) * 10) / 10 : null;
   const ownData = isParty || isDistributor; // their own orders only: no warehouse stock
 
   // Greeting header
@@ -679,11 +681,11 @@ const Dashboard = () => {
           </div>
         )}
 
-        {isSalesman && shopParty && (
+        {isSalesman && (
           <section className="rda-shop" aria-label="Nearest shop">
             <div>
-              <h3>{shopParty.party_name || shopParty.name}</h3>
-              <span>{[shopCity, shopKm != null ? `${shopKm} km away` : null].filter(Boolean).join(', ') || 'Shop location saved'}</span>
+              <h3>{shopParty ? (shopParty.party_name || shopParty.name) : 'At a shop?'}</h3>
+              <span>{[shopCity, shopKm != null ? `${shopKm} km away` : null].filter(Boolean).join(', ') || (shopParty ? 'Shop location saved' : 'Pick the party and save its location')}</span>
             </div>
             <button type="button" className="rda-shop__at" onClick={go('/dashboard/party')}><FiNavigation2 size={18} aria-hidden="true" />I'm at the shop</button>
             <button type="button" className="rda-btn rda-btn--ghost rda-shop__new" onClick={go('/products')}><FiShoppingCart size={16} aria-hidden="true" />New order</button>
