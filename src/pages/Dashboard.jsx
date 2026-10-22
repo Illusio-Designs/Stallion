@@ -639,7 +639,7 @@ const Dashboard = () => {
           <thead><tr>{cols.map((c) => <th key={c.h} className={c.r ? 'r' : ''}>{c.h}</th>)}</tr></thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={cols.length}><Skeleton width="100%" height={24} /></td></tr>
+              [0, 1, 2, 3].map((i) => <tr key={i}>{cols.map((c) => <td key={c.h}><Skeleton width="70%" height={14} /></td>)}</tr>)
             ) : latestOrders.length === 0 ? (
               <tr><td colSpan={cols.length} className="rda-empty">{loadError ? 'Could not load orders.' : 'No orders yet.'}</td></tr>
             ) : latestOrders.map((o) => (
@@ -750,7 +750,9 @@ const Dashboard = () => {
                 <div><h2>Needs attention</h2><p>Things only a person can decide</p></div>
               </div>
               <div className="needs-attention__list">
-                {attention.length === 0 && <p className="rda-empty">{loading ? 'Checking...' : 'Nothing needs your attention right now.'}</p>}
+                {attention.length === 0 && (loading
+                  ? <div className="rda-skel-list" aria-busy="true">{[0, 1, 2].map((i) => <Skeleton key={i} width="100%" height={44} radius={10} />)}</div>
+                  : <p className="rda-empty">Nothing needs your attention right now.</p>)}
                 {attention.map((a) => (
                   <button key={a.title} type="button" onClick={a.onClick} className={`needs-attention__item needs-attention__item--${a.tone}`}>
                     <span className="needs-attention__icon" aria-hidden="true"><a.icon size={18} /></span>
@@ -815,7 +817,7 @@ const Dashboard = () => {
                   <thead><tr><th>Party</th><th>City</th><th>Location</th><th className="r">Action</th></tr></thead>
                   <tbody>
                     {ownParties.length === 0 ? (
-                      <tr><td colSpan={4} className="rda-empty">{loading ? 'Loading...' : 'No parties yet.'}</td></tr>
+                      (loading ? [0, 1, 2].map((i) => <tr key={i}>{[0, 1, 2, 3].map((c) => <td key={c}><Skeleton width="70%" height={14} /></td>)}</tr>) : <tr><td colSpan={4} className="rda-empty">No parties yet.</td></tr>)
                     ) : ownParties.slice(0, 5).map((p) => {
                       const has = p.latitude != null && p.longitude != null;
                       return (
@@ -852,7 +854,7 @@ const Dashboard = () => {
                   <thead><tr><th>Party</th><th>City</th><th className="r">Orders</th></tr></thead>
                   <tbody>
                     {ownParties.length === 0 ? (
-                      <tr><td colSpan={3} className="rda-empty">{loading ? 'Loading...' : 'No parties yet.'}</td></tr>
+                      (loading ? [0, 1, 2].map((i) => <tr key={i}>{[0, 1, 2].map((c) => <td key={c}><Skeleton width="70%" height={14} /></td>)}</tr>) : <tr><td colSpan={3} className="rda-empty">No parties yet.</td></tr>)
                     ) : ownParties.slice(0, 6).map((p) => {
                       const pid = p.party_id || p.id;
                       return (

@@ -114,3 +114,21 @@
 :root .offline-banner__row--bad { color: #a3241b; }
 :root .offline-banner__btn { font: inherit; font-weight: 600; font-size: 12.5px; min-height: 30px; padding: 0 12px; border-radius: 8px; border: 1px solid #0a0a0a; background: #fff; color: #0a0a0a; cursor: pointer; }
 :root .offline-banner__btn[disabled] { opacity: .6; }
+
+/* Skeleton loading: page, lists and phone cards */
+:root .page-skeleton { display: flex; flex-direction: column; gap: 16px; }
+:root .page-skeleton__head { display: flex; flex-direction: column; gap: 8px; }
+:root .page-skeleton__kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+:root .page-skeleton__kpi { border: 1px solid #e1e1e1; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; background: #fff; }
+:root .page-skeleton__table { border: 1px solid #e1e1e1; border-radius: 12px; background: #fff; }
+:root .page-skeleton__row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-bottom: 1px solid #e1e1e1; }
+:root .page-skeleton__row:last-child { border-bottom: 0; }
+:root .rda-skel-list { display: flex; flex-direction: column; gap: 10px; }
+@media (max-width: 767px) {
+  :root .page-skeleton__kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root .page-skeleton__row > :nth-child(n+4) { display: none; }
+  /* table placeholders become card placeholders on phones */
+  :root .ui-table__scroll .ui-skeleton-row td::before { display: none; }
+  :root .ui-table__scroll .ui-skeleton-row td { justify-content: flex-start; text-align: left; }
+  :root .ui-table__scroll .ui-skeleton-row td[data-col="primary"] { border-bottom: 1px solid #e1e1e1 !important; }
+}
