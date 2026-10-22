@@ -745,7 +745,21 @@ class OrderController {
                     orderData.salesman_id = salesman_id;
                 }
 
-                const order = await Order.create(orderData, { transaction });
+                // The database refuses a repeated order number. If that ever happens (two orders
+                // made the same number at the same moment), make a new number and save again.
+                let order;
+                for (let attempt = 0; ; attempt++) {
+                    try {
+                        order = await Order.create(orderData, { transaction });
+                        break;
+                    } catch (err) {
+                        const clash = err && err.name === 'SequelizeUniqueConstraintError'
+                            && (err.fields && Object.prototype.hasOwnProperty.call(err.fields, 'order_number')
+                                || /order_number/.test(String(err.message)));
+                        if (!clash || attempt >= 4) throw err;
+                        orderData.order_number = generateUniqueOrderNumber();
+                    }
+                }
 
                 for (const operationData of orderOperationsToCreate) {
                     await OrderOperation.create({
