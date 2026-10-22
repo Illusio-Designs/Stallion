@@ -1034,7 +1034,7 @@ const DashboardSuppliers = () => {
           role="switch"
           aria-checked={active}
           onClick={() => handleInputChange('is_active', !active)}
-          className="inline-flex items-center gap-3 cursor-pointer select-none border-0 bg-transparent p-0"
+          className="inline-flex min-h-[28px] items-center gap-3 cursor-pointer select-none border-0 bg-transparent p-0"
         >
           <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${active ? 'bg-primary' : 'bg-border-strong'}`}>
             <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${active ? 'translate-x-5' : 'translate-x-0.5'}`} />
@@ -1851,7 +1851,7 @@ const DashboardSuppliers = () => {
             />
           </div>
           <div className="form-group form-group--full">
-            <label className="ui-label">Working States * <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
+            <label className="ui-label">Working States * <span className="text-[#5c5c5c] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
             <StatesMultiDropdown
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
@@ -2058,7 +2058,7 @@ const DashboardSuppliers = () => {
             />
           </div>
           <div className="form-group form-group--full">
-            <label className="ui-label">Working States * <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
+            <label className="ui-label">Working States * <span className="text-[#5c5c5c] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
             <StatesMultiDropdown
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}

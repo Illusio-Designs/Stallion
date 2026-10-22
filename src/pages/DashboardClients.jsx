@@ -21,7 +21,7 @@ import {
   verifyPartyLocation,
 } from '../services/apiService';
 import { getUser, getUserRole, getUserRoles } from '../services/authService';
-import { showError, showSuccess } from '../services/notificationService';
+import { showError, showSuccess, showWarning } from '../services/notificationService';
 import { captureCurrentPosition } from '../utils/geolocation';
 import { downloadCsv } from '../utils/exportCsv';
 
@@ -547,7 +547,9 @@ const DashboardClients = () => {
       const result = await bulkUploadParties(bulkFile);
       const created = result?.data?.created ?? result?.created ?? 0;
       const updated = result?.data?.updated ?? result?.updated ?? 0;
-      showSuccess(`Bulk upload complete. Created: ${created}, Updated: ${updated}.`);
+      const skipped = result?.data?.errors?.length ?? 0;
+      if (skipped > 0 && result?.message) showWarning(result.message);
+      else showSuccess(`Bulk upload complete. Created: ${created}, Updated: ${updated}.`);
       setOpenBulkUpload(false);
       setBulkFile(null);
       fetchPartiesForCountry(selectedCountryFilter);
