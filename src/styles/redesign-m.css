@@ -132,3 +132,55 @@
   :root .ui-table__scroll .ui-skeleton-row td { justify-content: flex-start; text-align: left; }
   :root .ui-table__scroll .ui-skeleton-row td[data-col="primary"] { border-bottom: 1px solid #e1e1e1 !important; }
 }
+
+/* Sales by state (Reports) */
+:root .sbs { display: flex; flex-direction: column; gap: 12px; }
+:root .sbs__head { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+:root .sbs__head h3 { margin: 0; font-family: var(--font-display); font-size: 16px; }
+:root .sbs__skel { display: flex; flex-direction: column; gap: 8px; }
+:root .sbs__split { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+:root .sbs__bars { display: flex; flex-direction: column; gap: 6px; }
+:root .sbs__row { display: grid; grid-template-columns: 130px minmax(0, 1fr) 96px; gap: 10px; align-items: center; width: 100%; border: 0; background: transparent; font: inherit; color: inherit; text-align: left; padding: 6px 8px; border-radius: 10px; cursor: pointer; }
+:root .sbs__row:hover { background: #f5f5f5; }
+:root .sbs__row[aria-pressed="true"] { background: #f5f5f5; box-shadow: inset 0 0 0 1px #0a0a0a; }
+:root .sbs__row b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root .sbs__track { height: 12px; border-radius: 99px; background: #f0f0f0; overflow: hidden; display: block; }
+:root .sbs__fill { display: block; height: 100%; background: #0a0a0a; border-radius: 99px; }
+:root .sbs__row--none .sbs__fill { background: #c9c9c9; }
+:root .sbs__val { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+:root .sbs__chg { display: block; font-size: 11.5px; font-weight: 600; }
+:root .sbs__chg.up { color: #0b7a53; } :root .sbs__chg.dn { color: #a3241b; }
+:root .sbs__det h4 { margin: 0; font-family: var(--font-display); font-size: 18px; }
+:root .sbs__share { margin: 2px 0 10px; color: #595959; }
+:root .sbs__stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 10px; }
+:root .sbs__stats > div { border: 1px solid #e1e1e1; border-radius: 10px; padding: 8px 12px; }
+:root .sbs__stats small { display: block; color: #595959; } :root .sbs__stats b { font-size: 17px; }
+:root .sbs__tbl { width: 100%; border-collapse: collapse; }
+:root .sbs__tbl th { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #595959; text-align: left; padding: 6px 4px; border-bottom: 1px solid #e1e1e1; }
+:root .sbs__tbl td { padding: 7px 4px; border-bottom: 1px solid #e1e1e1; } :root .sbs__tbl td:last-child, :root .sbs__tbl th:last-child { text-align: right; }
+:root .sbs__note { margin: 0; color: #595959; font-size: 12.5px; }
+@media (max-width: 820px) { :root .sbs__split { grid-template-columns: 1fr; } :root .sbs__row { grid-template-columns: 104px minmax(0, 1fr) 88px; } }
+
+/* Stock history panel */
+:root .sh__sum { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 12px; }
+:root .sh__st { border: 1px solid #e1e1e1; border-radius: 10px; padding: 8px 12px; }
+:root .sh__st small { display: block; color: #595959; } :root .sh__st b { font-family: var(--font-display); font-size: 20px; }
+:root .sh__st--dark { background: #0a0a0a; border-color: #0a0a0a; color: #fff; } :root .sh__st--dark small { color: #bdbdbd; }
+:root .sh__chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+:root .sh__chip { font: inherit; font-weight: 600; font-size: 12.5px; border: 1px solid #e1e1e1; background: #fff; color: #595959; border-radius: 99px; padding: 4px 12px; min-height: 30px; cursor: pointer; }
+:root .sh__chip[aria-pressed="true"] { background: #0a0a0a; color: #fff; border-color: #0a0a0a; }
+:root .sh__skel { display: flex; flex-direction: column; gap: 8px; }
+:root .sh__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; border: 1px solid #e1e1e1; border-radius: 12px; overflow: hidden; }
+:root .sh__list > li + li { border-top: 1px solid #e1e1e1; }
+:root .sh__row { display: grid; grid-template-columns: minmax(0, 1fr) 56px 56px; gap: 8px; align-items: center; width: 100%; border: 0; background: #fff; font: inherit; color: inherit; text-align: left; padding: 10px 12px; cursor: pointer; }
+:root .sh__row:hover, :root .sh__row[aria-expanded="true"] { background: #f5f5f5; }
+:root .sh__what { display: flex; flex-direction: column; min-width: 0; } :root .sh__what small { color: #595959; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .sh__chg, :root .sh__after { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+:root .sh__chg.up { color: #0b7a53; } :root .sh__chg.dn { color: #a3241b; }
+:root .sh__det { padding: 4px 12px 12px; background: #f5f5f5; }
+:root .sh__det p { margin: 0 0 8px; color: #3b3b3b; }
+:root .sh__flow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: center; margin-bottom: 8px; text-align: center; }
+:root .sh__flow > span:not([aria-hidden]) { border: 1px solid #e1e1e1; background: #fff; border-radius: 10px; padding: 6px 8px; }
+:root .sh__flow small { display: block; color: #595959; } :root .sh__flow b { font-size: 18px; }
+:root .sh__det dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 14px; margin: 0; color: #595959; } :root .sh__det dd { margin: 0; color: #0a0a0a; font-weight: 600; text-align: right; }
+:root .sh__pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 12px; color: #595959; }

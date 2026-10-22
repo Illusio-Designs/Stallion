@@ -338,6 +338,13 @@ export const getMyOrders = async () => getCached('orders:my', async () => {
 const SELF_SCOPED_ORDER_ROLES = new Set(['party', 'distributor', 'salesman']);
 
 /**
+ * Sales, orders and top parties per state for a date range, with the change against the period
+ * before it. @param {string} from YYYY-MM-DD  @param {string} to YYYY-MM-DD
+ */
+export const getSalesByState = async (from, to) =>
+  apiRequest(`/orders/sales-by-state?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'GET', includeAuth: true });
+
+/**
  * Role-aware order fetch. End-user roles (party / distributor / salesman) get
  * their own token-scoped orders from /orders/my; admin / *_manager roles get the
  * full list from /orders. Use this instead of getOrders() on any page that an

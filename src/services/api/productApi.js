@@ -622,3 +622,13 @@ export const deleteProductImage = async (fileName) => {
   });
 };
 
+
+/**
+ * Every stock change of one product, newest first, with the warehouse and tray numbers after each.
+ * @returns {Promise<{summary:Object, data:Array, pagination:Object}>}
+ */
+export const getProductStockHistory = async (productId, { kind = '', page = 1, limit = 20 } = {}) => {
+  const q = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (kind) q.set('kind', kind);
+  return apiRequest(`/products/${encodeURIComponent(productId)}/stock-history?${q.toString()}`, { method: 'GET', includeAuth: true });
+};

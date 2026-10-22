@@ -10,7 +10,7 @@ const ttClass =
 // Reusable row action buttons: only renders buttons for handlers provided.
 // Uses the plain-CSS .row-action-btn class so the icon colour is guaranteed
 // (not subject to Tailwind layer/theme-token resolution).
-export default function RowActions({ onView, onEdit, onDownload, onDelete, onUpload }) {
+export default function RowActions({ onView, onEdit, onDownload, onDelete, onUpload, onHistory }) {
   return (
     <div className="relative z-[1] flex items-center gap-1.5">
       {onView && (
@@ -29,6 +29,15 @@ export default function RowActions({ onView, onEdit, onDownload, onDelete, onUpl
             <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4 12.5-12.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
           </svg>
           <span className={ttClass}>Edit</span>
+        </button>
+      )}
+      {onHistory && (
+        <button type="button" aria-label="Stock history" className="row-action-btn has-tt relative" onClick={onHistory}>
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2"/>
+            <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          <span className={ttClass}>Stock history</span>
         </button>
       )}
       {onDownload && (
