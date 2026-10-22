@@ -34,10 +34,9 @@ const salesmanCheckInsRoutes = require('./salesman_checkins');
 const offerRoutes = require('./offer');
 const adminRoutes = require('./admin');
 
+// One short line per request (no query string, so searches and phone numbers stay out of the log).
 router.use((req, res, next) => {
-    const timestamp = new Date();
-    const timeString = `${timestamp.getDate()}/${timestamp.getMonth() + 1}/${timestamp.getFullYear()} ${timestamp.getHours()}:${timestamp.getMinutes()}:${timestamp.getSeconds()}`;
-    console.log(`-------------------------------- ${req.method} ${req.url} ${timeString} --------------------------------`);
+    console.log(`${req.method} ${(req.originalUrl || req.url).split('?')[0]}`);
     next();
 });
 

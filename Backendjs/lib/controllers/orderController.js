@@ -305,18 +305,13 @@ class OrderController {
             let distributor_id = req.body.distributor_id;
             let salesman_id = req.body.salesman_id;
             if (!order_date || !order_type || !order_items) {
-                console.log("order_date", order_date);
-                console.log("order_type", order_type);
-                console.log("order_items", order_items);
                 return res.status(400).json({ error: 'order_date, order_type, order_items  are required' });
             }
             if (!Array.isArray(order_items)) {
-                console.log("Order items must be an array");
                 return res.status(400).json({ error: 'Order items must be an array' });
             }
             // if order type is not among the allowed types, return error
             if (!Object.values(OrderType).includes(order_type)) {
-                console.log("Invalid order type. Allowed types are: " + Object.values(OrderType).join(', '));
                 return res.status(400).json({ error: 'Invalid order type. Allowed types are: ' + Object.values(OrderType).join(', ') });
             }
             let isSalesmanRequired = false;
@@ -329,12 +324,10 @@ class OrderController {
                 isDistributorRequired = false;
                 isPartyRequired = true;
                 if (!event_id) {
-                    console.log("Event ID is required for event orders");
                     return res.status(400).json({ error: 'Event ID is required for event orders' });
                 }
                 const event = await Event.findOne({ where: { event_id: event_id } });
                 if (!event) {
-                    console.log("Event not found");
                     return res.status(404).json({ error: 'Event not found' });
                 }
             }
@@ -344,12 +337,10 @@ class OrderController {
                 isDistributorRequired = false;
                 isSalesmanRequired = false;
                 if (!party_id) {
-                    console.log("Party ID is required for party orders");
                     return res.status(400).json({ error: 'Party ID is required for party orders' });
                 }
                 const party = await Party.findOne({ where: { party_id: party_id } });
                 if (!party) {
-                    console.log("Party not found");
                     return res.status(404).json({ error: 'Party not found' });
                 }
                 if (!party.is_active) {
@@ -381,7 +372,6 @@ class OrderController {
                     });
 
                     if (!userDetails) {
-                        console.log("User not found");
                         return res.status(404).json({ error: 'User not found' });
                     }
 
@@ -403,7 +393,6 @@ class OrderController {
                         distributor.user_id = user.user_id;
                         await distributor.save();
                     } else {
-                        console.log("No distributor found for this user");
                         return res.status(404).json({ error: 'No distributor found for this user' });
                     }
                 }
@@ -412,8 +401,6 @@ class OrderController {
             }
             else if (order_type === OrderType.VISIT_ORDER) {
                 if (!latitude || !longitude) {
-                    console.log("latitude", latitude);
-                    console.log("longitude", longitude);
                     return res.status(400).json({ error: 'Latitude and longitude are required for visit orders' });
                 }
                 isDistributorRequired = false;
@@ -458,40 +445,33 @@ class OrderController {
 
             if (isDistributorRequired) {
                 if (!distributor_id) {
-                    console.log("distributor_id", distributor_id);
                     return res.status(400).json({ error: 'Distributor ID is required' });
                 }
                 const distributor = await Distributor.findOne({ where: { distributor_id: distributor_id } });
                 if (!distributor) {
-                    console.log("distributor", distributor);
                     return res.status(404).json({ error: 'Distributor not found' });
                 }
             } else if (zone_id) {
                 const zone = await Zone.findOne({ where: { id: zone_id } });
                 if (!zone) {
-                    console.log("zone", zone);
                     return res.status(404).json({ error: 'Zone not found' });
                 }
                 const distributorZone = await DistributorZones.findOne({ where: { zone_id: zone_id } });
                 if (!distributorZone) {
-                    console.log("distributorZone", distributorZone);
                     return res.status(404).json({ error: 'Distributor zone not found' });
                 }
                 const distributor = await Distributor.findOne({ where: { distributor_id: distributorZone.distributor_id } });
                 if (!distributor) {
-                    console.log("distributor", distributor);
                     return res.status(404).json({ error: 'Distributor not found' });
                 }
                 distributor_id = distributor.distributor_id;
             }
             if (isPartyRequired) {
                 if (!party_id) {
-                    console.log("party_id", party_id);
                     return res.status(400).json({ error: 'Party ID is required' });
                 }
                 const party = await Party.findOne({ where: { party_id: party_id } });
                 if (!party) {
-                    console.log("party", party);
                     return res.status(404).json({ error: 'Party not found' });
                 }
                 if (!party.is_active) {
@@ -512,7 +492,6 @@ class OrderController {
                     const user = req.user;
                     const salesman = await Salesman.findOne({ where: { user_id: user.user_id } });
                     if (!salesman) {
-                        console.log("salesman", salesman);
                         return res.status(404).json({ error: 'Salesman record not found for this user' });
                     }
                     salesman_id = salesman.salesman_id;
@@ -520,7 +499,6 @@ class OrderController {
                     // If salesman_id is provided, verify it exists
                     const salesman = await Salesman.findOne({ where: { salesman_id: salesman_id } });
                     if (!salesman) {
-                        console.log("salesman", salesman);
                         return res.status(404).json({ error: 'Salesman not found' });
                     }
                 }
@@ -531,16 +509,13 @@ class OrderController {
                 const item = order_items[i];
                 // if item is not an object, return error
                 if (typeof item !== 'object') {
-                    console.log("item", typeof item);
                     return res.status(400).json({ error: 'Order items must be an array of objects' });
                 }
-                console.log("item", item.product_id, item.quantity);
                 if (!item.product_id || !item.quantity) {
                     return res.status(400).json({ error: 'product_id and quantity are required for each order item' });
                 }
                 // if product_id is not a string, return error
                 if (typeof item.product_id !== 'string') {
-                    console.log("item", typeof item.product_id);
                     return res.status(400).json({ error: 'Product ID must be a string' });
                 }
                 // if quantity is not a number, return error
@@ -549,7 +524,6 @@ class OrderController {
                 }
                 const product = await Product.findOne({ where: { product_id: item.product_id } });
                 if (!product) {
-                    console.log("product", product);
                     return res.status(404).json({ error: 'Product not found' });
                 }
             }

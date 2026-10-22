@@ -113,7 +113,7 @@ class DistributorController {
             }));
             res.status(200).json(buildPaginatedResponse(response, pagination, count));
         } catch (error) {
-            console.log("error", error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }

@@ -72,7 +72,6 @@ class SalesmanTrayController {
             if (!salesmanTray) {
                 return res.status(404).json({ error: 'Salesman tray not found' });
             }
-            console.log(salesmanTray.tray_id);
             const tray = await Tray.findOne({ where: { tray_id: salesmanTray.tray_id } });
             if (!tray) {
                 return res.status(404).json({ error: 'Tray not found' });
