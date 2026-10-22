@@ -11,6 +11,7 @@ router.post('/', authenticateToken, productController.getProducts);
 router.post('/featured', productController.getFeaturedProducts);
 router.get('/images/all', authenticateToken, isProductManager, productController.getAllUploadedImages);
 router.post('/create', authenticateToken, isProductManager, productController.createProduct);
+router.get('/:id/stock-history', authenticateToken, productController.getStockHistory);
 router.put('/:id', authenticateToken, checkRole(['admin', 'product_manager', 'tray_manager']), productController.updateProduct);
 router.delete('/:id', authenticateToken, noDelete('A product'));
 router.delete('/images/:file_name', authenticateToken, isProductManager, productController.deleteProductImage);

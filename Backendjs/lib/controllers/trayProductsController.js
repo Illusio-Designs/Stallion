@@ -5,6 +5,7 @@ const sequelize = require('../constants/database');
 const Tray = require('../models/Tray');
 const { TrayProductStatus, TrayProductStatusTransitions, TrayStatus } = require('../constants/enums');
 const { syncTrayStatus } = require('../utils/trayLifecycle');
+const { recordStockMove } = require('../utils/stockLedger');
 
 function isValidTrayProductStatus(status) {
     return Object.values(TrayProductStatus).includes(status);
@@ -108,6 +109,10 @@ class TrayProductsController {
                     total_qty: nextWarehouse + nextTray,
                     updated_at: new Date(),
                 }, { where: { product_id }, transaction });
+                await recordStockMove({
+                    transaction, productId: product_id, warehouseAfter: nextWarehouse, trayAfter: nextTray,
+                    kind: 'tray', dWarehouse: -1, dTray: 1, user: req.user, reference: 'Tray', note: 'Given to a tray',
+                });
                 return { trayProduct: created };
             });
             if (outcome.error) {
@@ -202,6 +207,10 @@ class TrayProductsController {
                     total_qty: nextWarehouse + nextTray,
                     updated_at: new Date(),
                 }, { where: { product_id }, transaction });
+                await recordStockMove({
+                    transaction, productId: product_id, warehouseAfter: nextWarehouse, trayAfter: nextTray,
+                    kind: 'tray', dWarehouse: qtyToRestore, dTray: -qtyToRestore, user: req.user, reference: 'Tray', note: 'Taken out of a tray',
+                });
                 await syncTrayStatus(tray_id, transaction);
                 return { snapshot: snap };
             });
@@ -298,6 +307,10 @@ class TrayProductsController {
                         await Product.update({
                             warehouse_qty: nextWarehouse, tray_qty: nextTray, total_qty: nextWarehouse + nextTray, updated_at: new Date(),
                         }, { where: { product_id: t.product_id }, transaction });
+                        await recordStockMove({
+                            transaction, productId: t.product_id, warehouseAfter: nextWarehouse, trayAfter: nextTray,
+                            kind: 'tray', dWarehouse: qty, dTray: -qty, user: req.user, reference: 'Tray', note: 'Moved back to the warehouse',
+                        });
                     }
                     touched.add(t.from_tray_id);
                     done.push({ from_tray_id: t.from_tray_id, product_id: t.product_id, qty, to_tray_id: t.to_tray_id || null });
