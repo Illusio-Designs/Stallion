@@ -160,14 +160,13 @@ class UserController {
             });
             res.status(200).json(user);
         } catch (error) {
-            console.log("error", error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }
     async updateUser(req, res) {
         try {
             const id = req.user.user_id;
-            console.log("id", id);
             const { name, is_active, phone, role_id, email, image_url, address, country_id, state_id, city_id } = req.body;
             const user = await User.findByPk(id);
             if (!user) {
@@ -347,9 +346,7 @@ class UserController {
     // Upload profile image
     async uploadProfileImage(req, res) {
         try {
-            console.log("req.fileInfo", req.fileInfo);
             if (!req.fileInfo) {
-                console.log("No file uploaded");
                 return res.status(400).json({
                     success: false,
                     message: 'No file uploaded'
@@ -360,7 +357,6 @@ class UserController {
             const user = await User.findByPk(id);
 
             if (!user) {
-                console.log("User not found");
                 return res.status(404).json({
                     success: false,
                     message: 'User not found'
@@ -382,7 +378,7 @@ class UserController {
             const updatedUser = await User.findByPk(id);
             res.status(200).json(updatedUser);
         } catch (error) {
-            console.log("error", error);
+            console.error('Request failed:', error.message);
             res.status(500).json({
                 success: false,
                 message: 'Error uploading profile image',

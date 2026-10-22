@@ -91,8 +91,6 @@ class SalesmanTargetsController {
             if (startDate > endDate) {
                 return res.status(400).json({ error: 'Start date must be before end date' });
             }
-            console.log("startDate", startDate);
-            console.log("endDate", endDate);
             const salesmanTarget = await SalesmanTargets.create({
                 salesman_id,
                 start_date: startDate,

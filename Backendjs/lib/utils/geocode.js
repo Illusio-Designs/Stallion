@@ -76,7 +76,7 @@ async function geocodeAddress(address, opts = {}) {
     if (!q) continue;
     const r = await geocodeQuery(q);
     if (r.ok) {
-      console.log('[geocode] resolved via:', q, `(${precision})`, '->', r.coords.latitude, r.coords.longitude);
+      console.log(`[geocode] resolved (${precision})`);
       return { ...r.coords, precision };
     }
   }

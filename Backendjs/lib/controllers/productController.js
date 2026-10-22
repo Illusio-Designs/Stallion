@@ -226,7 +226,7 @@ class ProductController {
                 }
             });
         } catch (error) {
-            console.log(error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }
@@ -291,7 +291,7 @@ class ProductController {
             });
             res.status(200).json(product);
         } catch (error) {
-            console.log(error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }
@@ -374,7 +374,7 @@ class ProductController {
             });
             res.status(200).json({ message: 'Product updated successfully' });
         } catch (error) {
-            console.log(error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }

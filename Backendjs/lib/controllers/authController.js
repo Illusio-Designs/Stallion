@@ -204,7 +204,7 @@ class AuthController {
 
             res.status(200).json({ message: 'Login successful', token, role: role.role_name, roles: allRoleNames });
         } catch (error) {
-            console.log(error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }
@@ -273,7 +273,7 @@ class AuthController {
 
             res.status(200).json(user.toJSON());
         } catch (error) {
-            console.log(error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }

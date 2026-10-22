@@ -51,7 +51,7 @@ class Msg91Service {
 
             // Log MSG91's raw reply so delivery issues (template/credits/test-mode)
             // are visible in the server logs.
-            console.log('[MSG91] send OTP ->', cleanedPhoneNumber, 'template:', tid || '(account default)', 'reply:', JSON.stringify(response.data));
+            console.log('[MSG91] send OTP -> ***' + String(cleanedPhoneNumber).slice(-4), 'template:', tid || '(account default)', 'reply:', JSON.stringify(response.data));
 
             // MSG91 signals failures with type:'error' even on HTTP 200, so don't
             // blindly report success — surface the real reason instead.
