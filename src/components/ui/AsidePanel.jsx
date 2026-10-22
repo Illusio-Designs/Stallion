@@ -88,6 +88,22 @@ export default function AsidePanel({
     lastFocused.current = null;
   }, [mounted]);
 
+  // Many forms put a <label> next to its field without linking them. Link each pair so a
+  // screen reader reads the label when the field gets focus.
+  useEffect(() => {
+    if (!mounted) return undefined;
+    const t = setTimeout(() => {
+      document.querySelectorAll('.ui-aside-panel__backdrop .form-group').forEach((g, gi) => {
+        const label = g.querySelector('label');
+        const field = g.querySelector('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select');
+        if (!label || !field || label.htmlFor || field.getAttribute('aria-label') || field.getAttribute('aria-labelledby')) return;
+        if (!field.id) field.id = `fld-${gi}-${Math.random().toString(36).slice(2, 7)}`;
+        label.htmlFor = field.id;
+      });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [mounted, children]);
+
   if (!mounted || typeof document === 'undefined') return null;
 
   // Portal to <body> so the fixed overlay covers the whole viewport (above the

@@ -50,7 +50,7 @@
   /* ---- Text ---- */
   --color-text: #0a0a0a;                /* near-black primary */
   --color-text-muted: #6a6b6f;          /* secondary */
-  --color-text-subtle: #909194;         /* tertiary / meta / placeholder */
+  --color-text-subtle: #6b6c70;         /* tertiary / meta / placeholder */
   --color-text-on-primary: #ffffff;
   --color-text-on-accent: #ffffff;
 

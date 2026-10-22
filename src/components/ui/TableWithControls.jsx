@@ -447,6 +447,7 @@ export default function TableWithControls({
             type="number"
             min={1}
             max={totalPages}
+            aria-label="Go to page number"
             className="ui-input ui-input--goto"
             value={gotoValue}
             onChange={(e) => setGotoValue(e.target.value)}

@@ -47,7 +47,7 @@
 .rda-card { background: #ffffff; border: 1px solid #e1e1e1; border-radius: 14px; padding: 20px; min-width: 0; box-shadow: none; }
 :root .needs-attention.rda-card { padding: 20px; }
 .rda-card__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-.rda-card__head h3 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; color: #0a0a0a; }
+.rda-card__head h3, .rda-card__head h2 { margin: 0; font-family: var(--font-display); font-size: 17px; font-weight: 600; color: #0a0a0a; }
 .rda-card__head p { margin: 2px 0 0; color: #595959; font-size: 13px; }
 .rda-link { color: #0a0a0a; text-decoration: underline; font-weight: 600; font-size: 13px; white-space: nowrap; }
 .rda-legend { display: flex; flex-wrap: wrap; gap: 14px; color: #595959; font-size: 13px; flex: none; }
