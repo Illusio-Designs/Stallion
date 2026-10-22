@@ -68,6 +68,11 @@ const SalesmanCheckIns = sequelize.define('SalesmanCheckIns', {
         type: DataTypes.DECIMAL(11, 8),
         allowNull: true
     },
+    // Set by the phone when a visit was saved offline and sent later, so a repeated send is not saved twice.
+    client_request_id: {
+        type: DataTypes.STRING(64),
+        allowNull: true
+    },
     check_in_remarks: {
         type: DataTypes.TEXT,
         allowNull: true

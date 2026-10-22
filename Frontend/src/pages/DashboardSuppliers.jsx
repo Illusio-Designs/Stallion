@@ -35,7 +35,8 @@ import {
   updateSalesmanTarget
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
-import { showError, showSuccess } from '../services/notificationService';
+import { showError, showSuccess, showInfo } from '../services/notificationService';
+import { queueCheckin, isNetworkError } from '../services/offlineQueue';
 import { captureCurrentPosition } from '../utils/geolocation';
 
 // Geofence radius used when a visit/order is recorded (mirror of the backend
@@ -1343,8 +1344,16 @@ const DashboardSuppliers = () => {
         await updateSalesmanCheckin(editCheckin.id, payload);
         showSuccess('Visit report updated successfully');
       } else {
-        await createSalesmanCheckin(payload);
-        showSuccess('Visit report created successfully');
+        // No signal (or the server cannot be reached): keep the visit on this phone and send it later.
+        try {
+          if (typeof navigator !== 'undefined' && navigator.onLine === false) throw Object.assign(new Error('offline'), {});
+          await createSalesmanCheckin(payload);
+          showSuccess('Visit report created successfully');
+        } catch (sendErr) {
+          if (!isNetworkError(sendErr)) throw sendErr;
+          queueCheckin(payload);
+          showInfo('', null, 'Saved on this phone', 'There is no signal right now. This visit will be sent when you are online.');
+        }
       }
       setOpenCheckinModal(false);
       setEditCheckin(null);

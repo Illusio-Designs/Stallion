@@ -5,6 +5,8 @@ import DashboardSidebar from '../components/DashboardSidebar';
 import DashboardFooter from '../components/DashboardFooter';
 import DashboardBottomNav from '../components/DashboardBottomNav';
 import { useTokenMonitor } from '../hooks/useTokenMonitor';
+import { useOfflineSync } from '../hooks/useOfflineSync';
+import OfflineVisitsBanner from '../components/OfflineVisitsBanner';
 
 const SIDEBAR_COLLAPSED_KEY = 'dashboardSidebarCollapsed';
 
@@ -20,6 +22,8 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
 
   // Monitor token presence - automatically log out if token is removed
   useTokenMonitor(true);
+  // Send visits that were saved while offline once the signal is back.
+  useOfflineSync();
 
   // Restore the persisted collapse state after mount (avoids SSR hydration mismatch).
   useEffect(() => {
@@ -122,6 +126,8 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
           onMobileMenuToggle={openMobileSidebar}
           onToggleSidebar={toggleSidebar}
         />
+
+        <OfflineVisitsBanner />
 
         <main
           className="dashboard-content page-enter w-full max-w-[1440px] flex-1 mx-auto px-4 py-4 sm:py-5 md:p-6 pb-[calc(84px+env(safe-area-inset-bottom))] md:pb-6"
