@@ -41,9 +41,9 @@ const GooeySearch = ({ value, onChange, placeholder = 'Search...', label = 'Sear
       <svg width="0" height="0" className="gsr__defs" aria-hidden="true" focusable="false">
         <defs>
           <filter id={filterId} x="-20%" y="-60%" width="140%" height="220%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b" />
             <feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9" result="g" />
-            <feBlend in="SourceGraphic" in2="g" />
+            <feComposite in="SourceGraphic" in2="g" operator="atop" />
           </filter>
         </defs>
       </svg>
