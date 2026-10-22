@@ -192,14 +192,14 @@
 :root .gsr__blob { position: absolute; top: 12px; height: var(--gsr-h); border-radius: 999px; background: #0a0a0a; transition: width .55s cubic-bezier(.3, 1.2, .4, 1), right .55s cubic-bezier(.3, 1.2, .4, 1); }
 :root .gsr__blob--btn { right: 12px; width: var(--gsr-h); }
 :root .gsr__blob--field { right: 12px; width: var(--gsr-h); }
-:root .gsr.is-open .gsr__blob--field { right: calc(12px + var(--gsr-h) + 8px); width: var(--gsr-open); }
+:root .gsr.is-open .gsr__blob--field { right: calc(12px + var(--gsr-h) + 6px); width: var(--gsr-open); }
 :root .gsr__btn { position: absolute; right: 0; top: 0; width: var(--gsr-h); height: var(--gsr-h); border: 0; border-radius: 50%; background: transparent; color: #ffffff; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2; }
-:root .gsr__form { position: absolute; top: 0; right: calc(var(--gsr-h) + 8px); width: var(--gsr-open); height: var(--gsr-h); margin: 0; z-index: 2; }
+:root .gsr__form { position: absolute; top: 0; right: calc(var(--gsr-h) + 6px); width: var(--gsr-open); height: var(--gsr-h); margin: 0; z-index: 2; }
 :root .gsr__input { width: 100%; height: var(--gsr-h); border: 0; background: transparent; color: #ffffff; font: inherit; font-size: 14px; padding: 0 16px; opacity: 0; pointer-events: none; transition: opacity .25s .15s; }
 :root .gsr__input::placeholder { color: #bdbdbd; }
 :root .gsr.is-open .gsr__input { opacity: 1; pointer-events: auto; }
 :root .gsr__input:focus-visible { outline: none; }
 :root .gsr__btn:focus-visible { outline: 2px solid #ffffff; outline-offset: -4px; }
-:root .gsr__results { position: absolute; right: 0; top: 0; width: calc(var(--gsr-open) + var(--gsr-h) + 8px); height: var(--gsr-h); pointer-events: none; z-index: 60; }
+:root .gsr__results { position: absolute; right: 0; top: 0; width: calc(var(--gsr-open) + var(--gsr-h) + 6px); height: var(--gsr-h); pointer-events: none; z-index: 60; }
 :root .gsr__results > * { pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { :root .gsr__blob, :root .gsr__input { transition: none; } }
