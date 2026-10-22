@@ -631,7 +631,7 @@ const Dashboard = () => {
   const ordersCard = (title, sub, linkLabel, cols) => (
     <section className="rda-card" aria-label={title}>
       <div className="rda-card__head">
-        <div><h3>{title}</h3>{sub && <p>{sub}</p>}</div>
+        <div><h2>{title}</h2>{sub && <p>{sub}</p>}</div>
         <AppLink href="/dashboard/orders" className="rda-link">{linkLabel}</AppLink>
       </div>
       <div className="rda-tw">
@@ -706,7 +706,7 @@ const Dashboard = () => {
         {isSalesman && (
           <section className="rda-shop" aria-label="Nearest shop">
             <div>
-              <h3>{shopParty ? (shopParty.party_name || shopParty.name) : 'At a shop?'}</h3>
+              <h2>{shopParty ? (shopParty.party_name || shopParty.name) : 'At a shop?'}</h2>
               <span>{[shopCity, shopKm != null ? `${shopKm} km away` : null].filter(Boolean).join(', ') || (shopParty ? 'Shop location saved' : 'Pick the party and save its location')}</span>
             </div>
             <button type="button" className="rda-shop__at" onClick={go('/dashboard/party')}><FiNavigation2 size={18} aria-hidden="true" />I'm at the shop</button>
@@ -736,7 +736,7 @@ const Dashboard = () => {
           <div className="rda-cols">
             <section className="rda-card" aria-label="Orders per day">
               <div className="rda-card__head">
-                <div><h3>Orders per day</h3><p>{ordersChart.sub}. Cancelled orders are not counted.</p></div>
+                <div><h2>Orders per day</h2><p>{ordersChart.sub}. Cancelled orders are not counted.</p></div>
                 <div className="rda-legend" aria-hidden="true">
                   <span><i style={{ background: '#c2c2c2' }} />Earlier</span>
                   <span><i style={{ background: '#0a0a0a' }} />{range === 'today' ? 'Now' : range === 'year' ? 'This month' : 'Today'}</span>
@@ -747,7 +747,7 @@ const Dashboard = () => {
 
             <section className="needs-attention rda-card" aria-label="Needs attention">
               <div className="rda-card__head">
-                <div><h3>Needs attention</h3><p>Things only a person can decide</p></div>
+                <div><h2>Needs attention</h2><p>Things only a person can decide</p></div>
               </div>
               <div className="needs-attention__list">
                 {attention.length === 0 && <p className="rda-empty">{loading ? 'Checking...' : 'Nothing needs your attention right now.'}</p>}
@@ -771,7 +771,7 @@ const Dashboard = () => {
             {targetRows.length > 0 && (
               <section className="rda-card" aria-label="Salesmen against target">
                 <div className="rda-card__head">
-                  <div><h3>Salesmen against target</h3><p>By order value</p></div>
+                  <div><h2>Salesmen against target</h2><p>By order value</p></div>
                   <AppLink href="/dashboard/salesmen" className="rda-link">All salesmen</AppLink>
                 </div>
                 <div className="rda-tw">
@@ -807,7 +807,7 @@ const Dashboard = () => {
           <div className="rda-cols rda-cols--even">
             <section className="rda-card" aria-label="My parties">
               <div className="rda-card__head">
-                <div><h3>My parties</h3><p>Open one to capture its shop location</p></div>
+                <div><h2>My parties</h2><p>Open one to capture its shop location</p></div>
                 <AppLink href="/dashboard/party" className="rda-link">All parties</AppLink>
               </div>
               <div className="rda-tw">
@@ -844,7 +844,7 @@ const Dashboard = () => {
           <div className="rda-cols rda-cols--even">
             <section className="rda-card" aria-label="My parties">
               <div className="rda-card__head">
-                <div><h3>My parties</h3></div>
+                <div><h2>My parties</h2></div>
                 <AppLink href="/dashboard/party" className="rda-link">All parties</AppLink>
               </div>
               <div className="rda-tw">

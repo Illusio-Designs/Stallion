@@ -248,6 +248,7 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
             <input
               type="text"
               placeholder="Search..."
+              aria-label="Search"
               className="border-none outline-none bg-transparent text-text w-full text-[length:var(--text-base)] placeholder:text-text-subtle"
               onChange={(e) => {
                 const q = e.target.value;
@@ -339,6 +340,7 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
               autoFocus
               type="text"
               placeholder="Search..."
+              aria-label="Search"
               className="border-none outline-none bg-transparent text-text w-full text-[length:var(--text-base)] placeholder:text-text-subtle"
               onChange={(e) => dispatchSearch(e.target.value)}
             />

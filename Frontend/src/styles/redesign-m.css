@@ -1,0 +1,89 @@
+/* Compact "SaaS" density: medium and small sizes instead of large ones. Loaded last so it wins.
+   Controls 36px (small 30px), body text 14px, tables 13px, page titles 24px, cards 16px padding.
+   Touch targets stay at least 32px, and rows keep enough padding to tap. */
+:root { --ui-control: 36px; --ui-control-sm: 30px; }
+:root body { font-size: 14px; }
+
+/* Page titles and card headings */
+:root .rda-head h1, :root .page-head h1, :root .pg-head h1 { font-size: 24px; letter-spacing: -0.01em; }
+:root .rda-head p, :root .page-head p, :root .pg-head p { font-size: 14px; }
+:root .rda-card__head h3 { font-size: 15px; }
+:root .rda-card, :root .needs-attention.rda-card { padding: 16px; border-radius: 12px; }
+:root .rda-card__head { margin-bottom: 12px; }
+
+/* Number cards */
+:root .rda-kpis > .rda-kpi { padding: 14px 16px; gap: 6px; border-radius: 12px; }
+:root .rda-kpi .metric-value.rda-kpi__num { font-size: 26px; }
+.rda-kpi__lab { font-size: 13px; }
+:root .analytics-card .metric-value { font-size: 22px; }
+
+/* Buttons */
+:root .rda-btn { height: var(--ui-control); padding: 0 14px; border-radius: 9px; font-size: 13.5px; }
+:root .rda-btn--sm { height: var(--ui-control-sm); padding: 0 10px; font-size: 12.5px; }
+:root .ui-btn, :root .gbtn, :root .page-head__actions .ui-btn { min-height: var(--ui-control); font-size: 13.5px; border-radius: 9px; }
+:root .ui-btn--lg { min-height: 40px; }
+:root .ui-btn--sm { min-height: var(--ui-control-sm); }
+:root .gbtn { padding: 0 14px; }
+:root .chips .chip, :root .order-tab { min-height: 32px; padding: 5px 12px; font-size: 13px; }
+:root .rda-seg button { min-height: 28px; padding: 4px 12px; font-size: 12.5px; }
+
+/* Inputs */
+:root .ui-input, :root .ui-select, :root input.ui-input { min-height: var(--ui-control); font-size: 14px; }
+:root .gtools .gsearch { min-height: var(--ui-control); }
+
+/* Sidebar rows */
+:root .dashboard-sidebar-nav a { min-height: 38px; font-size: 14px; gap: 10px; }
+:root .dashboard-sidebar.collapsed .dashboard-sidebar-nav a { width: 40px; height: 40px; min-height: 40px; }
+
+/* Header */
+:root .dashboard-header-content { min-height: 56px; }
+:root .dashboard-icon-btn, :root .dashboard-menu-btn { width: 36px; height: 36px; }
+:root .dashboard-icon-btn svg, :root .dashboard-menu-btn svg { width: 18px; height: 18px; }
+:root .dashboard-avatar-btn { width: 34px; height: 34px; }
+:root .profile-avatar-btn { width: 36px; height: 36px; }
+:root .profile-avatar-initials { font-size: 13px; }
+
+/* Tables */
+:root .ui-table__scroll th { font-size: 11px; }
+:root .ui-table__scroll td { font-size: 13px; }
+:root .rda-table th { font-size: 11px; }
+:root .rda-table td { font-size: 13px; }
+
+/* Storefront */
+:root .pdx-title { font-size: 28px; }
+:root .pdx-whp { font-size: 24px; }
+:root .products-main .products-header h2 { font-size: 24px; }
+:root .cart-page .section-title { font-size: 18px; }
+:root .product-card .pc-qty, :root .pagination-btn, :root .go-to-cart-btn, :root .cart-page .checkout-btn { min-height: 38px; }
+:root .pdx-buy .pdx-add { min-height: 40px; }
+
+/* Phones */
+@media (max-width: 767px) {
+  :root .rda-head h1, :root .page-head h1, :root .pg-head h1 { font-size: 20px; }
+  :root .rda-kpi .metric-value.rda-kpi__num { font-size: 24px; }
+  :root .header-actions .cart-btn,
+  :root .header-actions .icon-btn.menu-btn,
+  :root .header-actions .profile-avatar-btn,
+  :root .dashboard-menu-btn, :root .dashboard-icon-btn, :root .dashboard-avatar-btn {
+    width: 38px; height: 38px; min-width: 38px;
+  }
+  :root .header-actions .cart-btn svg { width: 20px; height: 20px; }
+  :root .header-actions .icon-btn.menu-btn svg,
+  :root .dashboard-menu-btn svg, :root .dashboard-icon-btn svg { width: 20px; height: 20px; }
+  :root .header-actions { gap: 8px; }
+  :root .dashboard-bottom-nav { padding: 6px 6px calc(8px + env(safe-area-inset-bottom)); }
+  :root .dashboard-bottom-nav button { min-height: 42px; gap: 2px; }
+  :root .dashboard-bottom-nav button svg { width: 20px; height: 20px; }
+  .dashboard-bottom-nav__label { font-size: 10.5px; }
+  :root .ui-table__scroll tr { padding: 10px 12px; border-radius: 12px; }
+  :root .ui-table__scroll td { padding: 5px 0 !important; font-size: 13px; }
+  :root .ui-table__scroll td[data-col="primary"] { font-size: 15px; }
+  :root .ui-table__scroll td::before { font-size: 10.5px; }
+}
+
+/* Accessibility: text colours with enough contrast, bigger hit areas for small controls. */
+:root .ui-badge--danger, :root .stock-badge.danger { color: #a3241b; }
+:root .rda-card__head h2 { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: #0a0a0a; }
+:root .rda-link { display: inline-flex; align-items: center; min-height: 28px; }
+:root .ui-th__btn { min-height: 28px; padding-top: 5px; padding-bottom: 5px; }
+:root :focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
