@@ -160,6 +160,13 @@ class SalesmanCheckInsController {
             const body = { ...req.body };
             // A salesman can only check in as themselves, whatever the body says.
             if (actor.salesmanId) body.salesman_id = actor.salesmanId;
+            // A visit saved offline is sent again until it gets through. If this one was already
+            // saved, answer with the saved record instead of creating a second visit.
+            const clientRequestId = body.client_request_id ? String(body.client_request_id).slice(0, 64) : null;
+            if (clientRequestId && body.salesman_id) {
+                const already = await SalesmanCheckIns.findOne({ where: { client_request_id: clientRequestId, salesman_id: body.salesman_id } });
+                if (already) return res.status(200).json(already);
+            }
             const fields = resolveCheckInFields(body);
             const validationError = validateCheckInFields(fields);
             if (validationError) {
@@ -193,6 +200,7 @@ class SalesmanCheckInsController {
 
             const salesmanCheckIn = await SalesmanCheckIns.create({
                 ...toCheckInPayload(fields),
+                client_request_id: clientRequestId,
                 created_at: new Date(),
                 updated_at: new Date(),
             });
