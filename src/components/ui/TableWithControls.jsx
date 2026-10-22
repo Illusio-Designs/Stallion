@@ -390,7 +390,7 @@ export default function TableWithControls({
               return (
                 <tr key={selKey(row, pageStart + idx)}>
                   {selectable && (
-                    <td style={{ width: '40px', padding: '18px 8px 0px' }}>
+                    <td data-col="skip" style={{ width: '40px', padding: '18px 8px 0px' }}>
                       <input
                         type="checkbox"
                         checked={selected.has(selKey(row, pageStart + idx))}
@@ -405,12 +405,17 @@ export default function TableWithControls({
                     </td>
                   )}
                   {showSerialNumber && visible.has('__serialNumber') && (
-                    <td style={{ width: '60px', padding: '18px 8px 0px' }}>{serialNumber}</td>
+                    <td data-col="skip" style={{ width: '60px', padding: '18px 8px 0px' }}>{serialNumber}</td>
                   )}
                   {columns
                     .filter((c) => visible.has(c.key))
-                    .map((c) => (
-                      <td key={c.key} style={c.width ? { minWidth: c.width } : undefined}>
+                    .map((c, ci) => (
+                      <td
+                        key={c.key}
+                        data-label={c.label}
+                        data-col={c.key === 'action' || c.key === 'actions' ? 'action' : (ci === 0 ? 'primary' : undefined)}
+                        style={c.width ? { minWidth: c.width } : undefined}
+                      >
                         {c.render
                           ? c.render(row[c.key], row)
                           : String(row[c.key] ?? "")}

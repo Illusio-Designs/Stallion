@@ -11,6 +11,7 @@ import "../styles/redesign-i.css";
 import "../styles/redesign-h.css";
 import "../styles/redesign-j.css";
 import "../styles/redesign-k.css";
+import "../styles/redesign-l.css";
 import LoaderProvider from "../components/LoaderProvider";
 import ToastContainerProvider from "../components/ToastContainerProvider";
 import ErrorBoundary from "../components/ErrorBoundary";
