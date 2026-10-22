@@ -87,3 +87,22 @@
 :root .rda-link { display: inline-flex; align-items: center; min-height: 28px; }
 :root .ui-th__btn { min-height: 28px; padding-top: 5px; padding-bottom: 5px; }
 :root :focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
+
+/* Search across everything: results under the header search box */
+:root .gs-pop {
+  position: absolute; top: calc(100% + 8px); left: 0; right: 0; min-width: 300px; max-height: min(70vh, 460px); overflow: auto; z-index: 60;
+  background: #ffffff; border: 1px solid #e1e1e1; border-radius: 12px; box-shadow: 0 12px 32px -12px rgba(0, 0, 0, .28); padding: 6px;
+}
+:root .gs-group + .gs-group { border-top: 1px solid #e1e1e1; margin-top: 4px; padding-top: 4px; }
+:root .gs-title { font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #595959; padding: 6px 10px 2px; }
+:root .gs-item {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px; width: 100%; min-height: 34px; padding: 6px 10px;
+  border: 0; border-radius: 8px; background: transparent; text-align: left; font: inherit; color: #0a0a0a; cursor: pointer;
+}
+:root .gs-item:hover, :root .gs-item:focus-visible { background: #f4f4f4; }
+:root .gs-label { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .gs-sub { color: #595959; font-size: 12px; flex: none; max-width: 45%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .gs-note { padding: 10px; color: #595959; font-size: 13px; }
+/* The search pill shows its own focus ring, so the input inside it needs none. */
+:root .dashboard-search-bar input:focus-visible { outline: none; }
+:root .dashboard-search-bar:focus-within { border-color: #0a0a0a; box-shadow: 0 0 0 3px rgba(10, 10, 10, .12); }
