@@ -8,6 +8,7 @@ import { logout as authLogout, getUser } from '../services/authService';
 import { showLogoutSuccess } from '../services/notificationService';
 import { getMe } from '../services/apiService';
 import GlobalSearchResults from './GlobalSearchResults';
+import GooeySearch from './ui/GooeySearch';
 
 const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuToggle, onToggleSidebar }) => {
   const [userName, setUserName] = useState('');
@@ -248,25 +249,19 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
             </svg>
             <span className="dashboard-back-shop__label max-[480px]:hidden">Back to Shop</span>
           </a>
-          <div className="dashboard-search-bar relative hidden md:flex items-center gap-2 bg-surface-muted border border-border rounded-pill px-3 py-2 transition duration-200 ease-[ease] motion-reduce:transition-none focus-within:border-primary focus-within:shadow-[var(--focus-ring)] focus-within:bg-surface">
-            <svg className="dashboard-search-icon text-text-subtle shrink-0" width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M21 21L16.514 16.506L21 21ZM19 10.5C19 15.194 15.194 19 10.5 19C5.806 19 2 15.194 2 10.5C2 5.806 5.806 2 10.5 2C15.194 2 19 5.806 19 10.5Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <input
-              type="text"
-              placeholder="Search..."
-              aria-label="Search"
-              className="border-none outline-none bg-transparent text-text w-full text-[length:var(--text-base)] placeholder:text-text-subtle"
-              onChange={(e) => {
-                const q = e.target.value;
+          <div className="hidden md:flex">
+            <GooeySearch
+              value={globalQuery}
+              onChange={(q) => {
                 setGlobalQuery(q);
-                try {
-                  const ev = new CustomEvent('globalSearchChanged', { detail: { query: q } });
-                  window.dispatchEvent(ev);
-                } catch (_e) {}
+                try { window.dispatchEvent(new CustomEvent('globalSearchChanged', { detail: { query: q } })); } catch (_e) { /* ignore */ }
               }}
-            />
-            <GlobalSearchResults query={globalQuery} onPick={openResult} />
+              placeholder="Search..."
+              label="Search"
+              openWidth={260}
+            >
+              <GlobalSearchResults query={globalQuery} onPick={openResult} />
+            </GooeySearch>
           </div>
 
           <div className="dashboard-action-icons flex items-center gap-2">

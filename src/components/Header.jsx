@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../styles/components/Header.css';
+import GooeySearch from './ui/GooeySearch';
 import { getCartCount, registerCartListener } from '../services/cartService';
 import { isLoggedIn, logout as authLogout, getUser } from '../services/authService';
 import { resolveProfileImageUrl } from '../utils/profileImage';
@@ -289,18 +290,15 @@ const Header = ({ onPageChange, currentPage }) => {
         </nav>
 
         <div className="header-actions flex items-center gap-2 md:gap-5">
-          <div className="search-bar relative hidden items-center rounded-pill border border-border-strong bg-grey-100 px-4 py-2 transition-[background,border-color,box-shadow] duration-200 ease-[ease] hover:bg-grey-200 focus-within:border-border-strong focus-within:bg-grey-200 focus-within:shadow-[0_0_0_3px_rgba(0,0,0,0.12)] sm:flex sm:min-w-[150px] md:min-w-[220px]">
-            <form onSubmit={handleSearchSubmit} role="search" className="flex w-full items-center">
-              <FiSearch size={18} className="search-icon mr-2 shrink-0 text-text-muted" aria-hidden="true" />
-              <input
-                type="text"
-                placeholder="Search products..."
-                aria-label="Search products"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="min-w-0 flex-1 border-none bg-none p-0 text-[length:var(--text-base)] leading-[var(--leading-normal)] text-text outline-none placeholder:text-text-subtle"
-              />
-            </form>
+          <div className="hidden sm:flex">
+            <GooeySearch
+              value={searchQuery}
+              onChange={(q) => handleSearchChange({ target: { value: q } })}
+              onSubmit={() => handleSearchSubmit({ preventDefault() {} })}
+              placeholder="Search products..."
+              label="Search products"
+              openWidth={220}
+            />
           </div>
           <div className="action-icons flex items-center gap-2">
             <button type="button" className="hd-btn hd-btn--ghost cart-btn" onClick={() => onPageChange('cart')} aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}>
