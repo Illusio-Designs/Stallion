@@ -1,0 +1,39 @@
+/* Phones: every table built with TableWithControls shows one card per row instead of a wide table.
+   The first column is the card title, each other cell shows its column name, actions sit at the bottom. */
+@media (max-width: 767px) {
+  :root .ui-table__scroll { overflow: visible; }
+  :root .ui-table__scroll table,
+  :root .ui-table__scroll tbody,
+  :root .ui-table__scroll tr,
+  :root .ui-table__scroll td { display: block; width: 100%; }
+  :root .ui-table__scroll table { min-width: 0 !important; border: 0; }
+  :root .ui-table__scroll thead { display: none; }
+  :root .ui-table__scroll tbody { display: flex; flex-direction: column; gap: 12px; padding: 12px 0; }
+  :root .ui-table__scroll tr {
+    background: #ffffff; border: 1px solid #e1e1e1; border-radius: 14px; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  :root .ui-table__scroll td {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+    padding: 7px 0 !important; min-width: 0 !important; width: 100% !important;
+    border: 0 !important; position: static !important; text-align: right;
+    white-space: normal !important; overflow: visible !important; text-overflow: clip !important;
+  }
+  :root .ui-table__scroll td::before {
+    content: attr(data-label); flex: 0 0 36%; max-width: 36%; text-align: left;
+    font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: #595959; padding-top: 2px;
+  }
+  :root .ui-table__scroll td > * { min-width: 0; max-width: 100%; text-align: right; overflow-wrap: anywhere; }
+  :root .ui-table__scroll td[data-col="primary"] {
+    justify-content: flex-start; text-align: left; font-weight: 700; font-size: 16px;
+    padding-bottom: 8px !important; border-bottom: 1px solid #e1e1e1 !important; margin-bottom: 4px;
+  }
+  :root .ui-table__scroll td[data-col="primary"]::before { display: none; }
+  :root .ui-table__scroll td[data-col="primary"] > * { text-align: left; }
+  :root .ui-table__scroll td[data-col="action"] {
+    justify-content: flex-end; border-top: 1px solid #e1e1e1 !important; margin-top: 6px; padding-top: 10px !important;
+  }
+  :root .ui-table__scroll td[data-col="action"]::before { display: none; }
+  :root .ui-table__scroll td[data-col="skip"] { display: none; }
+  :root .ui-table__scroll td:empty { display: none; }
+}
