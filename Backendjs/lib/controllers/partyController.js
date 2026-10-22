@@ -977,14 +977,21 @@ class PartyController {
                     }
                 }
 
-                const existing = await Party.findOne({
-                    where: {
-                        [Op.or]: [
-                            { party_name: row.party_name },
-                            ...(row.email ? [{ email: row.email }] : []),
-                        ],
-                    },
-                });
+                // A row is the same party when its GST number matches. With no GST
+                // number it is matched by PAN, and with no PAN by phone and email
+                // together. The name is never used, so two shops with one name stay apart.
+                const clean = (v) => (v != null && String(v).trim() !== '' ? String(v).trim() : null);
+                const gstin = clean(row.gstin) ? clean(row.gstin).toUpperCase() : null;
+                const pan = clean(row.pan) ? clean(row.pan).toUpperCase() : null;
+                const phone = clean(row.phone);
+                const email = clean(row.email);
+                let matchWhere = null;
+                if (gstin) matchWhere = { gstin };
+                else if (pan) matchWhere = { pan };
+                else if (phone && email) matchWhere = { phone, email };
+                else if (phone) matchWhere = { phone };
+                else if (email) matchWhere = { email };
+                const existing = matchWhere ? await Party.findOne({ where: matchWhere }) : null;
 
                 const billingSameAsShipping = row.billing_same_as_shipping !== false;
                 const billing = billingSameAsShipping ? null : (row.billing_address ?? null);
@@ -1003,8 +1010,8 @@ class PartyController {
                     city_id: city_id ?? null,
                     zone_id: zone_id ?? null,
                     pincode: row.pincode ?? null,
-                    gstin: row.gstin ?? null,
-                    pan: row.pan ?? null,
+                    gstin,
+                    pan,
                     is_active: row.active !== false,
                     credit_days: row.credit_days ?? 0,
                     prefered_courier: row.prefered_courier ?? null,
