@@ -8,6 +8,13 @@ const SITE = 'Stallion Eyewear';
 const DEFAULT_DESC =
   'Wholesale sunglasses and optical frames for retailers, opticians and distributors — competitive pricing and reliable supply.';
 
+const DASHBOARD_TITLES = {
+  products: 'Products', orders: 'Orders', expenses: 'Expenses', tray: 'Trays', events: 'Events',
+  offers: 'Offers', party: 'Party', salesmen: 'Salesmen', distributor: 'Distributor',
+  'office-team': 'Office Team', manage: 'Manage', analytics: 'Analytics & Reports',
+  support: 'Support', settings: 'Settings', sample: 'Sample',
+};
+
 /**
  * @param {string[]|undefined} slug - catch-all path segments (e.g. ['product','MAS-MYSTIC-C2'])
  * @returns {import('next').Metadata}
@@ -46,9 +53,11 @@ export function metadataForSlug(slug) {
     case 'login':
       title = `Sign in | ${SITE}`;
       break;
-    case 'dashboard':
-      title = `Dashboard | ${SITE}`;
+    case 'dashboard': {
+      const name = DASHBOARD_TITLES[seg[1] || ''];
+      title = `${name || 'Dashboard'} | ${SITE}`;
       break;
+    }
     default:
       title = SITE;
   }

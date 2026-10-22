@@ -124,7 +124,7 @@ export default function AsidePanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="ui-aside-panel__header">
-          <h4 className="ui-aside-panel__title">{title}</h4>
+          <h2 className="ui-aside-panel__title">{title}</h2>
           <button
             className="ui-aside-panel__close"
             onClick={onClose}

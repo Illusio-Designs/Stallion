@@ -309,6 +309,7 @@ export default function TableWithControls({
                 <th style={{ width: '40px', padding: '20px 8px' }}>
                   <input
                     type="checkbox"
+                    aria-label="Select all rows on this page"
                     checked={
                       pageRows.length > 0 &&
                       pageRows.every((r, i) =>
@@ -393,6 +394,7 @@ export default function TableWithControls({
                     <td data-col="skip" style={{ width: '40px', padding: '18px 8px 0px' }}>
                       <input
                         type="checkbox"
+                        aria-label={`Select row ${pageStart + idx + 1}`}
                         checked={selected.has(selKey(row, pageStart + idx))}
                         onChange={(e) => {
                           const next = new Set(selected);

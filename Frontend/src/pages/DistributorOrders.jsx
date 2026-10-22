@@ -561,7 +561,7 @@ const DistributorOrders = () => {
           {/* Order Items */}
           <div className="form-group">
             <label className="ui-label">
-              Order Items <span className="text-[red]">*</span>
+              Order Items <span className="text-[#b00020]">*</span>
             </label>
             <div className="border border-[#E0E0E0] rounded-lg p-4">
               {createFormData.order_items.map((item, index) => (

@@ -892,11 +892,7 @@ class PartyController {
                     const country = await Country.findOne({ where: ciNameEq(countryName) });
                     if (country) { country_id = country.id; }
                     else {
-                        return {
-                            success: false,
-                            message: countryName + ' Country not found',
-                            data: null,
-                        };
+                        throw new Error(countryName + ' Country not found');
                     }
                 }
                 if (stateName) {
@@ -911,11 +907,7 @@ class PartyController {
                     }
                     if (state) state_id = state.id;
                     else {
-                        return {
-                            success: false,
-                            message: `Cannot create state "${stateName}" without a Country. Add a Country value for this row.`,
-                            data: null,
-                        };
+                        throw new Error(`Cannot create state "${stateName}" without a Country. Add a Country value for this row.`);
                     }
                 }
                 if (cityName && state_id) {
@@ -932,11 +924,7 @@ class PartyController {
                     const city = await Cities.findOne({ where: ciNameEq(cityName) });
                     if (city) city_id = city.id;
                     else {
-                        return {
-                            success: false,
-                            message: `Cannot create city "${cityName}" without a State. Add a State value for this row.`,
-                            data: null,
-                        };
+                        throw new Error(`Cannot create city "${cityName}" without a State. Add a State value for this row.`);
                     }
                 }
                 const zoneName = row.zone != null ? String(row.zone).trim() : '';
@@ -947,39 +935,27 @@ class PartyController {
                     const zone = await Zone.findOne({ where: { [Op.and]: zoneAnd } });
                     if (zone) zone_id = zone.id;
                     else {
-                        return {
-                            success: false,
-                            message: zoneName + ' Zone not found',
-                            data: null,
-                        };
+                        throw new Error(zoneName + ' Zone not found');
                     }
                 }
                 if (row.distributor) {
                     const dist = await Distributor.findOne({ where: { distributor_name: { [Op.eq]: row.distributor } } });
                     if (dist) distributor_id = dist.distributor_id;
                     else {
-                        return {
-                            success: false,
-                            message: row.distributor + ' Distributor not found',
-                            data: null,
-                        };
+                        throw new Error(row.distributor + ' Distributor not found');
                     }
                 }
                 if (row.salesman) {
                     const sm = await Salesman.findOne({ where: { full_name: { [Op.eq]: row.salesman } } });
                     if (sm) salesman_id = sm.salesman_id;
                     else {
-                        return {
-                            success: false,
-                            message: row.salesman + ' Salesman not found',
-                            data: null,
-                        };
+                        throw new Error(row.salesman + ' Salesman not found');
                     }
                 }
 
                 // A row is the same party when its GST number matches. With no GST
                 // number it is matched by PAN, and with no PAN by phone and email
-                // together. The name is never used, so two shops with one name stay apart.
+                // together (both must be present). Otherwise there is no match and the row creates a party. The name is never used, so two shops with one name stay apart.
                 const clean = (v) => (v != null && String(v).trim() !== '' ? String(v).trim() : null);
                 const gstin = clean(row.gstin) ? clean(row.gstin).toUpperCase() : null;
                 const pan = clean(row.pan) ? clean(row.pan).toUpperCase() : null;
@@ -989,8 +965,6 @@ class PartyController {
                 if (gstin) matchWhere = { gstin };
                 else if (pan) matchWhere = { pan };
                 else if (phone && email) matchWhere = { phone, email };
-                else if (phone) matchWhere = { phone };
-                else if (email) matchWhere = { email };
                 const existing = matchWhere ? await Party.findOne({ where: matchWhere }) : null;
 
                 const billingSameAsShipping = row.billing_same_as_shipping !== false;
@@ -1020,9 +994,30 @@ class PartyController {
                     updated_at: new Date(),
                 };
 
+                // On an update only the filled cells are written. A blank cell keeps
+                // the value already saved; it never erases it.
+                const updatePayload = { updated_at: new Date() };
+                const filled = {
+                    party_name: row.party_name, trade_name: row.trade_name, contact_person: row.contact_person,
+                    email: row.email, phone: row.phone, address: row.address,
+                    country_id, state_id, city_id, zone_id, pincode: row.pincode,
+                    gstin, pan, credit_days: row.credit_days, prefered_courier: row.prefered_courier,
+                    distributor_id, salesman_id,
+                };
+                for (const [k, v] of Object.entries(filled)) {
+                    if (v !== null && v !== undefined && v !== '') updatePayload[k] = v;
+                }
+                if (row.active !== null && row.active !== undefined) updatePayload.is_active = row.active;
+                if (row.billing_same_as_shipping !== null && row.billing_same_as_shipping !== undefined) {
+                    updatePayload.billing_same_as_shipping = row.billing_same_as_shipping;
+                    updatePayload.billing_address = row.billing_same_as_shipping ? null : (row.billing_address ?? existing?.billing_address ?? null);
+                } else if (row.billing_address) {
+                    updatePayload.billing_address = row.billing_address;
+                }
+
                 if (existing) {
                     const oldSnapshot = existing.toJSON();
-                    await Party.update(payload, { where: { party_id: existing.party_id } });
+                    await Party.update(updatePayload, { where: { party_id: existing.party_id } });
                     result.updated++;
                     await logAudit({
                         req,
@@ -1032,22 +1027,14 @@ class PartyController {
                         tableName: 'parties',
                         recordId: existing.party_id,
                         oldValues: oldSnapshot,
-                        newValues: { ...oldSnapshot, ...payload },
+                        newValues: { ...oldSnapshot, ...updatePayload },
                     });
                 } else {
                     if (!row.phone) {
-                        return {
-                            success: false,
-                            message: `Row ${rowNum}: phone is required to create party login`,
-                            data: null,
-                        };
+                        throw new Error(`phone is required to create party login`);
                     }
                     if (!row.address) {
-                        return {
-                            success: false,
-                            message: `Row ${rowNum}: address is required to create party login`,
-                            data: null,
-                        };
+                        throw new Error(`address is required to create party login`);
                     }
                     const loginUser = await findOrCreateRoleUser({
                         phone: row.phone,
@@ -1070,9 +1057,11 @@ class PartyController {
         }
 
         const total = result.created + result.updated;
-        const message = result.errors.length === 0
+        const skipped = result.errors.length;
+        const reasons = result.errors.slice(0, 3).map((e) => `Row ${e.row}: ${e.error}`).join('; ');
+        const message = skipped === 0
             ? `Bulk upload complete. Created: ${result.created}, Updated: ${result.updated}.`
-            : `Processed ${total} parties; ${result.errors.length} row(s) failed.`;
+            : `Saved ${total} (Created: ${result.created}, Updated: ${result.updated}). Skipped ${skipped} row(s). ${reasons}${skipped > 3 ? ' ...' : ''}`;
 
         return {
             success: result.errors.length < parties.length,

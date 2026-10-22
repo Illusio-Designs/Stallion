@@ -614,7 +614,7 @@ const DashboardTray = () => {
               <div className="p-3 sm:p-5">
                 <h2 className="mt-0 mb-5">Assign Products to Sample</h2>
 
-                {error && <div className="mb-3 rounded-lg border border-[#fcc] bg-[#fee] p-3 text-[red]">{error}</div>}
+                {error && <div className="mb-3 rounded-lg border border-[#fcc] bg-[#fee] p-3 text-[#b00020]">{error}</div>}
 
                 {/* Single Section: Tray Selection, Add Product, and Products Table */}
                 <div className="flex flex-col gap-6">
@@ -737,7 +737,7 @@ const DashboardTray = () => {
                                             <span className="text-[13px] leading-[1.4] text-[#333]">
                                               <strong className="text-[#111]">{p.model_no || 'N/A'}</strong>
                                               {(p.brand_name || p.collection_name) && (
-                                                <span className="ml-[6px] text-[#888]">
+                                                <span className="ml-[6px] text-[#5c5c5c]">
                                                   {[p.brand_name, p.collection_name].filter(Boolean).join(' · ')}
                                                 </span>
                                               )}
@@ -750,7 +750,7 @@ const DashboardTray = () => {
 
                                   {/* Footer with actions — sticky bottom */}
                                   <div className="flex shrink-0 items-center justify-between rounded-b-[10px] border-t border-[#f0f0f0] bg-[#fafafa] p-[10px_12px]">
-                                    <span className="text-[12px] text-[#888]">
+                                    <span className="text-[12px] text-[#5c5c5c]">
                                       {selectedProducts.length > 0 ? `${selectedProducts.length} selected` : 'None selected'}
                                     </span>
                                     <div className="flex gap-2">

@@ -85,7 +85,7 @@
 :root .ui-badge--danger, :root .stock-badge.danger { color: #a3241b; }
 :root .rda-card__head h2 { margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 600; color: #0a0a0a; }
 :root .rda-link { display: inline-flex; align-items: center; min-height: 28px; }
-:root .ui-th__btn { min-height: 28px; padding-top: 5px; padding-bottom: 5px; }
+:root .ui-th__btn { min-width: 28px; min-height: 28px; padding-top: 5px; padding-bottom: 5px; }
 :root :focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
 
 /* Search across everything: results under the header search box */

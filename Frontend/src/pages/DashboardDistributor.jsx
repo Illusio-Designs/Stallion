@@ -1203,7 +1203,7 @@ const DashboardDistributor = () => {
             />
           </div>
           <div className="form-group form-group--full">
-            <label className="ui-label">Working States <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this distributor)</span></label>
+            <label className="ui-label">Working States <span className="text-[#5c5c5c] font-normal">(parties in these states are auto-assigned to this distributor)</span></label>
             <StatesMultiDropdown
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
@@ -1413,7 +1413,7 @@ const DashboardDistributor = () => {
             />
           </div>
           <div className="form-group form-group--full">
-            <label className="ui-label">Working States <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this distributor)</span></label>
+            <label className="ui-label">Working States <span className="text-[#5c5c5c] font-normal">(parties in these states are auto-assigned to this distributor)</span></label>
             <StatesMultiDropdown
               states={states}
               selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
