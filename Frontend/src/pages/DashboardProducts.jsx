@@ -33,6 +33,7 @@ import {
 } from '../services/apiService';
 import { showError, showSuccess } from '../services/notificationService';
 import { invalidateCache } from '../services/cacheService';
+import StockHistoryPanel from '../components/StockHistoryPanel';
 import { getProductImageUrl, PRODUCT_IMAGE_PLACEHOLDER } from '../utils/imageUrl';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard-products.css';
@@ -173,6 +174,7 @@ const DashboardProducts = () => {
   const [selectedBulkFile, setSelectedBulkFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [imageTargetProduct, setImageTargetProduct] = useState(null);
+  const [historyProduct, setHistoryProduct] = useState(null); // product whose stock history is open
   const [orphanedImages, setOrphanedImages] = useState([]); // Images uploaded without product_id
   const [invalidImageUrls, setInvalidImageUrls] = useState(new Set()); // Track images that failed to load
   const [selectedImageIds, setSelectedImageIds] = useState(new Set()); // For multiple selection in modal
@@ -2037,6 +2039,7 @@ const DashboardProducts = () => {
       key: 'action', label: 'ACTION', width: '100px', render: (_v, row) => (
         <RowActions
           onEdit={() => handleEdit(row)}
+          onHistory={() => setHistoryProduct({ id: row.product_id || row.id, model_no: row.model_no })}
 
           onUpload={(!row.data?.image_url && activeTab === 'Unuploaded Media Gallery')
             ? () => handleAttachImage(row)
@@ -2651,6 +2654,12 @@ const DashboardProducts = () => {
           </div>
         </div>
       </div>
+      <StockHistoryPanel
+        open={!!historyProduct}
+        onClose={() => setHistoryProduct(null)}
+        productId={historyProduct?.id}
+        modelNo={historyProduct?.model_no}
+      />
       <AsidePanel
         open={openAdd}
         onClose={() => {

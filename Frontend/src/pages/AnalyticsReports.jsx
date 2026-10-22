@@ -4,6 +4,7 @@ import TableWithControls from '../components/ui/TableWithControls';
 import StatusBadge from '../components/ui/StatusBadge';
 import Skeleton from '../components/ui/Skeleton';
 import MatchMeter from '../components/ui/MatchMeter';
+import SalesByState from '../components/SalesByState';
 import {
   getAllSalesmanTargets,
   getSalesmanTargets,
@@ -23,6 +24,7 @@ import { downloadCsv } from '../utils/exportCsv';
 const TABS = [
   { key: 'targets', label: 'Target Achievement' },
   { key: 'checkins', label: 'Visit Report' },
+  { key: 'states', label: 'Sales by State' },
 ];
 
 const PERIODS = [
@@ -459,6 +461,8 @@ const AnalyticsReports = () => {
             ))}
           </div>
         </div>
+
+        {activeTab === 'states' && <SalesByState from={periodRange.from} to={periodRange.to} />}
 
         {/* ===== Target Achievement ===== */}
         {activeTab === 'targets' && (

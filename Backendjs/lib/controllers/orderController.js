@@ -320,7 +320,7 @@ class OrderController {
      */
     async getSalesByState(req, res) {
         try {
-            const office = hasRole(req.userRoleNames, ['admin', 'reports_manager', 'order_manager', 'sales_manager', 'party_manager']);
+            const office = hasRole(req.userRoleNames, ['admin', 'reports_manager', 'expense_manager', 'order_manager', 'sales_manager', 'party_manager']);
             let stateFilter = '';
             const replacements = {};
             if (!office) {
