@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import '../styles/pages/dashboard-layout.css';
 import DashboardHeader from '../components/DashboardHeader';
 import DashboardSidebar from '../components/DashboardSidebar';
@@ -7,6 +7,7 @@ import DashboardBottomNav from '../components/DashboardBottomNav';
 import { useTokenMonitor } from '../hooks/useTokenMonitor';
 import { useOfflineSync } from '../hooks/useOfflineSync';
 import OfflineVisitsBanner from '../components/OfflineVisitsBanner';
+import PageSkeleton from '../components/ui/PageSkeleton';
 
 const SIDEBAR_COLLAPSED_KEY = 'dashboardSidebarCollapsed';
 
@@ -133,7 +134,8 @@ const DashboardLayout = ({ children, currentPage, onPageChange }) => {
           className="dashboard-content page-enter w-full max-w-[1440px] flex-1 mx-auto px-4 py-4 sm:py-5 md:p-6 pb-[calc(84px+env(safe-area-inset-bottom))] md:pb-6"
           key={currentPage}
         >
-          {children}
+          {/* A page that is still loading shows grey placeholders; the sidebar and header stay. */}
+          <Suspense fallback={<PageSkeleton />}>{children}</Suspense>
         </main>
 
         {/* Footer is desktop-only; the floating bottom nav replaces it on phones. */}
