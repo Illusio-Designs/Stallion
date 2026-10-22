@@ -1,5 +1,7 @@
 // Product controller — media gallery isAssigned fix (redeploy trigger).
 const Product = require('../models/Product');
+const { recordStockMove } = require('../utils/stockLedger');
+const StockMovement = require('../models/StockMovement');
 const { logAudit } = require('../utils/auditLogger');
 const Brand = require('../models/Brand');
 const Collection = require('../models/Collection');
@@ -15,7 +17,7 @@ const { PRODUCT_IMAGE_UPLOAD_DIR } = require('../constants/multer');
 const path = require('path');
 const fs = require('fs');
 const { Op, Sequelize } = require('sequelize');
-const { canManageInventory } = require('../utils/roleHelpers');
+const { canManageInventory, hasRole } = require('../utils/roleHelpers');
 const { getListSearchParams, likeContains } = require('../utils/listSearchHelpers');
 
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
@@ -280,6 +282,10 @@ class ProductController {
                 created_at: new Date(),
                 updated_at: new Date(),
             });
+            await recordStockMove({
+                productId: product.product_id, warehouseAfter: Number(warehouse_qty) || 0, trayAfter: 0,
+                kind: 'manual', dWarehouse: Number(warehouse_qty) || 0, user: req.user, reference: 'New product', note: 'Starting stock',
+            });
             await logAudit({
                 req,
                 action: 'create',
@@ -362,6 +368,17 @@ class ProductController {
             }
 
             await Product.update(updatePayload, { where: { product_id: id } });
+            {
+                // Stock history for a hand edit of the quantities.
+                const dW = (updatePayload.warehouse_qty !== undefined ? Number(updatePayload.warehouse_qty) : Number(oldSnapshot.warehouse_qty)) - (Number(oldSnapshot.warehouse_qty) || 0);
+                const dT = (updatePayload.tray_qty !== undefined ? Number(updatePayload.tray_qty) : Number(oldSnapshot.tray_qty)) - (Number(oldSnapshot.tray_qty) || 0);
+                await recordStockMove({
+                    productId: id,
+                    warehouseAfter: updatePayload.warehouse_qty !== undefined ? updatePayload.warehouse_qty : oldSnapshot.warehouse_qty,
+                    trayAfter: updatePayload.tray_qty !== undefined ? updatePayload.tray_qty : oldSnapshot.tray_qty,
+                    kind: 'manual', dWarehouse: dW, dTray: dT, user: req.user, reference: 'Product edit', note: 'Changed by hand',
+                });
+            }
 
             await logAudit({
                 req,
@@ -822,6 +839,43 @@ class ProductController {
         }
     }
 
+    /**
+     * GET /products/:id/stock-history?kind=&page=&limit=
+     * Every stock change of one product, newest first, with the numbers after each change.
+     */
+    async getStockHistory(req, res) {
+        try {
+            if (!hasRole(req.userRoleNames, ['admin', 'product_manager', 'tray_manager', 'order_manager'])) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const { id } = req.params;
+            const product = await Product.findOne({ where: { product_id: id }, attributes: ['product_id', 'model_no', 'warehouse_qty', 'tray_qty', 'total_qty'] });
+            if (!product) return res.status(404).json({ error: 'Product not found' });
+            const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+            const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+            const where = { product_id: id };
+            if (req.query.kind && ['order', 'cancel', 'tray', 'sheet', 'manual'].includes(req.query.kind)) where.kind = req.query.kind;
+            const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            const [{ count, rows }, monthCount] = await Promise.all([
+                StockMovement.findAndCountAll({ where, order: [['created_at', 'DESC']], limit, offset: (page - 1) * limit }),
+                StockMovement.count({ where: { product_id: id, created_at: { [Op.gte]: since } } }),
+            ]);
+            res.status(200).json({
+                summary: {
+                    model_no: product.model_no,
+                    warehouse_qty: Number(product.warehouse_qty) || 0,
+                    tray_qty: Number(product.tray_qty) || 0,
+                    total_qty: (Number(product.warehouse_qty) || 0) + (Number(product.tray_qty) || 0),
+                    moves_30_days: monthCount,
+                },
+                data: rows.map((r) => r.toJSON()),
+                pagination: { page, limit, total: count, totalPages: Math.max(1, Math.ceil(count / limit)) },
+            });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async hasData(data) {
         if (!data || data === undefined || data === null || data === '') {
             return false;
@@ -950,6 +1004,10 @@ class ProductController {
                         };
                         const oldSnapshot = existingProduct.toJSON();
                         await Product.update(bulkUpdatePayload, { where: { product_id: existingProduct.product_id } });
+                        await recordStockMove({
+                            productId: existingProduct.product_id, warehouseAfter: qtyNumber, trayAfter: Number(existingProduct.tray_qty) || 0,
+                            kind: 'sheet', dWarehouse: qtyNumber - (Number(oldSnapshot.warehouse_qty) || 0), user, reference: 'Sheet upload', note: 'The sheet quantity replaced the warehouse number',
+                        });
                         await logAudit({
                             req,
                             action: 'update',
@@ -989,6 +1047,10 @@ class ProductController {
                     });
 
                     createdProducts.push(product);
+                    await recordStockMove({
+                        productId: product.product_id, warehouseAfter: qtyNumber, trayAfter: 0,
+                        kind: 'sheet', dWarehouse: qtyNumber, user, reference: 'Sheet upload', note: 'New product from the sheet',
+                    });
 
                     // Create audit log if user is provided
                     if (user && req) {

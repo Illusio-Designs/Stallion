@@ -21,9 +21,10 @@ const { Op } = require('sequelize');
 const salesmanTargetsController = require('./salesmanTargetsController');
 const DistributorZones = require('../models/DistributorZones');
 const { resolveDistributorIdForParty } = require('../utils/distributorMatch');
-const { canManageOrders, normalizeRole } = require('../utils/roleHelpers');
+const { canManageOrders, normalizeRole, hasRole } = require('../utils/roleHelpers');
 const { resolveUserScope, canViewAllOrders } = require('../utils/scopeHelpers');
-const { salesmanCoversState } = require('../utils/workingStates');
+const { salesmanCoversState, salesmanStateIds } = require('../utils/workingStates');
+const { recordStockMove } = require('../utils/stockLedger');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 const orderPartyInclude = {
@@ -71,7 +72,8 @@ async function mapOrdersWithPartyName(orders) {
 }
 
 // Helper function to reverse an order operation (does not depend on controller instance)
-async function reverseOrderOperation(orderId, transaction) {
+async function reverseOrderOperation(orderId, transaction, actor = null) {
+    const orderRow = await Order.findOne({ where: { order_id: orderId }, attributes: ['order_number'], transaction });
     const orderOperations = await OrderOperation.findAll({
         where: { order_id: orderId },
         transaction,
@@ -94,6 +96,17 @@ async function reverseOrderOperation(orderId, transaction) {
         // Always derive total from warehouse + tray so it can never drift.
         product.total_qty = (Number(product.warehouse_qty) || 0) + (Number(product.tray_qty) || 0);
         await product.save({ transaction });
+        await recordStockMove({
+            transaction,
+            productId: product.product_id,
+            warehouseAfter: product.warehouse_qty,
+            trayAfter: product.tray_qty,
+            kind: 'cancel',
+            dWarehouse: Number(warehouseReducedQty) || 0,
+            dTray: Number(trayReducedQty) || 0,
+            user: actor,
+            reference: orderRow ? orderRow.order_number : null,
+        });
         const trayIds = Array.isArray(orderOperation.tray_ids) ? orderOperation.tray_ids : [];
         for (let j = 0; j < trayIds.length; j++) {
             const entry = trayIds[j] || {};
@@ -298,6 +311,93 @@ class OrderController {
             res.status(500).json({ error: 'Failed to fetch orders' });
         }
     }
+    /**
+     * GET /orders/sales-by-state?from=YYYY-MM-DD&to=YYYY-MM-DD
+     * Sales, orders and top parties per state for a period, plus the change against the period
+     * before it. Cancelled orders are counted (the salesman's effort still counts). A party's state
+     * decides the row; orders with no party or no state go under "No state set".
+     * Admin and the office roles see every state; a salesman sees only the states they work in.
+     */
+    async getSalesByState(req, res) {
+        try {
+            const office = hasRole(req.userRoleNames, ['admin', 'reports_manager', 'expense_manager', 'order_manager', 'sales_manager', 'party_manager']);
+            let stateFilter = '';
+            const replacements = {};
+            if (!office) {
+                const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                if (!hasRole(req.userRoleNames, 'salesman') || !scope.salesmanId) {
+                    return res.status(403).json({ error: 'Access denied' });
+                }
+                const ids = await salesmanStateIds(scope.salesmanId);
+                if (!ids.length) return res.status(200).json({ from: null, to: null, states: [], total_sales: 0 });
+                stateFilter = ' AND p.state_id IN (:stateIds)';
+                replacements.stateIds = ids;
+            }
+            const toDate = req.query.to ? new Date(`${String(req.query.to).slice(0, 10)}T00:00:00`) : new Date();
+            const fromDate = req.query.from ? new Date(`${String(req.query.from).slice(0, 10)}T00:00:00`) : new Date(toDate.getTime() - 30 * 86400000);
+            if (Number.isNaN(toDate.getTime()) || Number.isNaN(fromDate.getTime()) || fromDate > toDate) {
+                return res.status(400).json({ error: 'Choose a valid date range' });
+            }
+            const end = new Date(toDate.getTime() + 86400000); // include the whole last day
+            const span = end.getTime() - fromDate.getTime();
+            const prevFrom = new Date(fromDate.getTime() - span);
+
+            const totals = (from, to) => sequelize.query(
+                `SELECT COALESCE(s.name, 'No state set') AS state, COUNT(*) AS orders,
+                        COALESCE(SUM(o.order_total), 0) AS sales, COUNT(DISTINCT o.party_id) AS parties
+                 FROM \`order\` o
+                 LEFT JOIN parties p ON p.party_id = o.party_id
+                 LEFT JOIN states s ON s.id = p.state_id
+                 WHERE o.order_date >= :from AND o.order_date < :to${stateFilter}
+                 GROUP BY s.name`,
+                { replacements: { ...replacements, from, to }, type: sequelize.QueryTypes.SELECT }
+            );
+            const [now, before, tops] = await Promise.all([
+                totals(fromDate, end),
+                totals(prevFrom, fromDate),
+                sequelize.query(
+                    `SELECT COALESCE(s.name, 'No state set') AS state, p.party_name AS party_name, COUNT(*) AS orders,
+                            COALESCE(SUM(o.order_total), 0) AS amount
+                     FROM \`order\` o
+                     JOIN parties p ON p.party_id = o.party_id
+                     LEFT JOIN states s ON s.id = p.state_id
+                     WHERE o.order_date >= :from AND o.order_date < :to${stateFilter}
+                     GROUP BY s.name, p.party_id, p.party_name
+                     ORDER BY amount DESC`,
+                    { replacements: { ...replacements, from: fromDate, to: end }, type: sequelize.QueryTypes.SELECT }
+                ),
+            ]);
+            const prev = new Map(before.map((r) => [r.state, Number(r.sales) || 0]));
+            const topBy = new Map();
+            for (const t of tops) {
+                const list = topBy.get(t.state) || [];
+                if (list.length < 4) list.push({ party_name: t.party_name, orders: Number(t.orders), amount: Number(t.amount) });
+                topBy.set(t.state, list);
+            }
+            const states = now.map((r) => {
+                const sales = Number(r.sales) || 0;
+                const before = prev.get(r.state) || 0;
+                return {
+                    state: r.state,
+                    sales,
+                    orders: Number(r.orders) || 0,
+                    parties: Number(r.parties) || 0,
+                    change_percent: before > 0 ? Math.round(((sales - before) / before) * 100) : null,
+                    top_parties: topBy.get(r.state) || [],
+                };
+            }).sort((a, b) => b.sales - a.sales);
+            res.status(200).json({
+                from: fromDate.toISOString().slice(0, 10),
+                to: toDate.toISOString().slice(0, 10),
+                total_sales: states.reduce((sum, r) => sum + r.sales, 0),
+                states,
+            });
+        } catch (error) {
+            console.error('Sales by state failed:', error.message);
+            res.status(500).json({ error: 'Could not load sales by state' });
+        }
+    }
+
     async createOrder(req, res) {
         try {
             // latitude, logitude for visit order
@@ -570,6 +670,7 @@ class OrderController {
             let orderTotal = 0;
             const resolvedOrderItems = [];
             const orderOperationsToCreate = [];
+            const stockLines = [];
 
             await sequelize.transaction(async (transaction) => {
                 // Lock all products in one fixed order so two carts cannot block each other.
@@ -667,6 +768,13 @@ class OrderController {
 
                     await product.save({ transaction });
                     orderOperationsToCreate.push(orderOperationData);
+                    stockLines.push({
+                        productId: product.product_id,
+                        warehouseAfter: product.warehouse_qty,
+                        trayAfter: product.tray_qty,
+                        dWarehouse: -(Number(orderOperationData.warehouse_reduced_qty) || 0),
+                        dTray: -(Number(orderOperationData.tray_reduced_qty) || 0),
+                    });
 
                     const resolvedItem = {
                         product_id: item.product_id,
@@ -759,6 +867,11 @@ class OrderController {
                         if (!clash || attempt >= 4) throw err;
                         orderData.order_number = generateUniqueOrderNumber();
                     }
+                }
+
+                // Stock history: one line per product on this order.
+                for (const line of stockLines) {
+                    await recordStockMove({ transaction, ...line, kind: 'order', user, reference: order.order_number });
                 }
 
                 for (const operationData of orderOperationsToCreate) {
@@ -875,7 +988,7 @@ class OrderController {
                         lock: transaction.LOCK.UPDATE,
                     });
                     if (!locked || locked.order_status === OrderStatus.CANCELLED) return 'already';
-                    await reverseOrderOperation(locked.order_id, transaction);
+                    await reverseOrderOperation(locked.order_id, transaction, req.user);
                     locked.order_status = OrderStatus.CANCELLED;
                     locked.updated_at = new Date();
                     await locked.save({ transaction });
@@ -928,7 +1041,7 @@ class OrderController {
                 });
                 if (!locked) return true;
                 if (locked.order_status !== OrderStatus.CANCELLED && locked.order_status !== OrderStatus.COMPLETED) {
-                    await reverseOrderOperation(locked.order_id, transaction);
+                    await reverseOrderOperation(locked.order_id, transaction, req.user);
                 }
                 return false;
             });

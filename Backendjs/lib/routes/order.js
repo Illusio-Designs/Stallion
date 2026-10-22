@@ -5,6 +5,7 @@ const orderController = require('../controllers/orderController');
 const { authenticateToken } = require('../middleware/auth');
 
 router.get('/my', authenticateToken, orderController.getMyOrders);
+router.get('/sales-by-state', authenticateToken, orderController.getSalesByState);
 router.get('/', authenticateToken, orderController.getOrders);
 router.post('/quote', authenticateToken, orderController.quoteOrder);
 router.post('/', authenticateToken, orderController.createOrder);
