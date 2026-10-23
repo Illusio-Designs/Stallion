@@ -148,7 +148,7 @@ const DashboardOffers = () => {
   useEffect(() => { fetchOffers(); }, []);
 
   // One page (20) of products for the scope picker — passed to PagedMultiSelect.
-  const fetchProductPage = (page, search) => getProductsPage(page, 20, search || '');
+  const fetchProductPage = (page, search) => getProductsPage(page, 20, search || '', { activeOnly: true });
   const mapProduct = (p) => ({
     value: String(p.product_id || p.id),
     label: p.model_no || p.product_name || p.name || String(p.product_id || p.id),

@@ -37,6 +37,7 @@ import StockHistoryPanel from '../components/StockHistoryPanel';
 import { getProductImageUrl, PRODUCT_IMAGE_PLACEHOLDER } from '../utils/imageUrl';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard-products.css';
+import '../styles/redesign-n-manage.css';
 
 // Picker options for the add/edit form: active items only, plus the item the
 // product currently uses (even if it has since been made inactive) so it stays
@@ -240,6 +241,7 @@ const DashboardProducts = () => {
     collection_id: '',
     warehouse_qty: '',
     status: 'draft',
+    is_active: true,
   });
 
   // Load orphaned images from localStorage on mount
@@ -1263,6 +1265,7 @@ const DashboardProducts = () => {
         tray_qty: product.tray_qty || 0,
         total_qty: product.total_qty || product.qty || 0,
         status: product.status || 'draft',
+        is_active: product.is_active !== false,
         hasUploadedMedia: hasUploadedMedia,
         data: product,
       };
@@ -1889,6 +1892,7 @@ const DashboardProducts = () => {
       tray_qty: '',
       total_qty: '',
       status: 'draft',
+      is_active: true,
     });
   };
 
@@ -1920,6 +1924,7 @@ const DashboardProducts = () => {
       tray_qty: product.tray_qty || '',
       total_qty: product.total_qty || '',
       status: product.status || 'draft',
+      is_active: product.is_active !== false,
     });
     setEditRow(row);
   };
@@ -2085,6 +2090,7 @@ const DashboardProducts = () => {
       render: (v, row) => {
         const st = String(v || '').toLowerCase();
         const qty = Number(row.total_qty) || 0;
+        if (row.is_active === false) return <StatusBadge status="cancelled">Inactive</StatusBadge>;
         if (st === 'active' && qty <= 0) return <StatusBadge status="cancelled">Sold out</StatusBadge>;
         if (st === 'active' && qty <= 5) return <StatusBadge status="pending">Low stock</StatusBadge>;
         if (st === 'active') return <StatusBadge status="completed">Active</StatusBadge>;
@@ -2169,6 +2175,7 @@ const DashboardProducts = () => {
       if (editRow) {
         dataToSend.tray_qty = parseInt(formData.tray_qty) || 0;
         dataToSend.total_qty = parseInt(formData.total_qty) || 0;
+        dataToSend.is_active = formData.is_active !== false;
         await updateProduct(editRow.id, dataToSend);
         showSuccess('Product updated successfully');
       } else {
@@ -3139,6 +3146,22 @@ const DashboardProducts = () => {
               onChange={(value) => handleInputChange('status', value)}
               placeholder="Select status"
             />
+          </div>
+          <div className="form-group form-group--full">
+            <label className="ui-label">Availability</label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={formData.is_active !== false}
+              onClick={() => handleInputChange('is_active', formData.is_active === false)}
+              className="mng-switch"
+            >
+              <span className={`mng-switch__track ${formData.is_active !== false ? 'is-on' : ''}`}>
+                <span className="mng-switch__dot" />
+              </span>
+              <span className="mng-switch__label">{formData.is_active !== false ? 'Active' : 'Inactive'}</span>
+            </button>
+            <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted.</p>
           </div>
 
           {/* Assigned Images Preview + Assign Button */}

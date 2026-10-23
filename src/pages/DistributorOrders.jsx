@@ -137,7 +137,7 @@ const DistributorOrders = () => {
   const loadProducts = async (search = '') => {
     setProductLoading(true);
     try {
-      const result = await getProductsPage(1, 20, search);
+      const result = await getProductsPage(1, 20, search, { activeOnly: true });
       setProducts(Array.isArray(result) ? result : (result?.data || []));
     } catch (err) {
       console.error('Failed to load products:', err);

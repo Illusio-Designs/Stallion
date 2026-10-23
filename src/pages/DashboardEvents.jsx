@@ -9,6 +9,7 @@ import { showSuccess, showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/redesign-n-events.css';
+import '../styles/redesign-n-manage.css';
 
 const DashboardEvents = () => {
   const [when, setWhen] = useState('upcoming');
@@ -21,7 +22,8 @@ const DashboardEvents = () => {
     event_name: '', 
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0],
-    event_location: ''
+    event_location: '',
+    is_active: true
   });
   const [error, setError] = useState(null);       // the list could not load
   const [formError, setFormError] = useState(null); // a problem in the open form
@@ -50,7 +52,8 @@ const DashboardEvents = () => {
     event_name: '', 
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date().toISOString().split('T')[0],
-    event_location: ''
+    event_location: '',
+    is_active: true
   });
 
   const handleSubmitNew = async () => {
@@ -108,6 +111,7 @@ const DashboardEvents = () => {
       start_date: startDate,
       end_date: endDate,
       event_location: row.event_location || '',
+      is_active: row.is_active !== false,
     });
   };
 
@@ -143,6 +147,7 @@ const DashboardEvents = () => {
         start_date: `${form.start_date}T00:00:00`,
         end_date: `${form.end_date}T00:00:00`,
         event_location: form.event_location.trim(),
+        is_active: form.is_active !== false,
       };
       await updateEvent(eventId, eventData);
       showSuccess('Event updated successfully');
@@ -266,6 +271,7 @@ const DashboardEvents = () => {
                     <p>{detailLine(e)}</p>
                   </div>
                   {statusPill(e)}
+                  <span className={`pill ${e.is_active === false ? 'idle' : 'ok'}`}>{e.is_active === false ? 'Inactive' : 'Active'}</span>
                   <div className="ev-row__actions">
                     <button className="ui-btn ui-btn--secondary" onClick={() => openEdit(e)}>Edit</button>
                   </div>
@@ -385,6 +391,22 @@ const DashboardEvents = () => {
               value={form.event_location}
               onChange={(e) => setForm((p) => ({ ...p, event_location: e.target.value }))}
             />
+          </div>
+          <div className="form-group flex flex-col gap-2 col-span-full">
+            <label className="ui-label text-sm font-medium text-text">Status</label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.is_active !== false}
+              onClick={() => setForm((p) => ({ ...p, is_active: p.is_active === false }))}
+              className="mng-switch"
+            >
+              <span className={`mng-switch__track ${form.is_active !== false ? 'is-on' : ''}`}>
+                <span className="mng-switch__dot" />
+              </span>
+              <span className="mng-switch__label">{form.is_active !== false ? 'Active' : 'Inactive'}</span>
+            </button>
+            <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted.</p>
           </div>
         </div>
       </AsidePanel>
