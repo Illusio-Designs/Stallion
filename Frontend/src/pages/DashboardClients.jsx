@@ -25,6 +25,7 @@ import { showError, showSuccess, showWarning } from '../services/notificationSer
 import { captureCurrentPosition } from '../utils/geolocation';
 import { downloadCsv } from '../utils/exportCsv';
 import '../styles/redesign-n-party.css';
+import '../styles/redesign-n-headings.css';
 import GooeySearch from '../components/ui/GooeySearch';
 
 const DashboardClients = () => {
@@ -1681,6 +1682,7 @@ const DashboardClients = () => {
           <div className="dash-card full party-n-table">
             <TableWithControls
               title="Party"
+              titleAs="h2"
               columns={columns}
               rows={filteredRowsByTab}
               onAddNew={handleAdd}
