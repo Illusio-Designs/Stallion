@@ -36,9 +36,13 @@ function buildNamePhoneFilter({ name, phone, nameFields = [], phoneFields = [] }
     return { [Op.and]: conditions };
 }
 
+// Sequelize operators (Op.or, Op.and, ...) are Symbol keys, which Object.keys() does not list.
+// Counting only string keys made every search filter look empty, so searches were silently dropped.
+const hasWhereKeys = (obj) => !!obj && Reflect.ownKeys(obj).length > 0;
+
 function mergeWhere(baseWhere, searchFilter) {
-    const hasBase = baseWhere && Object.keys(baseWhere).length > 0;
-    const hasSearch = searchFilter && Object.keys(searchFilter).length > 0;
+    const hasBase = hasWhereKeys(baseWhere);
+    const hasSearch = hasWhereKeys(searchFilter);
     if (!hasBase && !hasSearch) return {};
     if (!hasSearch) return baseWhere;
     if (!hasBase) return searchFilter;
