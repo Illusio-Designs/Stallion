@@ -146,14 +146,14 @@ const Products = ({ onPageChange }) => {
   // its sidebar section is expanded - not all at once on page load.
   const filterLoaded = useRef({});
   const filterLoaders = {
-    brands: [getBrands, setBrandsData],
-    frameMaterial: [getFrameMaterials, setFrameMaterialsData],
-    shape: [getShapes, setShapesData],
-    type: [getFrameTypes, setFrameTypesData],
-    gender: [getGenders, setGendersData],
-    lensColor: [getLensColors, setLensColorsData],
-    lensMaterial: [getLensMaterials, setLensMaterialsData],
-    frameColor: [getFrameColors, setFrameColorsData],
+    brands: [() => getBrands({ activeOnly: true }), setBrandsData],
+    frameMaterial: [() => getFrameMaterials({ activeOnly: true }), setFrameMaterialsData],
+    shape: [() => getShapes({ activeOnly: true }), setShapesData],
+    type: [() => getFrameTypes({ activeOnly: true }), setFrameTypesData],
+    gender: [() => getGenders({ activeOnly: true }), setGendersData],
+    lensColor: [() => getLensColors({ activeOnly: true }), setLensColorsData],
+    lensMaterial: [() => getLensMaterials({ activeOnly: true }), setLensMaterialsData],
+    frameColor: [() => getFrameColors({ activeOnly: true }), setFrameColorsData],
   };
   const loadFilterData = async (section) => {
     const entry = filterLoaders[section];

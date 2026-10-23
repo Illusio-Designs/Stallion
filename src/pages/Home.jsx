@@ -40,7 +40,7 @@ const Home = ({ onPageChange }) => {
     const fetchCollections = async () => {
       try {
         setLoadingCollections(true);
-        const collectionsData = await getCollections();
+        const collectionsData = await getCollections({ activeOnly: true });
         // Handle both array response and object with data property
         const collectionsArray = Array.isArray(collectionsData) ? collectionsData : (collectionsData?.data || []);
         setCollections(collectionsArray);

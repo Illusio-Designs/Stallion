@@ -38,6 +38,24 @@ import { getProductImageUrl, PRODUCT_IMAGE_PLACEHOLDER } from '../utils/imageUrl
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard-products.css';
 
+// Picker options for the add/edit form: active items only, plus the item the
+// product currently uses (even if it has since been made inactive) so it stays
+// visible and selected. That item is looked up in the full list; it is labelled
+// "(inactive)" when it is inactive. While the active list is still loading, the
+// selected active item also resolves from the full list so the label never blanks.
+const buildPickerOptions = (activeList, fullList, selectedId, idKey, getLabel) => {
+  const idOf = (x) => x[idKey] || x.id;
+  const options = (activeList || []).map(x => ({ value: idOf(x), label: getLabel(x) }));
+  if (selectedId && !options.some(o => String(o.value) === String(selectedId))) {
+    const current = (fullList || []).find(x => String(idOf(x)) === String(selectedId));
+    if (current) {
+      const inactive = current.is_active === false;
+      options.push({ value: idOf(current), label: inactive ? `${getLabel(current)} (inactive)` : getLabel(current) });
+    }
+  }
+  return options;
+};
+
 // Helper function to parse image_urls from various formats
 // Handles: arrays, JSON strings like "[\"/uploads/products/image.webp\"]", plain strings
 const parseImageUrls = (product) => {
@@ -184,15 +202,25 @@ const DashboardProducts = () => {
 
   // Related data for dropdowns
   const [brands, setBrands] = useState([]);
+  const [activeBrands, setActiveBrands] = useState([]);
   const [collections, setCollections] = useState([]);
+  const [activeCollections, setActiveCollections] = useState([]);
   const [genders, setGenders] = useState([]);
+  const [activeGenders, setActiveGenders] = useState([]);
   const [colorCodes, setColorCodes] = useState([]);
+  const [activeColorCodes, setActiveColorCodes] = useState([]);
   const [shapes, setShapes] = useState([]);
+  const [activeShapes, setActiveShapes] = useState([]);
   const [lensColors, setLensColors] = useState([]);
+  const [activeLensColors, setActiveLensColors] = useState([]);
   const [frameColors, setFrameColors] = useState([]);
+  const [activeFrameColors, setActiveFrameColors] = useState([]);
   const [frameTypes, setFrameTypes] = useState([]);
+  const [activeFrameTypes, setActiveFrameTypes] = useState([]);
   const [lensMaterials, setLensMaterials] = useState([]);
+  const [activeLensMaterials, setActiveLensMaterials] = useState([]);
   const [frameMaterials, setFrameMaterials] = useState([]);
+  const [activeFrameMaterials, setActiveFrameMaterials] = useState([]);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -376,16 +404,46 @@ const DashboardProducts = () => {
       console.error(`Failed to load ${key}:`, e);
     }
   };
-  const loadBrands = () => loadLookup('brands', getBrands, setBrands);
-  const loadCollections = () => loadLookup('collections', getCollections, setCollections);
-  const loadGenders = () => loadLookup('genders', getGenders, setGenders);
-  const loadColorCodes = () => loadLookup('colorCodes', getColorCodes, setColorCodes);
-  const loadShapes = () => loadLookup('shapes', getShapes, setShapes);
-  const loadLensColors = () => loadLookup('lensColors', getLensColors, setLensColors);
-  const loadFrameColors = () => loadLookup('frameColors', getFrameColors, setFrameColors);
-  const loadFrameTypes = () => loadLookup('frameTypes', getFrameTypes, setFrameTypes);
-  const loadLensMaterials = () => loadLookup('lensMaterials', getLensMaterials, setLensMaterials);
-  const loadFrameMaterials = () => loadLookup('frameMaterials', getFrameMaterials, setFrameMaterials);
+  const loadBrands = () => {
+    loadLookup('brands', getBrands, setBrands);
+    loadLookup('brands:active', () => getBrands({ activeOnly: true }), setActiveBrands);
+  };
+  const loadCollections = () => {
+    loadLookup('collections', getCollections, setCollections);
+    loadLookup('collections:active', () => getCollections({ activeOnly: true }), setActiveCollections);
+  };
+  const loadGenders = () => {
+    loadLookup('genders', getGenders, setGenders);
+    loadLookup('genders:active', () => getGenders({ activeOnly: true }), setActiveGenders);
+  };
+  const loadColorCodes = () => {
+    loadLookup('colorCodes', getColorCodes, setColorCodes);
+    loadLookup('colorCodes:active', () => getColorCodes({ activeOnly: true }), setActiveColorCodes);
+  };
+  const loadShapes = () => {
+    loadLookup('shapes', getShapes, setShapes);
+    loadLookup('shapes:active', () => getShapes({ activeOnly: true }), setActiveShapes);
+  };
+  const loadLensColors = () => {
+    loadLookup('lensColors', getLensColors, setLensColors);
+    loadLookup('lensColors:active', () => getLensColors({ activeOnly: true }), setActiveLensColors);
+  };
+  const loadFrameColors = () => {
+    loadLookup('frameColors', getFrameColors, setFrameColors);
+    loadLookup('frameColors:active', () => getFrameColors({ activeOnly: true }), setActiveFrameColors);
+  };
+  const loadFrameTypes = () => {
+    loadLookup('frameTypes', getFrameTypes, setFrameTypes);
+    loadLookup('frameTypes:active', () => getFrameTypes({ activeOnly: true }), setActiveFrameTypes);
+  };
+  const loadLensMaterials = () => {
+    loadLookup('lensMaterials', getLensMaterials, setLensMaterials);
+    loadLookup('lensMaterials:active', () => getLensMaterials({ activeOnly: true }), setActiveLensMaterials);
+  };
+  const loadFrameMaterials = () => {
+    loadLookup('frameMaterials', getFrameMaterials, setFrameMaterials);
+    loadLookup('frameMaterials:active', () => getFrameMaterials({ activeOnly: true }), setActiveFrameMaterials);
+  };
 
   // Lightweight paginated fetch for the Products listing tab.
   // Fetches only ONE page (20) of products - NO attribute lookups on listing.
@@ -2703,10 +2761,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Brand *</label>
             <DropdownSelector
-              options={brands.map(b => ({
-                value: b.brand_id || b.id,
-                label: b.brand_name
-              }))}
+              options={buildPickerOptions(activeBrands, brands, formData.brand_id, 'brand_id', x => x.brand_name)}
               value={formData.brand_id}
               onChange={(value) => handleInputChange('brand_id', value)}
               placeholder="Select brand"
@@ -2716,10 +2771,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Collection *</label>
             <DropdownSelector
-              options={collections.map(c => ({
-                value: c.collection_id || c.id,
-                label: c.collection_name
-              }))}
+              options={buildPickerOptions(activeCollections, collections, formData.collection_id, 'collection_id', x => x.collection_name)}
               value={formData.collection_id}
               onChange={(value) => handleInputChange('collection_id', value)}
               placeholder="Select collection"
@@ -2729,10 +2781,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Gender</label>
             <DropdownSelector
-              options={genders.map(g => ({
-                value: g.gender_id || g.id,
-                label: g.gender_name
-              }))}
+              options={buildPickerOptions(activeGenders, genders, formData.gender_id, 'gender_id', x => x.gender_name)}
               value={formData.gender_id}
               onChange={(value) => handleInputChange('gender_id', value)}
               placeholder="Select gender"
@@ -2742,10 +2791,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Color Code</label>
             <DropdownSelector
-              options={colorCodes.map(c => ({
-                value: c.color_code_id || c.id,
-                label: c.color_code
-              }))}
+              options={buildPickerOptions(activeColorCodes, colorCodes, formData.color_code_id, 'color_code_id', x => x.color_code)}
               value={formData.color_code_id}
               onChange={(value) => handleInputChange('color_code_id', value)}
               placeholder="Select color code"
@@ -2755,10 +2801,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Shape</label>
             <DropdownSelector
-              options={shapes.map(s => ({
-                value: s.shape_id || s.id,
-                label: s.shape_name
-              }))}
+              options={buildPickerOptions(activeShapes, shapes, formData.shape_id, 'shape_id', x => x.shape_name)}
               value={formData.shape_id}
               onChange={(value) => handleInputChange('shape_id', value)}
               placeholder="Select shape"
@@ -2768,10 +2811,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Color</label>
             <DropdownSelector
-              options={lensColors.map(l => ({
-                value: l.lens_color_id || l.id,
-                label: l.lens_color
-              }))}
+              options={buildPickerOptions(activeLensColors, lensColors, formData.lens_color_id, 'lens_color_id', x => x.lens_color)}
               value={formData.lens_color_id}
               onChange={(value) => handleInputChange('lens_color_id', value)}
               placeholder="Select lens color"
@@ -2781,10 +2821,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Color</label>
             <DropdownSelector
-              options={frameColors.map(f => ({
-                value: f.frame_color_id || f.id,
-                label: f.frame_color
-              }))}
+              options={buildPickerOptions(activeFrameColors, frameColors, formData.frame_color_id, 'frame_color_id', x => x.frame_color)}
               value={formData.frame_color_id}
               onChange={(value) => handleInputChange('frame_color_id', value)}
               placeholder="Select frame color"
@@ -2794,10 +2831,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Type</label>
             <DropdownSelector
-              options={frameTypes.map(f => ({
-                value: f.frame_type_id || f.id,
-                label: f.frame_type
-              }))}
+              options={buildPickerOptions(activeFrameTypes, frameTypes, formData.frame_type_id, 'frame_type_id', x => x.frame_type)}
               value={formData.frame_type_id}
               onChange={(value) => handleInputChange('frame_type_id', value)}
               placeholder="Select frame type"
@@ -2807,10 +2841,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Material</label>
             <DropdownSelector
-              options={lensMaterials.map(l => ({
-                value: l.lens_material_id || l.id,
-                label: l.lens_material
-              }))}
+              options={buildPickerOptions(activeLensMaterials, lensMaterials, formData.lens_material_id, 'lens_material_id', x => x.lens_material)}
               value={formData.lens_material_id}
               onChange={(value) => handleInputChange('lens_material_id', value)}
               placeholder="Select lens material"
@@ -2820,10 +2851,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Material</label>
             <DropdownSelector
-              options={frameMaterials.map(f => ({
-                value: f.frame_material_id || f.id,
-                label: f.frame_material
-              }))}
+              options={buildPickerOptions(activeFrameMaterials, frameMaterials, formData.frame_material_id, 'frame_material_id', x => x.frame_material)}
               value={formData.frame_material_id}
               onChange={(value) => handleInputChange('frame_material_id', value)}
               placeholder="Select frame material"
@@ -2945,10 +2973,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Brand *</label>
             <DropdownSelector
-              options={brands.map(b => ({
-                value: b.brand_id || b.id,
-                label: b.brand_name
-              }))}
+              options={buildPickerOptions(activeBrands, brands, formData.brand_id, 'brand_id', x => x.brand_name)}
               value={formData.brand_id}
               onChange={(value) => handleInputChange('brand_id', value)}
               placeholder="Select brand"
@@ -2958,10 +2983,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Collection *</label>
             <DropdownSelector
-              options={collections.map(c => ({
-                value: c.collection_id || c.id,
-                label: c.collection_name
-              }))}
+              options={buildPickerOptions(activeCollections, collections, formData.collection_id, 'collection_id', x => x.collection_name)}
               value={formData.collection_id}
               onChange={(value) => handleInputChange('collection_id', value)}
               placeholder="Select collection"
@@ -2971,10 +2993,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Gender</label>
             <DropdownSelector
-              options={genders.map(g => ({
-                value: g.gender_id || g.id,
-                label: g.gender_name
-              }))}
+              options={buildPickerOptions(activeGenders, genders, formData.gender_id, 'gender_id', x => x.gender_name)}
               value={formData.gender_id}
               onChange={(value) => handleInputChange('gender_id', value)}
               placeholder="Select gender"
@@ -2984,10 +3003,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Color Code</label>
             <DropdownSelector
-              options={colorCodes.map(c => ({
-                value: c.color_code_id || c.id,
-                label: c.color_code
-              }))}
+              options={buildPickerOptions(activeColorCodes, colorCodes, formData.color_code_id, 'color_code_id', x => x.color_code)}
               value={formData.color_code_id}
               onChange={(value) => handleInputChange('color_code_id', value)}
               placeholder="Select color code"
@@ -2997,10 +3013,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Shape</label>
             <DropdownSelector
-              options={shapes.map(s => ({
-                value: s.shape_id || s.id,
-                label: s.shape_name
-              }))}
+              options={buildPickerOptions(activeShapes, shapes, formData.shape_id, 'shape_id', x => x.shape_name)}
               value={formData.shape_id}
               onChange={(value) => handleInputChange('shape_id', value)}
               placeholder="Select shape"
@@ -3010,10 +3023,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Color</label>
             <DropdownSelector
-              options={lensColors.map(l => ({
-                value: l.lens_color_id || l.id,
-                label: l.lens_color
-              }))}
+              options={buildPickerOptions(activeLensColors, lensColors, formData.lens_color_id, 'lens_color_id', x => x.lens_color)}
               value={formData.lens_color_id}
               onChange={(value) => handleInputChange('lens_color_id', value)}
               placeholder="Select lens color"
@@ -3023,10 +3033,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Color</label>
             <DropdownSelector
-              options={frameColors.map(f => ({
-                value: f.frame_color_id || f.id,
-                label: f.frame_color
-              }))}
+              options={buildPickerOptions(activeFrameColors, frameColors, formData.frame_color_id, 'frame_color_id', x => x.frame_color)}
               value={formData.frame_color_id}
               onChange={(value) => handleInputChange('frame_color_id', value)}
               placeholder="Select frame color"
@@ -3036,10 +3043,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Type</label>
             <DropdownSelector
-              options={frameTypes.map(f => ({
-                value: f.frame_type_id || f.id,
-                label: f.frame_type
-              }))}
+              options={buildPickerOptions(activeFrameTypes, frameTypes, formData.frame_type_id, 'frame_type_id', x => x.frame_type)}
               value={formData.frame_type_id}
               onChange={(value) => handleInputChange('frame_type_id', value)}
               placeholder="Select frame type"
@@ -3049,10 +3053,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Material</label>
             <DropdownSelector
-              options={lensMaterials.map(l => ({
-                value: l.lens_material_id || l.id,
-                label: l.lens_material
-              }))}
+              options={buildPickerOptions(activeLensMaterials, lensMaterials, formData.lens_material_id, 'lens_material_id', x => x.lens_material)}
               value={formData.lens_material_id}
               onChange={(value) => handleInputChange('lens_material_id', value)}
               placeholder="Select lens material"
@@ -3062,10 +3063,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Material</label>
             <DropdownSelector
-              options={frameMaterials.map(f => ({
-                value: f.frame_material_id || f.id,
-                label: f.frame_material
-              }))}
+              options={buildPickerOptions(activeFrameMaterials, frameMaterials, formData.frame_material_id, 'frame_material_id', x => x.frame_material)}
               value={formData.frame_material_id}
               onChange={(value) => handleInputChange('frame_material_id', value)}
               placeholder="Select frame material"
