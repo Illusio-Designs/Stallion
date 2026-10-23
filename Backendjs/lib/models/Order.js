@@ -102,6 +102,8 @@ const Order = sequelize.define('Order', {
     dispatched_at: { type: DataTypes.DATE, allowNull: true },
     delivered_at: { type: DataTypes.DATE, allowNull: true },
     received_by: { type: DataTypes.STRING(255), allowNull: true },
+    // Unsent pieces cancelled after part of the order was already shipped (null otherwise).
+    cancelled_qty: { type: DataTypes.INTEGER, allowNull: true },
     cancel_reason: { type: DataTypes.STRING(500), allowNull: true },
     cancelled_by: { type: DataTypes.UUID, allowNull: true },
     cancelled_at: { type: DataTypes.DATE, allowNull: true },

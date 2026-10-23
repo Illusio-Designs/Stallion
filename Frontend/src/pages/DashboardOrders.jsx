@@ -536,13 +536,24 @@ const DashboardOrders = () => {
       return;
     }
     setCancelError('');
+    const pc = getPieceCounts(row.originalOrder);
+    const partly = pc.shipped > 0;
+    const unsentQty = Math.max(pc.total - pc.shipped, 0);
     if (!(await confirm({
-      title: 'Cancel order',
-      message: 'Cancel this order? Stock is returned and this cannot be undone.',
-      confirmLabel: 'Cancel order',
+      title: partly ? 'Cancel the unsent pieces' : 'Cancel order',
+      message: partly
+        ? `Cancel the ${unsentQty} unsent pieces? They return to stock. The ${pc.shipped} pieces already sent are not affected. This cannot be undone.`
+        : 'Cancel this order? Stock is returned and this cannot be undone.',
+      confirmLabel: partly ? 'Cancel unsent pieces' : 'Cancel order',
       danger: true,
     }))) return;
-    await runAction('cancel', () => updateOrderStatus(orderId, { order_status: 'cancelled', cancel_reason: reason }), 'Order cancelled', `${row.orderId || 'Order'} was cancelled.`, 'cancelled');
+    await runAction(
+      'cancel',
+      () => updateOrderStatus(orderId, { order_status: 'cancelled', cancel_reason: reason }),
+      partly ? 'Unsent pieces cancelled' : 'Order cancelled',
+      partly ? `${unsentQty} unsent pieces of ${row.orderId || 'the order'} were cancelled.` : `${row.orderId || 'Order'} was cancelled.`,
+      partly ? 'dispatched' : 'cancelled',
+    );
   };
 
   // Dispatch the ready pieces: courier + tracking + how many pieces go in this shipment.
@@ -741,8 +752,9 @@ const DashboardOrders = () => {
           const shipments = getShipments(order);
           const busy = !!busyAction;
           const cancellable = canEditOrder && ['pending', 'processed', 'hold_by_tray', 'partially_dispatched', 'dispatched'].includes(apiStatus);
-          const canCancel = cancellable && counts.shipped === 0;
-          const shippedBlocksCancel = cancellable && counts.shipped > 0;
+          const unsentQty = Math.max(counts.total - counts.shipped - counts.cancelled, 0);
+          const partlyCancel = counts.shipped > 0;
+          const canCancel = cancellable && (counts.shipped === 0 || (unsentQty > 0 && counts.cancelled === 0));
           const dispatchable = canEditOrder && ['processed', 'partially_dispatched'].includes(apiStatus);
           const field = (label, value) => (value ? <div className="ordn-fl__row" key={label}><dt>{label}</dt><dd>{value}</dd></div> : null);
           const shipmentList = shipments.length ? (
@@ -758,6 +770,9 @@ const DashboardOrders = () => {
           ) : null;
           const sentLabel = `${counts.shipped} of ${counts.total} pieces`;
           const waiting = counts.ready + counts.held;
+          const partCancelField = counts.cancelled > 0 && apiStatus !== 'cancelled'
+            ? field('Cancelled', `Cancelled ${counts.cancelled} pieces${order?.cancel_reason ? `: ${order.cancel_reason}` : ''}`)
+            : null;
           const trayTasks = getTrayTasksOf(order);
           const allTrayReceived = trayTasks.length > 0 && trayTasks.every((t) => t.status === 'received');
           const trayLine = counts.held
@@ -786,11 +801,13 @@ const DashboardOrders = () => {
               field('Shipments', shipmentList),
               field('Sent', sentLabel),
               field('Dispatched', fmtDateTime(order?.dispatched_at)),
+              partCancelField,
             ];
             if (apiStatus === 'completed') return [
               field('Shipments', shipmentList),
               field('Delivered', fmtDateTime(order?.delivered_at)),
               field('Received by', order?.received_by),
+              partCancelField,
             ];
             return [
               field('Reason', order?.cancel_reason),
@@ -856,7 +873,7 @@ const DashboardOrders = () => {
                     <span><i className="ordn-dot ordn-dot--ready" />Ready to send {counts.ready}</span>
                     <span><i className="ordn-dot ordn-dot--transit" />In transit to office {counts.inTransit}</span>
                     <span><i className="ordn-dot ordn-dot--held" />Booked in trays {counts.held - counts.inTransit}</span>
-                    {counts.cancelled > 0 && <span><i className="ordn-dot ordn-dot--canc" />Cancelled {counts.cancelled}</span>}
+                    {counts.cancelled > 0 && <span><i className="ordn-dot ordn-dot--canc" />{counts.cancelled} cancelled</span>}
                   </div>
                 </div>
               )}
@@ -975,13 +992,12 @@ const DashboardOrders = () => {
               {apiStatus === 'completed' && <p className="ordn-note">This order is closed. No further changes.</p>}
               {apiStatus === 'cancelled' && <p className="ordn-note">A cancelled order cannot be reopened. Place a new order instead.</p>}
 
-              {shippedBlocksCancel && (
-                <p className="ordn-note">Some pieces were already sent, so this order cannot be cancelled. Complete it instead.</p>
-              )}
-
               {canCancel && (
                 <div className="ordn-dispatch ordn-cancel">
-                  <h5 className="ord-view__section-title">Cancel this order</h5>
+                  <h5 className="ord-view__section-title">{partlyCancel ? 'Cancel the unsent pieces' : 'Cancel this order'}</h5>
+                  {partlyCancel && (
+                    <p className="ordn-note">{unsentQty} of {counts.total} pieces have not been sent. Cancelling returns them to stock. The {counts.shipped} pieces already sent are not affected.</p>
+                  )}
                   <label className="ordn-dispatch__field">
                     <span className="ui-label">Reason (required)</span>
                     <select
@@ -1002,7 +1018,7 @@ const DashboardOrders = () => {
                     </label>
                   )}
                   {cancelError && <span className="ordn-dispatch__err" role="alert">{cancelError}</span>}
-                  <Button variant="secondary" onClick={() => handleCancel(viewRow)} disabled={busy || !cancelChoice}>{busyAction === 'cancel' ? 'Cancelling…' : 'Cancel order'}</Button>
+                  <Button variant="secondary" onClick={() => handleCancel(viewRow)} disabled={busy || !cancelChoice}>{busyAction === 'cancel' ? 'Cancelling…' : (partlyCancel ? 'Cancel unsent pieces' : 'Cancel order')}</Button>
                 </div>
               )}
 
