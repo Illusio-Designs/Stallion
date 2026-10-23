@@ -37,9 +37,3 @@
   :root .gchips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
   :root .gchip{flex:none}
 }
-
-/* Salesmen list: below 1400px drop the email column so Target and Action stay on screen */
-@media (max-width:1399px){
-  :root table:has(.sm-pic) th:nth-child(7),
-  :root table:has(.sm-pic) td:nth-child(7){display:none}
-}
