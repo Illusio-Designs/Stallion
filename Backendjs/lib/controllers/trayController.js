@@ -15,7 +15,7 @@ async function withTrayDetails(rows) {
     if (ids.length === 0) return trays;
     const [items, links] = await Promise.all([
         TrayProducts.findAll({ where: { tray_id: { [Op.in]: ids } }, order: [['assigned_at', 'ASC']] }),
-        SalesmanTray.findAll({ where: { tray_id: { [Op.in]: ids } }, order: [['assigned_at', 'DESC']] }),
+        SalesmanTray.findAll({ where: { tray_id: { [Op.in]: ids }, released_at: null }, order: [['assigned_at', 'DESC']] }),
     ]);
     const productIds = [...new Set(items.map((i) => i.product_id))];
     const salesmanIds = [...new Set(links.map((l) => l.salesman_id))];

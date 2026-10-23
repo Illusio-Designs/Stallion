@@ -11,7 +11,7 @@ class SalesmanTrayController {
             if (!salesman_id) {
                 return res.status(400).json({ error: 'Salesman ID is required' });
             }
-            const salesmanTrays = await SalesmanTray.findAll({ where: { salesman_id }, include: [Salesman, Tray] });
+            const salesmanTrays = await SalesmanTray.findAll({ where: { salesman_id, released_at: null }, include: [Salesman, Tray] });
             res.status(200).json(salesmanTrays);
         } catch (error) {
             console.error(error);
@@ -68,7 +68,7 @@ class SalesmanTrayController {
             if (!id) {
                 return res.status(400).json({ error: 'Salesman tray ID is required' });
             }
-            const salesmanTray = await SalesmanTray.findOne({ where: { tray_id: id } });
+            const salesmanTray = await SalesmanTray.findOne({ where: { tray_id: id, released_at: null } });
             if (!salesmanTray) {
                 return res.status(404).json({ error: 'Salesman tray not found' });
             }
@@ -84,15 +84,16 @@ class SalesmanTrayController {
                 updated_at: new Date(),
             }, { where: { tray_id: salesmanTray.tray_id } });
             const snapshot = salesmanTray.toJSON();
-            await SalesmanTray.destroy({ where: { id: salesmanTray.id } });
+            // The link is closed, not deleted: it stays as history (who had the tray, from when to when).
+            await SalesmanTray.update({ released_at: new Date(), updated_at: new Date() }, { where: { id: salesmanTray.id } });
             await logAudit({
                 req,
-                action: 'delete',
-                description: 'Salesman tray deleted',
+                action: 'update',
+                description: 'Salesman tray released (kept as history)',
                 tableName: 'salesman_tray',
                 recordId: salesmanTray.id,
                 oldValues: snapshot,
-                newValues: null,
+                newValues: { ...snapshot, released_at: new Date() },
             });
             res.status(200).json({ message: 'Salesman tray unassigned successfully' });
         } catch (error) {

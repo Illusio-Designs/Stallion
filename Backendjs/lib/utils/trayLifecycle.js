@@ -16,7 +16,7 @@ async function trayPieceCount(trayId, transaction) {
 }
 
 async function syncTrayStatus(trayId, transaction) {
-    const link = await SalesmanTray.findOne({ where: { tray_id: trayId }, transaction });
+    const link = await SalesmanTray.findOne({ where: { tray_id: trayId, released_at: null }, transaction });
     if (!link) return null;
     const salesman = await Salesman.findOne({ where: { salesman_id: link.salesman_id }, transaction });
     const tray = await Tray.findOne({ where: { tray_id: trayId }, transaction });
@@ -34,7 +34,7 @@ async function syncTrayStatus(trayId, transaction) {
 }
 
 async function syncSalesmanTrays(salesmanId, transaction) {
-    const links = await SalesmanTray.findAll({ where: { salesman_id: salesmanId }, transaction });
+    const links = await SalesmanTray.findAll({ where: { salesman_id: salesmanId, released_at: null }, transaction });
     for (const link of links) await syncTrayStatus(link.tray_id, transaction);
 }
 
