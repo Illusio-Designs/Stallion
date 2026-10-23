@@ -307,7 +307,7 @@ export default function TableWithControls({
           <thead>
             <tr>
               {selectable && (
-                <th style={{ width: '40px', padding: '20px 8px' }}>
+                <th style={{ width: '40px', padding: '0 8px 10px 0' }}>
                   <input
                     type="checkbox"
                     aria-label="Select all rows on this page"
@@ -334,7 +334,7 @@ export default function TableWithControls({
                 </th>
               )}
               {showSerialNumber && visible.has('__serialNumber') && (
-                <th style={{ width: '60px', padding: '20px 8px' }}>
+                <th style={{ width: '60px', padding: '0 8px 10px 0' }}>
                   <span className="ui-th">SR NO</span>
                 </th>
               )}
@@ -392,7 +392,7 @@ export default function TableWithControls({
               return (
                 <tr key={selKey(row, pageStart + idx)}>
                   {selectable && (
-                    <td data-col="skip" style={{ width: '40px', padding: '18px 8px 0px' }}>
+                    <td data-col="skip" style={{ width: '40px', padding: '13px 8px 13px 0' }}>
                       <input
                         type="checkbox"
                         aria-label={`Select row ${pageStart + idx + 1}`}
@@ -408,7 +408,7 @@ export default function TableWithControls({
                     </td>
                   )}
                   {showSerialNumber && visible.has('__serialNumber') && (
-                    <td data-col="skip" style={{ width: '60px', padding: '18px 8px 0px' }}>{serialNumber}</td>
+                    <td data-col="skip" style={{ width: '60px', padding: '13px 8px 13px 0' }}>{serialNumber}</td>
                   )}
                   {columns
                     .filter((c) => visible.has(c.key))
