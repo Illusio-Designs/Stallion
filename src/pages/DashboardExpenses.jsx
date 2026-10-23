@@ -19,6 +19,7 @@ import {
 import { showSuccess, showError } from '../services/notificationService';
 import { getUserRole, getUserRoles, getUser } from '../services/authService';
 import '../styles/pages/dashboard-expenses.css';
+import '../styles/redesign-n-headings.css';
 
 
 const EXPENSE_TYPE_OPTIONS = [
@@ -499,25 +500,25 @@ const DashboardExpenses = () => {
         {/* Summary Cards */}
         <div className="dash-row expenses-summary grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div className="dash-card p-5 lg:p-6">
-            <h4>Total Expenses</h4>
+            <h2>Total Expenses</h2>
             <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.totalExpenses}</div>
             <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">₹{summaryStats.totalAmount.toLocaleString('en-IN')}</div>
           </div>
 
           <div className="dash-card p-5 lg:p-6">
-            <h4>Pending</h4>
+            <h2>Pending</h2>
             <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingExpenses}</div>
             <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">Awaiting Approval</div>
           </div>
 
           <div className="dash-card p-5 lg:p-6">
-            <h4>Approved</h4>
+            <h2>Approved</h2>
             <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.approvedExpenses}</div>
             <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">₹{summaryStats.approvedAmount.toLocaleString('en-IN')}</div>
           </div>
 
           <div className="dash-card p-5 lg:p-6">
-            <h4>Rejected</h4>
+            <h2>Rejected</h2>
             <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.rejectedExpenses}</div>
             <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">Need Review</div>
           </div>
@@ -537,7 +538,7 @@ const DashboardExpenses = () => {
         {/* Expenses Table */}
         <div className="dash-card">
           <div className="card-header flex flex-col items-stretch md:flex-row md:items-center md:justify-between gap-4 p-6 border-b border-border">
-            <h3 className="m-0 text-center md:text-left text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{shouldShowAdminFeatures ? 'All Salesman Expenses' : 'My Expenses'}</h3>
+            <h2 className="m-0 text-center md:text-left text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{shouldShowAdminFeatures ? 'All Salesman Expenses' : 'My Expenses'}</h2>
             {shouldShowSalesmanFeatures && (
               <Button onClick={() => setCreateModalOpen(true)}>
                 New expense
@@ -582,6 +583,7 @@ const DashboardExpenses = () => {
             </div>
           ) : (
             <TableWithControls
+              titleAs="h3"
               columns={columns}
               rows={filteredRows}
               loading={loading}

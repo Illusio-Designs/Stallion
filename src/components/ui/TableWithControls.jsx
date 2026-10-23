@@ -25,6 +25,7 @@ function stableRowId(row) {
 
 export default function TableWithControls({
   title = "Overview",
+  titleAs: TitleTag = "h4", // heading element for the title (pages pass h2/h3 to keep a valid outline)
   columns = [], // [{key,label,render?,width?}]
   rows = [], // array of records
   defaultVisible = null, // array of keys
@@ -218,7 +219,7 @@ export default function TableWithControls({
     <div className="ui-table-container">
     <div className="ui-table">
       <div className="ui-table__header">
-        <h4 className="ui-table__title">{title}</h4>
+        <TitleTag className="ui-table__title">{title}</TitleTag>
         <div className="ui-table__actions">
           {secondaryActions.map((action, idx) => (
             <Button

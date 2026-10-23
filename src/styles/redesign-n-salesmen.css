@@ -8,3 +8,6 @@
 
 :root .sn-name{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (max-width:767.98px){:root .sn-name{white-space:normal;overflow-wrap:anywhere}}
+
+:root .sn-reason{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}
+:root .sn-prog-pill{display:inline-flex;align-items:center;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;background:#fdf0d5;color:#8a5a00;white-space:nowrap}

@@ -1,0 +1,43 @@
+/* Heading-level fixes: these titles moved from h4/h3 to h2/h3 so the page outline
+   has no skipped levels. The old look came from tag-name selectors
+   (.dash-card h4, .ui-table__header h4, .card-header h3), so the same
+   declarations are repeated here for the new tags. Nothing should change visually. */
+
+/* TableWithControls title inside a .dash-card (Party, Manage, Expenses table).
+   Was h4: .dash-card h4 (dashboard.css) won over .ui-table__header h4 (ui.css),
+   except font-family which only ui.css sets. */
+:root .dash-card h2.ui-table__title,
+:root .dash-card h3.ui-table__title {
+  font-family: var(--font-display);
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: #595959;
+  margin: 0 0 var(--space-2) 0;
+}
+
+/* Expenses summary card labels (were h4 under .dash-card; h4 had no font-family
+   of its own, so h2 must not take the display face from redesign.css). */
+:root .expenses-summary .dash-card h2 {
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: var(--tracking-label);
+  text-transform: uppercase;
+  color: #595959;
+  margin: 0 0 var(--space-2) 0;
+}
+
+/* Expenses table card title (was h3 under .card-header). */
+:root .card-header h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--leading-tight);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+}
+@media (max-width: 768px) {
+  :root .card-header h2 { text-align: center; }
+}

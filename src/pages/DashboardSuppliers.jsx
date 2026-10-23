@@ -1587,7 +1587,18 @@ const DashboardSuppliers = () => {
                     { key: 'party_id', label: 'PARTY', render: (_v, row) => row.party_name || partyNameMap[row.party_id] || row.party_id || '-' },
                     { key: 'order_qty', label: 'QTY', render: (v) => (v != null && Number(v) > 0) ? Number(v).toLocaleString('en-IN') : '-' },
                     { key: 'order_total', label: 'AMOUNT', render: (v) => (v != null && Number(v) > 0) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
-                    { key: 'check_in_remarks', label: 'REASON', render: (v, row) => (row.order_notes || v) || '-' },
+                    { key: 'check_in_remarks', label: 'REASON', render: (v, row) => {
+                      // A visit started from the home screen is saved as "[In progress]" until the visit report is completed.
+                      const raw = String(row.order_notes || v || '');
+                      const inProgress = row.in_progress === true || /^\s*\[In progress\]/i.test(raw);
+                      const text = raw.replace(/^\s*\[In progress\]\s*/i, '').trim();
+                      return (
+                        <span className="sn-reason">
+                          {inProgress ? <span className="sn-prog-pill">In progress</span> : null}
+                          {text || (inProgress ? '' : '-')}
+                        </span>
+                      );
+                    } },
                     {
                       key: 'location', label: 'LOCATION', render: (_v, row) => {
                         const hasDev = row.latitude != null && row.longitude != null;

@@ -33,6 +33,7 @@ import { apiRequest } from '../services/api/client';
 import { invalidateCache } from '../services/cacheService';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/redesign-n-manage.css';
+import '../styles/redesign-n-headings.css';
 
 // Master-data attribute tabs. Lists are read with every item (active and inactive) so they can be
 // switched back on; pickers and shop filters ask the API for ?active=true. Nothing is ever deleted.
@@ -1100,6 +1101,7 @@ const DashboardManage = () => {
           <div className="dash-card full">
             <TableWithControls
               title="Manage"
+              titleAs="h2"
               columns={columns}
               rows={filteredRowsByTab}
               onAddNew={handleAdd}
