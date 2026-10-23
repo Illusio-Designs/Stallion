@@ -3,57 +3,71 @@ import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getIndianCountries,
   createCountry,
   updateCountry,
-  deleteCountry,
   getStates,
   createState,
   updateState,
-  deleteState,
   getCities,
   createCity,
   updateCity,
-  deleteCity,
   getZones,
   getAllZones,
   createZone,
   updateZone,
-  deleteZone,
-  getBrands, createBrand, updateBrand, deleteBrand,
-  getCollections, createCollection, updateCollection, deleteCollection,
-  getShapes, createShape, updateShape, deleteShape,
-  getFrameColors, createFrameColor, updateFrameColor, deleteFrameColor,
-  getFrameMaterials, createFrameMaterial, updateFrameMaterial, deleteFrameMaterial,
-  getFrameTypes, createFrameType, updateFrameType, deleteFrameType,
-  getGenders, createGender, updateGender, deleteGender,
-  getLensColors, createLensColor, updateLensColor, deleteLensColor,
-  getLensMaterials, createLensMaterial, updateLensMaterial, deleteLensMaterial,
-  getColorCodes, createColorCode, updateColorCode, deleteColorCode,
+  getBrands, createBrand,
+  createCollection,
+  createShape,
+  createFrameColor,
+  createFrameMaterial,
+  createFrameType,
+  createGender,
+  createLensColor,
+  createLensMaterial,
+  createColorCode,
 } from '../services/apiService';
+import StatusBadge from '../components/ui/StatusBadge';
+import { apiRequest } from '../services/api/client';
+import { invalidateCache } from '../services/cacheService';
 import '../styles/pages/dashboard-orders.css';
+import '../styles/redesign-n-manage.css';
 
-// Master-data attribute tabs. Each maps to existing attributesApi list/create/update/delete calls.
-const attr = (idKey, field, label, list, create, update, del, extra = {}) => ({ idKey, field, label, list, create, update, del, ...extra });
+// Master-data attribute tabs. Lists are read with every item (active and inactive) so they can be
+// switched back on; pickers and shop filters ask the API for ?active=true. Nothing is ever deleted.
+const attr = (idKey, field, label, path, cache, create, extra = {}) => ({ idKey, field, label, path, cache, create, ...extra });
 const ATTRIBUTE_TABS = {
-  Brand: attr('brand_id', 'brand_name', 'Brand Name', getBrands, createBrand, updateBrand, deleteBrand),
-  Collection: attr('collection_id', 'collection_name', 'Collection Name', getCollections, createCollection, updateCollection, deleteCollection, { hasBrand: true }),
-  Shape: attr('shape_id', 'shape_name', 'Shape Name', getShapes, createShape, updateShape, deleteShape),
-  'Frame Colour': attr('frame_color_id', 'frame_color', 'Frame Colour', getFrameColors, createFrameColor, updateFrameColor, deleteFrameColor),
-  'Frame Material': attr('frame_material_id', 'frame_material', 'Frame Material', getFrameMaterials, createFrameMaterial, updateFrameMaterial, deleteFrameMaterial),
-  'Frame Type': attr('frame_type_id', 'frame_type', 'Frame Type', getFrameTypes, createFrameType, updateFrameType, deleteFrameType),
-  Gender: attr('gender_id', 'gender_name', 'Gender Name', getGenders, createGender, updateGender, deleteGender),
-  'Lens Colour': attr('lens_color_id', 'lens_color', 'Lens Colour', getLensColors, createLensColor, updateLensColor, deleteLensColor),
-  'Lens Material': attr('lens_material_id', 'lens_material', 'Lens Material', getLensMaterials, createLensMaterial, updateLensMaterial, deleteLensMaterial),
-  'Colour Code': attr('color_code_id', 'color_code', 'Colour Code', getColorCodes, createColorCode, updateColorCode, deleteColorCode),
+  Brand: attr('brand_id', 'brand_name', 'Brand Name', '/brands', 'brands', createBrand),
+  Collection: attr('collection_id', 'collection_name', 'Collection Name', '/collections', 'collections', createCollection, { hasBrand: true }),
+  Shape: attr('shape_id', 'shape_name', 'Shape Name', '/shapes', 'shapes', createShape),
+  'Frame Colour': attr('frame_color_id', 'frame_color', 'Frame Colour', '/frame_colors', 'frame_colors', createFrameColor),
+  'Frame Material': attr('frame_material_id', 'frame_material', 'Frame Material', '/frame_materials', 'frame_materials', createFrameMaterial),
+  'Frame Type': attr('frame_type_id', 'frame_type', 'Frame Type', '/frame_types', 'frame_types', createFrameType),
+  Gender: attr('gender_id', 'gender_name', 'Gender Name', '/genders', 'genders', createGender),
+  'Lens Colour': attr('lens_color_id', 'lens_color', 'Lens Colour', '/lens_colors', 'lens_colors', createLensColor),
+  'Lens Material': attr('lens_material_id', 'lens_material', 'Lens Material', '/lens_materials', 'lens_materials', createLensMaterial),
+  'Colour Code': attr('color_code_id', 'color_code', 'Colour Code', '/color_codes', 'color_codes', createColorCode),
+};
+const listAttr = async (cfg) => {
+  try {
+    const res = await apiRequest(cfg.path, { method: 'GET', includeAuth: true });
+    if (Array.isArray(res)) return res;
+    return Array.isArray(res?.data) ? res.data : [];
+  } catch (e) {
+    if (e?.statusCode === 404 || /not found/i.test(e?.message || '')) return [];
+    throw e;
+  }
+};
+const updateAttr = async (cfg, id, payload) => {
+  const r = await apiRequest(`${cfg.path}/${id}`, { method: 'PUT', body: payload, includeAuth: true });
+  invalidateCache(cfg.cache);
+  return r;
 };
 const GEO_TABS = ['Country', 'State', 'City', 'Zone'];
 const attrRowId = (cfg, item) => item[cfg.idKey] ?? item.id;
 
 const DashboardManage = () => {
-  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('Country');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -87,6 +101,7 @@ const DashboardManage = () => {
     zone_code: '',
     attr_value: '',
     brand_id: '',
+    is_active: true,
   });
 
   // Options for dropdowns
@@ -381,7 +396,7 @@ const DashboardManage = () => {
           const cfg = ATTRIBUTE_TABS[tab];
           if (cfg) {
             const [list, brands] = await Promise.all([
-              cfg.list(),
+              listAttr(cfg),
               cfg.hasBrand ? getBrands().catch(() => []) : Promise.resolve([]),
             ]);
             setAttrRows(list || []);
@@ -522,6 +537,7 @@ const DashboardManage = () => {
           id: attrRowId(cfg, item),
           type: activeTab,
           name: item[cfg.field] ?? '',
+          isActive: item.is_active !== false,
           details: cfg.hasBrand ? (item.brand?.brand_name || item.brand_name || brand?.brand_name || 'N/A') : '',
           data: item,
         });
@@ -551,6 +567,9 @@ const DashboardManage = () => {
       return [
         { key: 'name', label: 'NAME' },
         ...(ATTRIBUTE_TABS[activeTab].hasBrand ? [{ key: 'details', label: 'BRAND' }] : []),
+        { key: 'isActive', label: 'STATUS', render: (_v, row) => (
+          <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>{row.isActive ? 'Active' : 'Inactive'}</StatusBadge>
+        ) },
         { key: 'action', label: 'ACTION', render: (_v, row) => (
           <RowActions onEdit={() => handleEdit(row)}/>
         ) },
@@ -617,6 +636,7 @@ const DashboardManage = () => {
       zone_code: '',
       attr_value: '',
       brand_id: '',
+      is_active: true,
     });
   };
 
@@ -641,6 +661,7 @@ const DashboardManage = () => {
       zone_code: data.zone_code || '',
       attr_value: ATTRIBUTE_TABS[type] ? (data[ATTRIBUTE_TABS[type].field] ?? '') : '',
       brand_id: data.brand_id || '',
+      is_active: data.is_active !== false,
     };
 
     setFormData(editData);
@@ -655,55 +676,6 @@ const DashboardManage = () => {
           await fetchZones(editData.city_id);
         }
       }
-    }
-  };
-
-  const handleDelete = async (row) => {
-    if (!(await confirm(`Are you sure you want to delete this ${row.type}?`))) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      switch (row.type) {
-        case 'Country':
-          await deleteCountry(row.id);
-          break;
-        case 'State':
-          await deleteState(row.id);
-          break;
-        case 'City':
-          await deleteCity(row.id);
-          break;
-        case 'Zone':
-          await deleteZone(row.id);
-          break;
-        default:
-          if (ATTRIBUTE_TABS[row.type]) await ATTRIBUTE_TABS[row.type].del(row.id);
-      }
-      await fetchDataForTab(activeTab);
-      setError(null); // Clear any previous errors
-    } catch (error) {
-      // Don't show alert for token expiration as user will be redirected
-      if (error.message?.toLowerCase().includes('token expired') || 
-          error.message?.toLowerCase().includes('unauthorized')) {
-        // Token expiration is handled by apiService, just return
-        return;
-      }
-      console.error('Error deleting:', error);
-      
-      // Check for foreign key constraint errors
-      if (error.message?.toLowerCase().includes('foreign key constraint') ||
-          error.message?.toLowerCase().includes('cannot delete or update a parent row')) {
-        setError('Cannot delete this item because other records depend on it. Please delete the dependent records first.');
-      } else if (error.message?.toLowerCase().includes("doesn't exist") ||
-          error.message?.toLowerCase().includes('table')) {
-        setError('Database tables not found. Please contact the administrator to set up the database tables.');
-      } else {
-        setError(`Failed to delete item: ${error.message}`);
-      }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -773,9 +745,10 @@ const DashboardManage = () => {
             const payload = { [cfg.field]: formData.attr_value };
             if (cfg.hasBrand) payload.brand_id = formData.brand_id;
             if (editRow) {
-              await cfg.update(editRow.id, payload);
+              await updateAttr(cfg, editRow.id, { ...payload, is_active: formData.is_active !== false });
             } else {
               await cfg.create(payload);
+              invalidateCache(cfg.cache);
             }
           }
         }
@@ -998,7 +971,7 @@ const DashboardManage = () => {
               <div className="form-group form-group--full">
                 <label className="ui-label">Brand *</label>
                 <DropdownSelector
-                  options={brandList.map(b => ({ value: b.brand_id, label: b.brand_name }))}
+                  options={brandList.filter(b => b.is_active !== false || b.brand_id === formData.brand_id).map(b => ({ value: b.brand_id, label: b.brand_name }))}
                   value={formData.brand_id}
                   onChange={(value) => handleInputChange('brand_id', value)}
                   placeholder="Select brand"
@@ -1015,6 +988,24 @@ const DashboardManage = () => {
                 required
               />
             </div>
+            {editRow && (
+              <div className="form-group form-group--full">
+                <label className="ui-label">Status</label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.is_active !== false}
+                  onClick={() => handleInputChange('is_active', formData.is_active === false)}
+                  className="mng-switch"
+                >
+                  <span className={`mng-switch__track ${formData.is_active !== false ? 'is-on' : ''}`}>
+                    <span className="mng-switch__dot" />
+                  </span>
+                  <span className="mng-switch__label">{formData.is_active !== false ? 'Active' : 'Inactive'}</span>
+                </button>
+                <p className="mng-note">Inactive items are hidden from product forms and shop filters. Nothing is ever deleted.</p>
+              </div>
+            )}
           </>
         );
       }

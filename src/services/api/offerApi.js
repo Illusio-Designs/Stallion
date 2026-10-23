@@ -32,6 +32,17 @@ export const updateOffer = async (offerId, offer) => {
   return result;
 };
 
+/** Admin: switch an offer on or off (never deletes). */
+export const setOfferActive = async (offerId, isActive) => {
+  const result = await apiRequest(`/offers/${offerId}/active`, {
+    method: 'PATCH',
+    body: { is_active: !!isActive },
+    includeAuth: true,
+  });
+  invalidateCache('offers');
+  return result;
+};
+
 /** Admin: delete an offer. */
 export const deleteOffer = async (offerId) => {
   const result = await apiRequest(`/offers/${offerId}`, {

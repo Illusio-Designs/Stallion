@@ -2,17 +2,17 @@ import React, { useEffect, useMemo, useState } from 'react';
 import AsidePanel from '../components/ui/AsidePanel';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import PagedMultiSelect from '../components/ui/PagedMultiSelect';
-import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getOffers,
   createOffer,
   updateOffer,
-  deleteOffer,
+  setOfferActive,
   getProductsPage,
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import '../styles/pages/dashboard-orders.css';
+import '../styles/redesign-n-offers.css';
 
 const TYPE_LABELS = { flat: 'Flat (whole order)', product: 'Product-wise', bogo: 'Buy X Get Y' };
 const TYPE_OPTIONS = [
@@ -120,7 +120,6 @@ const fmtDate = (d) => {
 };
 
 const DashboardOffers = () => {
-  const confirm = useConfirm();
   const [offers, setOffers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -249,20 +248,6 @@ const DashboardOffers = () => {
     }
   };
 
-  const handleDelete = async (offer) => {
-    if (!(await confirm(`Delete offer "${offer.title}"?`))) return;
-    setSaving(true);
-    try {
-      await deleteOffer(offer.offer_id);
-      showSuccess('Offer deleted');
-      await fetchOffers();
-    } catch (err) {
-      showError(err?.message || 'Failed to delete offer');
-    } finally {
-      setSaving(false);
-    }
-  };
-
   // Active / Inactive switch: optimistic, rolled back if the save fails.
   const [togglingId, setTogglingId] = useState(null);
   const handleToggle = async (offer) => {
@@ -272,15 +257,7 @@ const DashboardOffers = () => {
     setTogglingId(id);
     setOffers((list) => list.map((o) => (o.offer_id === id ? { ...o, is_active: next } : o)));
     try {
-      await updateOffer(id, {
-        offer_type: offer.offer_type,
-        title: offer.title,
-        is_active: next,
-        priority: Number(offer.priority) || 0,
-        start_date: offer.start_date || null,
-        end_date: offer.end_date || null,
-        config: offer.config || {},
-      });
+      await setOfferActive(id, next);
       showSuccess('', null, next ? 'Offer is active' : 'Offer switched off', `"${offer.title}" ${next ? 'is now shown to customers.' : 'is hidden. You can switch it back on any time.'}`);
     } catch (err) {
       setOffers((list) => list.map((o) => (o.offer_id === id ? { ...o, is_active: !next } : o)));
@@ -307,7 +284,7 @@ const DashboardOffers = () => {
         <div className="page-head">
           <div>
             <h1>Offers</h1>
-            <p>Discounts shown on the home page and in the cart. Switch one off to hide it without deleting it.</p>
+            <p>Discounts shown on the home page and in the cart. Switch one off to hide it; offers are never deleted.</p>
           </div>
           <div className="page-head__actions">
             <button className="ui-btn ui-btn--secondary" onClick={fetchOffers} disabled={loading}>Refresh</button>
@@ -329,8 +306,8 @@ const DashboardOffers = () => {
             <button className="ui-btn ui-btn--secondary" onClick={fetchOffers}>Try again</button>
           </div>
         ) : loading && offers.length === 0 ? (
-          <div className="offer-grid" aria-busy="true">
-            {[0, 1].map((i) => <div key={i} className="offer-card ui-skeleton" style={{ height: 220 }} />)}
+          <div className="nof-grid" aria-busy="true">
+            {[0, 1].map((i) => <div key={i} className="nof-card ui-skeleton" style={{ height: 160 }} />)}
           </div>
         ) : offers.length === 0 ? (
           <div className="dash-card ui-state ui-state--empty">
@@ -345,37 +322,30 @@ const DashboardOffers = () => {
             <button className="ui-btn ui-btn--primary" onClick={openAdd}>Add Offer</button>
           </div>
         ) : (
-          <div className="offer-grid">
+          <div className="nof-grid">
             {offers.map((o) => {
               const active = o.is_active !== false;
-              const img = o.image_url || o.banner_url || o.image;
               return (
-                <div className="offer-card" key={o.offer_id}>
-                  {img ? (
-                    <img className="offer-card__img" src={img} alt="" />
-                  ) : (
-                    <div className="offer-card__img offer-card__img--ph">{TYPE_LABELS[o.offer_type] || 'Offer'}</div>
-                  )}
-                  <div className="offer-card__row">
-                    <div className="offer-card__text">
-                      <h3>{o.title}</h3>
-                      <p>{validityLine(o)}</p>
+                <div className={`nof-card${active ? '' : ' nof-card--off'}`} key={o.offer_id}>
+                  <div className="nof-card__art">
+                    <span className="nof-card__type">{TYPE_LABELS[o.offer_type] || 'Offer'}</span>
+                    <span className="nof-card__title">{o.title}</span>
+                  </div>
+                  <div className="nof-card__body">
+                    <div className="nof-card__text">
+                      <b>{active ? 'Live' : 'Off'}</b>
+                      <small>{validityLine(o)}</small>
                     </div>
+                    <button className="ui-btn ui-btn--secondary nof-card__edit" onClick={() => openEdit(o)}>Edit</button>
                     <button
                       type="button"
                       role="switch"
                       aria-checked={active}
-                      aria-label={`${o.title}: ${active ? 'Active' : 'Inactive'}`}
+                      aria-label={`${o.title}: ${active ? 'Live' : 'Off'}`}
                       className={`tgl${active ? ' on' : ''}`}
                       disabled={togglingId === o.offer_id}
                       onClick={() => handleToggle(o)}
                     />
-                  </div>
-                  <div className="offer-card__foot">
-                    <span className={`pill ${active ? 'ok' : 'idle'}`}>{active ? 'Active' : 'Inactive'}</span>
-                    <div className="offer-card__actions">
-                      <button className="ui-btn ui-btn--secondary" onClick={() => openEdit(o)}>Edit</button>
-                    </div>
                   </div>
                 </div>
               );

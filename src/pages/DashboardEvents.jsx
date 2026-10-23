@@ -1,38 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import AsidePanel from '../components/ui/AsidePanel';
-import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getEvents,
   createEvent,
   updateEvent,
-  deleteEvent,
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import '../styles/pages/dashboard-orders.css';
-
-const EventStatus = {
-  ACTIVE: 'active',
-  COMPLETED: 'completed',
-  CANCELLED: 'cancelled'
-};
-
-// Helper function to get status label
-const getStatusLabel = (status) => {
-  switch (status?.toLowerCase()) {
-    case EventStatus.ACTIVE:
-      return 'Active';
-    case EventStatus.COMPLETED:
-      return 'Completed';
-    case EventStatus.CANCELLED:
-      return 'Cancelled';
-    default:
-      return status || 'Active';
-  }
-};
+import '../styles/redesign-n-events.css';
 
 const DashboardEvents = () => {
-  const confirm = useConfirm();
   const [when, setWhen] = useState('upcoming');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -180,24 +158,6 @@ const DashboardEvents = () => {
     }
   };
 
-  const handleDelete = async (row) => {
-    const eventId = row?.event_id || row?.id;
-    if (!eventId) return;
-    const confirmed = await confirm(`Delete event "${row.event_name}"?`);
-    if (!confirmed) return;
-    setSaving(true);
-    try {
-      await deleteEvent(eventId);
-      showSuccess('Event deleted successfully');
-      await fetchEvents();
-    } catch (err) {
-      const message = err.message || 'Failed to delete event';
-      showError(message);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const parseDay = (v) => {
     if (!v) return null;
     const d = new Date(v);
@@ -219,9 +179,12 @@ const DashboardEvents = () => {
   const shown = when === 'upcoming' ? upcoming : past;
 
   const statusPill = (e) => {
-    const st = String(e.event_status || EventStatus.ACTIVE).toLowerCase();
-    const cls = st === 'active' ? 'ok' : st === 'cancelled' ? 'bad' : 'idle';
-    return <span className={`pill ${cls}`}>{getStatusLabel(st)}</span>;
+    const past = isPast(e);
+    const st = String(e.event_status || '').toLowerCase();
+    if (past) return <span className="pill idle">Ended</span>;
+    const started = parseDay(e.start_date) && parseDay(e.start_date) <= new Date();
+    if (st === 'ongoing' || started) return <span className="pill ok">Running now</span>;
+    return <span className="pill info">Upcoming</span>;
   };
   const detailLine = (e) => {
     const s = parseDay(e.start_date);
@@ -231,7 +194,12 @@ const DashboardEvents = () => {
       const n = Math.round((en - s) / 86400000) + 1;
       if (n >= 1) days = `${n} ${n === 1 ? 'day' : 'days'}`;
     }
-    return [e.event_location, days].filter(Boolean).join(', ') || 'No location';
+    const line = [e.event_location, days].filter(Boolean).join(', ') || 'No location';
+    if (when === 'past') {
+      const n = Number(e.order_count) || 0;
+      return `${line} · ${n} ${n === 1 ? 'order' : 'orders'}`;
+    }
+    return line;
   };
 
   return (

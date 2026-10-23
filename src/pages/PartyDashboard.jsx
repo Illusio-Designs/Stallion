@@ -1,5 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import Skeleton from '../components/ui/Skeleton';
+import PageSkeleton from '../components/ui/PageSkeleton';
+import { MySalesmanCard } from '../components/home/HomeBlocks';
 import '../styles/pages/dashboard.css';
 import { getMyOrders, getProducts, getProductById } from '../services/apiService';
 import { getUser } from '../services/authService';
@@ -106,9 +108,13 @@ const PartyDashboard = () => {
     return statusMap[apiStatus?.toLowerCase()] || apiStatus?.toUpperCase() || 'PENDING';
   };
 
+  // First load: grey page shapes instead of empty cards. A retry after an error shows them again.
+  if (loading && orders.length === 0) return <PageSkeleton />;
+
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
+        <MySalesmanCard />
         {/* Summary Cards */}
         <div className="dash-row orders-summary grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
           <div className="dash-card metric orders-card col-span-1 sm:col-span-6 lg:col-span-3 bg-surface border border-border rounded-lg shadow-sm p-5">
