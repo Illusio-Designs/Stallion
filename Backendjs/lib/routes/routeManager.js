@@ -33,6 +33,7 @@ const salesmanTargetsRoutes = require('./salesman_targets');
 const salesmanCheckInsRoutes = require('./salesman_checkins');
 const offerRoutes = require('./offer');
 const adminRoutes = require('./admin');
+const dashboardRoutes = require('./dashboard');
 
 // One short line per request (no query string, so searches and phone numbers stay out of the log).
 router.use((req, res, next) => {
@@ -72,6 +73,7 @@ router.use('/salesman_targets', salesmanTargetsRoutes);
 router.use('/salesman_checkins', salesmanCheckInsRoutes);
 router.use('/offers', offerRoutes);
 router.use('/admin', adminRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 // API documentation route
 router.get('/docs', (req, res) => {

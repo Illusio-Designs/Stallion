@@ -1,13 +1,13 @@
 const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const Party = require('../models/Party');
-const { checkAddressProximity, checkGeofence } = require('../utils/geo');
+const { checkAddressProximity, checkGeofence, distanceMeters } = require('../utils/geo');
 const { ensurePartyCoords } = require('../utils/geocode');
 const Distributor = require('../models/distributor');
 const Salesman = require('../models/Salesman');
 const Product = require('../models/Product');
 const TrayProducts = require('../models/TrayProducts');
-const { TrayProductStatus, OrderStatus, OrderType } = require('../constants/enums');
+const { TrayProductStatus, OrderStatus, OrderStatusTransitions, OrderType } = require('../constants/enums');
 const { generateUniqueOrderNumber } = require('../services/order_number_generator');
 const Event = require('../models/event');
 const OrderOperation = require('../models/OrderOperation');
@@ -203,6 +203,10 @@ class OrderError extends Error {
         this.status = status;
     }
 }
+
+const statusLabel = (st) => String(st || '').replace(/_/g, ' ');
+const statusMoveMessage = (from, to) =>
+    `This order is ${statusLabel(from)}, so it cannot be changed to ${statusLabel(to)}.`;
 
 class OrderController {
 
@@ -841,6 +845,16 @@ class OrderController {
                     longitude,
                 };
 
+                // Distance at checkout: device position vs the party's saved shop
+                // location. Only stored when both are known.
+                if (party_id && latitude != null && longitude != null && latitude !== '' && longitude !== '') {
+                    const distParty = await Party.findOne({ where: { party_id }, attributes: ['latitude', 'longitude'], transaction });
+                    if (distParty && distParty.latitude != null && distParty.longitude != null) {
+                        const metres = distanceMeters(latitude, longitude, distParty.latitude, distParty.longitude);
+                        if (metres != null) orderData.distance_m = Math.round(metres);
+                    }
+                }
+
                 if (isPartyRequired && party_id) {
                     orderData.party_id = party_id;
                 }
@@ -950,6 +964,12 @@ class OrderController {
             if (currentStatus === OrderStatus.CANCELLED && order_status !== OrderStatus.CANCELLED) {
                 return res.status(400).json({ error: 'A cancelled order cannot be reopened. Place a new order instead.' });
             }
+            // Only valid moves are allowed (see OrderStatusTransitions). Re-sending
+            // "cancelled" on a cancelled order stays a harmless no-op, as before.
+            if (!(currentStatus === OrderStatus.CANCELLED && order_status === OrderStatus.CANCELLED)
+                && !(OrderStatusTransitions[currentStatus] || []).includes(order_status)) {
+                return res.status(409).json({ error: statusMoveMessage(currentStatus, order_status) });
+            }
             if (order_status === OrderStatus.DISPATCHED || order_status === OrderStatus.PARTIALLY_DISPATCHED) {
                 if (!courier_name || !courier_tracking_number) {
                     return res.status(400).json({ error: 'Courier name and tracking number are required' });
@@ -1015,6 +1035,50 @@ class OrderController {
         catch (error) {
             console.error('Error updating order status:', error);
             res.status(500).json({ error: 'Failed to update order status' });
+        }
+    }
+
+    async dispatchOrder(req, res) {
+        try {
+            if (!canManageOrders(req.userRoleNames)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const { id } = req.params;
+            const courierName = String(req.body?.courier_name ?? '').trim();
+            const trackingNumber = String(req.body?.courier_tracking_number ?? '').trim();
+            if (!courierName || !trackingNumber) {
+                return res.status(400).json({ error: 'Courier name and tracking number are required' });
+            }
+            if (courierName.length > 255 || trackingNumber.length > 255) {
+                return res.status(400).json({ error: 'Courier name and tracking number must be 255 characters or fewer' });
+            }
+            const order = await Order.findOne({ where: { order_id: id } });
+            if (!order) {
+                return res.status(404).json({ error: 'Order not found' });
+            }
+            const currentStatus = order.order_status;
+            if (!(OrderStatusTransitions[currentStatus] || []).includes(OrderStatus.DISPATCHED)) {
+                return res.status(409).json({ error: statusMoveMessage(currentStatus, OrderStatus.DISPATCHED) });
+            }
+            const oldSnapshot = order.toJSON();
+            order.courier_name = courierName;
+            order.courier_tracking_number = trackingNumber;
+            order.order_status = OrderStatus.DISPATCHED;
+            order.updated_at = new Date();
+            await order.save();
+            await logAudit({
+                req,
+                action: 'update',
+                description: 'Order marked dispatched',
+                tableName: 'order',
+                recordId: order.order_id,
+                oldValues: oldSnapshot,
+                newValues: order,
+            });
+            res.status(200).json(order);
+        } catch (error) {
+            console.error('Error dispatching order:', error);
+            res.status(500).json({ error: 'Failed to mark order dispatched' });
         }
     }
 

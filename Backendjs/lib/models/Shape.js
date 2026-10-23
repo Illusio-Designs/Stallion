@@ -17,6 +17,11 @@ const Shape = sequelize.define('Shape', {
         allowNull: false,
         unique: true
     }
+    ,is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    }
 }, {
     tableName: 'shape',
     timestamps: true,

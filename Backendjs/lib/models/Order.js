@@ -104,6 +104,13 @@ const Order = sequelize.define('Order', {
         type: DataTypes.DECIMAL(11, 8),
         allowNull: true
     },
+    // Metres between the device and the party's saved shop location when the
+    // order was placed. Null when the order carried no GPS or the party has no
+    // saved location.
+    distance_m: {
+        type: DataTypes.INTEGER,
+        allowNull: true
+    },
     created_at: {
         type: DataTypes.DATE,
         allowNull: false,

@@ -17,6 +17,11 @@ const FrameColor = sequelize.define('FrameColor', {
         allowNull: false,
         unique: true
     }
+    ,is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    }
 }, {
     tableName: 'frame_color',
     timestamps: true,

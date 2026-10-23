@@ -100,6 +100,31 @@ class OfferController {
         }
     }
 
+    // Admin: switch an offer on or off. Never deletes.
+    async setOfferActive(req, res) {
+        try {
+            const { id } = req.params;
+            const { is_active } = req.body || {};
+            if (typeof is_active !== 'boolean') {
+                return res.status(400).json({ error: 'is_active must be true or false' });
+            }
+            const offer = await Offer.findOne({ where: { offer_id: id } });
+            if (!offer) {
+                return res.status(404).json({ error: 'Offer not found' });
+            }
+            const oldSnapshot = offer.toJSON();
+            await Offer.update({ is_active }, { where: { offer_id: id } });
+            const updated = await Offer.findOne({ where: { offer_id: id } });
+            await logAudit({
+                req, action: 'update', description: is_active ? 'Offer switched on' : 'Offer switched off',
+                tableName: 'offer', recordId: id, oldValues: oldSnapshot, newValues: updated,
+            });
+            res.status(200).json(updated);
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async deleteOffer(req, res) {
         try {
             const { id } = req.params;

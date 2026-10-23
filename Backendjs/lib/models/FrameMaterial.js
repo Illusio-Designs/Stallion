@@ -17,6 +17,11 @@ const FrameMaterial = sequelize.define('FrameMaterial', {
         allowNull: false,
         unique: true
     }
+    ,is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    }
 }, {
     tableName: 'frame_material',
     timestamps: true,

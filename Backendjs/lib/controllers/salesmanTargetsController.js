@@ -213,7 +213,7 @@ class SalesmanTargetsController {
     async updateSalesmanTarget(req, res) {
         try {
             const { id } = req.params;
-            const { completed_amount, target_amount, start_date, end_date, order_type, target_description, target_remarks } = req.body;
+            const { completed_amount, target_amount, start_date, end_date, order_type, target_description, target_remarks, salesman_id } = req.body;
             let startDate = null;
             let endDate = null;
             if (start_date && end_date) {
@@ -236,13 +236,30 @@ class SalesmanTargetsController {
             if (!salesmanTarget) {
                 return res.status(404).json({ error: 'Salesman target not found' });
             }
+            // Once a target has started its start date, salesman and order type are locked;
+            // only the amount (and the notes / end date) can change.
+            const hasStarted = new Date(salesmanTarget.start_date).getTime() <= Date.now();
+            let lockedStart = start_date;
+            let lockedOrderType = order_type;
+            if (hasStarted) {
+                const sameDay = (a, b) => startOfDay(a).getTime() === startOfDay(b).getTime();
+                const normType = (v) => (v === undefined || v === null || v === '' ? null : String(v));
+                const startChanged = start_date && !sameDay(start_date, salesmanTarget.start_date);
+                const typeChanged = order_type !== undefined && normType(order_type) !== normType(salesmanTarget.order_type);
+                const partyChanged = salesman_id && String(salesman_id) !== String(salesmanTarget.salesman_id);
+                if (startChanged || typeChanged || partyChanged) {
+                    return res.status(409).json({ error: 'Date and party are locked once a target has started. Only the amount can change.' });
+                }
+                lockedStart = undefined;
+                lockedOrderType = undefined;
+            }
             const oldSnapshot = salesmanTarget.toJSON();
             const payload = {
                 completed_amount,
                 target_amount,
-                start_date,
+                start_date: lockedStart,
                 end_date,
-                order_type,
+                order_type: lockedOrderType,
                 target_description,
                 target_remarks,
                 updated_at: new Date(),
