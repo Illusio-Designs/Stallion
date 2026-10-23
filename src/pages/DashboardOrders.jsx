@@ -10,7 +10,7 @@ import {
   getOrdersForRole,
   updateOrderStatus,
   dispatchOrder,
-  returnOrderTrays,
+  markTrayTaskReceived,
   completeOrder,
   deleteOrder,
   getPartiesForRole,
@@ -92,6 +92,11 @@ const toInt = (v) => {
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
 };
 
+// Tray tasks of an order, without the cancelled ones.
+const getTrayTasksOf = (order) => (Array.isArray(order?.tasks) ? order.tasks : []).filter((t) => t && t.status !== 'cancelled');
+
+const TASK_PILL = { booked: 'Booked', in_transit: 'In transit', received: 'Received' };
+
 // Piece counts for an order. The server sends total/tray/held/shipped/ready;
 // older orders without them are derived from the items and the status.
 const getPieceCounts = (order) => {
@@ -107,7 +112,21 @@ const getPieceCounts = (order) => {
     ? toInt(order.ready_qty)
     : (status === 'processed' || status === 'partially_dispatched' ? Math.max(total - shipped - held, 0) : 0);
   const cancelled = status === 'cancelled' ? Math.max(total - shipped, 0) : 0;
-  return { total, shipped, ready: status === 'cancelled' ? 0 : ready, held: status === 'cancelled' ? 0 : held, cancelled, trayQty: toInt(order?.tray_qty) };
+  const tasks = getTrayTasksOf(order);
+  const taskSum = (state) => tasks.filter((t) => t.status === state).reduce((sum, t) => sum + toInt(t.qty), 0);
+  const inTransit = order?.in_transit_qty != null ? toInt(order.in_transit_qty) : taskSum('in_transit');
+  const receivedTray = order?.received_tray_qty != null ? toInt(order.received_tray_qty) : taskSum('received');
+  const gone = status === 'cancelled';
+  return {
+    total,
+    shipped,
+    ready: gone ? 0 : ready,
+    held: gone ? 0 : held,
+    inTransit: gone ? 0 : Math.min(inTransit, held),
+    receivedTray,
+    cancelled,
+    trayQty: toInt(order?.tray_qty),
+  };
 };
 
 const getShipments = (order) => {
@@ -136,7 +155,7 @@ const DashboardOrders = () => {
   const [cancelOther, setCancelOther] = useState('');
   const [cancelError, setCancelError] = useState('');
   const [receivedBy, setReceivedBy] = useState('');
-  const [busyAction, setBusyAction] = useState(''); // '' | process | dispatch | trays | complete | cancel
+  const [busyAction, setBusyAction] = useState(''); // '' | process | dispatch | recv:<taskId> | complete | cancel
   const [actionError, setActionError] = useState('');
   const [viewItems, setViewItems] = useState([]);
   const [viewItemsLoading, setViewItemsLoading] = useState(false);
@@ -159,7 +178,7 @@ const DashboardOrders = () => {
   const isDistributor = userRole === 'distributor';
   const isParty = userRole === 'party';
   const isSalesman = userRole === 'salesman';
-  // The tray manager can also tell the order that the sample trays came back.
+  // The tray manager can open the order panel to follow the frames coming back from trays.
   const canReturnTrays = useMemo(
     () => getUserRoles().some((r) => ['admin', 'order_manager', 'tray_manager'].includes(r)),
     []
@@ -188,6 +207,18 @@ const DashboardOrders = () => {
   }, [viewOrderId, viewOrderQtyKey]);
 
   // Fetch orders from API
+  // Keep the open panel in step with the refreshed list (e.g. after a tray task is received).
+  useEffect(() => {
+    setViewRow((cur) => {
+      const id = cur?.originalOrder?.order_id;
+      if (!id) return cur;
+      const fresh = orders.find((o) => o.order_id === id);
+      if (!fresh || fresh === cur.originalOrder) return cur;
+      const merged = { ...cur.originalOrder, ...fresh };
+      return { ...cur, status: mapApiStatusToUI(merged.order_status), originalOrder: merged };
+    });
+  }, [orders]);
+
   const fetchOrders = async (suppressError = false) => {
     try {
       setLoading(true);
@@ -585,7 +616,7 @@ const DashboardOrders = () => {
     if (!orderId) { showError('Order ID not found'); return; }
     if (!(await confirm({
       title: 'Process order',
-      message: 'Start processing this order? Pieces held by sample trays stay held until the trays are returned.',
+      message: 'Start processing this order? Pieces booked from sample trays are sent after the salesmen send them back and the office receives them.',
       confirmLabel: 'Process order',
     }))) return;
     await runAction('process', () => updateOrderStatus(orderId, { order_status: 'processed' }), 'Order processed', `${row.orderId || 'Order'} is now processing.`, 'processed');
@@ -624,7 +655,7 @@ const DashboardOrders = () => {
     if (!tracking) errs.tracking = 'Enter the tracking number.';
     if (!/^\d+$/.test(qtyText) || qty < 1) errs.qty = 'Pieces to send must be a whole number, 1 or more.';
     else if (qty > ready) errs.qty = held > 0
-      ? `Only ${ready} pieces are ready. The other ${held} are held by sample tray.`
+      ? `Only ${ready} pieces are ready. The other ${held} are still on their way from trays.`
       : `Only ${ready} pieces are ready to send.`;
     setDispatchErrors(errs);
     if (Object.keys(errs).length) return;
@@ -632,11 +663,23 @@ const DashboardOrders = () => {
     if (ok) { setDispatchCourier(''); setDispatchTracking(''); }
   };
 
-  const handleTraysReturned = async (row) => {
-    const orderId = orderIdOf(row);
-    if (!orderId) return;
-    const { held } = getPieceCounts(row.originalOrder);
-    await runAction('trays', () => returnOrderTrays(orderId), 'Trays returned', `${held} pieces are now ready to send.`);
+  // The office got the parcel from the salesman. The server answers with the task,
+  // so the list is refreshed and the open panel follows it (see the effect on `orders`).
+  const handleTrayReceived = async (task) => {
+    if (busyAction || !task?.task_id) return;
+    setBusyAction(`recv:${task.task_id}`);
+    setActionError('');
+    try {
+      await markTrayTaskReceived(task.task_id);
+      showSuccess('Marked received', null, 'Marked received', `${task.qty} pieces from ${task.tray_name || 'the tray'} are now ready to send.`);
+      await fetchOrders(true);
+    } catch (err) {
+      const message = errMessage(err, 'Could not mark this as received');
+      setActionError(message);
+      showError(message, null, 'Not updated', message);
+    } finally {
+      setBusyAction('');
+    }
   };
 
   const handleComplete = async (row) => {
@@ -803,6 +846,13 @@ const DashboardOrders = () => {
           ) : null;
           const sentLabel = `${counts.shipped} of ${counts.total} pieces`;
           const waiting = counts.ready + counts.held;
+          const trayTasks = getTrayTasksOf(order);
+          const allTrayReceived = trayTasks.length > 0 && trayTasks.every((t) => t.status === 'received');
+          const trayLine = counts.held
+            ? `${counts.held} still on the way (${counts.held - counts.inTransit} booked, ${counts.inTransit} in transit)`
+            : (trayTasks.length ? 'all received' : '');
+          const receivedPieces = counts.receivedTray || trayTasks.reduce((sum, t) => sum + toInt(t.qty), 0);
+          const openOrder = ['processed', 'partially_dispatched', 'hold_by_tray'].includes(apiStatus);
           const fieldsBody = (() => {
             if (apiStatus === 'pending') return [
               field('Pieces', counts.total ? `${counts.total} in total` : ''),
@@ -812,14 +862,13 @@ const DashboardOrders = () => {
             if (apiStatus === 'processed' || apiStatus === 'hold_by_tray') return [
               field('Processed', fmtDateTime(order?.processed_at)),
               field('Ready to send', `${counts.ready} pieces`),
-              field('Held by sample tray', counts.held ? `${counts.held} pieces` : (order?.tray_released_at ? `Released ${fmtDate(order.tray_released_at)}` : 'none')),
-              field('Trays returned', fmtDate(order?.tray_released_at)),
+              field('Tray pieces', trayLine),
             ];
             if (apiStatus === 'partially_dispatched') return [
               field('Shipments', shipmentList),
               field('Sent so far', sentLabel),
-              field('Still waiting', waiting ? `${waiting} pieces${counts.held ? ' (' + counts.held + ' held by sample tray)' : ' (ready to send)'}` : ''),
-              field('Trays returned', fmtDate(order?.tray_released_at)),
+              field('Still waiting', waiting ? `${waiting} pieces${counts.held ? ' (' + counts.held + ' still on the way from trays)' : ' (ready to send)'}` : ''),
+              field('Tray pieces', trayLine),
             ];
             if (apiStatus === 'dispatched') return [
               field('Shipments', shipmentList),
@@ -882,16 +931,18 @@ const DashboardOrders = () => {
 
               {counts.total > 0 && (
                 <div className="ordn-flow">
-                  <div className="ordn-bar" role="img" aria-label={`Pieces: ${counts.shipped} sent, ${counts.ready} ready, ${counts.held} held by sample tray${counts.cancelled ? `, ${counts.cancelled} cancelled` : ''}`}>
+                  <div className="ordn-bar" role="img" aria-label={`Pieces: ${counts.shipped} sent, ${counts.ready} ready, ${counts.inTransit} in transit to office, ${counts.held - counts.inTransit} booked in trays${counts.cancelled ? `, ${counts.cancelled} cancelled` : ''}`}>
                     {seg('sent', counts.shipped, 'sent')}
                     {seg('ready', counts.ready, 'ready to send')}
-                    {seg('held', counts.held, 'held by sample tray')}
+                    {seg('transit', counts.inTransit, 'in transit to office')}
+                    {seg('held', counts.held - counts.inTransit, 'booked in trays')}
                     {seg('canc', counts.cancelled, 'cancelled')}
                   </div>
                   <div className="ordn-legend">
                     <span><i className="ordn-dot ordn-dot--sent" />Sent {counts.shipped}</span>
                     <span><i className="ordn-dot ordn-dot--ready" />Ready to send {counts.ready}</span>
-                    <span><i className="ordn-dot ordn-dot--held" />Held by sample tray {counts.held}</span>
+                    <span><i className="ordn-dot ordn-dot--transit" />In transit to office {counts.inTransit}</span>
+                    <span><i className="ordn-dot ordn-dot--held" />Booked in trays {counts.held - counts.inTransit}</span>
                     {counts.cancelled > 0 && <span><i className="ordn-dot ordn-dot--canc" />Cancelled {counts.cancelled}</span>}
                   </div>
                 </div>
@@ -903,6 +954,41 @@ const DashboardOrders = () => {
               </div>
 
               {actionError && <p className="ordn-dispatch__err" role="alert">{actionError}</p>}
+
+              {openOrder && counts.held > 0 && (
+                <div className="ordn-banner ordn-banner--wait" role="status">
+                  {counts.held} pieces are still on their way from trays.{counts.ready > 0 ? ` You can dispatch the ${counts.ready} ready pieces now.` : ''}
+                </div>
+              )}
+              {openOrder && allTrayReceived && counts.held === 0 && counts.ready > 0 && (
+                <div className="ordn-banner ordn-banner--go" role="status">
+                  All {receivedPieces} tray pieces were received. The order is ready to dispatch.
+                </div>
+              )}
+
+              {trayTasks.length > 0 && !['cancelled', 'completed'].includes(apiStatus) && !(allTrayReceived && apiStatus === 'dispatched') && (
+                <div className="ordn-tasks">
+                  <h5 className="ord-view__section-title">Frames coming back from trays</h5>
+                  {trayTasks.map((t) => {
+                    const pill = t.status === 'booked' ? `Booked, waiting for ${t.salesman_name || 'salesman'}` : (TASK_PILL[t.status] || t.status);
+                    const courierLine = [t.courier_name, t.tracking_number].filter(Boolean).join(', ');
+                    return (
+                      <div className="ordn-task" key={t.task_id}>
+                        <div className="ordn-task__head">
+                          <b>{[t.tray_name, t.salesman_name].filter(Boolean).join(' · ') || 'Tray'}</b>
+                          <span className={`ordn-pill ordn-pill--${t.status}`}>{pill}</span>
+                        </div>
+                        <div className="ordn-task__meta">{toInt(t.qty)} pieces{courierLine ? ` · ${courierLine}` : ''}</div>
+                        {canEditOrder && t.status === 'in_transit' && (
+                          <Button variant="secondary" onClick={() => handleTrayReceived(t)} disabled={busy}>
+                            {busyAction === `recv:${t.task_id}` ? 'Saving…' : 'Mark received'}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {canEditOrder && apiStatus === 'pending' && (
                 <div className="ordn-actions">
@@ -960,16 +1046,6 @@ const DashboardOrders = () => {
                   </div>
                   <Button type="submit" variant="secondary" disabled={busy}>{busyAction === 'dispatch' ? 'Dispatching…' : 'Dispatch ready pieces'}</Button>
                 </form>
-              )}
-
-              {canReturnTrays && counts.held > 0 && !['cancelled', 'completed'].includes(apiStatus) && (
-                <div className="ordn-notice" role="status">
-                  <b>{counts.held} pieces are held by sample tray.</b>
-                  <span>They can only be sent after the trays are returned.</span>
-                  <Button variant="secondary" onClick={() => handleTraysReturned(viewRow)} disabled={busy}>
-                    {busyAction === 'trays' ? 'Saving…' : `Trays returned the ${counts.held} pieces`}
-                  </Button>
-                </div>
               )}
 
               {canEditOrder && apiStatus === 'dispatched' && (

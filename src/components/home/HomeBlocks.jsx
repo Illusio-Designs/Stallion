@@ -7,9 +7,11 @@ import { FiMapPin, FiShoppingCart, FiUsers, FiPackage, FiCreditCard, FiNavigatio
 import { captureCurrentPosition, distanceMeters, GEOFENCE_RADIUS_M } from '../../utils/geolocation';
 import { createSalesmanCheckin } from '../../services/api/salesmanApi';
 import { getMySalesman } from '../../services/api/dashboardApi';
+import { getTrayTasks, markTrayTaskInTransit } from '../../services/api/inventoryApi';
 import { queueCheckin, isNetworkError } from '../../services/offlineQueue';
 import { showError, showSuccess, showInfo } from '../../services/notificationService';
 import '../../styles/redesign-n-home.css';
+import '../../styles/redesign-n-tasks.css';
 
 const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const shortRupee = (n) => {
@@ -359,6 +361,151 @@ export function MySalesmanCard({ plural = false }) {
             </li>
           ))}
         </ul>
+      )}
+    </section>
+  );
+}
+
+// ---------- Salesman: frames to send back from a sample tray ----------
+const TASK_COURIERS = ['Delhivery', 'Blue Dart', 'DTDC', 'India Post', 'Other'];
+
+function TrayTaskForm({ task, onDone }) {
+  const [courier, setCourier] = useState(TASK_COURIERS[0]);
+  const [other, setOther] = useState('');
+  const [tracking, setTracking] = useState('');
+  const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false);
+  const id = String(task.task_id);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (busy) return;
+    const name = courier === 'Other' ? other.trim() : courier;
+    const number = tracking.trim();
+    const errs = {};
+    if (!name) errs.courier = 'Enter the courier name.';
+    if (!number) errs.tracking = 'Enter the tracking number.';
+    setErrors(errs);
+    if (Object.keys(errs).length) return;
+    setBusy(true);
+    try {
+      await markTrayTaskInTransit(task.task_id, { courier_name: name, tracking_number: number });
+      showSuccess('Marked in transit');
+      onDone();
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || 'Could not save the courier details.';
+      showError(message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <form className="rdt-form" noValidate onSubmit={submit}>
+      <div className="rdt-banner rdt-banner--act">
+        New task: send {task.qty} pieces of {task.model_no || 'the model'} from {task.tray_name || 'your tray'} back to the office by courier, then enter the courier details here.
+      </div>
+      <div className="rdt-fields">
+        <label className="rdt-field" htmlFor={`rdt-c-${id}`}>
+          <span>Courier</span>
+          <select id={`rdt-c-${id}`} value={courier} disabled={busy} onChange={(e) => { setCourier(e.target.value); setErrors((x) => ({ ...x, courier: undefined })); }}>
+            {TASK_COURIERS.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+        {courier === 'Other' && (
+          <label className="rdt-field" htmlFor={`rdt-o-${id}`}>
+            <span>Courier name</span>
+            <input id={`rdt-o-${id}`} type="text" value={other} maxLength={255} disabled={busy} aria-invalid={!!errors.courier} onChange={(e) => { setOther(e.target.value); setErrors((x) => ({ ...x, courier: undefined })); }} />
+            {errors.courier && <small className="rdt-err" role="alert">{errors.courier}</small>}
+          </label>
+        )}
+        <label className="rdt-field" htmlFor={`rdt-t-${id}`}>
+          <span>Tracking number</span>
+          <input id={`rdt-t-${id}`} type="text" placeholder="Enter the number" value={tracking} maxLength={255} disabled={busy} aria-invalid={!!errors.tracking} onChange={(e) => { setTracking(e.target.value); setErrors((x) => ({ ...x, tracking: undefined })); }} />
+          {errors.tracking && <small className="rdt-err" role="alert">{errors.tracking}</small>}
+        </label>
+      </div>
+      <button type="submit" className="rda-btn rda-btn--sm rdt-submit" disabled={busy}>{busy ? 'Saving…' : 'Mark in transit'}</button>
+    </form>
+  );
+}
+
+export function MyTrayTasksCard() {
+  const [tasks, setTasks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const load = useCallback(async (quiet = false) => {
+    if (!quiet) setLoading(true);
+    setError('');
+    try {
+      const list = await getTrayTasks('all');
+      setTasks(Array.isArray(list) ? list : []);
+    } catch (e) {
+      setError(e?.message || 'Could not load your tasks.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // A new task can arrive while the dashboard stays open: refresh when the tab is shown again.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === 'visible') load(true); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [load]);
+
+  const open = tasks.filter((t) => t.status === 'booked');
+  const transit = tasks.filter((t) => t.status === 'in_transit');
+  const received = tasks
+    .filter((t) => t.status === 'received')
+    .sort((a, b) => new Date(b.received_at || 0) - new Date(a.received_at || 0))
+    .slice(0, 3);
+  const count = open.length + transit.length;
+  const head = (t) => `${t.tray_name || 'Tray'}: ${t.qty} pieces${t.order_number ? `, order ${String(t.order_number).startsWith('#') ? '' : '#'}${t.order_number}` : ''}`;
+
+  return (
+    <section className="rda-card rdt" aria-label="My tray tasks">
+      <div className="rda-card__head">
+        <div><h2>My tray tasks{count > 0 && <span className="rdt-count" aria-label={`${count} open`}>{count}</span>}</h2><p>Frames booked from your sample trays that go back to the office</p></div>
+      </div>
+      {loading ? (
+        <div className="rdt-list" aria-busy="true"><Skeleton width="100%" height={64} radius={10} /><Skeleton width="100%" height={64} radius={10} /></div>
+      ) : error ? (
+        <CardError text={error} onRetry={() => load()} />
+      ) : tasks.length === 0 ? (
+        <p className="rdt-none">No tasks right now</p>
+      ) : (
+        <div className="rdt-list">
+          {open.length === 0 && transit.length === 0 && <p className="rdt-none">No tasks right now</p>}
+          {open.map((t) => (
+            <div className="rdt-task" key={t.task_id}>
+              <div className="rdt-task__head"><b>{head(t)}</b><span className="rdt-pill">To send</span></div>
+              {t.party_name && <div className="rdt-task__meta">{t.party_name}</div>}
+              <TrayTaskForm task={t} onDone={() => load(true)} />
+            </div>
+          ))}
+          {transit.map((t) => (
+            <div className="rdt-task" key={t.task_id}>
+              <div className="rdt-task__head"><b>{head(t)}</b><span className="rdt-pill rdt-pill--transit">In transit</span></div>
+              <div className="rdt-banner rdt-banner--wait">
+                In transit with {t.courier_name || 'the courier'}, tracking {t.tracking_number || 'not given'}. The office will mark it received.
+              </div>
+            </div>
+          ))}
+          {received.length > 0 && (
+            <div className="rdt-done">
+              <h3>Received</h3>
+              {received.map((t) => (
+                <div className="rdt-task rdt-task--done" key={t.task_id}>
+                  <div className="rdt-task__head"><b>{head(t)}</b><span className="rdt-pill rdt-pill--done">Received</span></div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </section>
   );

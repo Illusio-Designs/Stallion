@@ -4,11 +4,13 @@ import { FiMaximize, FiMinimize, FiBell, FiMenu, FiSidebar } from './icons/hugei
 import Tooltip from './ui/Tooltip';
 import InstallAppButton from './InstallAppButton';
 import { resolveProfileImageUrl } from '../utils/profileImage';
-import { logout as authLogout, getUser } from '../services/authService';
+import { logout as authLogout, getUser, getUserRole } from '../services/authService';
 import { showLogoutSuccess } from '../services/notificationService';
 import { getMe } from '../services/apiService';
+import { getNotifications, markNotificationsRead } from '../services/api/notificationsApi';
 import GlobalSearchResults from './GlobalSearchResults';
 import GooeySearch from './ui/GooeySearch';
+import '../styles/redesign-n-tasks.css';
 
 const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuToggle, onToggleSidebar }) => {
   const [userName, setUserName] = useState('');
@@ -16,6 +18,65 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const userMenuRef = useRef(null);
+
+  // Notification bell: unread count, a dropdown with the latest ones, polled every 60 s and on focus.
+  const [notes, setNotes] = useState([]);
+  const [unread, setUnread] = useState(0);
+  const [isBellOpen, setIsBellOpen] = useState(false);
+  const [notesError, setNotesError] = useState(false);
+  const bellRef = useRef(null);
+  const bellBtnRef = useRef(null);
+  const loadNotes = React.useCallback(async () => {
+    try {
+      const res = await getNotifications();
+      setNotes(res.data);
+      setUnread(res.unread_count);
+      setNotesError(false);
+    } catch (_e) {
+      setNotesError(true); // keep what we had; the bell must never break the header
+    }
+  }, []);
+  useEffect(() => {
+    if (!getUser()) return undefined;
+    loadNotes();
+    const timer = setInterval(() => { if (document.visibilityState !== 'hidden') loadNotes(); }, 60000);
+    const onFocus = () => loadNotes();
+    window.addEventListener('focus', onFocus);
+    return () => { clearInterval(timer); window.removeEventListener('focus', onFocus); };
+  }, [loadNotes]);
+  useEffect(() => {
+    if (!isBellOpen) return undefined;
+    const onDown = (e) => { if (bellRef.current && !bellRef.current.contains(e.target)) setIsBellOpen(false); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { setIsBellOpen(false); if (bellBtnRef.current) bellBtnRef.current.focus(); }
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [isBellOpen]);
+  const markAllRead = async () => {
+    const before = { notes, unread };
+    setNotes((list) => list.map((n) => (n.read_at ? n : { ...n, read_at: new Date().toISOString() })));
+    setUnread(0);
+    try { await markNotificationsRead({ all: true }); } catch (_e) { setNotes(before.notes); setUnread(before.unread); }
+  };
+  // A task notification opens the page where the task lives: the dashboard for a salesman, the orders page for the office.
+  const openNote = async (n) => {
+    setIsBellOpen(false);
+    if (!n.read_at) {
+      setNotes((list) => list.map((x) => (x.notification_id === n.notification_id ? { ...x, read_at: new Date().toISOString() } : x)));
+      setUnread((c) => Math.max(0, c - 1));
+      try { await markNotificationsRead({ ids: [n.notification_id] }); } catch (_e) { /* the next poll corrects the count */ }
+    }
+    if (onPageChange && (n.order_id || /task|tray|order/i.test(String(n.kind || '')))) {
+      onPageChange(getUserRole() === 'salesman' ? 'dashboard' : 'orders');
+    }
+  };
+  const noteTime = (v) => {
+    const d = v ? new Date(v) : null;
+    if (!d || Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  };
 
   // Broadcast the search query — one event for desktop and phone, so every page filters the same way.
   const [globalQuery, setGlobalQuery] = useState('');
@@ -265,11 +326,49 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
 
           <div className="dashboard-action-icons flex items-center gap-2">
             <InstallAppButton />
-            <Tooltip label="Notifications" placement="bottom">
-              <button className="dashboard-icon-btn bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]" aria-label="Notifications">
-                <FiBell size={20} aria-hidden="true" />
-              </button>
-            </Tooltip>
+            <div className="rdb" ref={bellRef}>
+              <Tooltip label="Notifications" placement="bottom">
+                <button
+                  ref={bellBtnRef}
+                  type="button"
+                  className="dashboard-icon-btn bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]"
+                  aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
+                  aria-haspopup="true"
+                  aria-expanded={isBellOpen}
+                  aria-controls="rdb-panel"
+                  onClick={() => { setIsBellOpen((v) => !v); if (!isBellOpen) loadNotes(); }}
+                >
+                  <FiBell size={20} aria-hidden="true" />
+                  {unread > 0 && <span className="rdb-badge" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>}
+                </button>
+              </Tooltip>
+              {isBellOpen && (
+                <div className="rdb-panel" id="rdb-panel" role="region" aria-label="Notifications">
+                  <div className="rdb-panel__head">
+                    <h2>Notifications</h2>
+                    <button type="button" className="rdb-link" onClick={markAllRead} disabled={unread === 0}>Mark all read</button>
+                  </div>
+                  {notes.length === 0 ? (
+                    <p className="rdb-empty">{notesError ? 'Could not load notifications.' : 'No notifications'}</p>
+                  ) : (
+                    <ul className="rdb-list">
+                      {[...notes].sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0)).map((n) => (
+                        <li key={n.notification_id}>
+                          <button type="button" className={`rdb-item${n.read_at ? '' : ' rdb-item--unread'}`} onClick={() => openNote(n)}>
+                            <span className="rdb-dot" aria-hidden="true" />
+                            <span className="rdb-item__body">
+                              <span>{n.title}</span>
+                              {n.message && <span className="rdb-item__msg">{n.message}</span>}
+                              <span className="rdb-item__time">{noteTime(n.created_at)}{n.read_at ? '' : ' · Unread'}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
             <Tooltip label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} placement="bottom">
               <button className="dashboard-icon-btn bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]" aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} onClick={toggleFullscreen}>
                 {isFullscreen ? <FiMinimize size={20} /> : <FiMaximize size={20} />}

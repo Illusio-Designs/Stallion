@@ -8,7 +8,7 @@ import '../styles/pages/dashboard.css';
 import OrdersPerDayChart from '../components/charts/OrdersPerDayChart';
 import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets, getTrays } from '../services/apiService';
 import { getDashboardSummary } from '../services/api/dashboardApi';
-import { SalesRevenueCard, QuickActionsCard, OrderOverviewCard, FieldCard, ShopCheckInCard, MySalesmanCard } from '../components/home/HomeBlocks';
+import { SalesRevenueCard, QuickActionsCard, OrderOverviewCard, FieldCard, ShopCheckInCard, MySalesmanCard, MyTrayTasksCard } from '../components/home/HomeBlocks';
 import { getUserRole, getUserRoles, getUser } from '../services/authService';
 import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiPackage, FiInbox } from '../components/icons/hugeicons';
 import RupeeIcon from '../components/icons/RupeeIcon';
@@ -668,6 +668,8 @@ const Dashboard = () => {
             </section>
           </div>
         )}
+
+        {isSalesman && <MyTrayTasksCard />}
 
         {isSalesman && <ShopCheckInCard parties={ownParties} salesmanId={mySalesmanId || user?.salesman_id || null} loading={loading && ownParties.length === 0} />}
 
