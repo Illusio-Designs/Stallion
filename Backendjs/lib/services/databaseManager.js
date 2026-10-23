@@ -433,6 +433,8 @@ class DatabaseManager {
             require('../models/event');
             require('../models/Order');
             require('../models/OrderShipment');
+            require('../models/TrayReturnTask');
+            require('../models/Notification');
             require('../models/SalesmanExpense');
             require('../models/SalesmanTargets');
             require('../models/SalesmanCheckIns');
@@ -470,7 +472,7 @@ class DatabaseManager {
             const modelSyncOrder = ['Country', 'State', 'Cities', 'Zone', 'Party', 'Distributor', 'Salesman',
                 'ColorCode', 'FrameColor', 'FrameMaterial', 'FrameType', 'Gender', 'LensColor',
                 'LensMaterial', 'Shape', 'Brand', 'Collection', 'Product', 'Tray', 'SalesmanTray',
-                'TrayProducts', 'Event', 'Order', 'OrderOperation', 'OrderShipment', 'SalesmanExpense', 'SalesmanTargets', 'SalesmanCheckIns', 'DistributorZones', 'SalesmanZones', 'SalesmanStates', 'DistributorStates'];
+                'TrayProducts', 'Event', 'Order', 'OrderOperation', 'OrderShipment', 'TrayReturnTask', 'Notification', 'SalesmanExpense', 'SalesmanTargets', 'SalesmanCheckIns', 'DistributorZones', 'SalesmanZones', 'SalesmanStates', 'DistributorStates'];
 
             // Sync all models except the manually managed ones
             console.log('🔄 Syncing Sequelize models (excluding manually managed tables)...');

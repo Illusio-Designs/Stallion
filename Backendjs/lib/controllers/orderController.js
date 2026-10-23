@@ -12,6 +12,10 @@ const { generateUniqueOrderNumber } = require('../services/order_number_generato
 const Event = require('../models/event');
 const OrderOperation = require('../models/OrderOperation');
 const OrderShipment = require('../models/OrderShipment');
+const TrayReturnTask = require('../models/TrayReturnTask');
+const Notification = require('../models/Notification');
+const Tray = require('../models/Tray');
+const SalesmanTray = require('../models/SalesmanTray');
 const SalesmanCheckIns = require('../models/SalesmanCheckIns');
 const Offer = require('../models/Offer');
 const { isOfferActive, offerScopeMatches, applyOfferToItems } = require('../utils/offerPricing');
@@ -48,18 +52,23 @@ function sumItemQty(items) {
         : 0;
 }
 
-// Adds the dispatch figures to plain order objects. Two grouped queries for the
-// whole page (shipments and tray pieces), never one per order.
-//   total_qty    pieces ordered
-//   tray_qty     pieces booked from sample trays when the order was placed
-//   held_qty     tray pieces still waiting (0 once trays returned, or once the order is
-//                dispatched / completed / cancelled)
-//   shipped_qty  pieces already sent in shipments
-//   ready_qty    pieces that can be sent right now
+// Adds the dispatch figures to plain order objects. A few grouped queries for the
+// whole page (shipments, tray pieces, tray tasks), never one per order.
+//   total_qty         pieces ordered
+//   tray_qty          pieces booked from sample trays when the order was placed
+//   tasks             one per tray part: who must send it back and where it is now
+//   held_qty          tray pieces not yet received at the office (tasks booked or in transit);
+//                     0 once dispatched / completed / cancelled. Orders placed before tray tasks
+//                     existed have no tasks, so they hold nothing (they are not blocked).
+//   in_transit_qty    pieces on a courier right now
+//   received_tray_qty pieces the office has received back from trays
+//   shipped_qty       pieces already sent in shipments
+//   ready_qty         pieces that can be sent right now
 async function decorateOrders(plainOrders, { transaction } = {}) {
     const ids = plainOrders.map((o) => o.order_id).filter(Boolean);
     const shipmentsByOrder = {};
     const trayByOrder = {};
+    const tasksByOrder = {};
     if (ids.length) {
         const shipments = await OrderShipment.findAll({
             where: { order_id: ids },
@@ -83,18 +92,71 @@ async function decorateOrders(plainOrders, { transaction } = {}) {
             transaction,
         });
         ops.forEach((r) => { trayByOrder[r.order_id] = Number(r.tray_sum) || 0; });
+
+        const tasks = await TrayReturnTask.findAll({
+            where: { order_id: ids },
+            order: [['created_at', 'ASC']],
+            transaction,
+        });
+        if (tasks.length) {
+            const names = await taskNameMaps(tasks, transaction);
+            tasks.forEach((t) => {
+                (tasksByOrder[t.order_id] = tasksByOrder[t.order_id] || []).push(shapeTask(t, names));
+            });
+        }
     }
     return plainOrders.map((o) => {
         const total_qty = sumItemQty(o.order_items);
         const tray_qty = trayByOrder[o.order_id] || 0;
         const shipments = shipmentsByOrder[o.order_id] || [];
+        const tasks = tasksByOrder[o.order_id] || [];
         const shipped_qty = shipments.reduce((s, sh) => s + sh.qty, 0);
-        const held_qty = (o.tray_released_at || NO_HELD_STATUSES.includes(o.order_status)) ? 0 : tray_qty;
+        const sumQty = (statuses) => tasks.filter((t) => statuses.includes(t.status)).reduce((s, t) => s + t.qty, 0);
+        const terminal = NO_HELD_STATUSES.includes(o.order_status);
+        const held_qty = terminal ? 0 : sumQty(['booked', 'in_transit']);
+        const in_transit_qty = sumQty(['in_transit']);
+        const received_tray_qty = sumQty(['received']);
         const ready_qty = READY_STATUSES.includes(o.order_status)
             ? Math.max(0, total_qty - shipped_qty - held_qty)
             : 0;
-        return { ...o, total_qty, tray_qty, held_qty, shipped_qty, ready_qty, shipments };
+        return { ...o, total_qty, tray_qty, held_qty, in_transit_qty, received_tray_qty, shipped_qty, ready_qty, shipments, tasks };
     });
+}
+
+// Names for a batch of tasks (tray, salesman, model) in three queries.
+async function taskNameMaps(tasks, transaction) {
+    const uniq = (key) => [...new Set(tasks.map((t) => t[key]).filter(Boolean))];
+    const trayIds = uniq('tray_id');
+    const salesmanIds = uniq('salesman_id');
+    const productIds = uniq('product_id');
+    const [trays, salesmen, products] = await Promise.all([
+        trayIds.length ? Tray.findAll({ where: { tray_id: trayIds }, attributes: ['tray_id', 'tray_name'], transaction }) : [],
+        salesmanIds.length ? Salesman.findAll({ where: { salesman_id: salesmanIds }, attributes: ['salesman_id', 'full_name'], transaction }) : [],
+        productIds.length ? Product.findAll({ where: { product_id: productIds }, attributes: ['product_id', 'model_no'], transaction }) : [],
+    ]);
+    const map = { tray: {}, salesman: {}, product: {} };
+    trays.forEach((r) => { map.tray[r.tray_id] = r.tray_name; });
+    salesmen.forEach((r) => { map.salesman[r.salesman_id] = r.full_name; });
+    products.forEach((r) => { map.product[r.product_id] = r.model_no; });
+    return map;
+}
+
+function shapeTask(t, names) {
+    return {
+        task_id: t.task_id,
+        tray_id: t.tray_id,
+        tray_name: names.tray[t.tray_id] || null,
+        salesman_id: t.salesman_id,
+        salesman_name: names.salesman[t.salesman_id] || null,
+        product_id: t.product_id,
+        model_no: names.product[t.product_id] || null,
+        qty: Number(t.qty) || 0,
+        status: t.status,
+        courier_name: t.courier_name,
+        tracking_number: t.tracking_number,
+        in_transit_at: t.in_transit_at,
+        received_at: t.received_at,
+    };
 }
 
 async function decorateOrder(order, opts) {
@@ -127,6 +189,92 @@ async function mapOrdersWithPartyName(orders) {
                 : null,
         };
     });
+}
+
+// ---- Sample tray return tasks and notifications -------------------------------------------
+
+async function notify({ transaction, userId = null, targetRole = null, title, message, kind, orderId = null }) {
+    await Notification.create({
+        user_id: userId,
+        target_role: userId ? null : targetRole,
+        title,
+        message,
+        kind,
+        order_id: orderId,
+        created_at: new Date(),
+    }, { transaction });
+}
+
+// The salesman who holds a tray right now (latest assignment), with their login user id.
+async function currentTrayHolder(trayId, transaction) {
+    const link = await SalesmanTray.findOne({ where: { tray_id: trayId }, order: [['assigned_at', 'DESC']], transaction });
+    if (!link) return null;
+    const sm = await Salesman.findOne({ where: { salesman_id: link.salesman_id }, attributes: ['salesman_id', 'user_id', 'full_name'], transaction });
+    return sm || null;
+}
+
+async function createTrayTask({ transaction, order, productId, modelNo, trayId, qty }) {
+    const holder = await currentTrayHolder(trayId, transaction);
+    const tray = await Tray.findOne({ where: { tray_id: trayId }, attributes: ['tray_name'], transaction });
+    const trayName = tray ? tray.tray_name : 'your tray';
+    await TrayReturnTask.create({
+        order_id: order.order_id,
+        product_id: productId,
+        tray_id: trayId,
+        salesman_id: holder ? holder.salesman_id : null,
+        qty,
+        status: 'booked',
+    }, { transaction });
+    await notify({
+        transaction,
+        userId: holder ? holder.user_id : null,
+        targetRole: 'office',
+        title: 'New task: send frames back',
+        message: `New task: send ${qty} pieces of ${modelNo || 'the frame'} from ${trayName} back to the office (order ${order.order_number})`,
+        kind: 'tray_task',
+        orderId: order.order_id,
+    });
+}
+
+// Called inside the cancel transaction: open tasks become cancelled and the salesmen are told.
+async function cancelTrayTasks(order, transaction) {
+    const open = await TrayReturnTask.findAll({
+        where: { order_id: order.order_id, status: ['booked', 'in_transit'] },
+        transaction,
+    });
+    if (!open.length) return;
+    const salesmanIds = [...new Set(open.map((t) => t.salesman_id).filter(Boolean))];
+    const salesmen = salesmanIds.length
+        ? await Salesman.findAll({ where: { salesman_id: salesmanIds }, attributes: ['salesman_id', 'user_id'], transaction })
+        : [];
+    const userBySalesman = {};
+    salesmen.forEach((sm) => { userBySalesman[sm.salesman_id] = sm.user_id; });
+    const now = new Date();
+    let notifyOffice = false;
+    const notifiedUsers = new Set();
+    for (const t of open) {
+        t.status = 'cancelled';
+        t.updated_at = now;
+        await t.save({ transaction });
+        const uid = t.salesman_id ? userBySalesman[t.salesman_id] : null;
+        if (!uid) { notifyOffice = true; continue; }
+        if (notifiedUsers.has(uid)) continue;
+        notifiedUsers.add(uid);
+        await notify({
+            transaction, userId: uid,
+            title: 'Order cancelled',
+            message: `Order ${order.order_number} was cancelled. Keep the frames in your tray.`,
+            kind: 'order_cancelled', orderId: order.order_id,
+        });
+    }
+    if (notifyOffice) {
+        await notify({
+            transaction, targetRole: 'office',
+            title: 'Order cancelled',
+            message: `Order ${order.order_number} was cancelled. Keep the frames in your tray.`,
+            kind: 'order_cancelled', orderId: order.order_id,
+        });
+    }
 }
 
 // Helper function to reverse an order operation (does not depend on controller instance)
@@ -953,6 +1101,26 @@ class OrderController {
                     }, { transaction });
                 }
 
+                // Sample-tray parts: one return task per tray part, and tell the salesman holding
+                // that tray (or the office when nobody holds it) to send the frames back.
+                const modelByProduct = {};
+                resolvedOrderItems.forEach((it) => { modelByProduct[it.product_id] = it.model_no; });
+                for (const operationData of orderOperationsToCreate) {
+                    const parts = Array.isArray(operationData.tray_ids) ? operationData.tray_ids : [];
+                    for (const part of parts) {
+                        const partQty = Number(part && part.qty) || 0;
+                        if (!part || !part.tray_id || partQty < 1) continue;
+                        await createTrayTask({
+                            transaction,
+                            order,
+                            productId: operationData.product_id,
+                            modelNo: modelByProduct[operationData.product_id],
+                            trayId: part.tray_id,
+                            qty: partQty,
+                        });
+                    }
+                }
+
                 // Count the order toward the assigned salesman's target — for any
                 // order that has a salesman_id, regardless of who placed it.
                 if (order.salesman_id) {
@@ -1066,6 +1234,7 @@ class OrderController {
                     const sent = await OrderShipment.sum('qty', { where: { order_id: locked.order_id }, transaction });
                     if (Number(sent) > 0) return 'shipped';
                     await reverseOrderOperation(locked.order_id, transaction, req.user);
+                    await cancelTrayTasks(locked, transaction);
                     locked.order_status = OrderStatus.CANCELLED;
                     locked.cancel_reason = cancelReason;
                     locked.cancelled_by = user ? user.user_id : null;
@@ -1186,45 +1355,170 @@ class OrderController {
         }
     }
 
-    // POST /:id/trays-returned  Sample trays handed back the held pieces; they become ready.
-    async traysReturned(req, res) {
+    // GET /tray-tasks?status=open|all  Salesman: own tasks. Admin / order manager / tray manager: all.
+    async getTrayTasks(req, res) {
         try {
-            if (!hasRole(req.userRoleNames, TRAY_RETURN_ROLES)) {
+            const roles = req.userRoleNames;
+            const where = {};
+            if (!hasRole(roles, TRAY_RETURN_ROLES)) {
+                if (!hasRole(roles, ['salesman'])) return res.status(403).json({ error: 'Access denied' });
+                const sm = await Salesman.findOne({ where: { user_id: req.user.user_id }, attributes: ['salesman_id'] });
+                if (!sm) return res.status(200).json([]);
+                where.salesman_id = sm.salesman_id;
+            }
+            if (String(req.query.status || '').toLowerCase() === 'open') where.status = ['booked', 'in_transit'];
+            const tasks = await TrayReturnTask.findAll({ where, order: [['created_at', 'DESC']], limit: 100 });
+            if (!tasks.length) return res.status(200).json([]);
+            const names = await taskNameMaps(tasks);
+            const orderIds = [...new Set(tasks.map((t) => t.order_id))];
+            const orders = await Order.findAll({
+                where: { order_id: orderIds },
+                attributes: ['order_id', 'order_number', 'party_id'],
+                include: [orderPartyInclude],
+            });
+            const orderMap = {};
+            orders.forEach((o) => { orderMap[o.order_id] = o; });
+            res.status(200).json(tasks.map((t) => {
+                const o = orderMap[t.order_id];
+                return {
+                    ...shapeTask(t, names),
+                    order_id: t.order_id,
+                    order_number: o ? o.order_number : null,
+                    party_name: o && o.party ? o.party.party_name : null,
+                    created_at: t.created_at,
+                };
+            }));
+        } catch (error) {
+            console.error('Error loading tray tasks:', error);
+            res.status(500).json({ error: 'Failed to load tray tasks' });
+        }
+    }
+
+    // POST /tray-tasks/:taskId/in-transit  { courier_name, tracking_number }
+    async trayTaskInTransit(req, res) {
+        try {
+            const roles = req.userRoleNames;
+            const isOffice = hasRole(roles, TRAY_RETURN_ROLES);
+            if (!isOffice && !hasRole(roles, ['salesman'])) {
                 return res.status(403).json({ error: 'Access denied' });
             }
-            const { id } = req.params;
+            const courier = String(req.body?.courier_name ?? '').trim();
+            const tracking = String(req.body?.tracking_number ?? '').trim();
+            if (!courier || !tracking) {
+                return res.status(400).json({ error: 'Courier name and tracking number are required' });
+            }
+            if (courier.length > 255 || tracking.length > 255) {
+                return res.status(400).json({ error: 'Courier name and tracking number must be 255 characters or fewer' });
+            }
             const result = await sequelize.transaction(async (transaction) => {
-                const order = await Order.findOne({ where: { order_id: id }, transaction, lock: transaction.LOCK.UPDATE });
-                if (!order) return { status: 404, error: 'Order not found' };
-                if (order.order_status === OrderStatus.CANCELLED || order.order_status === OrderStatus.COMPLETED) {
-                    return { status: 409, error: `This order is ${statusLabel(order.order_status)}, so there is nothing to release.` };
+                const task = await TrayReturnTask.findOne({ where: { task_id: req.params.taskId }, transaction, lock: transaction.LOCK.UPDATE });
+                if (!task) return { status: 404, error: 'Task not found' };
+                if (!isOffice) {
+                    const sm = await Salesman.findOne({ where: { user_id: req.user.user_id }, attributes: ['salesman_id'], transaction });
+                    if (!sm || sm.salesman_id !== task.salesman_id) {
+                        return { status: 403, error: 'This task belongs to another salesman.' };
+                    }
                 }
-                const fig = await decorateOrder(order, { transaction });
-                if (order.tray_released_at || fig.held_qty < 1) {
-                    return { status: 409, error: 'No pieces are held by sample tray for this order.' };
+                if (task.status !== 'booked') {
+                    return { status: 409, error: task.status === 'in_transit'
+                        ? 'This parcel is already marked in transit.'
+                        : `This task is ${task.status}, so it cannot be sent.` };
                 }
-                const oldSnapshot = order.toJSON();
-                order.tray_released_at = new Date();
-                order.tray_released_by = req.user ? req.user.user_id : null;
-                order.updated_at = new Date();
-                await order.save({ transaction });
-                await logAudit({
-                    req,
-                    transaction,
-                    action: 'update',
-                    description: `Sample trays returned ${fig.held_qty} pieces for this order`,
-                    tableName: 'order',
-                    recordId: order.order_id,
-                    oldValues: oldSnapshot,
-                    newValues: order,
+                const old = task.toJSON();
+                task.status = 'in_transit';
+                task.courier_name = courier;
+                task.tracking_number = tracking;
+                task.in_transit_at = new Date();
+                task.updated_at = new Date();
+                await task.save({ transaction });
+                const ord = await Order.findOne({ where: { order_id: task.order_id }, attributes: ['order_id', 'order_number'], transaction });
+                const tray = task.tray_id ? await Tray.findOne({ where: { tray_id: task.tray_id }, attributes: ['tray_name'], transaction }) : null;
+                await notify({
+                    transaction, targetRole: 'office',
+                    title: 'Frames in transit',
+                    message: `${task.qty} pieces from ${tray ? tray.tray_name : 'a tray'} are in transit (${courier}, ${tracking}). Mark received when they arrive.`,
+                    kind: 'tray_in_transit', orderId: task.order_id,
                 });
-                return { status: 200, body: await decorateOrder(order, { transaction }) };
+                await logAudit({
+                    req, transaction, action: 'update',
+                    description: `Tray frames sent back for order ${ord ? ord.order_number : ''}: ${task.qty} pieces via ${courier} (${tracking})`,
+                    tableName: 'tray_return_tasks', recordId: task.task_id, oldValues: old, newValues: task,
+                });
+                return { status: 200, task };
             });
             if (result.error) return res.status(result.status).json({ error: result.error });
-            res.status(200).json(result.body);
+            const names = await taskNameMaps([result.task]);
+            res.status(200).json(shapeTask(result.task, names));
         } catch (error) {
-            console.error('Error releasing tray pieces:', error);
-            res.status(500).json({ error: 'Failed to mark sample trays returned' });
+            console.error('Error marking tray task in transit:', error);
+            res.status(500).json({ error: 'Failed to update the tray task' });
+        }
+    }
+
+    // POST /tray-tasks/:taskId/received  Office has the parcel.
+    async trayTaskReceived(req, res) {
+        try {
+            if (!canManageOrders(req.userRoleNames)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const result = await sequelize.transaction(async (transaction) => {
+                const task = await TrayReturnTask.findOne({ where: { task_id: req.params.taskId }, transaction, lock: transaction.LOCK.UPDATE });
+                if (!task) return { status: 404, error: 'Task not found' };
+                if (task.status !== 'in_transit') {
+                    return { status: 409, error: task.status === 'booked'
+                        ? 'The salesman has not sent this parcel yet.'
+                        : `This task is already ${task.status}.` };
+                }
+                const order = await Order.findOne({ where: { order_id: task.order_id }, transaction, lock: transaction.LOCK.UPDATE });
+                if (!order || order.order_status === OrderStatus.CANCELLED) {
+                    return { status: 409, error: 'This order is cancelled.' };
+                }
+                const old = task.toJSON();
+                task.status = 'received';
+                task.received_at = new Date();
+                task.received_by = req.user ? req.user.user_id : null;
+                task.updated_at = new Date();
+                await task.save({ transaction });
+
+                // Stock was already moved from the tray to this order when it was placed (product
+                // tray_qty and the tray's own qty went down then). Nothing is deducted again here;
+                // the history line below only records that the frames reached the office.
+                const tray = task.tray_id ? await Tray.findOne({ where: { tray_id: task.tray_id }, attributes: ['tray_name'], transaction }) : null;
+                const trayName = tray ? tray.tray_name : 'tray';
+                const note = `Received from ${trayName}: reserved in warehouse for order ${order.order_number}`;
+                const product = task.product_id ? await Product.findOne({ where: { product_id: task.product_id }, transaction }) : null;
+                if (product) {
+                    await recordStockMove({
+                        transaction, productId: product.product_id,
+                        warehouseAfter: product.warehouse_qty, trayAfter: product.tray_qty,
+                        kind: 'tray', dWarehouse: 0, dTray: 0, user: req.user, reference: order.order_number, note,
+                    });
+                }
+                await logAudit({
+                    req, transaction, action: 'update',
+                    description: `${note} (${task.qty} pieces, ${task.courier_name || ''} ${task.tracking_number || ''})`.trim(),
+                    tableName: 'tray_return_tasks', recordId: task.task_id, oldValues: old, newValues: task,
+                });
+
+                const all = await TrayReturnTask.findAll({ where: { order_id: order.order_id }, transaction });
+                const live = all.filter((t) => t.status !== 'cancelled');
+                if (live.length && live.every((t) => t.status === 'received')) {
+                    const total = live.reduce((s, t) => s + (Number(t.qty) || 0), 0);
+                    await notify({
+                        transaction, targetRole: 'office',
+                        title: 'Ready to dispatch',
+                        message: `All ${total} tray pieces of order ${order.order_number} were received. Ready to dispatch.`,
+                        kind: 'ready_to_dispatch', orderId: order.order_id,
+                    });
+                }
+                return { status: 200, task };
+            });
+            if (result.error) return res.status(result.status).json({ error: result.error });
+            const names = await taskNameMaps([result.task]);
+            res.status(200).json(shapeTask(result.task, names));
+        } catch (error) {
+            console.error('Error marking tray task received:', error);
+            res.status(500).json({ error: 'Failed to update the tray task' });
         }
     }
 

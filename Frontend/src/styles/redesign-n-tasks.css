@@ -1,0 +1,56 @@
+/* Salesman tray tasks (rdt-) and the header notification bell (rdb-). Black and white, phone first. */
+:root .rdt-count { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; margin-left: 8px; padding: 0 7px; border-radius: 99px; background: #0a0a0a; color: #fff; font-family: inherit; font-size: 12px; font-weight: 700; vertical-align: 2px; }
+:root .rdt-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+:root .rdt-none { margin: 0; font-size: 13px; color: #595959; }
+:root .rdt-task { display: flex; flex-direction: column; gap: 8px; padding: 12px; border: 1px solid #e1e1e1; border-radius: 12px; background: #fff; min-width: 0; }
+:root .rdt-task--done { padding: 8px 12px; }
+:root .rdt-task__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 10px; min-width: 0; font-size: 14px; }
+:root .rdt-task__head b { min-width: 0; overflow-wrap: anywhere; }
+:root .rdt-task__meta { font-size: 13px; color: #595959; }
+:root .rdt-pill { display: inline-flex; padding: 2px 10px; border-radius: 99px; font-size: 12px; font-weight: 700; border: 1px solid #0a0a0a; background: #fff; color: #0a0a0a; white-space: nowrap; }
+:root .rdt-pill--transit { background: #0a0a0a; color: #fff; }
+:root .rdt-pill--done { background: #f0f0f0; border-color: #a3a3a3; color: #404040; }
+:root .rdt-banner { padding: 10px 12px; border-radius: 10px; font-size: 13px; font-weight: 600; overflow-wrap: anywhere; }
+:root .rdt-banner--act { background: #0a0a0a; color: #fff; }
+:root .rdt-banner--wait { background: #f4f4f4; color: #0a0a0a; border: 1px solid #e1e1e1; }
+:root .rdt-form { display: flex; flex-direction: column; gap: 10px; }
+:root .rdt-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+:root .rdt-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; font-size: 12px; font-weight: 600; color: #595959; }
+:root .rdt-field select, :root .rdt-field input { width: 100%; min-width: 0; min-height: 40px; padding: 0 10px; border: 1px solid #d4d4d4; border-radius: 9px; background: #fff; color: #0a0a0a; font: inherit; font-size: 14px; font-weight: 400; }
+:root .rdt-field select:focus-visible, :root .rdt-field input:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.25); border-color: #0a0a0a; }
+:root .rdt-field input[aria-invalid="true"] { border-color: #0a0a0a; border-width: 2px; }
+:root .rdt-err { color: #b00020; font-size: 12px; font-weight: 500; }
+:root .rdt-submit { align-self: flex-start; }
+:root .rdt-submit[disabled] { opacity: 0.55; cursor: not-allowed; }
+:root .rdt-done { display: flex; flex-direction: column; gap: 6px; }
+:root .rdt-done h3 { margin: 4px 0 0; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #595959; }
+@media (max-width: 520px) {
+  :root .rdt-submit { align-self: stretch; }
+}
+
+/* Notification bell dropdown */
+:root .rdb { position: relative; display: inline-flex; }
+:root .rdb-badge { position: absolute; top: 2px; right: 0; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 99px; background: #0a0a0a; color: #fff; border: 2px solid #fff; font-size: 10px; font-weight: 700; line-height: 14px; text-align: center; pointer-events: none; box-sizing: border-box; }
+:root .rdb-panel { position: absolute; right: 0; top: calc(100% + 8px); width: 360px; max-width: calc(100vw - 24px); max-height: min(70vh, 480px); display: flex; flex-direction: column; background: #fff; color: #0a0a0a; border: 1px solid #e1e1e1; border-radius: 14px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.14); z-index: 100; overflow: hidden; }
+:root .rdb-panel__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 10px 12px; border-bottom: 1px solid #e1e1e1; }
+:root .rdb-panel__head h2 { margin: 0; font-size: 14px; font-weight: 700; }
+:root .rdb-link { border: 0; background: transparent; color: #0a0a0a; font: inherit; font-size: 13px; font-weight: 600; text-decoration: underline; cursor: pointer; min-height: 32px; padding: 0 6px; }
+:root .rdb-link[disabled] { opacity: 0.4; cursor: default; text-decoration: none; }
+:root .rdb-link:focus-visible, :root .rdb-item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.25); }
+:root .rdb-list { list-style: none; margin: 0; padding: 0; overflow-y: auto; }
+:root .rdb-item { display: flex; gap: 10px; align-items: flex-start; width: 100%; padding: 10px 12px; border: 0; border-top: 1px solid #efefef; background: #fff; color: #0a0a0a; font: inherit; font-size: 13px; text-align: left; cursor: pointer; min-height: 48px; }
+:root .rdb-list li:first-child .rdb-item { border-top: 0; }
+:root .rdb-item:hover { background: #f4f4f4; }
+:root .rdb-item--unread { font-weight: 700; }
+:root .rdb-dot { flex: none; width: 8px; height: 8px; margin-top: 5px; border-radius: 50%; background: transparent; }
+:root .rdb-item--unread .rdb-dot { background: #0a0a0a; }
+:root .rdb-item__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow-wrap: anywhere; }
+:root .rdb-item__msg { font-weight: 400; color: #404040; }
+:root .rdb-item--unread .rdb-item__msg { font-weight: 600; color: #0a0a0a; }
+:root .rdb-item__time { font-size: 11px; font-weight: 400; color: #737373; }
+:root .rdb-empty { margin: 0; padding: 18px 12px; font-size: 13px; color: #595959; text-align: center; }
+@media (max-width: 520px) {
+  /* The header is full width on phones: anchor the panel to the screen, not to the bell. */
+  :root .rdb { position: static; }
+  :root .rdb-panel { position: fixed; left: 12px; right: 12px; top: 64px; width: auto; max-width: none; }
+}

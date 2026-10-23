@@ -532,13 +532,46 @@ export const dispatchOrder = async (orderId, { courier_name, courier_tracking_nu
 };
 
 /**
- * Sample trays returned the held pieces: they become ready to send.
- * POST /orders/:id/trays-returned
- * @param {string} orderId - Order ID (UUID)
- * @returns {Promise<Object>} Updated order object
+ * Tray tasks: frames booked from a sample tray that must come back to the office.
+ * GET /orders/tray-tasks?status=open|all
+ * Salesmen get only their own tasks; office roles get all of them.
+ * @param {'open'|'all'} [status]
+ * @returns {Promise<Array>} Array of task objects
  */
-export const returnOrderTrays = async (orderId) => {
-  const result = await apiRequest(`/orders/${orderId}/trays-returned`, {
+export const getTrayTasks = async (status = 'open') => {
+  const result = await apiRequest(`/orders/tray-tasks?status=${encodeURIComponent(status)}`, {
+    method: 'GET',
+    includeAuth: true,
+  });
+  if (Array.isArray(result)) return result;
+  return Array.isArray(result?.data) ? result.data : [];
+};
+
+/**
+ * The salesman sent the frames back by courier.
+ * POST /orders/tray-tasks/:taskId/in-transit
+ * @param {string} taskId
+ * @param {{courier_name: string, tracking_number: string}} data
+ * @returns {Promise<Object>} Updated task
+ */
+export const markTrayTaskInTransit = async (taskId, { courier_name, tracking_number } = {}) => {
+  const result = await apiRequest(`/orders/tray-tasks/${taskId}/in-transit`, {
+    method: 'POST',
+    body: { courier_name, tracking_number },
+    includeAuth: true,
+  });
+  invalidateCache('orders');
+  return result;
+};
+
+/**
+ * The office received the frames (admin and order manager).
+ * POST /orders/tray-tasks/:taskId/received
+ * @param {string} taskId
+ * @returns {Promise<Object>} Updated task
+ */
+export const markTrayTaskReceived = async (taskId) => {
+  const result = await apiRequest(`/orders/tray-tasks/${taskId}/received`, {
     method: 'POST',
     body: {},
     includeAuth: true,
