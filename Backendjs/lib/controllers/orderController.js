@@ -284,10 +284,26 @@ async function reverseOrderOperation(orderId, transaction, actor = null) {
         where: { order_id: orderId },
         transaction,
     });
+    // Tray parts already RECEIVED by the office are physically in the warehouse now, so they go
+    // back to warehouse_qty (not tray_qty) and their TrayProducts rows are left alone.
+    const receivedTasks = await TrayReturnTask.findAll({
+        where: { order_id: orderId, status: 'received' },
+        transaction,
+    });
     for (let i = 0; i < orderOperations.length; i++) {
         const orderOperation = orderOperations[i];
-        const warehouseReducedQty = orderOperation.warehouse_reduced_qty;
-        const trayReducedQty = orderOperation.tray_reduced_qty;
+        const receivedByTray = {};
+        let receivedTotal = 0;
+        receivedTasks.forEach((t) => {
+            if (t.product_id !== orderOperation.product_id) return;
+            const q = Number(t.qty) || 0;
+            receivedByTray[t.tray_id] = (receivedByTray[t.tray_id] || 0) + q;
+            receivedTotal += q;
+        });
+        // Never move more out of the tray side than was taken from it.
+        receivedTotal = Math.min(receivedTotal, Number(orderOperation.tray_reduced_qty) || 0);
+        const warehouseReducedQty = (Number(orderOperation.warehouse_reduced_qty) || 0) + receivedTotal;
+        const trayReducedQty = (Number(orderOperation.tray_reduced_qty) || 0) - receivedTotal;
         const totalReducedQty = orderOperation.total_reduced_qty;
         const product = await Product.findOne({
             where: { product_id: orderOperation.product_id },
@@ -317,8 +333,12 @@ async function reverseOrderOperation(orderId, transaction, actor = null) {
         for (let j = 0; j < trayIds.length; j++) {
             const entry = trayIds[j] || {};
             const trayId = entry.tray_id;
-            const qty = entry.qty;
+            // Frames of this tray part that were received are no longer in the tray.
+            const takenBack = Math.min(receivedByTray[trayId] || 0, Number(entry.qty) || 0);
+            const qty = (Number(entry.qty) || 0) - takenBack;
             const status = entry.status;
+            if (takenBack > 0) receivedByTray[trayId] -= takenBack;
+            if (takenBack > 0 && qty <= 0) continue;
             // Skip malformed/legacy entries without a tray id — querying with an
             // undefined tray_id throws ("WHERE parameter tray_id has invalid
             // undefined value") and aborts the whole reversal/delete.
@@ -1233,6 +1253,11 @@ class OrderController {
                     if (!locked || locked.order_status === OrderStatus.CANCELLED) return 'already';
                     const sent = await OrderShipment.sum('qty', { where: { order_id: locked.order_id }, transaction });
                     if (Number(sent) > 0) return 'shipped';
+                    const inTransit = await TrayReturnTask.count({
+                        where: { order_id: locked.order_id, status: 'in_transit' },
+                        transaction,
+                    });
+                    if (inTransit > 0) return 'in_transit';
                     await reverseOrderOperation(locked.order_id, transaction, req.user);
                     await cancelTrayTasks(locked, transaction);
                     locked.order_status = OrderStatus.CANCELLED;
@@ -1245,6 +1270,9 @@ class OrderController {
                 });
                 if (outcome === 'already') {
                     return res.status(409).json({ error: 'This order was just cancelled by someone else.' });
+                }
+                if (outcome === 'in_transit') {
+                    return res.status(409).json({ error: 'A tray parcel for this order is on its way. Wait until the office marks it received, then cancel.' });
                 }
                 if (outcome === 'shipped') {
                     return res.status(409).json({ error: 'Some pieces were already sent, so this order can no longer be cancelled. Complete it instead.' });
