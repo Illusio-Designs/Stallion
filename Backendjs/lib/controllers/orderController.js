@@ -207,7 +207,7 @@ async function notify({ transaction, userId = null, targetRole = null, title, me
 
 // The salesman who holds a tray right now (latest assignment), with their login user id.
 async function currentTrayHolder(trayId, transaction) {
-    const link = await SalesmanTray.findOne({ where: { tray_id: trayId }, order: [['assigned_at', 'DESC']], transaction });
+    const link = await SalesmanTray.findOne({ where: { tray_id: trayId, released_at: null }, order: [['assigned_at', 'DESC']], transaction });
     if (!link) return null;
     const sm = await Salesman.findOne({ where: { salesman_id: link.salesman_id }, attributes: ['salesman_id', 'user_id', 'full_name'], transaction });
     return sm || null;

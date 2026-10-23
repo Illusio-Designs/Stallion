@@ -12,6 +12,7 @@ import { SalesRevenueCard, QuickActionsCard, OrderOverviewCard, FieldCard, ShopC
 import { getUserRole, getUserRoles, getUser } from '../services/authService';
 import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiPackage, FiInbox } from '../components/icons/hugeicons';
 import RupeeIcon from '../components/icons/RupeeIcon';
+import { orderStatusLabel, orderStatusBadgeKey, heldNote } from '../utils/orderStatus';
 
 // A link that switches pages inside the app instead of reloading the whole page.
 const AppLink = ({ href, children, ...rest }) => {
@@ -577,7 +578,15 @@ const Dashboard = () => {
   const RANGES = [['today', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['year', 'Year']];
   const partyOf = (row) => row.party?.party_name || row.party_name || row.party?.name || partyNamesMap[row.party_id] || '-';
   const orderRef = (row) => row.order_number || `#${String(row.order_id || row.id || '').slice(-6)}`;
-  const statusPill = (v) => { const st = v || 'pending'; return <StatusBadge status={String(st).toLowerCase().replace(/\s+/g, '-')}>{String(st).charAt(0).toUpperCase() + String(st).slice(1).toLowerCase()}</StatusBadge>; };
+  const statusPill = (v, order) => {
+    const held = heldNote(order);
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+        <StatusBadge status={orderStatusBadgeKey(v)}>{orderStatusLabel(v)}</StatusBadge>
+        {held && <small className="text-text-muted">{held}</small>}
+      </span>
+    );
+  };
   const initialsOf = (name) => String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
 
   // Salesmen against target (office view): this month's targets, one row per salesman.
@@ -801,7 +810,7 @@ const Dashboard = () => {
             {ordersCard('My latest orders', null, 'All orders', [
               { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
               { h: 'Party', cell: partyOf },
-              { h: 'Status', cell: (o) => statusPill(o.order_status) },
+              { h: 'Status', cell: (o) => statusPill(o.order_status, o) },
               { h: 'Amount', r: true, cell: (o) => money(amountOf(o)) },
             ])}
           </div>
@@ -837,7 +846,7 @@ const Dashboard = () => {
             {ordersCard('Orders from my parties', null, 'All orders', [
               { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
               { h: 'Party', cell: partyOf },
-              { h: 'Status', cell: (o) => statusPill(o.order_status) },
+              { h: 'Status', cell: (o) => statusPill(o.order_status, o) },
             ])}
           </div>
         )}
@@ -849,7 +858,7 @@ const Dashboard = () => {
             {ordersCard('My orders', null, 'All orders', [
               { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
               { h: 'Placed', cell: (o) => { const d = o.created_at || o.order_date; return d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '-'; } },
-              { h: 'Status', cell: (o) => statusPill(o.order_status) },
+              { h: 'Status', cell: (o) => statusPill(o.order_status, o) },
               { h: 'Amount', r: true, cell: (o) => <b>{money(amountOf(o))}</b> },
             ])}
             <div className="rda-lock">
@@ -903,7 +912,7 @@ const Dashboard = () => {
                 <div key={o.order_id || o.id || o.order_number} className="row grid grid-cols-[1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
                   <div className="name text-text font-medium text-[var(--text-sm)] leading-snug">
                     {o.order_number || `#${String(o.order_id || o.id || '').slice(-6)}`}
-                    <span className="ml-2 text-text-muted text-[var(--text-xs)]">{String(o.order_status || 'pending').toUpperCase()}</span>
+                    <span className="ml-2 text-text-muted text-[var(--text-xs)]">{orderStatusLabel(o.order_status)}</span>
                   </div>
                   <div className="units text-text-muted text-[var(--text-xs)] [font-variant-numeric:tabular-nums]">{money(amountOf(o))}</div>
                 </div>
@@ -954,7 +963,7 @@ const Dashboard = () => {
                 { key: 'order_number', label: 'ORDER ID', render: (v, row) => v || `#${String(row.order_id || row.id || '').slice(-6)}` },
                 { key: 'order_type', label: 'ORDER TYPE', render: (v) => (v || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'N/A' },
                 { key: 'party', label: 'PARTY', render: (_, row) => row.party?.party_name || row.party_name || row.party?.name || partyNamesMap[row.party_id] || '-' },
-                { key: 'order_status', label: 'STATUS', render: (v) => { const st = v || 'pending'; return <StatusBadge status={String(st).toLowerCase().replace(/\s+/g, '-')}>{String(st).toUpperCase()}</StatusBadge>; } },
+                { key: 'order_status', label: 'STATUS', render: (v, row) => statusPill(v, row) },
                 { key: 'order_total', label: 'VALUE', render: (v, row) => `₹${parseFloat(v || row.total_value || row.total_amount || 0).toLocaleString('en-IN')}` },
                 { key: 'created_at', label: 'DATE', render: (v, row) => { const d = v || row.order_date; return d ? new Date(d).toLocaleDateString('en-GB') : '-'; } },
               ]}

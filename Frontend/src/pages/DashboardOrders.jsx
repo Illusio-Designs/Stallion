@@ -18,131 +18,35 @@ import {
   getSalesmanById,
 } from '../services/apiService';
 import { downloadOrderPdf } from '../utils/orderPdf';
+import {
+  orderStatusLabel,
+  orderStatusBadgeKey,
+  ORDER_STATUS_TITLE,
+  ORDER_TAB_TO_STATUS,
+  ORDER_LABEL_TO_STATUS,
+  ORDER_FILTER_TABS_WITH_LEGACY,
+  TASK_PILL,
+  toInt,
+  fmtDate,
+  fmtDateTime,
+  getTrayTasksOf,
+  getPieceCounts,
+  getShipments,
+  heldNote,
+} from '../utils/orderStatus';
 import { downloadCsv } from '../utils/exportCsv';
 import { showSuccess, showError } from '../services/notificationService';
 import { getUserRole, getUser, getUserRoles } from '../services/authService';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/redesign-n-orders.css';
 
-// Map API status to UI status
-const mapApiStatusToUI = (apiStatus) => {
-  const statusMap = {
-    'pending': 'PENDING',
-    'processed': 'PROCESSING',
-    'hold_by_tray': 'HOLD BY SAMPLE',
-    'partially_dispatched': 'PARTIALLY DISPATCH',
-    'dispatched': 'DISPATCH',
-    'completed': 'COMPLETED',
-    'cancelled': 'CANCEL'
-  };
-  return statusMap[apiStatus?.toLowerCase()] || apiStatus?.toUpperCase() || 'PENDING';
-};
-
-// Map UI tab to API status
-const mapUITabToApiStatus = (tab) => {
-  const tabMap = {
-    'Pending': 'pending',
-    'Processing': 'processed',
-    'Hold by Sample': 'hold_by_tray',
-    'Partially Dispatch': 'partially_dispatched',
-    'Dispatch': 'dispatched',
-    'Completed': 'completed',
-    'Cancel': 'cancelled'
-  };
-  return tabMap[tab];
-};
-
-// Canonical UI-status label <-> API status value (single source of truth for
-// the edit modal). Keep in sync with mapApiStatusToUI above.
-const UI_TO_API_STATUS = {
-  'PENDING': 'pending',
-  'PROCESSING': 'processed',
-  'HOLD BY SAMPLE': 'hold_by_tray',
-  'PARTIALLY DISPATCH': 'partially_dispatched',
-  'DISPATCH': 'dispatched',
-  'COMPLETED': 'completed',
-  'CANCEL': 'cancelled',
-};
+// Status wording, tones and piece counts live in utils/orderStatus.js
+const mapApiStatusToUI = (apiStatus) => (apiStatus ? orderStatusLabel(apiStatus) : 'PENDING');
+const mapUITabToApiStatus = (tab) => ORDER_TAB_TO_STATUS[tab];
+const UI_TO_API_STATUS = ORDER_LABEL_TO_STATUS;
 const COURIER_SUGGESTIONS = ['Blue Dart', 'DTDC', 'Delhivery', 'India Post', 'Professional Couriers', 'Gati'];
 const CANCEL_REASONS = ['Party asked to cancel', 'Stock not available', 'Wrong order', 'Other'];
-const OFFICE_STATUS_TITLE = {
-  pending: 'Pending',
-  processed: 'Processing',
-  hold_by_tray: 'Hold by sample',
-  partially_dispatched: 'Partially dispatch',
-  dispatched: 'Dispatch',
-  completed: 'Completed',
-  cancelled: 'Cancel',
-};
-
-const fmtDate = (v) => {
-  if (!v) return '';
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-};
-const fmtDateTime = (v) => {
-  if (!v) return '';
-  const d = new Date(v);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${fmtDate(v)}, ${d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
-};
-const toInt = (v) => {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
-};
-
-// Tray tasks of an order, without the cancelled ones.
-const getTrayTasksOf = (order) => (Array.isArray(order?.tasks) ? order.tasks : []).filter((t) => t && t.status !== 'cancelled');
-
-const TASK_PILL = { booked: 'Booked', in_transit: 'In transit', received: 'Received' };
-
-// Piece counts for an order. The server sends total/tray/held/shipped/ready;
-// older orders without them are derived from the items and the status.
-const getPieceCounts = (order) => {
-  const items = Array.isArray(order?.order_items) ? order.order_items : [];
-  const itemsTotal = items.reduce((sum, it) => sum + toInt(it?.quantity), 0);
-  const total = toInt(order?.total_qty) || itemsTotal;
-  const status = String(order?.order_status || '').toLowerCase();
-  const shipments = Array.isArray(order?.shipments) ? order.shipments : [];
-  let shipped = order?.shipped_qty != null ? toInt(order.shipped_qty) : shipments.reduce((sum, sh) => sum + toInt(sh?.qty), 0);
-  if (order?.shipped_qty == null && !shipments.length && (status === 'dispatched' || status === 'completed')) shipped = total;
-  const held = order?.held_qty != null ? toInt(order.held_qty) : 0;
-  const ready = order?.ready_qty != null
-    ? toInt(order.ready_qty)
-    : (status === 'processed' || status === 'partially_dispatched' ? Math.max(total - shipped - held, 0) : 0);
-  const cancelled = status === 'cancelled' ? Math.max(total - shipped, 0) : 0;
-  const tasks = getTrayTasksOf(order);
-  const taskSum = (state) => tasks.filter((t) => t.status === state).reduce((sum, t) => sum + toInt(t.qty), 0);
-  const inTransit = order?.in_transit_qty != null ? toInt(order.in_transit_qty) : taskSum('in_transit');
-  const receivedTray = order?.received_tray_qty != null ? toInt(order.received_tray_qty) : taskSum('received');
-  const gone = status === 'cancelled';
-  return {
-    total,
-    shipped,
-    ready: gone ? 0 : ready,
-    held: gone ? 0 : held,
-    inTransit: gone ? 0 : Math.min(inTransit, held),
-    receivedTray,
-    cancelled,
-    trayQty: toInt(order?.tray_qty),
-  };
-};
-
-const getShipments = (order) => {
-  const list = Array.isArray(order?.shipments) ? order.shipments : [];
-  if (list.length) return list;
-  if (order?.courier_name || order?.courier_tracking_number) {
-    return [{
-      shipment_id: 'legacy',
-      courier_name: order.courier_name,
-      tracking_number: order.courier_tracking_number,
-      qty: null,
-      shipped_at: order.dispatched_at || null,
-    }];
-  }
-  return [];
-};
+const OFFICE_STATUS_TITLE = ORDER_STATUS_TITLE;
 
 const DashboardOrders = () => {
   const confirm = useConfirm();
@@ -519,7 +423,7 @@ const DashboardOrders = () => {
   // Counts shown on the status chips
   const tabCounts = useMemo(() => {
     const out = { All: orders.length };
-    ['Pending', 'Processing', 'Hold by Sample', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].forEach((t) => {
+    ORDER_FILTER_TABS_WITH_LEGACY.forEach((t) => {
       const api = mapUITabToApiStatus(t);
       out[t] = orders.filter((o) => o.order_status?.toLowerCase() === api).length;
     });
@@ -714,7 +618,15 @@ const DashboardOrders = () => {
     ) },
     { key: 'salesman', label: 'SALESMAN' },
     { key: 'date', label: 'PLACED', render: (v) => <span className="ord-muted">{v}</span> },
-    { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase().replace(/\s+/g, '-')}>{v}</StatusBadge> },
+    { key: 'status', label: 'STATUS', render: (v, row) => {
+      const held = heldNote(row?.originalOrder);
+      return (
+        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+          <StatusBadge status={orderStatusBadgeKey(UI_TO_API_STATUS[v])}>{v}</StatusBadge>
+          {held && <small className="text-text-muted">{held}</small>}
+        </span>
+      );
+    } },
     { key: 'value', label: 'AMOUNT', render: (v) => <b className="ord-amount">{v}</b> },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions
@@ -759,7 +671,7 @@ const DashboardOrders = () => {
         {/* Order Status Tabs */}
         <div className="dash-row">
           <div className="order-tabs-container col-[1/-1] flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm">
-            {['All', 'Pending', 'Processing', 'Hold by Sample', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].map(tab => (
+            {['All', ...ORDER_FILTER_TABS_WITH_LEGACY].map(tab => (
               <button
                 key={tab}
                 className={`order-tab inline-flex min-h-10 flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-4 py-2 text-[length:var(--text-base)] font-semibold leading-[var(--leading-snug)] transition-[background,color,box-shadow] duration-[0.12s] ease-out focus-visible:outline-none active:scale-[0.98] ${activeTab === tab ? 'active bg-primary text-text-on-primary' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
@@ -920,7 +832,8 @@ const DashboardOrders = () => {
                 <div className="ord-field">
                   <span className="ord-field__label">Status</span>
                   <span>
-                    <StatusBadge status={String(viewRow.status).toLowerCase().replace(/\s+/g, '-')}>{viewRow.status}</StatusBadge>
+                    <StatusBadge status={orderStatusBadgeKey(apiStatus)}>{viewRow.status}</StatusBadge>
+                    {counts.held > 0 && <small className="ml-2 text-text-muted">{counts.held} held by sample tray</small>}
                   </span>
                 </div>
                 <div className="ord-field">

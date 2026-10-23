@@ -8,6 +8,7 @@
 
 import { getProductsByIds } from '../services/apiService';
 import { RUPEE_FONT_BASE64 } from './rupeeFont';
+import { orderStatusLabel, getShipments, heldNote, fmtDate } from './orderStatus';
 
 const parseOrderItems = (orderItems) => {
   if (!orderItems) return [];
@@ -106,6 +107,10 @@ export async function downloadOrderPdf(row, products = []) {
   const rawDate = order?.order_date || order?.created_at;
   const orderDate = rawDate ? new Date(rawDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
   const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+  // Same wording as the app: PROCESSING, DISPATCH, CANCEL ... plus pieces held in sample trays.
+  const statusText = (order?.order_status ? orderStatusLabel(order.order_status) : String(row?.status || '-'))
+    + (heldNote(order) ? ` (${heldNote(order)})` : '');
+  const shipments = getShipments(order);
 
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF('p', 'mm', 'a4');
@@ -157,7 +162,7 @@ export async function downloadOrderPdf(row, products = []) {
   const colGap = CW / 2;
   const meta = [
     ['Order ID', row?.orderId, 'Order Date', orderDate],
-    ['Party Name', row?.client, 'Status', row?.status],
+    ['Party Name', row?.client, 'Status', statusText],
     ['Order Type', row?.orderType, 'Total', money(pdfFinal), true],
   ];
   let my = y + 7;
@@ -278,6 +283,27 @@ export async function downloadOrderPdf(row, products = []) {
   doc.text('TOTAL', tX + 4, ty + 7.5);
   money$(money(pdfFinal), PW - M - 4, ty + 7.5, 'right');
   y = ty + 11 + 6;
+
+  // ================= Shipments box =================
+  if (shipments.length > 0) {
+    doc.setFontSize(9);
+    const shipLines = shipments.map((sh, n) => {
+      const parts = [`#${n + 1}`];
+      if (sh.qty != null) parts.push(`${sh.qty} pcs`);
+      if (sh.courier_name) parts.push(String(sh.courier_name));
+      if (sh.tracking_number) parts.push(`Tracking ${sh.tracking_number}`);
+      if (sh.shipped_at && fmtDate(sh.shipped_at)) parts.push(fmtDate(sh.shipped_at));
+      return doc.splitTextToSize(parts.join('  |  '), CW - 8);
+    });
+    const sH = 6 + 5 + shipLines.reduce((sum, l) => sum + l.length * 4.6 + 1, 0);
+    if (y + sH > 280) { doc.addPage(); y = 20; }
+    rect(M, y, CW, sH);
+    label('Shipments', M + 4, y + 6);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK);
+    let sy = y + 11;
+    shipLines.forEach((l) => { doc.text(l, M + 4, sy); sy += l.length * 4.6 + 1; });
+    y += sH + 6;
+  }
 
   // ================= Notes box =================
   if (order?.order_notes) {

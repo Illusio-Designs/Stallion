@@ -8,10 +8,15 @@ import { getUser } from '../services/authService';
 import { showError } from '../services/notificationService';
 import StatusBadge from '../components/ui/StatusBadge';
 import RowActions from '../components/ui/RowActions';
+import AsidePanel from '../components/ui/AsidePanel';
+import Button from '../components/ui/Button';
+import OrderProgressInfo from '../components/orders/OrderProgressInfo';
+import { orderStatusLabel, orderStatusBadgeKey, heldNote } from '../utils/orderStatus';
 
 const DistributorDashboard = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [viewOrder, setViewOrder] = useState(null); // read-only order detail
   const [error, setError] = useState(null);
   const [products, setProducts] = useState([]);
   const [productNames, setProductNames] = useState({}); // product_id -> resolved name
@@ -89,19 +94,8 @@ const DistributorDashboard = () => {
     };
   }, [orders]);
 
-  // Map API status to UI status
-  const mapApiStatusToUI = (apiStatus) => {
-    const statusMap = {
-      'pending': 'PENDING',
-      'processed': 'PROCESSING',
-      'hold_by_tray': 'HOLD BY SAMPLE',
-      'partially_dispatched': 'PARTIALLY DISPATCH',
-      'dispatched': 'DISPATCH',
-      'completed': 'COMPLETED',
-      'cancelled': 'CANCEL'
-    };
-    return statusMap[apiStatus?.toLowerCase()] || apiStatus?.toUpperCase() || 'PENDING';
-  };
+  // Status wording lives in utils/orderStatus.js
+  const mapApiStatusToUI = (apiStatus) => (apiStatus ? orderStatusLabel(apiStatus) : 'PENDING');
 
   // First load: grey page shapes instead of empty cards. A retry after an error shows them again.
   if (loading && orders.length === 0) return <PageSkeleton />;
@@ -243,10 +237,15 @@ const DistributorDashboard = () => {
                           <td className="py-[14px]">{partyName}</td>
                           <td className="py-[14px] text-[#6b7280]">{productDisplay}</td>
                           <td className="py-[14px]">{totalQuantity}</td>
-                          <td className="py-[14px]"><StatusBadge status={orderStatus.toLowerCase().replace(/\s+/g, '-')}>{orderStatus}</StatusBadge></td>
+                          <td className="py-[14px]">
+                            <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <StatusBadge status={orderStatusBadgeKey(order.order_status)}>{orderStatus}</StatusBadge>
+                              {heldNote(order) && <small className="text-text-muted">{heldNote(order)}</small>}
+                            </span>
+                          </td>
                           <td className="py-[14px]">₹{totalValue.toLocaleString('en-IN')}</td>
                           <td className="py-[14px]">
-                            <RowActions onView={()=>console.log('view', order)} />
+                            <RowActions onView={() => setViewOrder({ order, number: orderNumber, status: orderStatus, value: totalValue })} />
                           </td>
                         </tr>
                       );
@@ -258,6 +257,23 @@ const DistributorDashboard = () => {
           </div>
         </div>
       </div>
+      <AsidePanel open={!!viewOrder} onClose={() => setViewOrder(null)} title="Order Details" footer={(
+        <div className="flex items-center justify-end gap-2"><Button onClick={() => setViewOrder(null)}>Close</Button></div>
+      )}>
+        {viewOrder && (
+          <div className="flex flex-col gap-4 p-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div><div className="text-xs text-text-subtle">Order ID</div><div className="font-semibold break-words">{viewOrder.number}</div></div>
+              <div>
+                <div className="text-xs text-text-subtle">Status</div>
+                <div className="font-semibold"><StatusBadge status={orderStatusBadgeKey(viewOrder.order.order_status)}>{viewOrder.status}</StatusBadge></div>
+              </div>
+              <div><div className="text-xs text-text-subtle">Total Value</div><div className="font-semibold">₹{viewOrder.value.toLocaleString('en-IN')}</div></div>
+            </div>
+            <OrderProgressInfo order={viewOrder.order} />
+          </div>
+        )}
+      </AsidePanel>
     </div>
   );
 };
