@@ -5,3 +5,6 @@
 :root .sn-lock-note{margin:6px 0 0;font-size:12px;color:#666}
 @media (max-width:1400px){:root .sn-trunc{max-width:170px}:root .sn-who .sn-trunc{max-width:150px}}
 @media (max-width:767.98px){:root .sn-trunc,:root .sn-who,:root .sn-who .sn-trunc{max-width:100%;white-space:normal}}
+
+:root .sn-name{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:767.98px){:root .sn-name{white-space:normal;overflow-wrap:anywhere}}

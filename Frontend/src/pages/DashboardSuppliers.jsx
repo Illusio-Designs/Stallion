@@ -807,7 +807,7 @@ const DashboardSuppliers = () => {
               {String(v || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
             </span>
             <span className="sm-who__txt sn-trunc" title={`${v || ''}${sub ? ` (${sub})` : ''}`}>
-              {v}
+              <span className="sn-name">{v}</span>
               {sub ? <small className="sm-sub sn-trunc">{sub}</small> : null}
             </span>
           </span>
