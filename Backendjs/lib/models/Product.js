@@ -144,6 +144,13 @@ const Product = sequelize.define('Product', {
         allowNull: true,
         defaultValue: 'draft'
     },
+    // Manual switch, separate from status (draft/active). Inactive products are
+    // hidden from the shop and pickers and cannot be ordered. Never deleted.
+    is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    },
     brand_id: {
         type: DataTypes.UUID,
         allowNull: true,

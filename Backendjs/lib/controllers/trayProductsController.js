@@ -85,6 +85,7 @@ class TrayProductsController {
                 if (!product) return { status: 404, error: 'Product not found' };
                 const targetTray = await Tray.findOne({ where: { tray_id }, transaction });
                 if (!targetTray) return { status: 404, error: 'Tray not found' };
+                if (targetTray.is_active === false) return { status: 409, error: 'This tray is inactive, so nothing can be added to it.' };
                 if (targetTray.tray_status === TrayStatus.INACTIVE) return { status: 409, error: 'This tray is inactive, so nothing can be added to it.' };
                 const duplicate = await TrayProducts.findOne({ where: { tray_id, product_id }, transaction });
                 if (duplicate) return { status: 409, error: 'This product is already in the tray' };
@@ -281,6 +282,7 @@ class TrayProductsController {
                     if (t.to_tray_id) {
                         const dest = await Tray.findOne({ where: { tray_id: t.to_tray_id }, transaction });
                         if (!dest) return { status: 404, error: 'Destination tray not found' };
+                        if (dest.is_active === false) return { status: 409, error: 'The destination tray is inactive' };
                         if (dest.tray_status === TrayStatus.INACTIVE) return { status: 409, error: 'The destination tray is inactive' };
                         const existing = await TrayProducts.findOne({ where: { tray_id: t.to_tray_id, product_id: t.product_id }, transaction });
                         if (existing) return { status: 409, error: 'That product is already in the destination tray' };

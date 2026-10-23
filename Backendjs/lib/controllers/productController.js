@@ -19,6 +19,7 @@ const fs = require('fs');
 const { Op, Sequelize } = require('sequelize');
 const { canManageInventory, hasRole } = require('../utils/roleHelpers');
 const { getListSearchParams, likeContains } = require('../utils/listSearchHelpers');
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
 
@@ -102,10 +103,10 @@ class ProductController {
         try {
             const { collection_id } = req.body;
             if (!collection_id || collection_id === '' || collection_id === 'all') {
-                const products = await Product.findAll({ limit: 6 });
+                const products = await Product.findAll({ where: { is_active: true }, limit: 6 });
                 return res.status(200).json(products);
             }
-            const products = await Product.findAll({ where: { collection_id: collection_id }, limit: 6 });
+            const products = await Product.findAll({ where: { collection_id: collection_id, is_active: true }, limit: 6 });
             res.status(200).json(products);
         }
         catch (error) {
@@ -172,6 +173,14 @@ class ProductController {
             // can be paged on the server instead of filtering each page afterwards.
             if (status) {
                 conditions.push(Sequelize.where(Sequelize.fn('LOWER', Sequelize.col(`${Product.name}.status`)), String(status).trim().toLowerCase()));
+            }
+            // The shop (status 'active') and the pickers (?active=true or active:true in the body)
+            // only see products that are switched on. The dashboard list sends neither.
+            const wantsActive = activeOnlyWhere(req).is_active === true
+                || req.body.active === true || String(req.body.active).toLowerCase() === 'true'
+                || String(status || '').trim().toLowerCase() === 'active';
+            if (wantsActive) {
+                conditions.push({ is_active: true });
             }
             if (price) {
                 conditions.push({
@@ -346,6 +355,7 @@ class ProductController {
                 whp: whp !== undefined ? whp : product.whp,
                 size_mm: size_mm !== undefined ? (size_mm || null) : product.size_mm,
                 status: status !== undefined ? status : product.status,
+                ...activeUpdate(req.body),
                 brand_id: brand_id ? brand_id : product.brand_id,
                 collection_id: collection_id ? collection_id : product.collection_id,
                 updated_at: new Date(),

@@ -21,6 +21,8 @@ async function syncTrayStatus(trayId, transaction) {
     const salesman = await Salesman.findOne({ where: { salesman_id: link.salesman_id }, transaction });
     const tray = await Tray.findOne({ where: { tray_id: trayId }, transaction });
     if (!salesman || !tray) return null;
+    // A tray switched off by hand stays as it is; the automatic lifecycle must not touch it.
+    if (tray.is_active === false) return tray.tray_status;
     let next = tray.tray_status;
     if (salesman.is_active !== false) {
         if (tray.tray_status === TrayStatus.INACTIVE) next = TrayStatus.ASSIGNED;
