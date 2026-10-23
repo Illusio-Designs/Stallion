@@ -460,6 +460,22 @@ const Cart = ({ onPageChange = null }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderType, isSalesman]); // Only depend on orderType and isSalesman, not user object
 
+  // After "I'm at the shop" on Home, preselect that party for a visit order. Selecting goes
+  // through setSelectedParty, so the verified-location / distance effects still run.
+  useEffect(() => {
+    if (!isSalesman || orderType !== 'visit_order' || selectedParty || parties.length === 0) return;
+    try {
+      const raw = sessionStorage.getItem('stallion.checkinParty');
+      if (!raw) return;
+      const stored = JSON.parse(raw);
+      if (!stored || !stored.party_id || !(Date.now() - Number(stored.at) < 6 * 60 * 60 * 1000)) return;
+      if (parties.some((p) => String(p.id || p.party_id) === String(stored.party_id))) {
+        const match = parties.find((p) => String(p.id || p.party_id) === String(stored.party_id));
+        setSelectedParty(match.id || match.party_id);
+      }
+    } catch { /* storage unavailable or bad data: leave the party empty */ }
+  }, [parties, orderType, isSalesman, selectedParty]);
+
   // Fetch events when event_order is selected (for salesman)
   useEffect(() => {
     if (isSalesman && orderType === 'event_order') {
@@ -1229,6 +1245,7 @@ const Cart = ({ onPageChange = null }) => {
       
       // Reset form. Nothing from this order may leak into the next one: the note,
       // typed quantities and the captured visit location are forgotten too.
+      try { sessionStorage.removeItem('stallion.checkinParty'); } catch { /* ignore */ }
       setSelectedParty("");
       setSelectedEvent("");
       setSelectedCountry("");

@@ -25,6 +25,7 @@ import { showError, showSuccess, showWarning } from '../services/notificationSer
 import { captureCurrentPosition } from '../utils/geolocation';
 import { downloadCsv } from '../utils/exportCsv';
 import '../styles/redesign-n-party.css';
+import GooeySearch from '../components/ui/GooeySearch';
 
 const DashboardClients = () => {
   const confirm = useConfirm();
@@ -1574,10 +1575,14 @@ const DashboardClients = () => {
         </div>
         <div className="dash-row party-tools">
           <div className="gtools">
-            <label className="gsearch">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4-4" /></svg>
-              <input type="search" value={partySearch} onChange={e => setPartySearch(e.target.value)} placeholder="Search name, city, phone or GST" aria-label="Search parties" />
-            </label>
+            <GooeySearch
+              value={partySearch}
+              onChange={setPartySearch}
+              placeholder="Search name, city, phone or GST"
+              label="Search parties"
+              openWidth={260}
+              rowOnPhone
+            />
             <button type="button" className="gbtn" onClick={handleExportParties} disabled={loading || filteredRowsByTab.length === 0}>Export CSV</button>
           </div>
           <div className="gchips" role="group" aria-label="Location">

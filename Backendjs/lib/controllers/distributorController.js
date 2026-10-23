@@ -4,6 +4,7 @@ const User = require('../models/User');
 const { Op } = require('sequelize');
 const Party = require('../models/Party');
 const Zone = require('../models/Zone');
+const Salesman = require('../models/Salesman');
 const DistributorZones = require('../models/DistributorZones');
 const DistributorStates = require('../models/DistributorStates');
 const State = require('../models/State');
@@ -49,6 +50,18 @@ class DistributorController {
                     partyActiveFilter(req.userRoleNames)
                 ),
                 order: [['created_at', 'ASC'], ['party_id', 'ASC']],
+            }, async (rows) => {
+                // One Salesman lookup per page so the Party page can show the salesman's name.
+                const salesmanIds = [...new Set(rows.map((r) => r.salesman_id).filter(Boolean))];
+                const salesmen = salesmanIds.length
+                    ? await Salesman.findAll({ where: { salesman_id: salesmanIds }, attributes: ['salesman_id', 'full_name'] })
+                    : [];
+                const nameById = {};
+                salesmen.forEach((s) => { nameById[s.salesman_id] = s.full_name; });
+                return rows.map((r) => ({
+                    ...(typeof r.toJSON === 'function' ? r.toJSON() : r),
+                    salesman_name: nameById[r.salesman_id] || null,
+                }));
             });
             res.status(200).json(body);
         } catch (error) {

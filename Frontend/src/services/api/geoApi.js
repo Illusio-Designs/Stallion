@@ -7,8 +7,10 @@ import { getCached, invalidateCache } from '../cacheService';
  * Get all countries
  * @returns {Promise<Array>} Array of country objects
  */
-export const getCountries = async () => {
-  return getCached('countries', () => apiRequest('/countries', {
+export const getCountries = async ({ includeInactive = false } = {}) => {
+  // include_inactive is honoured by the backend for admin/office roles only.
+  const suffix = includeInactive ? '?include_inactive=true' : '';
+  return getCached(includeInactive ? 'countries:inactive' : 'countries', () => apiRequest(`/countries${suffix}`, {
     method: 'GET',
     includeAuth: true,
   }), TTL_LOOKUP);
@@ -18,8 +20,8 @@ export const getCountries = async () => {
  * Countries for forms and filters: India only (the business operates in India).
  * The Manage page keeps using getCountries so admins can still see every country.
  */
-export const getIndianCountries = async () => {
-  const res = await getCountries();
+export const getIndianCountries = async (opts = {}) => {
+  const res = await getCountries(opts);
   const list = Array.isArray(res) ? res : (res?.data || []);
   const india = list.filter((c) => {
     const name = String(c?.name || '').trim().toLowerCase();
@@ -60,10 +62,10 @@ export const createCountry = async (countryData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const updateCountry = async (countryId, countryData) => {
-  const { name, code, phone_code, currency } = countryData;
+  const { name, code, phone_code, currency, is_active } = countryData;
   const result = await apiRequest(`/countries/${countryId}`, {
     method: 'PUT',
-    body: { name, code, phone_code, currency },
+    body: { name, code, phone_code, currency, ...(is_active === undefined ? {} : { is_active }) },
     includeAuth: true,
   });
   invalidateCache('countries');
@@ -91,10 +93,10 @@ export const deleteCountry = async (countryId) => {
  * @param {string} countryId - Country ID (UUID)
  * @returns {Promise<Array>} Array of state objects
  */
-export const getStates = async (countryId) => {
+export const getStates = async (countryId, { includeInactive = false } = {}) => {
   try {
     // Use POST to /states/get with country_id in body
-    const response = await apiRequest('/states/get', {
+    const response = await apiRequest(`/states/get${includeInactive ? '?include_inactive=true' : ''}`, {
       method: 'POST',
       body: { country_id: countryId },
       includeAuth: true,
@@ -148,10 +150,10 @@ export const createState = async (stateData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const updateState = async (stateId, stateData) => {
-  const { name, code, country_id } = stateData;
+  const { name, code, country_id, is_active } = stateData;
   return apiRequest(`/states/${stateId}`, {
     method: 'PUT',
-    body: { name, code, country_id },
+    body: { name, code, country_id, ...(is_active === undefined ? {} : { is_active }) },
     includeAuth: true,
   });
 };
@@ -175,9 +177,9 @@ export const deleteState = async (stateId) => {
  * @param {string} stateId - State ID (UUID)
  * @returns {Promise<Array>} Array of city objects
  */
-export const getCities = async (stateId) => {
+export const getCities = async (stateId, { includeInactive = false } = {}) => {
   try {
-    const response = await fetchAllPages('/cities/get', {
+    const response = await fetchAllPages(`/cities/get${includeInactive ? '?include_inactive=true' : ''}`, {
       method: 'POST',
       body: { state_id: stateId },
       includeAuth: true,
@@ -230,10 +232,10 @@ export const createCity = async (cityData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const updateCity = async (cityId, cityData) => {
-  const { name, state_id } = cityData;
+  const { name, state_id, is_active } = cityData;
   return apiRequest(`/cities/${cityId}`, {
     method: 'PUT',
-    body: { name, state_id },
+    body: { name, state_id, ...(is_active === undefined ? {} : { is_active }) },
     includeAuth: true,
   });
 };
@@ -257,9 +259,9 @@ export const deleteCity = async (cityId) => {
  * @param {string} cityId - City ID (UUID)
  * @returns {Promise<Array>} Array of zone objects
  */
-export const getZones = async (cityId) => {
+export const getZones = async (cityId, { includeInactive = false } = {}) => {
   try {
-    const response = await apiRequest('/zones/get', {
+    const response = await apiRequest(`/zones/get${includeInactive ? '?include_inactive=true' : ''}`, {
       method: 'POST',
       body: { city_id: cityId },
       includeAuth: true,
@@ -283,13 +285,13 @@ export const getZones = async (cityId) => {
  * @param {string} countryId - Country ID (optional, defaults to India)
  * @returns {Promise<Array>} Array of all zone objects (deduplicated)
  */
-const fetchAllZonesUncached = async () => {
+const fetchAllZonesUncached = async (includeInactive = false) => {
   try {
     // POST /zones/get with no city_id returns ALL active zones in a SINGLE call
     // (the backend filters only by is_active when city_id is omitted). This
     // replaces the old states -> cities -> zones walk, which fired 100+ requests
     // (one /cities/get per state + one /zones/get per city) on every form open.
-    const resp = await apiRequest('/zones/get', {
+    const resp = await apiRequest(`/zones/get${includeInactive ? '?include_inactive=true' : ''}`, {
       method: 'POST',
       body: {},
       includeAuth: true,
@@ -319,8 +321,8 @@ const fetchAllZonesUncached = async () => {
  * @param {string} [countryId] - ignored; kept for call-site compatibility
  * @returns {Promise<Array>}
  */
-export const getAllZones = async (countryId) => {
-  return getCached('allZones:all', () => fetchAllZonesUncached(), TTL_LOOKUP);
+export const getAllZones = async (countryId, { includeInactive = false } = {}) => {
+  return getCached(includeInactive ? 'allZones:inactive' : 'allZones:all', () => fetchAllZonesUncached(includeInactive), TTL_LOOKUP);
 };
 
 /**
@@ -358,10 +360,10 @@ export const createZone = async (zoneData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const updateZone = async (zoneId, zoneData) => {
-  const { name, description, city_id, state_id, country_id, zone_code } = zoneData;
+  const { name, description, city_id, state_id, country_id, zone_code, is_active } = zoneData;
   const result = await apiRequest(`/zones/${zoneId}`, {
     method: 'PUT',
-    body: { name, description, city_id, state_id, country_id, zone_code },
+    body: { name, description, city_id, state_id, country_id, zone_code, ...(is_active === undefined ? {} : { is_active }) },
     includeAuth: true,
   });
   invalidateCache('allZones:');

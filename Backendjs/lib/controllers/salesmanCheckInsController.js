@@ -8,6 +8,8 @@ const { SalesmanCheckInType } = require('../constants/enums');
 const { checkGeofence } = require('../utils/geo');
 const { isOfficeRole, hasRole } = require('../utils/roleHelpers');
 
+const IN_PROGRESS_MARK = '[In progress]';
+
 // Who is calling: office roles (admin, sales/reports managers, ...) can see and
 // manage every check-in; a salesman only their own; everyone else none.
 async function resolveActor(req) {
@@ -57,6 +59,7 @@ async function enrichCheckIns(checkIns) {
         const p = partyMap[r.party_id] || null;
         return {
             ...r,
+            in_progress: typeof r.check_in_remarks === 'string' && r.check_in_remarks.startsWith(IN_PROGRESS_MARK),
             party_name: p ? p.party_name : null,
             party_latitude: p ? p.latitude : null,
             party_longitude: p ? p.longitude : null,
@@ -166,6 +169,17 @@ class SalesmanCheckInsController {
             if (clientRequestId && body.salesman_id) {
                 const already = await SalesmanCheckIns.findOne({ where: { client_request_id: clientRequestId, salesman_id: body.salesman_id } });
                 if (already) return res.status(200).json(already);
+            }
+            // Start-only check-in ("I'm at the shop"): the out time and next visit date are not
+            // known yet. The columns are NOT NULL, so placeholders are kept server-side and the
+            // remark is marked "[In progress]" until the salesman saves the visit report.
+            if (body.start_only === true || body.start_only === 'true') {
+                const inAt = new Date(body.in_time);
+                if (!body.out_time && !Number.isNaN(inAt.getTime())) {
+                    body.out_time = new Date(inAt.getTime() + 60 * 1000).toISOString();
+                }
+                if (!body.next_visit_date) body.next_visit_date = body.check_in_date;
+                body.check_in_remarks = `${IN_PROGRESS_MARK} ${String(body.check_in_remarks || '').trim()}`.trim();
             }
             const fields = resolveCheckInFields(body);
             const validationError = validateCheckInFields(fields);
@@ -314,7 +328,11 @@ class SalesmanCheckInsController {
             body.party_id = existingCheckIn.party_id;
             body.check_in_date = existingCheckIn.check_in_date;
 
+            // Saving the visit report completes a started visit: drop the in-progress mark.
             const fields = resolveCheckInFields(body, existingCheckIn.toJSON());
+            if (typeof fields.check_in_remarks === 'string' && fields.check_in_remarks.startsWith(IN_PROGRESS_MARK)) {
+                fields.check_in_remarks = fields.check_in_remarks.slice(IN_PROGRESS_MARK.length).trim();
+            }
             // The location was checked against the geofence when the check-in was
             // created. Editing later (remarks, times) keeps that stored point and
             // is not re-checked, so it works from anywhere.

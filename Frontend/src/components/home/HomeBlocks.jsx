@@ -240,20 +240,17 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
       }
       const now = new Date();
       const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      // Same payload as the visit report form. The server needs an out time and a next visit
-      // date, so a short placeholder is used here; the salesman completes them in the visit report.
+      // Start-only check-in: the salesman completes out time and next visit date in the visit report.
       const payload = {
+        start_only: true,
         salesman_id: salesmanId,
         check_in_date: day,
         party_id: idOf(party),
         contact_person: (party.contact_person || party.party_name || party.name || 'Shop').trim(),
         type: 'visit',
         in_time: now.toISOString(),
-        out_time: new Date(now.getTime() + 60 * 1000).toISOString(),
-        next_visit_date: day,
         latitude: String(result.pos.latitude),
         longitude: String(result.pos.longitude),
-        check_in_remarks: 'Checked in from Home. Update the visit report after the visit.',
       };
       try {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('offline');
@@ -264,6 +261,13 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
         queueCheckin(payload);
         showInfo('', null, 'Saved on this phone', 'There is no signal right now. This check-in will be sent when you are online.');
       }
+      try {
+        sessionStorage.setItem('stallion.checkinParty', JSON.stringify({
+          party_id: idOf(party),
+          party_name: party.party_name || party.name || '',
+          at: Date.now(),
+        }));
+      } catch { /* storage unavailable: the cart simply asks for the party */ }
       router.push('/products');
     } catch (err) {
       showError(err?.message || 'Could not check in. Please try again.');

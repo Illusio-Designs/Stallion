@@ -290,7 +290,7 @@ const Header = ({ onPageChange, currentPage }) => {
         </nav>
 
         <div className="header-actions flex items-center gap-2 md:gap-5">
-          <div className="hidden sm:flex">
+          <div className="flex">
             <GooeySearch
               value={searchQuery}
               onChange={(q) => handleSearchChange({ target: { value: q } })}
@@ -298,6 +298,7 @@ const Header = ({ onPageChange, currentPage }) => {
               placeholder="Search products..."
               label="Search products"
               openWidth={220}
+              phoneAuto
             />
           </div>
           <div className="action-icons flex items-center gap-2">

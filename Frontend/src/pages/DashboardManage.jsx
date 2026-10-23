@@ -64,6 +64,8 @@ const updateAttr = async (cfg, id, payload) => {
   invalidateCache(cfg.cache);
   return r;
 };
+// Manage lists every item (active and inactive) so inactive ones can be switched back on.
+const INC = { includeInactive: true };
 const GEO_TABS = ['Country', 'State', 'City', 'Zone'];
 const attrRowId = (cfg, item) => item[cfg.idKey] ?? item.id;
 
@@ -172,7 +174,7 @@ const DashboardManage = () => {
       }
       
       fetchingStatesRef.current = true;
-      getStates(stateCountryFilter)
+      getStates(stateCountryFilter, INC)
         .then((statesData) => {
           setStates(statesData || []);
         })
@@ -211,7 +213,7 @@ const DashboardManage = () => {
         }
         
         fetchingStatesRef.current = true;
-        getStates(india.id)
+        getStates(india.id, INC)
           .then((statesData) => {
             setStates(statesData || []);
           })
@@ -256,7 +258,7 @@ const DashboardManage = () => {
       }
       
       fetchingCitiesRef.current = true; 
-      getCities(cityStateFilter)
+      getCities(cityStateFilter, INC)
         .then((citiesData) => {
           setCities(citiesData || []);
         })
@@ -335,7 +337,7 @@ const DashboardManage = () => {
     try {
       switch (tab) {
         case 'Country':
-          const countriesData = await getIndianCountries().catch((error) => {
+          const countriesData = await getIndianCountries(INC).catch((error) => {
             if (!error.message?.toLowerCase().includes('token expired') && 
                 !error.message?.toLowerCase().includes('unauthorized')) {
               console.error('Error fetching countries:', error);
@@ -353,7 +355,7 @@ const DashboardManage = () => {
         
         case 'State':
           // Only fetch countries, states will be fetched when country filter is selected
-          const countriesForStates = await getIndianCountries().catch(() => []);
+          const countriesForStates = await getIndianCountries(INC).catch(() => []);
           setCountries(countriesForStates || []);
           // Don't fetch states here - wait for country filter selection
           setStates([]);
@@ -361,7 +363,7 @@ const DashboardManage = () => {
         
         case 'City':
           // Only fetch countries, states will be fetched for default country (India)
-          const countriesForCities = await getIndianCountries().catch(() => []);
+          const countriesForCities = await getIndianCountries(INC).catch(() => []);
           setCountries(countriesForCities || []);
           // Don't fetch states here - wait for default country selection
           setStates([]);
@@ -372,8 +374,8 @@ const DashboardManage = () => {
         case 'Zone':
           // Fetch all zones directly, and cities for the filter dropdown
           const [allZonesData, countriesForZones] = await Promise.all([
-            getAllZones().catch(() => []),
-            getIndianCountries().catch(() => []),
+            getAllZones(undefined, INC).catch(() => []),
+            getIndianCountries(INC).catch(() => []),
           ]);
           setAllZones(allZonesData || []);
           setZones(allZonesData || []);
@@ -383,9 +385,9 @@ const DashboardManage = () => {
             c.name?.toLowerCase() === 'india' || c.code?.toLowerCase() === 'in'
           );
           if (indiaForZone) {
-            const statesForZone = await getStates(indiaForZone.id).catch(() => []);
+            const statesForZone = await getStates(indiaForZone.id, INC).catch(() => []);
             const allCitiesPromises = (statesForZone || []).map(s =>
-              getCities(s.id).catch(() => [])
+              getCities(s.id, INC).catch(() => [])
             );
             const citiesArrays = await Promise.all(allCitiesPromises);
             setCities(citiesArrays.flat());
@@ -423,7 +425,7 @@ const DashboardManage = () => {
 
   const fetchStates = async (countryId, updateMainArray = false) => {
     try {
-      const statesData = await getStates(countryId);
+      const statesData = await getStates(countryId, INC);
       // Only update main states array if we're on State tab or explicitly requested
       if (updateMainArray || activeTab === 'State') {
         setStates(statesData || []);
@@ -445,7 +447,7 @@ const DashboardManage = () => {
 
   const fetchCities = async (stateId, updateMainArray = false) => {
     try {
-      const citiesData = await getCities(stateId);
+      const citiesData = await getCities(stateId, INC);
       // Only update main cities array if we're on City tab or explicitly requested
       if (updateMainArray || activeTab === 'City') {
         setCities(citiesData || []);
@@ -467,7 +469,7 @@ const DashboardManage = () => {
 
   const fetchZones = async (cityId) => {
     try {
-      const zonesData = await getZones(cityId);
+      const zonesData = await getZones(cityId, INC);
       setZones(zonesData || []);
     } catch (error) {
       // Don't log token expiration errors as they're handled by apiService
@@ -491,6 +493,7 @@ const DashboardManage = () => {
         code: country.code,
         phone_code: country.phone_code,
         currency: country.currency,
+        isActive: country.is_active !== false,
         details: `${country.code} | ${country.phone_code} | ${country.currency}`,
         data: country,
       });
@@ -502,6 +505,7 @@ const DashboardManage = () => {
         id: state.id,
         type: 'State',
         name: state.name,
+        isActive: state.is_active !== false,
         details: `${state.code} | ${country?.name || 'N/A'}`,
         data: state,
       });
@@ -513,6 +517,7 @@ const DashboardManage = () => {
         id: city.id,
         type: 'City',
         name: city.name,
+        isActive: city.is_active !== false,
         details: state?.name || 'N/A',
         data: city,
       });
@@ -524,6 +529,7 @@ const DashboardManage = () => {
         id: zone.id,
         type: 'Zone',
         name: zone.name,
+        isActive: zone.is_active !== false,
         details: `${zone.zone_code || 'N/A'} | ${city?.name || 'N/A'}`,
         data: zone,
       });
@@ -555,6 +561,9 @@ const DashboardManage = () => {
         { key: 'code', label: 'CODE' },
         { key: 'phone_code', label: 'PHONE CODE' },
         { key: 'currency', label: 'CURRENCY' },
+        { key: 'isActive', label: 'STATUS', render: (_v, row) => (
+          <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>{row.isActive ? 'Active' : 'Inactive'}</StatusBadge>
+        ) },
         { key: 'action', label: 'ACTION', render: (_v, row) => (
           <RowActions 
             onEdit={() => handleEdit(row)} 
@@ -580,6 +589,9 @@ const DashboardManage = () => {
       { key: 'type', label: 'TYPE' },
       { key: 'name', label: 'NAME' },
       { key: 'details', label: 'DETAILS' },
+      { key: 'isActive', label: 'STATUS', render: (_v, row) => (
+        <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>{row.isActive ? 'Active' : 'Inactive'}</StatusBadge>
+      ) },
       { key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions 
           onEdit={() => handleEdit(row)} 
@@ -694,6 +706,7 @@ const DashboardManage = () => {
             code: formData.code,
             phone_code: formData.phone_code,
             currency: formData.currency,
+            ...(editRow ? { is_active: formData.is_active !== false } : {}),
           };
           if (editRow) {
             await updateCountry(editRow.id, dataToSend);
@@ -706,6 +719,7 @@ const DashboardManage = () => {
             name: formData.name,
             code: formData.code,
             country_id: formData.country_id,
+            ...(editRow ? { is_active: formData.is_active !== false } : {}),
           };
           if (editRow) {
             await updateState(editRow.id, dataToSend);
@@ -717,6 +731,7 @@ const DashboardManage = () => {
           dataToSend = {
             name: formData.name,
             state_id: formData.state_id,
+            ...(editRow ? { is_active: formData.is_active !== false } : {}),
           };
           if (editRow) {
             await updateCity(editRow.id, dataToSend);
@@ -732,6 +747,7 @@ const DashboardManage = () => {
             state_id: formData.state_id,
             country_id: formData.country_id,
             zone_code: formData.zone_code || '',
+            ...(editRow ? { is_active: formData.is_active !== false } : {}),
           };
           if (editRow) {
             await updateZone(editRow.id, dataToSend);
@@ -1234,6 +1250,24 @@ const DashboardManage = () => {
       >
         <form className="ui-form" onSubmit={handleSubmit}>
           {renderFormFields()}
+          {GEO_TABS.includes(formData.type) && (
+            <div className="form-group form-group--full">
+              <label className="ui-label">Status</label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formData.is_active !== false}
+                onClick={() => handleInputChange('is_active', formData.is_active === false)}
+                className="mng-switch"
+              >
+                <span className={`mng-switch__track ${formData.is_active !== false ? 'is-on' : ''}`}>
+                  <span className="mng-switch__dot" />
+                </span>
+                <span className="mng-switch__label">{formData.is_active !== false ? 'Active' : 'Inactive'}</span>
+              </button>
+              <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted.</p>
+            </div>
+          )}
         </form>
       </AsidePanel>
     </div>
