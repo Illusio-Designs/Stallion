@@ -8,6 +8,16 @@ import { hasAnyRolePageAccess } from '../utils/rolePermissions';
 // Only the lists the signed-in role can open are asked for, and the server does the matching.
 const FIELD_ROLES = new Set(['salesman', 'distributor', 'party']);
 
+// Which hidden field made a row match, so a result never looks unrelated to what was typed.
+const matchedIn = (item, term, fields) => {
+  const t = String(term || '').trim().toLowerCase();
+  if (!t) return '';
+  const hit = fields.find(([key]) => String(item[key] ?? '').toLowerCase().includes(t));
+  return hit ? `${hit[1]}: ${item[hit[0]]}` : '';
+};
+const PARTY_MATCH = [['party_name', 'Name'], ['trade_name', 'Trade name'], ['contact_person', 'Contact'], ['phone', 'Phone'], ['city_name', 'City'], ['gstin', 'GST']];
+const ORDER_MATCH = [['order_number', 'Order'], ['party_name', 'Party'], ['order_status', 'Status'], ['courier_name', 'Courier'], ['courier_tracking_number', 'Tracking']];
+
 const GlobalSearchResults = ({ query, onPick }) => {
   const [state, setState] = useState({ loading: false, parties: [], orders: [], products: [], done: false });
   const [open, setOpen] = useState(true);
@@ -74,8 +84,8 @@ const GlobalSearchResults = ({ query, onPick }) => {
   return (
     <div className="gs-pop" ref={boxRef} role="region" aria-label="Search results">
       {loading && <div className="gs-note">Searching…</div>}
-      <Group title="Parties" items={parties} page="party" label={(x) => x.party_name || x.name || 'Party'} sub={(x) => x.phone || ''} />
-      <Group title="Orders" items={orders} page="orders" label={(x) => x.order_number || 'Order'} sub={(x) => [x.party_name, x.order_status].filter(Boolean).join(' · ')} />
+      <Group title="Parties" items={parties} page="party" label={(x) => x.party_name || x.name || 'Party'} sub={(x) => { const m = matchedIn(x, term, PARTY_MATCH); return m && !m.startsWith('Name:') && !m.startsWith('Phone:') ? m : (x.phone || m || ''); }} />
+      <Group title="Orders" items={orders} page="orders" label={(x) => x.order_number || 'Order'} sub={(x) => { const m = matchedIn(x, term, ORDER_MATCH); return [x.party_name, x.order_status, m && !m.startsWith('Order:') && !m.startsWith('Party:') && !m.startsWith('Status:') ? m : ''].filter(Boolean).join(' · '); }} />
       <Group title="Products" items={products} page="dashboard-products" label={(x) => x.model_no || 'Product'} sub={(x) => (x.whp ? `₹${x.whp}` : '')} />
       {nothing && <div className="gs-note">Nothing found for “{term}”.</div>}
     </div>
