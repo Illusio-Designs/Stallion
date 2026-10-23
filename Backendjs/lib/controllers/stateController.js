@@ -1,4 +1,5 @@
 const State = require('../models/State');
+const { activeFilter, activeUpdate } = require('../utils/geoActive');
 const { logAudit } = require('../utils/auditLogger');
 const Country = require('../models/Country');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
@@ -14,7 +15,7 @@ class StateController {
                 nameFields: ['name', 'code'],
                 phoneFields: [],
             });
-            const where = mergeWhere({ is_active: true, country_id }, searchFilter);
+            const where = mergeWhere({ ...activeFilter(req), country_id }, searchFilter);
             const states = await State.findAll({ where });
             res.status(200).json(states);
         } catch (error) {
@@ -90,6 +91,7 @@ class StateController {
                 name: name || state.name,
                 code: code || state.code,
                 country_id: country_id || state.country_id,
+                ...activeUpdate(req.body),
                 updated_at: new Date(),
                 updated_by: user.user_id
             };

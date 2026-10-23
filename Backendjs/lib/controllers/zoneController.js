@@ -8,6 +8,7 @@ const SalesmanZones = require('../models/SalesmanZones');
 const Distributor = require('../models/distributor');
 const DistributorZones = require('../models/DistributorZones');
 const User = require('../models/User');
+const { activeFilter, activeUpdate } = require('../utils/geoActive');
 const { Op } = require('sequelize');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 class ZoneController {
@@ -22,7 +23,7 @@ class ZoneController {
                 nameFields: ['name', 'zone_code'],
                 phoneFields: [],
             });
-            const where = mergeWhere({ is_active: true, city_id }, searchFilter);
+            const where = mergeWhere({ ...activeFilter(req), city_id }, searchFilter);
             const zones = await Zone.findAll({ where });
             res.status(200).json(zones);
         } catch (error) {
@@ -197,6 +198,7 @@ class ZoneController {
                 state_id,
                 country_id,
                 zone_code,
+                ...activeUpdate(req.body),
                 updated_at: new Date(),
                 updated_by: user.user_id
             };

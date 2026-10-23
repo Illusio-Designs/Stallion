@@ -1,4 +1,5 @@
 const City = require('../models/Cities');
+const { activeFilter, activeUpdate } = require('../utils/geoActive');
 const { logAudit } = require('../utils/auditLogger');
 const State = require('../models/State');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
@@ -18,7 +19,7 @@ class CityController {
                 nameFields: ['name'],
                 phoneFields: [],
             });
-            const where = mergeWhere({ is_active: true, state_id }, searchFilter);
+            const where = mergeWhere({ ...activeFilter(req), state_id }, searchFilter);
             const { count, rows: cities } = await City.findAndCountAll({
                 where,
                 limit: pagination.limit,
@@ -100,6 +101,7 @@ class CityController {
             const payload = {
                 name: name || city.name,
                 state_id: state_id || city.state_id,
+                ...activeUpdate(req.body),
                 updated_at: new Date(),
                 updated_by: user.user_id
             };
