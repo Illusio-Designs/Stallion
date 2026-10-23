@@ -30,6 +30,7 @@ const { canManageOrders, normalizeRole, hasRole } = require('../utils/roleHelper
 const { resolveUserScope, canViewAllOrders } = require('../utils/scopeHelpers');
 const { salesmanCoversState, salesmanStateIds } = require('../utils/workingStates');
 const { recordStockMove } = require('../utils/stockLedger');
+const { toInt, allocateShipped, planItemCancel, spreadOver } = require('../utils/orderCancel');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 const orderPartyInclude = {
@@ -63,6 +64,7 @@ function sumItemQty(items) {
 //   in_transit_qty    pieces on a courier right now
 //   received_tray_qty pieces the office has received back from trays
 //   shipped_qty       pieces already sent in shipments
+//   cancelled_qty     unsent pieces cancelled after part of the order was shipped (0 otherwise)
 //   ready_qty         pieces that can be sent right now
 async function decorateOrders(plainOrders, { transaction } = {}) {
     const ids = plainOrders.map((o) => o.order_id).filter(Boolean);
@@ -112,14 +114,15 @@ async function decorateOrders(plainOrders, { transaction } = {}) {
         const tasks = tasksByOrder[o.order_id] || [];
         const shipped_qty = shipments.reduce((s, sh) => s + sh.qty, 0);
         const sumQty = (statuses) => tasks.filter((t) => statuses.includes(t.status)).reduce((s, t) => s + t.qty, 0);
-        const terminal = NO_HELD_STATUSES.includes(o.order_status);
+        const cancelled_qty = Number(o.cancelled_qty) || 0;
+        const terminal = NO_HELD_STATUSES.includes(o.order_status) || cancelled_qty > 0;
         const held_qty = terminal ? 0 : sumQty(['booked', 'in_transit']);
         const in_transit_qty = sumQty(['in_transit']);
         const received_tray_qty = sumQty(['received']);
-        const ready_qty = READY_STATUSES.includes(o.order_status)
+        const ready_qty = READY_STATUSES.includes(o.order_status) && cancelled_qty === 0
             ? Math.max(0, total_qty - shipped_qty - held_qty)
             : 0;
-        return { ...o, total_qty, tray_qty, held_qty, in_transit_qty, received_tray_qty, shipped_qty, ready_qty, shipments, tasks };
+        return { ...o, total_qty, tray_qty, held_qty, in_transit_qty, received_tray_qty, shipped_qty, cancelled_qty, ready_qty, shipments, tasks };
     });
 }
 
@@ -277,8 +280,13 @@ async function cancelTrayTasks(order, transaction) {
     }
 }
 
-// Helper function to reverse an order operation (does not depend on controller instance)
-async function reverseOrderOperation(orderId, transaction, actor = null) {
+// Helper function to reverse an order operation (does not depend on controller instance).
+// shippedByProduct (optional) is the number of already SHIPPED pieces per product (see
+// allocateShipped). Those pieces are left alone: only the unsent part goes back to stock, and the
+// order's operation row is kept, shrunk to the shipped pieces. With nothing shipped (the default)
+// everything goes back and the operation rows are removed, as for any full cancel.
+// Returns { restoredQty } = the pieces put back into stock (warehouse + tray).
+async function reverseOrderOperation(orderId, transaction, actor = null, { shippedByProduct = {} } = {}) {
     const orderRow = await Order.findOne({ where: { order_id: orderId }, attributes: ['order_number'], transaction });
     const orderOperations = await OrderOperation.findAll({
         where: { order_id: orderId },
@@ -290,6 +298,7 @@ async function reverseOrderOperation(orderId, transaction, actor = null) {
         where: { order_id: orderId, status: 'received' },
         transaction,
     });
+    let restoredQty = 0;
     for (let i = 0; i < orderOperations.length; i++) {
         const orderOperation = orderOperations[i];
         const receivedByTray = {};
@@ -300,11 +309,16 @@ async function reverseOrderOperation(orderId, transaction, actor = null) {
             receivedByTray[t.tray_id] = (receivedByTray[t.tray_id] || 0) + q;
             receivedTotal += q;
         });
+        const shipped = toInt(shippedByProduct[orderOperation.product_id]);
         // Never move more out of the tray side than was taken from it.
-        receivedTotal = Math.min(receivedTotal, Number(orderOperation.tray_reduced_qty) || 0);
-        const warehouseReducedQty = (Number(orderOperation.warehouse_reduced_qty) || 0) + receivedTotal;
-        const trayReducedQty = (Number(orderOperation.tray_reduced_qty) || 0) - receivedTotal;
-        const totalReducedQty = orderOperation.total_reduced_qty;
+        const plan = planItemCancel({
+            warehouse: orderOperation.warehouse_reduced_qty,
+            tray: orderOperation.tray_reduced_qty,
+            received: receivedTotal,
+            shipped,
+        });
+        const warehouseReducedQty = plan.unsentWarehouse + plan.unsentReceived;
+        const trayReducedQty = plan.unsentBooked;
         const product = await Product.findOne({
             where: { product_id: orderOperation.product_id },
             transaction,
@@ -318,6 +332,7 @@ async function reverseOrderOperation(orderId, transaction, actor = null) {
         // Always derive total from warehouse + tray so it can never drift.
         product.total_qty = (Number(product.warehouse_qty) || 0) + (Number(product.tray_qty) || 0);
         await product.save({ transaction });
+        restoredQty += warehouseReducedQty + trayReducedQty;
         await recordStockMove({
             transaction,
             productId: product.product_id,
@@ -330,15 +345,25 @@ async function reverseOrderOperation(orderId, transaction, actor = null) {
             reference: orderRow ? orderRow.order_number : null,
         });
         const trayIds = Array.isArray(orderOperation.tray_ids) ? orderOperation.tray_ids : [];
-        for (let j = 0; j < trayIds.length; j++) {
-            const entry = trayIds[j] || {};
+        // Booked tray pieces of each tray part (received frames are no longer in the tray).
+        const parts = trayIds.map((entry) => {
+            const e = entry || {};
+            const takenBack = Math.min(receivedByTray[e.tray_id] || 0, Number(e.qty) || 0);
+            const qty = (Number(e.qty) || 0) - takenBack;
+            if (takenBack > 0) receivedByTray[e.tray_id] -= takenBack;
+            return { entry: e, takenBack, qty };
+        });
+        const gives = shipped > 0
+            ? spreadOver(parts.map((p) => p.qty), trayReducedQty)
+            : parts.map((p) => p.qty);
+        for (let j = 0; j < parts.length; j++) {
+            const { entry, takenBack, qty } = parts[j];
             const trayId = entry.tray_id;
-            // Frames of this tray part that were received are no longer in the tray.
-            const takenBack = Math.min(receivedByTray[trayId] || 0, Number(entry.qty) || 0);
-            const qty = (Number(entry.qty) || 0) - takenBack;
+            const give = gives[j];
             const status = entry.status;
-            if (takenBack > 0) receivedByTray[trayId] -= takenBack;
             if (takenBack > 0 && qty <= 0) continue;
+            // Booked frames of this part that were already sent stay out of the tray.
+            if (shipped > 0 && give <= 0 && qty > 0) continue;
             // Skip malformed/legacy entries without a tray id — querying with an
             // undefined tray_id throws ("WHERE parameter tray_id has invalid
             // undefined value") and aborts the whole reversal/delete.
@@ -352,14 +377,26 @@ async function reverseOrderOperation(orderId, transaction, actor = null) {
             if (!trayProduct) {
                 continue;
             }
-            trayProduct.qty = trayProduct.qty + (qty || 0);
+            trayProduct.qty = trayProduct.qty + (give || 0);
             if (status) {
                 trayProduct.status = status;
             }
             await trayProduct.save({ transaction });
         }
-        await orderOperation.destroy({ transaction });
+        const keptWarehouse = plan.shippedWarehouse;
+        const keptReceived = plan.shippedReceived;
+        if (shipped > 0 && keptWarehouse + keptReceived > 0) {
+            // Keep what the shipped pieces took out of stock, so a later delete stays correct.
+            orderOperation.warehouse_reduced_qty = keptWarehouse;
+            orderOperation.tray_reduced_qty = keptReceived;
+            orderOperation.total_reduced_qty = keptWarehouse + keptReceived;
+            orderOperation.tray_ids = [];
+            await orderOperation.save({ transaction });
+        } else {
+            await orderOperation.destroy({ transaction });
+        }
     }
+    return { restoredQty };
 }
 
 
@@ -1257,13 +1294,44 @@ class OrderController {
                         lock: transaction.LOCK.UPDATE,
                     });
                     if (!locked || locked.order_status === OrderStatus.CANCELLED) return 'already';
-                    const sent = await OrderShipment.sum('qty', { where: { order_id: locked.order_id }, transaction });
-                    if (Number(sent) > 0) return 'shipped';
+                    const sent = Number(await OrderShipment.sum('qty', { where: { order_id: locked.order_id }, transaction })) || 0;
                     const inTransit = await TrayReturnTask.count({
                         where: { order_id: locked.order_id, status: 'in_transit' },
                         transaction,
                     });
                     if (inTransit > 0) return 'in_transit';
+                    if (sent > 0) {
+                        // Part of the order was already sent: cancel only the unsent pieces.
+                        // The sent pieces are not touched; the order then counts as dispatched
+                        // (everything left is resolved) and can be marked completed.
+                        const totalQty = sumItemQty(locked.order_items);
+                        const unsent = totalQty - sent - (Number(locked.cancelled_qty) || 0);
+                        if (unsent < 1) return 'nothing_left';
+                        const { restoredQty } = await reverseOrderOperation(locked.order_id, transaction, req.user, {
+                            shippedByProduct: allocateShipped(locked.order_items, sent),
+                        });
+                        await cancelTrayTasks(locked, transaction);
+                        const before = locked.toJSON();
+                        locked.order_status = OrderStatus.DISPATCHED;
+                        locked.cancelled_qty = (Number(locked.cancelled_qty) || 0) + unsent;
+                        locked.cancel_reason = cancelReason;
+                        locked.cancelled_by = user ? user.user_id : null;
+                        locked.cancelled_at = cancelledAt;
+                        if (!locked.dispatched_at) locked.dispatched_at = cancelledAt;
+                        locked.updated_at = new Date();
+                        await locked.save({ transaction });
+                        await logAudit({
+                            req,
+                            transaction,
+                            action: 'update',
+                            description: `Order partly cancelled: ${unsent} of ${totalQty} pieces cancelled, ${sent} already sent, ${restoredQty} returned to stock`,
+                            tableName: 'order',
+                            recordId: locked.order_id,
+                            oldValues: before,
+                            newValues: locked,
+                        });
+                        return 'partial';
+                    }
                     await reverseOrderOperation(locked.order_id, transaction, req.user);
                     await cancelTrayTasks(locked, transaction);
                     locked.order_status = OrderStatus.CANCELLED;
@@ -1280,8 +1348,12 @@ class OrderController {
                 if (outcome === 'in_transit') {
                     return res.status(409).json({ error: 'A tray parcel for this order is on its way. Wait until the office marks it received, then cancel.' });
                 }
-                if (outcome === 'shipped') {
-                    return res.status(409).json({ error: 'Some pieces were already sent, so this order can no longer be cancelled. Complete it instead.' });
+                if (outcome === 'nothing_left') {
+                    return res.status(409).json({ error: 'All pieces of this order were already sent or cancelled, so there is nothing left to cancel.' });
+                }
+                if (outcome === 'partial') {
+                    const fresh = await Order.findOne({ where: { order_id: order.order_id } });
+                    return res.status(200).json(await decorateOrder(fresh));
                 }
             }
             order.order_status = order_status;
