@@ -10,6 +10,7 @@ import { getMySalesman } from '../../services/api/dashboardApi';
 import { getTrayTasks, markTrayTaskInTransit } from '../../services/api/inventoryApi';
 import { queueCheckin, isNetworkError } from '../../services/offlineQueue';
 import { showError, showSuccess, showInfo } from '../../services/notificationService';
+import { orderStatusTitle, orderStatusBadgeKey } from '../../utils/orderStatus';
 import '../../styles/redesign-n-home.css';
 import '../../styles/redesign-n-tasks.css';
 
@@ -117,7 +118,7 @@ export function OrderOverviewCard({ orders, loading, loadError, partyOf, onAll }
     .sort((a, b) => new Date(b.created_at || b.order_date || 0) - new Date(a.created_at || a.order_date || 0))
     .slice(0, 5), [orders]);
   const amount = (o) => Number(o.order_total) || Number(o.total_value) || Number(o.total_amount) || 0;
-  const label = (s) => s.charAt(0).toUpperCase() + s.slice(1).replace(/_/g, ' ');
+  const label = orderStatusTitle;
   return (
     <section className="rda-card" aria-label="Order overview">
       <div className="rda-card__head">
@@ -141,7 +142,7 @@ export function OrderOverviewCard({ orders, loading, loadError, partyOf, onAll }
                 <b>{o.order_number || `#${String(o.order_id || o.id || '').slice(-6)}`}</b>
                 <span>{partyOf(o)}</span>
               </div>
-              <StatusBadge status={status(o).replace(/\s+/g, '-')}>{label(status(o))}</StatusBadge>
+              <StatusBadge status={orderStatusBadgeKey(status(o))}>{label(status(o))}</StatusBadge>
               <span className="rdn-row__amt">{money(amount(o))}</span>
             </li>
           ))}

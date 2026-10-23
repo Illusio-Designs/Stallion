@@ -17,35 +17,19 @@ import {
 import { getUser } from '../services/authService';
 import { showError, showSuccess } from '../services/notificationService';
 import { downloadOrderPdf } from '../utils/orderPdf';
+import OrderProgressInfo from '../components/orders/OrderProgressInfo';
+import {
+  orderStatusLabel,
+  orderStatusBadgeKey,
+  ORDER_TAB_TO_STATUS,
+  ORDER_FILTER_TABS_WITH_LEGACY,
+  heldNote,
+} from '../utils/orderStatus';
 import '../styles/pages/dashboard-orders.css';
 
-// Map API status to UI status
-const mapApiStatusToUI = (apiStatus) => {
-  const statusMap = {
-    'pending': 'PENDING',
-    'processed': 'PROCESSING',
-    'hold_by_tray': 'HOLD BY SAMPLE',
-    'partially_dispatched': 'PARTIALLY DISPATCH',
-    'dispatched': 'DISPATCH',
-    'completed': 'COMPLETED',
-    'cancelled': 'CANCEL'
-  };
-  return statusMap[apiStatus?.toLowerCase()] || apiStatus?.toUpperCase() || 'PENDING';
-};
-
-// Map UI tab to API status
-const mapUITabToApiStatus = (tab) => {
-  const tabMap = {
-    'Pending': 'pending',
-    'Processing': 'processed',
-    'Hold by Sample': 'hold_by_tray',
-    'Partially Dispatch': 'partially_dispatched',
-    'Dispatch': 'dispatched',
-    'Completed': 'completed',
-    'Cancel': 'cancelled'
-  };
-  return tabMap[tab];
-};
+// Status wording and tones live in utils/orderStatus.js
+const mapApiStatusToUI = (apiStatus) => (apiStatus ? orderStatusLabel(apiStatus) : 'PENDING');
+const mapUITabToApiStatus = (tab) => ORDER_TAB_TO_STATUS[tab];
 
 const DistributorOrders = () => {
   const confirm = useConfirm();
@@ -410,7 +394,15 @@ const DistributorOrders = () => {
     { key: 'client', label: 'PARTY NAME' },
     { key: 'product', label: 'PRODUCT' },
     { key: 'qty', label: 'QTY' },
-    { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase().replace(/\s+/g, '-')}>{v}</StatusBadge> },
+    { key: 'status', label: 'STATUS', render: (v, row) => {
+      const held = heldNote(row?.originalOrder);
+      return (
+        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+          <StatusBadge status={orderStatusBadgeKey(row?.originalOrder?.order_status)}>{v}</StatusBadge>
+          {held && <small className="text-text-muted">{held}</small>}
+        </span>
+      );
+    } },
     { key: 'value', label: 'VALUE' },
     {
       // Distributors can create, view and download their orders — not delete
@@ -450,7 +442,7 @@ const DistributorOrders = () => {
         {/* Order Status Tabs */}
         <div className="dash-row">
           <div className="order-tabs-container bg-surface border border-border rounded-lg shadow-sm flex gap-2 overflow-x-auto px-3 py-2 w-full [grid-column:1/-1] [scrollbar-width:thin]">
-            {['All', 'Pending', 'Processing', 'Hold by Sample', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].map(tab => (
+            {['All', ...ORDER_FILTER_TABS_WITH_LEGACY].map(tab => (
               <button
                 key={tab}
                 className={`order-tab inline-flex items-center min-h-10 px-4 py-2 rounded-md font-semibold text-[var(--text-base)] leading-snug cursor-pointer whitespace-nowrap shrink-0 transition-[background,color,box-shadow] duration-[0.12s] ease-[ease] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] ${activeTab === tab
@@ -699,8 +691,9 @@ const DistributorOrders = () => {
                 <div><div className="ord-field__label">Order ID</div><div className="font-semibold">{viewRow.orderId}</div></div>
                 <div><div className="ord-field__label">Order Type</div><div className="font-semibold">{viewRow.orderType}</div></div>
                 <div><div className="ord-field__label">Party Name</div><div className="font-semibold">{viewRow.client}</div></div>
-                <div><div className="ord-field__label">Status</div><div className="font-semibold"><StatusBadge status={String(viewRow.status).toLowerCase().replace(/\s+/g, '-')}>{viewRow.status}</StatusBadge></div></div>
+                <div><div className="ord-field__label">Status</div><div className="font-semibold"><StatusBadge status={orderStatusBadgeKey(o.order_status)}>{viewRow.status}</StatusBadge></div></div>
               </div>
+              <OrderProgressInfo order={o} />
               <div>
                 <h5 className="ord-view__section-title">Order Items</h5>
                 <table className="w-full text-[length:var(--text-sm)]">

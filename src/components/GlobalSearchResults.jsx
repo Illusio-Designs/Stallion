@@ -3,6 +3,7 @@ import { getOrdersPageForRole, getPartiesPage, getProductsPage } from '../servic
 import { fetchPage } from '../services/api/client';
 import { getUserRole, getUserRoles } from '../services/authService';
 import { hasAnyRolePageAccess } from '../utils/rolePermissions';
+import { orderStatusLabel, heldNote } from '../utils/orderStatus';
 
 // Results from parties, orders and products for what is typed in the header search box.
 // Only the lists the signed-in role can open are asked for, and the server does the matching.
@@ -85,7 +86,7 @@ const GlobalSearchResults = ({ query, onPick }) => {
     <div className="gs-pop" ref={boxRef} role="region" aria-label="Search results">
       {loading && <div className="gs-note">Searching…</div>}
       <Group title="Parties" items={parties} page="party" label={(x) => x.party_name || x.name || 'Party'} sub={(x) => { const m = matchedIn(x, term, PARTY_MATCH); return m && !m.startsWith('Name:') && !m.startsWith('Phone:') ? m : (x.phone || m || ''); }} />
-      <Group title="Orders" items={orders} page="orders" label={(x) => x.order_number || 'Order'} sub={(x) => { const m = matchedIn(x, term, ORDER_MATCH); return [x.party_name, x.order_status, m && !m.startsWith('Order:') && !m.startsWith('Party:') && !m.startsWith('Status:') ? m : ''].filter(Boolean).join(' · '); }} />
+      <Group title="Orders" items={orders} page="orders" label={(x) => x.order_number || 'Order'} sub={(x) => { const m = matchedIn(x, term, ORDER_MATCH); return [x.party_name, orderStatusLabel(x.order_status), heldNote(x), m && !m.startsWith('Order:') && !m.startsWith('Party:') && !m.startsWith('Status:') ? m : ''].filter(Boolean).join(' · '); }} />
       <Group title="Products" items={products} page="dashboard-products" label={(x) => x.model_no || 'Product'} sub={(x) => (x.whp ? `₹${x.whp}` : '')} />
       {nothing && <div className="gs-note">Nothing found for “{term}”.</div>}
     </div>

@@ -64,3 +64,5 @@
 @media (max-width: 520px) {
   :root .ordn-task > button { align-self: stretch; width: 100%; }
 }
+
+:root .ordn-progress { display: flex; flex-direction: column; gap: 12px; min-width: 0; overflow-wrap: anywhere; }

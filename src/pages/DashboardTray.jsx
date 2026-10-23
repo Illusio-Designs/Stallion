@@ -12,14 +12,18 @@ import {
   getCollections,
   getProductsPage,
   getProductsInTray,
+  getTrayTasks,
   getTraysPage,
   updateProductInTray,
   updateTray,
 } from '../services/apiService';
 import { showError, showSuccess } from '../services/notificationService';
+import { getUserRoles } from '../services/authService';
+import { TASK_PILL } from '../utils/orderStatus';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard.css';
 import '../styles/redesign-n-tray.css';
+import '../styles/redesign-n-orders.css';
 import GooeySearch from '../components/ui/GooeySearch';
 
 const TrayStatus = {
@@ -431,6 +435,27 @@ const DashboardTray = () => {
   // (same transfer API as the Assign Products tab). With nothing picked it takes back every frame.
   const [cardPick, setCardPick] = useState({}); // { [trayId]: [product_id] }
   const [cardBusy, setCardBusy] = useState('');
+
+  // Return tasks: frames booked from trays for orders that must come back to the office.
+  // Shown to admin and tray manager only (the salesman sees their own on the home page).
+  const canSeeReturnTasks = useMemo(() => getUserRoles().some((r) => ['admin', 'tray_manager'].includes(r)), []);
+  const [returnTasks, setReturnTasks] = useState([]);
+  useEffect(() => {
+    if (!canSeeReturnTasks) return undefined;
+    let alive = true;
+    getTrayTasks('open')
+      .then((list) => { if (alive) setReturnTasks(Array.isArray(list) ? list : []); })
+      .catch(() => { if (alive) setReturnTasks([]); });
+    return () => { alive = false; };
+  }, [canSeeReturnTasks]);
+  // Pieces booked for orders per tray (not yet sent back).
+  const bookedByTray = useMemo(() => {
+    const out = {};
+    returnTasks.forEach((t) => {
+      if (t.status === 'booked' && t.tray_id) out[t.tray_id] = (out[t.tray_id] || 0) + (Number(t.qty) || 0);
+    });
+    return out;
+  }, [returnTasks]);
   const toggleCardPick = (trayId, productId) => {
     setCardPick((prev) => {
       const cur = prev[trayId] || [];
@@ -553,6 +578,20 @@ const DashboardTray = () => {
         {/* Tab Content */}
         {activeTab === 'all-trays' && (
           <div className="tray-view">
+            {canSeeReturnTasks && returnTasks.length > 0 && (
+              <section className="ordn-tasks" aria-label="Return tasks">
+                <h5 className="ord-view__section-title">Return tasks <span className="tray-meta">({returnTasks.length})</span></h5>
+                {returnTasks.map((t) => (
+                  <div className="ordn-task" key={t.task_id}>
+                    <div className="ordn-task__head">
+                      <b className="min-w-0 break-words">{[t.tray_name, t.salesman_name].filter(Boolean).join(' · ') || 'Tray'}</b>
+                      <span className={`ordn-pill ordn-pill--${t.status}`}>{TASK_PILL[t.status] || t.status}</span>
+                    </div>
+                    <div className="ordn-task__meta">{Number(t.qty) || 0} pieces{t.order_number ? ` · Order ${t.order_number}` : ''}</div>
+                  </div>
+                ))}
+              </section>
+            )}
             <div className="tray-toolbar">
               <div className="chips" role="tablist" aria-label="Filter trays">
                 {trayChips.map((c) => (
@@ -625,6 +664,7 @@ const DashboardTray = () => {
                         </div>
                         <span className={`pill ${pillCls}`}>{pillLabel}</span>
                       </div>
+                      {(bookedByTray[trayId] || 0) > 0 && <span className="tray-meta">{bookedByTray[trayId]} booked for orders</span>}
                       <div className="trn-fill">
                         <span className="trn-fill__pill">{frames.length} of {TRAY_SLOTS}</span>
                         {frames.length > TRAY_SLOTS && <span className="trn-fill__more">+{frames.length - TRAY_SLOTS} more in Assign Products</span>}
