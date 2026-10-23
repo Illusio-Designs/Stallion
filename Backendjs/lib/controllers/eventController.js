@@ -4,6 +4,7 @@ const Order = require('../models/Order');
 const { fn, col } = require('sequelize');
 const { EventStatus } = require('../constants/enums');
 const { UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 // past = already ended, ongoing = started and not ended, upcoming = not started.
 // An end date picked without a time (midnight) lasts through that whole day.
 function computeEventStatus(start, end, now = new Date()) {
@@ -21,7 +22,7 @@ class EventController {
         try {
             // Refresh statuses only for rows whose status actually changed (was one
             // UPDATE per event on every request), then return a bounded list.
-            const events = await Event.findAll({ order: [['end_date', 'DESC']], limit: UNPAGINATED_CAP });
+            const events = await Event.findAll({ where: activeOnlyWhere(req), order: [['end_date', 'DESC']], limit: UNPAGINATED_CAP });
             for (const event of events) {
                 const eventStatus = computeEventStatus(event.start_date, event.end_date);
                 if (event.event_status !== eventStatus) {
@@ -108,6 +109,7 @@ class EventController {
                 event_location: event_location || event.event_location,
                 updated_at: new Date(),
                 event_status: eventStatus || event.event_status,
+                ...activeUpdate(req.body),
             };
             await Event.update(payload, { where: { event_id: id } });
             await logAudit({

@@ -4,6 +4,9 @@ const TrayProducts = require('../models/TrayProducts');
 const Product = require('../models/Product');
 const SalesmanTray = require('../models/SalesmanTray');
 const Salesman = require('../models/Salesman');
+const TrayReturnTask = require('../models/TrayReturnTask');
+const { trayPieceCount } = require('../utils/trayLifecycle');
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const { Op } = require('sequelize');
 const { parsePaginationParams, buildPaginatedResponse, getListSearchParams, buildNamePhoneFilter } = require('../utils/listSearchHelpers');
 
@@ -59,7 +62,7 @@ class TrayController {
             const { name } = getListSearchParams(req);
             const searchFilter = buildNamePhoneFilter({ name, nameFields: ['tray_name'] });
             const { count, rows: trays } = await Tray.findAndCountAll({
-                where: searchFilter || undefined,
+                where: { ...(searchFilter || {}), ...activeOnlyWhere(req) },
                 order: [['tray_name', 'ASC']],
                 limit: pagination.limit,
                 offset: pagination.offset,
@@ -106,10 +109,20 @@ class TrayController {
             if (!tray) {
                 return res.status(404).json({ error: 'Tray not found' });
             }
+            const active = activeUpdate(req.body);
+            if (active.is_active === false && tray.is_active !== false) {
+                // A tray can only be switched off once it is empty and nothing is on its way back.
+                const pieces = await trayPieceCount(id);
+                const openReturns = await TrayReturnTask.count({ where: { tray_id: id, status: { [Op.in]: ['booked', 'in_transit'] } } });
+                if (pieces > 0 || openReturns > 0) {
+                    return res.status(409).json({ error: 'Take the frames back to the warehouse first.' });
+                }
+            }
             const oldSnapshot = tray.toJSON();
             const payload = {
                 tray_name: tray_name || tray.tray_name,
                 tray_status: tray_status || tray.tray_status,
+                ...active,
                 updated_at: new Date(),
             };
             await tray.update(payload);

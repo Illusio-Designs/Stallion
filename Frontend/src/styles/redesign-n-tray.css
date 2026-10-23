@@ -18,3 +18,4 @@
   :root .trn-slots { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   :root .trn-slot { font-size: 11px; aspect-ratio: 1.4; }
 }
+:root .tray-card__pills{display:inline-flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}

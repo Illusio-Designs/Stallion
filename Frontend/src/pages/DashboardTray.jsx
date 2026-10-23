@@ -23,6 +23,7 @@ import { TASK_PILL } from '../utils/orderStatus';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard.css';
 import '../styles/redesign-n-tray.css';
+import '../styles/redesign-n-manage.css';
 import '../styles/redesign-n-orders.css';
 import GooeySearch from '../components/ui/GooeySearch';
 
@@ -112,7 +113,8 @@ const DashboardTray = () => {
   const [trayTotal, setTrayTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ tray_name: '', tray_status: TrayStatus.AVAILABLE });
+  const [form, setForm] = useState({ tray_name: '', tray_status: TrayStatus.AVAILABLE, is_active: true });
+  const [showInactive, setShowInactive] = useState(false);
   const [error, setError] = useState(null);
 
   // Product assignment tab state
@@ -130,16 +132,16 @@ const DashboardTray = () => {
   const [openEditProduct, setOpenEditProduct] = useState(false);
 
   // Server-paginated trays: 20 per page, fetched per page (and on search).
-  const fetchTraysPage = async (page = 1, search = '') => {
+  const fetchTraysPage = async (page = 1, search = '', withInactive = showInactive) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await getTraysPage(page, 20, search);
+      const res = await getTraysPage(page, 20, search, { activeOnly: !withInactive });
       const data = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
       // A delete may have emptied the last page: step back to the last valid page.
       const lastPage = Math.max(1, res?.pagination?.totalPages ?? 1);
       if (data.length === 0 && page > lastPage) {
-        return fetchTraysPage(lastPage, search);
+        return fetchTraysPage(lastPage, search, withInactive);
       }
       setTrays(data);
       setTrayPage(page);
@@ -161,7 +163,7 @@ const DashboardTray = () => {
   const fetchAllProducts = async (search = '') => {
     setLoadingProducts(true);
     try {
-      const result = await getProductsPage(1, 20, search);
+      const result = await getProductsPage(1, 20, search, { activeOnly: true });
       setAllProducts(Array.isArray(result) ? result : (result?.data || []));
     } catch (err) {
       console.error('Failed to load products:', err);
@@ -205,7 +207,7 @@ const DashboardTray = () => {
     fetchTrays();
   }, []);
 
-  const resetForm = () => setForm({ tray_name: '', tray_status: TrayStatus.AVAILABLE });
+  const resetForm = () => setForm({ tray_name: '', tray_status: TrayStatus.AVAILABLE, is_active: true });
 
   const handleSubmitNew = async () => {
     if (!form.tray_name.trim()) {
@@ -229,6 +231,7 @@ const DashboardTray = () => {
     setForm({
       tray_name: row.tray_name || '',
       tray_status: row.tray_status || TrayStatus.AVAILABLE,
+      is_active: row.is_active !== false,
     });
   };
 
@@ -245,6 +248,7 @@ const DashboardTray = () => {
       await updateTray(trayId, {
         tray_name: form.tray_name.trim(),
         tray_status: form.tray_status,
+        is_active: form.is_active !== false,
       });
       showSuccess('Tray updated successfully');
       await fetchTrays();
@@ -606,6 +610,14 @@ const DashboardTray = () => {
                     {c.label} <b>{c.count}</b>
                   </button>
                 ))}
+                <button
+                  type="button"
+                  aria-pressed={showInactive}
+                  className={`chip${showInactive ? ' on' : ''}`}
+                  onClick={() => { const next = !showInactive; setShowInactive(next); fetchTraysPage(1, traySearch, next); }}
+                >
+                  Show inactive
+                </button>
               </div>
               <GooeySearch
                 value={traySearch}
@@ -652,7 +664,8 @@ const DashboardTray = () => {
                   const picked = cardPick[trayId] || [];
                   const shown = frames.slice(0, TRAY_SLOTS);
                   const busy = cardBusy === trayId;
-                  const canAssign = state === 'available' || state === 'assigned' || state === 'overdue';
+                  const trayOff = t.is_active === false;
+                  const canAssign = !trayOff && (state === 'available' || state === 'assigned' || state === 'overdue');
                   return (
                     <div key={trayId || t.tray_name} className="tray-card trn-card">
                       <div className="tray-card__top">
@@ -662,7 +675,10 @@ const DashboardTray = () => {
                             {holder ? `${holder}${since ? ` · since ${since}` : ''}` : 'Not assigned'}
                           </span>
                         </div>
-                        <span className={`pill ${pillCls}`}>{pillLabel}</span>
+                        <span className="tray-card__pills">
+                          {trayOff && <span className="pill idle">Inactive</span>}
+                          <span className={`pill ${pillCls}`}>{pillLabel}</span>
+                        </span>
                       </div>
                       {(bookedByTray[trayId] || 0) > 0 && <span className="tray-meta">{bookedByTray[trayId]} booked for orders</span>}
                       <div className="trn-fill">
@@ -726,7 +742,7 @@ const DashboardTray = () => {
                   <div className="form-group">
                     <label className="ui-label" style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 700 }}>Select Sample</label>
                     <DropdownSelector
-                      options={trays.map(t => ({
+                      options={trays.filter((t) => t.is_active !== false).map(t => ({
                         value: t.tray_id || t.id,
                         label: t.tray_name || 'N/A'
                       }))}
@@ -1032,7 +1048,7 @@ const DashboardTray = () => {
                                         <option value="" disabled>Move to…</option>
                                         <option value="__warehouse">Warehouse</option>
                                         {trays
-                                          .filter((t) => (t.tray_id || t.id) !== selectedTray && t.tray_status !== 'inactive')
+                                          .filter((t) => (t.tray_id || t.id) !== selectedTray && t.tray_status !== 'inactive' && t.is_active !== false)
                                           .map((t) => (
                                             <option key={t.tray_id || t.id} value={t.tray_id || t.id}>{t.tray_name || t.name}</option>
                                           ))}
@@ -1125,6 +1141,22 @@ const DashboardTray = () => {
               onChange={(value) => setForm((p) => ({ ...p, tray_status: value }))}
               placeholder="Select status"
             />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">Active</label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.is_active !== false}
+              onClick={() => setForm((p) => ({ ...p, is_active: p.is_active === false }))}
+              className="mng-switch"
+            >
+              <span className={`mng-switch__track ${form.is_active !== false ? 'is-on' : ''}`}>
+                <span className="mng-switch__dot" />
+              </span>
+              <span className="mng-switch__label">{form.is_active !== false ? 'Active' : 'Inactive'}</span>
+            </button>
+            <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted. A tray can only be switched off when it is empty.</p>
           </div>
         </div>
       </AsidePanel>

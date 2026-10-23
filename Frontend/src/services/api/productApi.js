@@ -126,6 +126,11 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
       filterBody.status = filters.status;
     }
 
+    // active: true -> only products that are switched on (shop and pickers)
+    if (filters.active === true) {
+      filterBody.active = true;
+    }
+
     // search (server-side text search on model_no/size/status) — used by the
     // 20-per-page picker dropdowns so typing queries the server instead of
     // pulling the whole catalog.
@@ -195,10 +200,12 @@ export const getProducts = async (page = 1, limit = 20, filters = {}) => {
  * @param {number} [page=1]
  * @param {number} [limit=20]
  * @param {string} [search=''] - text matched against model_no/size/status
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true hides products switched off (pickers)
  */
-export const getProductsPage = async (page = 1, limit = 20, search = '') => {
+export const getProductsPage = async (page = 1, limit = 20, search = '', { activeOnly = false } = {}) => {
   const term = String(search || '').trim();
-  return getProducts(page, limit, term ? { search: term } : null);
+  const filters = { ...(term ? { search: term } : {}), ...(activeOnly ? { active: true } : {}) };
+  return getProducts(page, limit, Object.keys(filters).length ? filters : null);
 };
 
 /**
@@ -312,6 +319,7 @@ export const updateProduct = async (productId, productData) => {
     tray_qty,
     total_qty,
     status,
+    is_active,
     image_urls, // Array of image paths
   } = productData;
 
@@ -339,6 +347,10 @@ export const updateProduct = async (productId, productData) => {
   // Include image_urls if provided (array of image paths)
   if (image_urls !== undefined) {
     body.image_urls = image_urls;
+  }
+  // The manual Active/Inactive switch: only sent when the caller sets it.
+  if (is_active !== undefined) {
+    body.is_active = is_active;
   }
 
   const result = await apiRequest(`/products/${productId}`, {

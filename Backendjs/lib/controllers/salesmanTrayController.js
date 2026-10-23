@@ -30,6 +30,9 @@ class SalesmanTrayController {
                 return res.status(404).json({ error: 'Tray not found' });
             }
 
+            if (tray.is_active === false) {
+                return res.status(409).json({ error: 'This tray is inactive.' });
+            }
             if (tray.tray_status != TrayStatus.AVAILABLE) {
                 return res.status(400).json({ error: 'Tray is not available' });
             }

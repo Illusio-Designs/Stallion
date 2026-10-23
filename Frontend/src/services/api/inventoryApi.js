@@ -57,10 +57,10 @@ export const createTray = async (trayData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const updateTray = async (trayId, trayData) => {
-  const { tray_name, tray_status } = trayData;
+  const { tray_name, tray_status, is_active } = trayData;
   return apiRequest(`/trays/${trayId}`, {
     method: 'PUT',
-    body: { tray_name, tray_status },
+    body: { tray_name, tray_status, ...(is_active === undefined ? {} : { is_active }) },
     includeAuth: true,
   });
 };
@@ -207,11 +207,12 @@ export const transferTrayProducts = async (transfers) => {
 // ==================== EVENT ENDPOINTS ====================
 
 /**
- * Get all events
+ * Get events
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active events (for pickers); default returns all
  * @returns {Promise<Array>} Array of event objects
  */
-export const getEvents = async () => {
-  return getCached('events', () => apiRequest('/events', {
+export const getEvents = async ({ activeOnly = false } = {}) => {
+  return getCached(activeOnly ? 'events:active' : 'events', () => apiRequest(`/events${activeOnly ? '?active=true' : ''}`, {
     method: 'GET',
     includeAuth: true,
   }), TTL_TRANSACTIONAL);
@@ -248,10 +249,10 @@ export const createEvent = async (eventData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const updateEvent = async (eventId, eventData) => {
-  const { event_name, start_date, end_date, event_location } = eventData;
+  const { event_name, start_date, end_date, event_location, is_active } = eventData;
   const result = await apiRequest(`/events/${eventId}`, {
     method: 'PUT',
-    body: { event_name, start_date, end_date, event_location },
+    body: { event_name, start_date, end_date, event_location, ...(is_active === undefined ? {} : { is_active }) },
     includeAuth: true,
   });
   invalidateCache('events');
@@ -372,8 +373,8 @@ export const getOrdersPageForRole = (role, page = 1, limit = 20, search = '', st
     ? getMyOrdersPage(page, limit, search, status)
     : getOrdersPage(page, limit, search, status);
 /** One page of trays -> { data, pagination }. */
-export const getTraysPage = (page = 1, limit = 20, search = '') =>
-  fetchPage('/trays', { page, limit, search }, { method: 'GET', includeAuth: true });
+export const getTraysPage = (page = 1, limit = 20, search = '', { activeOnly = false } = {}) =>
+  fetchPage('/trays', { page, limit, search, params: activeOnly ? { active: 'true' } : {} }, { method: 'GET', includeAuth: true });
 
 /**
  * Create a new order

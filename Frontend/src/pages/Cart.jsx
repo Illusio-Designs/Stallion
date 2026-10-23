@@ -487,7 +487,7 @@ const Cart = ({ onPageChange = null }) => {
 
   const fetchEvents = async () => {
     try {
-      const eventsData = await getEvents();
+      const eventsData = await getEvents({ activeOnly: true });
       setEvents(Array.isArray(eventsData) ? eventsData : []);
     } catch (err) {
       console.error('Failed to fetch events:', err);

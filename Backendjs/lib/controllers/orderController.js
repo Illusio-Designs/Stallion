@@ -660,6 +660,9 @@ class OrderController {
                 if (!event) {
                     return res.status(404).json({ error: 'Event not found' });
                 }
+                if (event.is_active === false) {
+                    return res.status(400).json({ error: 'This event is inactive.' });
+                }
             }
             // if order type is party order, check if party id is provided
             else if (order_type === OrderType.PARTY_ORDER) {
@@ -920,6 +923,9 @@ class OrderController {
                     });
                     if (!product) {
                         throw new OrderError('One of the products in your cart is no longer available. Please remove it and try again.', 404);
+                    }
+                    if (product.is_active === false) {
+                        throw new OrderError('This frame is no longer available.', 409);
                     }
                     if (product.total_qty < item.quantity) {
                         throw new OrderError(`Sorry, ${product.model_no} does not have enough stock for this quantity.`, 409);
