@@ -20,6 +20,7 @@ import { showError, showSuccess } from '../services/notificationService';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard.css';
 import '../styles/redesign-n-tray.css';
+import GooeySearch from '../components/ui/GooeySearch';
 
 const TrayStatus = {
   AVAILABLE: 'available',
@@ -567,13 +568,13 @@ const DashboardTray = () => {
                   </button>
                 ))}
               </div>
-              <input
-                type="search"
-                className="ui-input tray-search"
-                placeholder="Search trays"
-                aria-label="Search trays"
+              <GooeySearch
                 value={traySearch}
-                onChange={(e) => handleTraySearch(e.target.value)}
+                onChange={handleTraySearch}
+                placeholder="Search trays"
+                label="Search trays"
+                openWidth={260}
+                rowOnPhone
               />
             </div>
 

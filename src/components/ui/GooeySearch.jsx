@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { FiSearch } from '../icons/hugeicons';
+import '../../styles/redesign-n-gsr.css';
 
 // A search box that rests as a round magnifying glass. Tapping it pulls a second blob out
 // of the glass like liquid, and that blob becomes the text field. The two blobs and the
@@ -30,8 +31,16 @@ const shapes = (p, openWidth) => {
   return { W, cx, cy, rectX: fx + R - wf, rectW: wf, neck, show: p > 0.001 };
 };
 
-const GooeySearch = ({ value, onChange, placeholder = 'Search...', label = 'Search', openWidth = 240, onSubmit, children, className = '' }) => {
+const EDGE = 8; // keep this much space between the open field and the screen edge
+const PHONE = 640;
+
+// openWidth: a number of px, or 'auto' to fill all the room to the left of the glass.
+// phoneAuto: below 640 px behave like 'auto'. rowOnPhone: below 640 px the open box takes
+// the whole row it sits in (for toolbars), so nothing next to it is covered.
+const GooeySearch = ({ value, onChange, placeholder = 'Search...', label = 'Search', openWidth = 240, phoneAuto = false, rowOnPhone = false, onSubmit, children, className = '' }) => {
   const [open, setOpen] = useState(false);
+  const [px, setPx] = useState(typeof openWidth === 'number' ? openWidth : 240);
+  const [avail, setAvail] = useState(null);
   const [p, setP] = useState(0);
   const rootRef = useRef(null);
   const inputRef = useRef(null);
@@ -72,17 +81,38 @@ const GooeySearch = ({ value, onChange, placeholder = 'Search...', label = 'Sear
     return () => document.removeEventListener('mousedown', onDoc);
   }, [open, text]);
 
+  // Work out how wide the field may be so it never runs off the screen.
+  useEffect(() => {
+    const measure = () => {
+      const el = rootRef.current;
+      if (!el || typeof window === 'undefined') return;
+      const phone = window.innerWidth < PHONE;
+      const chrome = 2 * R + GAP;
+      const rect = el.getBoundingClientRect();
+      const room = rowOnPhone && phone && el.parentElement
+        ? el.parentElement.clientWidth - chrome
+        : rect.right - EDGE - chrome;
+      const auto = openWidth === 'auto' || (phoneAuto && phone);
+      const want = auto ? Math.min(room, 560) : Math.min(Number(openWidth) || 240, room);
+      setPx(Math.max(96, Math.floor(want)));
+      setAvail(Math.max(200, Math.floor(rowOnPhone && phone && el.parentElement ? el.parentElement.clientWidth : rect.right - EDGE)));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [openWidth, phoneAuto, rowOnPhone, isOpen]);
+
   const toggle = () => {
     if (isOpen) { onChange?.(''); setOpen(false); } else { setOpen(true); }
   };
 
-  const s = shapes(p, openWidth);
+  const s = shapes(p, px);
 
   return (
     <div
       ref={rootRef}
-      className={`gsr${isOpen ? ' is-open' : ''}${className ? ` ${className}` : ''}`}
-      style={{ '--gsr-open': `${openWidth}px` }}
+      className={`gsr${isOpen ? ' is-open' : ''}${rowOnPhone ? ' gsr--row' : ''}${className ? ` ${className}` : ''}`}
+      style={{ '--gsr-open': `${px}px`, '--gsr-avail': avail ? `${avail}px` : undefined }}
       role="search"
     >
       <svg className="gsr__svg" style={{ width: s.W, height: 2 * R, maxWidth: 'none' }} width={s.W} height={2 * R} viewBox={`0 0 ${s.W} ${2 * R}`} aria-hidden="true" focusable="false">
@@ -101,6 +131,7 @@ const GooeySearch = ({ value, onChange, placeholder = 'Search...', label = 'Sear
           tabIndex={isOpen ? 0 : -1}
           autoComplete="off"
           onChange={(e) => onChange?.(e.target.value)}
+          onBlur={(e) => { if (!text && rootRef.current && !rootRef.current.contains(e.relatedTarget)) setOpen(false); }}
           onKeyDown={(e) => { if (e.key === 'Escape') { onChange?.(''); setOpen(false); } }}
         />
       </form>
