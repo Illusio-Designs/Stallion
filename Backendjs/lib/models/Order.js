@@ -96,6 +96,18 @@ const Order = sequelize.define('Order', {
         type: DataTypes.INTEGER,
         allowNull: true
     },
+    // Order handling trail. Nothing here is ever cleared once set.
+    processed_by: { type: DataTypes.UUID, allowNull: true },
+    processed_at: { type: DataTypes.DATE, allowNull: true },
+    dispatched_at: { type: DataTypes.DATE, allowNull: true },
+    delivered_at: { type: DataTypes.DATE, allowNull: true },
+    received_by: { type: DataTypes.STRING(255), allowNull: true },
+    cancel_reason: { type: DataTypes.STRING(500), allowNull: true },
+    cancelled_by: { type: DataTypes.UUID, allowNull: true },
+    cancelled_at: { type: DataTypes.DATE, allowNull: true },
+    // Set when the sample trays hand back the pieces this order was waiting on.
+    tray_released_at: { type: DataTypes.DATE, allowNull: true },
+    tray_released_by: { type: DataTypes.UUID, allowNull: true },
     latitude: {
         type: DataTypes.DECIMAL(10, 8),
         allowNull: true

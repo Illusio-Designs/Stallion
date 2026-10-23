@@ -5,12 +5,13 @@ import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
-import DropdownSelector from '../components/ui/DropdownSelector';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getOrdersForRole,
   updateOrderStatus,
   dispatchOrder,
+  returnOrderTrays,
+  completeOrder,
   deleteOrder,
   getPartiesForRole,
   getProductsByIds,
@@ -62,23 +63,81 @@ const UI_TO_API_STATUS = {
   'COMPLETED': 'completed',
   'CANCEL': 'cancelled',
 };
-// Statuses that require courier name + tracking number (and, for partial,
-// a dispatch quantity) — mirrors the backend validation.
-const DISPATCH_STATUSES = ['dispatched', 'partially_dispatched'];
+const COURIER_SUGGESTIONS = ['Blue Dart', 'DTDC', 'Delhivery', 'India Post', 'Professional Couriers', 'Gati'];
+const CANCEL_REASONS = ['Party asked to cancel', 'Stock not available', 'Wrong order', 'Other'];
+const OFFICE_STATUS_TITLE = {
+  pending: 'Pending',
+  processed: 'Processing',
+  hold_by_tray: 'Hold by sample',
+  partially_dispatched: 'Partially dispatch',
+  dispatched: 'Dispatch',
+  completed: 'Completed',
+  cancelled: 'Cancel',
+};
+
+const fmtDate = (v) => {
+  if (!v) return '';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+const fmtDateTime = (v) => {
+  if (!v) return '';
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${fmtDate(v)}, ${d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`;
+};
+const toInt = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+};
+
+// Piece counts for an order. The server sends total/tray/held/shipped/ready;
+// older orders without them are derived from the items and the status.
+const getPieceCounts = (order) => {
+  const items = Array.isArray(order?.order_items) ? order.order_items : [];
+  const itemsTotal = items.reduce((sum, it) => sum + toInt(it?.quantity), 0);
+  const total = toInt(order?.total_qty) || itemsTotal;
+  const status = String(order?.order_status || '').toLowerCase();
+  const shipments = Array.isArray(order?.shipments) ? order.shipments : [];
+  let shipped = order?.shipped_qty != null ? toInt(order.shipped_qty) : shipments.reduce((sum, sh) => sum + toInt(sh?.qty), 0);
+  if (order?.shipped_qty == null && !shipments.length && (status === 'dispatched' || status === 'completed')) shipped = total;
+  const held = order?.held_qty != null ? toInt(order.held_qty) : 0;
+  const ready = order?.ready_qty != null
+    ? toInt(order.ready_qty)
+    : (status === 'processed' || status === 'partially_dispatched' ? Math.max(total - shipped - held, 0) : 0);
+  const cancelled = status === 'cancelled' ? Math.max(total - shipped, 0) : 0;
+  return { total, shipped, ready: status === 'cancelled' ? 0 : ready, held: status === 'cancelled' ? 0 : held, cancelled, trayQty: toInt(order?.tray_qty) };
+};
+
+const getShipments = (order) => {
+  const list = Array.isArray(order?.shipments) ? order.shipments : [];
+  if (list.length) return list;
+  if (order?.courier_name || order?.courier_tracking_number) {
+    return [{
+      shipment_id: 'legacy',
+      courier_name: order.courier_name,
+      tracking_number: order.courier_tracking_number,
+      qty: null,
+      shipped_at: order.dispatched_at || null,
+    }];
+  }
+  return [];
+};
 
 const DashboardOrders = () => {
   const confirm = useConfirm();
-  const [editRow, setEditRow] = useState(null);
-  const [editStatus, setEditStatus] = useState('PENDING');
-  // Extra data captured for dispatch / partial-dispatch status changes
-  const [courierName, setCourierName] = useState('');
-  const [courierTracking, setCourierTracking] = useState('');
-  const [partialQty, setPartialQty] = useState('');
   const [viewRow, setViewRow] = useState(null);
   const [dispatchCourier, setDispatchCourier] = useState('');
   const [dispatchTracking, setDispatchTracking] = useState('');
+  const [dispatchQty, setDispatchQty] = useState('');
   const [dispatchErrors, setDispatchErrors] = useState({});
-  const [dispatching, setDispatching] = useState(false);
+  const [cancelChoice, setCancelChoice] = useState('');
+  const [cancelOther, setCancelOther] = useState('');
+  const [cancelError, setCancelError] = useState('');
+  const [receivedBy, setReceivedBy] = useState('');
+  const [busyAction, setBusyAction] = useState(''); // '' | process | dispatch | trays | complete | cancel
+  const [actionError, setActionError] = useState('');
   const [viewItems, setViewItems] = useState([]);
   const [viewItemsLoading, setViewItemsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
@@ -100,6 +159,11 @@ const DashboardOrders = () => {
   const isDistributor = userRole === 'distributor';
   const isParty = userRole === 'party';
   const isSalesman = userRole === 'salesman';
+  // The tray manager can also tell the order that the sample trays came back.
+  const canReturnTrays = useMemo(
+    () => getUserRoles().some((r) => ['admin', 'order_manager', 'tray_manager'].includes(r)),
+    []
+  );
   // Changing an order's status is for admin and order manager only (the server
   // answers "Access denied" to everyone else), so only they get the Edit button.
   const canEditOrder = useMemo(
@@ -107,11 +171,21 @@ const DashboardOrders = () => {
     []
   );
   
+  const viewOrderId = viewRow?.originalOrder?.order_id;
+  const viewOrderQtyKey = `${viewRow?.originalOrder?.order_status}:${viewRow?.originalOrder?.ready_qty}`;
   useEffect(() => {
     setDispatchCourier('');
     setDispatchTracking('');
     setDispatchErrors({});
-  }, [viewRow?.originalOrder?.order_id]);
+    setCancelChoice('');
+    setCancelOther('');
+    setCancelError('');
+    setReceivedBy('');
+    setActionError('');
+    const ready = toInt(viewRow?.originalOrder?.ready_qty);
+    setDispatchQty(ready ? String(ready) : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewOrderId, viewOrderQtyKey]);
 
   // Fetch orders from API
   const fetchOrders = async (suppressError = false) => {
@@ -470,99 +544,106 @@ const DashboardOrders = () => {
     }
   };
 
-  // Handle update order status
-  const handleUpdateStatus = async (row, newStatus, overrides = null) => {
-    const orderId = row.originalOrder?.order_id || row.originalOrder?.id;
-    if (!orderId) {
-      showError('Order ID not found');
-      return;
-    }
+  // Merge the order the server returned into the open panel, then refresh the list.
+  const applyUpdated = (updated, fallbackStatus) => {
+    const next = updated && typeof updated === 'object' ? (updated.data && updated.data.order_id ? updated.data : updated) : {};
+    setViewRow((cur) => {
+      if (!cur) return cur;
+      const merged = { ...cur.originalOrder, ...next };
+      if (!next.order_status && fallbackStatus) merged.order_status = fallbackStatus;
+      return { ...cur, status: mapApiStatusToUI(merged.order_status), originalOrder: merged };
+    });
+    fetchOrders(true);
+  };
 
-    const apiStatus = UI_TO_API_STATUS[newStatus] || newStatus.toLowerCase();
-    const payload = { order_status: apiStatus };
+  const errMessage = (err, fallback) => err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback;
 
-    // Dispatch & partial-dispatch require courier details; partial also needs a
-    // dispatched quantity. Validate client-side (toast, panel stays open) so we
-    // don't bounce off the backend's 400.
-    if (DISPATCH_STATUSES.includes(apiStatus)) {
-      const name = String(overrides?.courierName ?? courierName).trim();
-      const tracking = String(overrides?.courierTracking ?? courierTracking).trim();
-      if (!name || !tracking) {
-        showError('Courier name and tracking number are required to dispatch this order.');
-        return;
-      }
-      payload.courier_name = name;
-      payload.courier_tracking_number = tracking;
-    }
-    if (apiStatus === 'partially_dispatched') {
-      const qty = Number(partialQty);
-      const totalQty = Number(row.qty) || 0;
-      if (!partialQty || !Number.isFinite(qty) || qty <= 0) {
-        showError('Enter a valid partial dispatch quantity (greater than 0).');
-        return;
-      }
-      if (totalQty > 0 && qty > totalQty) {
-        showError(`Partial dispatch quantity cannot exceed the order quantity (${totalQty}).`);
-        return;
-      }
-      payload.partial_dispatch_qty = qty;
-    }
-
-    // Confirm before committing — a status change can't be reversed. Uses the
-    // app ConfirmDialog (via useConfirm), same as the delete confirmations.
-    if (!(await confirm({
-      title: 'Update order status',
-      message: `Change this order's status to "${newStatus}"? This action cannot be undone.`,
-      confirmLabel: 'Update status',
-      danger: true,
-    }))) {
-      return;
-    }
-
+  // Run one order action with a busy flag, an inline error and a refresh.
+  const runAction = async (key, fn, okTitle, okText, fallbackStatus) => {
+    if (busyAction) return;
+    setBusyAction(key);
+    setActionError('');
     try {
-      setLoading(true);
-      await updateOrderStatus(orderId, payload);
-      showSuccess('Order status updated successfully', null, 'Status updated', `${row.orderId || 'Order'} is now ${String(newStatus).toLowerCase()}.`);
-      await fetchOrders();
-      closeEditPanel();
-      setViewRow(null);
+      const updated = await fn();
+      showSuccess(okTitle, null, okTitle, okText);
+      applyUpdated(updated, fallbackStatus);
+      return true;
     } catch (err) {
-      const message = err?.response?.data?.message || err?.message || 'Failed to update order status';
-      showError(message, null, 'Status not updated', message);
+      const message = errMessage(err, 'Could not update this order');
+      setActionError(message);
+      showError(message, null, 'Order not updated', message);
+      return false;
     } finally {
-      setLoading(false);
+      setBusyAction('');
     }
   };
 
-  // "Mark dispatched" (order detail panel): courier + tracking, then
-  // POST /orders/:id/dispatch. Only offered for processing orders.
-  const handleMarkDispatched = async (row) => {
-    const orderId = row?.originalOrder?.order_id || row?.originalOrder?.id;
-    if (!orderId || dispatching) return;
+  const orderIdOf = (row) => row?.originalOrder?.order_id || row?.originalOrder?.id;
+
+  const handleProcess = async (row) => {
+    const orderId = orderIdOf(row);
+    if (!orderId) { showError('Order ID not found'); return; }
+    if (!(await confirm({
+      title: 'Process order',
+      message: 'Start processing this order? Pieces held by sample trays stay held until the trays are returned.',
+      confirmLabel: 'Process order',
+    }))) return;
+    await runAction('process', () => updateOrderStatus(orderId, { order_status: 'processed' }), 'Order processed', `${row.orderId || 'Order'} is now processing.`, 'processed');
+  };
+
+  const handleCancel = async (row) => {
+    const orderId = orderIdOf(row);
+    if (!orderId) { showError('Order ID not found'); return; }
+    if (!cancelChoice) { setCancelError('Choose a reason before cancelling.'); return; }
+    const reason = cancelChoice === 'Other' ? cancelOther.trim() : cancelChoice;
+    if (reason.length < 3 || reason.length > 500) {
+      setCancelError(cancelChoice === 'Other' ? 'Write the reason in 3 to 500 characters.' : 'Choose a reason before cancelling.');
+      return;
+    }
+    setCancelError('');
+    if (!(await confirm({
+      title: 'Cancel order',
+      message: 'Cancel this order? Stock is returned and this cannot be undone.',
+      confirmLabel: 'Cancel order',
+      danger: true,
+    }))) return;
+    await runAction('cancel', () => updateOrderStatus(orderId, { order_status: 'cancelled', cancel_reason: reason }), 'Order cancelled', `${row.orderId || 'Order'} was cancelled.`, 'cancelled');
+  };
+
+  // Dispatch the ready pieces: courier + tracking + how many pieces go in this shipment.
+  const handleDispatch = async (row) => {
+    const orderId = orderIdOf(row);
+    if (!orderId) return;
+    const { ready, held } = getPieceCounts(row.originalOrder);
     const name = dispatchCourier.trim();
     const tracking = dispatchTracking.trim();
+    const qtyText = String(dispatchQty).trim();
+    const qty = Number(qtyText);
     const errs = {};
     if (!name) errs.courier = 'Enter the courier name.';
     if (!tracking) errs.tracking = 'Enter the tracking number.';
+    if (!/^\d+$/.test(qtyText) || qty < 1) errs.qty = 'Pieces to send must be a whole number, 1 or more.';
+    else if (qty > ready) errs.qty = held > 0
+      ? `Only ${ready} pieces are ready. The other ${held} are held by sample tray.`
+      : `Only ${ready} pieces are ready to send.`;
     setDispatchErrors(errs);
     if (Object.keys(errs).length) return;
-    try {
-      setDispatching(true);
-      const updated = await dispatchOrder(orderId, { courier_name: name, courier_tracking_number: tracking });
-      showSuccess('Order marked as dispatched', null, 'Order dispatched', `${row.orderId || 'Order'} is now dispatched.`);
-      setViewRow((cur) => (cur ? {
-        ...cur,
-        status: mapApiStatusToUI('dispatched'),
-        originalOrder: { ...cur.originalOrder, ...(updated || {}), order_status: 'dispatched', courier_name: name, courier_tracking_number: tracking },
-      } : cur));
-      fetchOrders(true);
-    } catch (err) {
-      const message = err?.response?.data?.error || err?.message || 'Could not mark this order dispatched';
-      setDispatchErrors({ form: message });
-      showError(message, null, 'Order not dispatched', message);
-    } finally {
-      setDispatching(false);
-    }
+    const ok = await runAction('dispatch', () => dispatchOrder(orderId, { courier_name: name, courier_tracking_number: tracking, qty }), 'Shipment dispatched', `${qty} pieces sent with ${name}.`);
+    if (ok) { setDispatchCourier(''); setDispatchTracking(''); }
+  };
+
+  const handleTraysReturned = async (row) => {
+    const orderId = orderIdOf(row);
+    if (!orderId) return;
+    const { held } = getPieceCounts(row.originalOrder);
+    await runAction('trays', () => returnOrderTrays(orderId), 'Trays returned', `${held} pieces are now ready to send.`);
+  };
+
+  const handleComplete = async (row) => {
+    const orderId = orderIdOf(row);
+    if (!orderId) return;
+    const ok = await runAction('complete', () => completeOrder(orderId, { received_by: receivedBy }), 'Order completed', `${row.orderId || 'Order'} is completed.`, 'completed');
+    if (ok) setReceivedBy('');
   };
 
   const handleExportOrders = () => {
@@ -577,29 +658,6 @@ const DashboardOrders = () => {
       { label: 'Total', value: r => Number(r.originalOrder?.order_total ?? 0) || 0 },
     ], filteredRowsByTab);
   };
-
-  // Open the edit panel for a row, pre-filling status + any existing courier
-  // details so an edit doesn't wipe them.
-  const openEditPanel = (row) => {
-    setEditRow(row);
-    setEditStatus(row?.status || 'PENDING');
-    setCourierName(row?.originalOrder?.courier_name || '');
-    setCourierTracking(row?.originalOrder?.courier_tracking_number || '');
-    setPartialQty(
-      row?.originalOrder?.partial_dispatch_qty != null
-        ? String(row.originalOrder.partial_dispatch_qty)
-        : ''
-    );
-  };
-
-  const closeEditPanel = () => {
-    setEditRow(null);
-    setEditStatus('PENDING');
-    setCourierName('');
-    setCourierTracking('');
-    setPartialQty('');
-  };
-
 
   // Download the order as a branded PDF (shared generator — see utils/orderPdf).
   const handleDownload = (row) => downloadOrderPdf(row, []);
@@ -618,12 +676,12 @@ const DashboardOrders = () => {
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions
         onView={() => setViewRow(row)}
-        onEdit={canEditOrder ? () => openEditPanel(row) : undefined}
+        onEdit={(canEditOrder || canReturnTrays) ? () => setViewRow(row) : undefined}
         onDownload={() => handleDownload(row)}
         // Delete is admin-only (the backend also enforces canManageOrders).
       />
     ) },
-  ]), [isAdmin, canEditOrder]);
+  ]), [isAdmin, canEditOrder, canReturnTrays]);
 
   return (
     <div className="dash-page">
@@ -723,6 +781,64 @@ const DashboardOrders = () => {
           const orderDate = rawDate
             ? new Date(rawDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
             : '—';
+          const apiStatus = String(order?.order_status || 'pending').toLowerCase();
+          const counts = getPieceCounts(order);
+          const shipments = getShipments(order);
+          const busy = !!busyAction;
+          const cancellable = canEditOrder && ['pending', 'processed', 'hold_by_tray', 'partially_dispatched', 'dispatched'].includes(apiStatus);
+          const canCancel = cancellable && counts.shipped === 0;
+          const shippedBlocksCancel = cancellable && counts.shipped > 0;
+          const dispatchable = canEditOrder && ['processed', 'partially_dispatched'].includes(apiStatus);
+          const field = (label, value) => (value ? <div className="ordn-fl__row" key={label}><dt>{label}</dt><dd>{value}</dd></div> : null);
+          const shipmentList = shipments.length ? (
+            <ul className="ordn-ship">
+              {shipments.map((sh, n) => (
+                <li key={sh.shipment_id || n}>
+                  <b>#{n + 1}{sh.qty != null ? ` · ${sh.qty} pcs` : ''}</b>
+                  <span>{[sh.courier_name, sh.tracking_number].filter(Boolean).join(' · ') || '—'}</span>
+                  {sh.shipped_at && <small>{fmtDate(sh.shipped_at)}</small>}
+                </li>
+              ))}
+            </ul>
+          ) : null;
+          const sentLabel = `${counts.shipped} of ${counts.total} pieces`;
+          const waiting = counts.ready + counts.held;
+          const fieldsBody = (() => {
+            if (apiStatus === 'pending') return [
+              field('Pieces', counts.total ? `${counts.total} in total` : ''),
+              field('Stock source', counts.trayQty ? `${Math.max(counts.total - counts.trayQty, 0)} warehouse + ${counts.trayQty} sample trays` : (counts.total ? `${counts.total} warehouse` : '')),
+              field('Placed', fmtDateTime(order?.created_at || order?.order_date)),
+            ];
+            if (apiStatus === 'processed' || apiStatus === 'hold_by_tray') return [
+              field('Processed', fmtDateTime(order?.processed_at)),
+              field('Ready to send', `${counts.ready} pieces`),
+              field('Held by sample tray', counts.held ? `${counts.held} pieces` : (order?.tray_released_at ? `Released ${fmtDate(order.tray_released_at)}` : 'none')),
+              field('Trays returned', fmtDate(order?.tray_released_at)),
+            ];
+            if (apiStatus === 'partially_dispatched') return [
+              field('Shipments', shipmentList),
+              field('Sent so far', sentLabel),
+              field('Still waiting', waiting ? `${waiting} pieces${counts.held ? ' (' + counts.held + ' held by sample tray)' : ' (ready to send)'}` : ''),
+              field('Trays returned', fmtDate(order?.tray_released_at)),
+            ];
+            if (apiStatus === 'dispatched') return [
+              field('Shipments', shipmentList),
+              field('Sent', sentLabel),
+              field('Dispatched', fmtDateTime(order?.dispatched_at)),
+            ];
+            if (apiStatus === 'completed') return [
+              field('Shipments', shipmentList),
+              field('Delivered', fmtDateTime(order?.delivered_at)),
+              field('Received by', order?.received_by),
+            ];
+            return [
+              field('Reason', order?.cancel_reason),
+              field('Cancelled', fmtDateTime(order?.cancelled_at)),
+              field('Returned to stock', counts.cancelled ? `${counts.cancelled} pieces` : ''),
+              field('Already shipped', counts.shipped ? `${counts.shipped} pieces stay with the party` : 'none'),
+            ];
+          })();
+          const seg = (cls, n, label) => (n > 0 ? <div className={`ordn-seg ordn-seg--${cls}`} style={{ flex: `${n} 1 0` }} title={`${n} ${label}`}>{n}</div> : null);
           return (
             <div className="ord-view">
               <div className="ord-view__summary">
@@ -764,38 +880,54 @@ const DashboardOrders = () => {
                 </div>
               </div>
 
-              {(order?.courier_name || order?.courier_tracking_number) && order?.order_status !== 'processed' && (
-                <div className="ordn-dispatch ordn-dispatch--done">
-                  <h5 className="ord-view__section-title">Dispatch</h5>
-                  <div className="ordn-dispatch__ro">
-                    <div className="ord-field"><span className="ord-field__label">Courier</span><span className="ord-field__value">{order.courier_name || '—'}</span></div>
-                    <div className="ord-field"><span className="ord-field__label">Tracking number</span><span className="ord-field__value">{order.courier_tracking_number || '—'}</span></div>
+              {counts.total > 0 && (
+                <div className="ordn-flow">
+                  <div className="ordn-bar" role="img" aria-label={`Pieces: ${counts.shipped} sent, ${counts.ready} ready, ${counts.held} held by sample tray${counts.cancelled ? `, ${counts.cancelled} cancelled` : ''}`}>
+                    {seg('sent', counts.shipped, 'sent')}
+                    {seg('ready', counts.ready, 'ready to send')}
+                    {seg('held', counts.held, 'held by sample tray')}
+                    {seg('canc', counts.cancelled, 'cancelled')}
+                  </div>
+                  <div className="ordn-legend">
+                    <span><i className="ordn-dot ordn-dot--sent" />Sent {counts.shipped}</span>
+                    <span><i className="ordn-dot ordn-dot--ready" />Ready to send {counts.ready}</span>
+                    <span><i className="ordn-dot ordn-dot--held" />Held by sample tray {counts.held}</span>
+                    {counts.cancelled > 0 && <span><i className="ordn-dot ordn-dot--canc" />Cancelled {counts.cancelled}</span>}
                   </div>
                 </div>
               )}
 
-              {canEditOrder && order?.order_status === 'processed' && (
-                <form
-                  className="ordn-dispatch"
-                  noValidate
-                  onSubmit={(e) => { e.preventDefault(); handleMarkDispatched(viewRow); }}
-                >
-                  <h5 className="ord-view__section-title">Mark dispatched</h5>
-                  <div className="ordn-dispatch__grid">
+              <div className="ordn-fields">
+                <h5 className="ord-view__section-title">Fields in {OFFICE_STATUS_TITLE[apiStatus] || viewRow.status}</h5>
+                <dl className="ordn-fl">{fieldsBody}</dl>
+              </div>
+
+              {actionError && <p className="ordn-dispatch__err" role="alert">{actionError}</p>}
+
+              {canEditOrder && apiStatus === 'pending' && (
+                <div className="ordn-actions">
+                  <Button onClick={() => handleProcess(viewRow)} disabled={busy}>{busyAction === 'process' ? 'Processing…' : 'Process order'}</Button>
+                </div>
+              )}
+
+              {dispatchable && counts.ready > 0 && (
+                <form className="ordn-dispatch" noValidate onSubmit={(e) => { e.preventDefault(); handleDispatch(viewRow); }}>
+                  <h5 className="ord-view__section-title">Send ready pieces</h5>
+                  <div className="ordn-dispatch__grid ordn-dispatch__grid--3">
                     <label className="ordn-dispatch__field">
                       <span className="ui-label">Courier</span>
                       <input
                         className="ui-input"
                         list="ordn-couriers"
-                        placeholder="e.g., Blue Dart, DTDC"
+                        placeholder="e.g., Blue Dart"
                         value={dispatchCourier}
                         maxLength={255}
-                        disabled={dispatching}
+                        disabled={busy}
                         aria-invalid={!!dispatchErrors.courier}
-                        onChange={(e) => { setDispatchCourier(e.target.value); setDispatchErrors((x) => ({ ...x, courier: undefined, form: undefined })); }}
+                        onChange={(e) => { setDispatchCourier(e.target.value); setDispatchErrors((x) => ({ ...x, courier: undefined })); setActionError(''); }}
                       />
                       <datalist id="ordn-couriers">
-                        {['Blue Dart', 'DTDC', 'Delhivery', 'India Post', 'Professional Couriers', 'Gati'].map((c) => <option key={c} value={c} />)}
+                        {COURIER_SUGGESTIONS.map((c) => <option key={c} value={c} />)}
                       </datalist>
                       {dispatchErrors.courier && <span className="ordn-dispatch__err" role="alert">{dispatchErrors.courier}</span>}
                     </label>
@@ -803,19 +935,86 @@ const DashboardOrders = () => {
                       <span className="ui-label">Tracking number</span>
                       <input
                         className="ui-input"
-                        placeholder="Enter tracking number"
+                        placeholder="Enter the number"
                         value={dispatchTracking}
                         maxLength={255}
-                        disabled={dispatching}
+                        disabled={busy}
                         aria-invalid={!!dispatchErrors.tracking}
-                        onChange={(e) => { setDispatchTracking(e.target.value); setDispatchErrors((x) => ({ ...x, tracking: undefined, form: undefined })); }}
+                        onChange={(e) => { setDispatchTracking(e.target.value); setDispatchErrors((x) => ({ ...x, tracking: undefined })); setActionError(''); }}
                       />
                       {dispatchErrors.tracking && <span className="ordn-dispatch__err" role="alert">{dispatchErrors.tracking}</span>}
                     </label>
+                    <label className="ordn-dispatch__field">
+                      <span className="ui-label">Pieces to send</span>
+                      <input
+                        className="ui-input"
+                        type="text"
+                        inputMode="numeric"
+                        value={dispatchQty}
+                        disabled={busy}
+                        aria-invalid={!!dispatchErrors.qty}
+                        onChange={(e) => { setDispatchQty(e.target.value); setDispatchErrors((x) => ({ ...x, qty: undefined })); setActionError(''); }}
+                      />
+                      {dispatchErrors.qty && <span className="ordn-dispatch__err" role="alert">{dispatchErrors.qty}</span>}
+                    </label>
                   </div>
-                  {dispatchErrors.form && <p className="ordn-dispatch__err" role="alert">{dispatchErrors.form}</p>}
-                  <Button type="submit" variant="secondary" disabled={dispatching}>{dispatching ? 'Marking…' : 'Mark dispatched'}</Button>
+                  <Button type="submit" variant="secondary" disabled={busy}>{busyAction === 'dispatch' ? 'Dispatching…' : 'Dispatch ready pieces'}</Button>
                 </form>
+              )}
+
+              {canReturnTrays && counts.held > 0 && !['cancelled', 'completed'].includes(apiStatus) && (
+                <div className="ordn-notice" role="status">
+                  <b>{counts.held} pieces are held by sample tray.</b>
+                  <span>They can only be sent after the trays are returned.</span>
+                  <Button variant="secondary" onClick={() => handleTraysReturned(viewRow)} disabled={busy}>
+                    {busyAction === 'trays' ? 'Saving…' : `Trays returned the ${counts.held} pieces`}
+                  </Button>
+                </div>
+              )}
+
+              {canEditOrder && apiStatus === 'dispatched' && (
+                <div className="ordn-dispatch">
+                  <h5 className="ord-view__section-title">Mark completed</h5>
+                  <label className="ordn-dispatch__field">
+                    <span className="ui-label">Received by (optional)</span>
+                    <input className="ui-input" placeholder="Name of the person who received it" value={receivedBy} maxLength={255} disabled={busy} onChange={(e) => setReceivedBy(e.target.value)} />
+                  </label>
+                  <Button onClick={() => handleComplete(viewRow)} disabled={busy}>{busyAction === 'complete' ? 'Saving…' : 'Mark completed'}</Button>
+                </div>
+              )}
+
+              {apiStatus === 'completed' && <p className="ordn-note">This order is closed. No further changes.</p>}
+              {apiStatus === 'cancelled' && <p className="ordn-note">A cancelled order cannot be reopened. Place a new order instead.</p>}
+
+              {shippedBlocksCancel && (
+                <p className="ordn-note">Some pieces were already sent, so this order cannot be cancelled. Complete it instead.</p>
+              )}
+
+              {canCancel && (
+                <div className="ordn-dispatch ordn-cancel">
+                  <h5 className="ord-view__section-title">Cancel this order</h5>
+                  <label className="ordn-dispatch__field">
+                    <span className="ui-label">Reason (required)</span>
+                    <select
+                      className="ui-input"
+                      value={cancelChoice}
+                      disabled={busy}
+                      aria-invalid={!!cancelError}
+                      onChange={(e) => { setCancelChoice(e.target.value); setCancelError(''); }}
+                    >
+                      <option value="">Choose a reason</option>
+                      {CANCEL_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                    </select>
+                  </label>
+                  {cancelChoice === 'Other' && (
+                    <label className="ordn-dispatch__field">
+                      <span className="ui-label">Write the reason</span>
+                      <input className="ui-input" value={cancelOther} maxLength={500} disabled={busy} onChange={(e) => { setCancelOther(e.target.value); setCancelError(''); }} />
+                    </label>
+                  )}
+                  {cancelError && <span className="ordn-dispatch__err" role="alert">{cancelError}</span>}
+                  <Button variant="secondary" onClick={() => handleCancel(viewRow)} disabled={busy || !cancelChoice}>{busyAction === 'cancel' ? 'Cancelling…' : 'Cancel order'}</Button>
+                </div>
               )}
 
               {!canEditOrder && (
@@ -899,92 +1098,6 @@ const DashboardOrders = () => {
             </div>
           );
         })()}
-      </AsidePanel>
-
-      {/* Edit Order Status Modal */}
-      <AsidePanel open={!!editRow} onClose={closeEditPanel} title="Edit Order Status" footer={(
-        <>
-          <Button variant="secondary" onClick={closeEditPanel} disabled={loading}>Cancel</Button>
-          <Button
-            onClick={() => {
-              if (editStatus && editRow) {
-                handleUpdateStatus(editRow, editStatus);
-              }
-            }}
-            disabled={loading}
-          >
-            {loading ? 'Updating...' : 'Update'}
-          </Button>
-        </>
-      )}>
-        <div className="ui-form">
-          <div className="form-group">
-            <label className="ui-label">Order ID</label>
-            <input className="ui-input" value={editRow?.orderId || ''} disabled />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Client</label>
-            <input className="ui-input" value={editRow?.client || ''} disabled />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Product</label>
-            <input className="ui-input" value={editRow?.product || ''} disabled />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Quantity</label>
-            <input type="number" className="ui-input" value={editRow?.qty || ''} disabled />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Status</label>
-            <DropdownSelector
-              options={Object.keys(UI_TO_API_STATUS).map(label => ({ value: label, label }))}
-              value={editStatus}
-              onChange={(value) => setEditStatus(value)}
-              placeholder="Select status"
-            />
-          </div>
-
-          {/* Dispatch details — required by the backend when dispatching or
-              partially dispatching an order. */}
-          {DISPATCH_STATUSES.includes(UI_TO_API_STATUS[editStatus]) && (
-            <>
-              <div className="form-group">
-                <label className="ui-label">Courier Name *</label>
-                <input
-                  className="ui-input"
-                  placeholder="e.g., Blue Dart, DTDC"
-                  value={courierName}
-                  onChange={(e) => setCourierName(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="ui-label">Courier Tracking Number *</label>
-                <input
-                  className="ui-input"
-                  placeholder="Enter tracking number"
-                  value={courierTracking}
-                  onChange={(e) => setCourierTracking(e.target.value)}
-                />
-              </div>
-            </>
-          )}
-
-          {/* Partial dispatch also needs the dispatched quantity. */}
-          {UI_TO_API_STATUS[editStatus] === 'partially_dispatched' && (
-            <div className="form-group">
-              <label className="ui-label">Partial Dispatch Quantity *</label>
-              <input
-                type="number"
-                min="1"
-                max={editRow?.qty || undefined}
-                className="ui-input"
-                placeholder={`How many of ${editRow?.qty || 0} are being dispatched`}
-                value={partialQty}
-                onChange={(e) => setPartialQty(e.target.value)}
-              />
-            </div>
-          )}
-        </div>
       </AsidePanel>
     </div>
   );

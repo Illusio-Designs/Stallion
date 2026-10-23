@@ -11,6 +11,7 @@ const { TrayProductStatus, OrderStatus, OrderStatusTransitions, OrderType } = re
 const { generateUniqueOrderNumber } = require('../services/order_number_generator');
 const Event = require('../models/event');
 const OrderOperation = require('../models/OrderOperation');
+const OrderShipment = require('../models/OrderShipment');
 const SalesmanCheckIns = require('../models/SalesmanCheckIns');
 const Offer = require('../models/Offer');
 const { isOfferActive, offerScopeMatches, applyOfferToItems } = require('../utils/offerPricing');
@@ -34,6 +35,73 @@ const orderPartyInclude = {
     required: false,
 };
 
+const TRAY_RETURN_ROLES = ['admin', 'order_manager', 'tray_manager'];
+const READY_STATUSES = [OrderStatus.PROCESSED, OrderStatus.PARTIALLY_DISPATCHED, OrderStatus.HOLD_BY_TRAY];
+const NO_HELD_STATUSES = [OrderStatus.DISPATCHED, OrderStatus.COMPLETED, OrderStatus.CANCELLED];
+
+function sumItemQty(items) {
+    let its = items;
+    if (typeof its === 'string') { try { its = JSON.parse(its); } catch { its = []; } }
+    if (its && typeof its === 'object' && !Array.isArray(its)) its = Object.values(its);
+    return Array.isArray(its)
+        ? its.reduce((s, it) => s + (Number(it && (it.quantity ?? it.qty)) || 0), 0)
+        : 0;
+}
+
+// Adds the dispatch figures to plain order objects. Two grouped queries for the
+// whole page (shipments and tray pieces), never one per order.
+//   total_qty    pieces ordered
+//   tray_qty     pieces booked from sample trays when the order was placed
+//   held_qty     tray pieces still waiting (0 once trays returned, or once the order is
+//                dispatched / completed / cancelled)
+//   shipped_qty  pieces already sent in shipments
+//   ready_qty    pieces that can be sent right now
+async function decorateOrders(plainOrders, { transaction } = {}) {
+    const ids = plainOrders.map((o) => o.order_id).filter(Boolean);
+    const shipmentsByOrder = {};
+    const trayByOrder = {};
+    if (ids.length) {
+        const shipments = await OrderShipment.findAll({
+            where: { order_id: ids },
+            order: [['shipped_at', 'ASC'], ['created_at', 'ASC']],
+            transaction,
+        });
+        shipments.forEach((sh) => {
+            (shipmentsByOrder[sh.order_id] = shipmentsByOrder[sh.order_id] || []).push({
+                shipment_id: sh.shipment_id,
+                courier_name: sh.courier_name,
+                tracking_number: sh.tracking_number,
+                qty: Number(sh.qty) || 0,
+                shipped_at: sh.shipped_at,
+            });
+        });
+        const ops = await OrderOperation.findAll({
+            where: { order_id: ids },
+            attributes: ['order_id', [sequelize.fn('SUM', sequelize.col('tray_reduced_qty')), 'tray_sum']],
+            group: ['order_id'],
+            raw: true,
+            transaction,
+        });
+        ops.forEach((r) => { trayByOrder[r.order_id] = Number(r.tray_sum) || 0; });
+    }
+    return plainOrders.map((o) => {
+        const total_qty = sumItemQty(o.order_items);
+        const tray_qty = trayByOrder[o.order_id] || 0;
+        const shipments = shipmentsByOrder[o.order_id] || [];
+        const shipped_qty = shipments.reduce((s, sh) => s + sh.qty, 0);
+        const held_qty = (o.tray_released_at || NO_HELD_STATUSES.includes(o.order_status)) ? 0 : tray_qty;
+        const ready_qty = READY_STATUSES.includes(o.order_status)
+            ? Math.max(0, total_qty - shipped_qty - held_qty)
+            : 0;
+        return { ...o, total_qty, tray_qty, held_qty, shipped_qty, ready_qty, shipments };
+    });
+}
+
+async function decorateOrder(order, opts) {
+    const plain = typeof order.get === 'function' ? order.get({ plain: true }) : order;
+    return (await decorateOrders([plain], opts))[0];
+}
+
 async function mapOrdersWithPartyName(orders) {
     // Batched salesman-name lookup so order lists (and the Visit Report that
     // merges visit orders) carry salesman_name without the client fetching each
@@ -44,21 +112,11 @@ async function mapOrdersWithPartyName(orders) {
         const salesmen = await Salesman.findAll({ where: { salesman_id: salesmanIds }, attributes: ['salesman_id', 'full_name'] });
         salesmen.forEach((s) => { salesmanMap[s.salesman_id] = s.full_name; });
     }
-    return orders.map((order) => {
-        const plain = order.get({ plain: true });
+    const decorated = await decorateOrders(orders.map((o) => o.get({ plain: true })));
+    return decorated.map((plain) => {
         const { party, ...rest } = plain;
-        // Total quantity across the order's items, computed here so the frontend
-        // (Visit Report QTY, etc.) never has to re-parse order_items — which may be
-        // a JSON string. Handles array / JSON-string / object shapes.
-        let its = rest.order_items;
-        if (typeof its === 'string') { try { its = JSON.parse(its); } catch { its = []; } }
-        if (its && typeof its === 'object' && !Array.isArray(its)) its = Object.values(its);
-        const total_qty = Array.isArray(its)
-            ? its.reduce((s, it) => s + (Number(it && (it.quantity ?? it.qty)) || 0), 0)
-            : 0;
         return {
             ...rest,
-            total_qty,
             salesman_name: salesmanMap[rest.salesman_id] || null,
             party_name: party ? party.party_name : null,
             party_address: party ? party.address : null,
@@ -942,7 +1000,7 @@ class OrderController {
             if (!id) {
                 return res.status(400).json({ error: 'Order ID is required' });
             }
-            const { order_status, partial_dispatch_qty, courier_name, courier_tracking_number } = req.body;
+            const { order_status } = req.body;
             if (!order_status) {
                 return res.status(400).json({ error: 'All fields are required' });
             }
@@ -970,30 +1028,23 @@ class OrderController {
                 && !(OrderStatusTransitions[currentStatus] || []).includes(order_status)) {
                 return res.status(409).json({ error: statusMoveMessage(currentStatus, order_status) });
             }
+            // Every dispatch goes through the shipment route so each parcel is recorded.
             if (order_status === OrderStatus.DISPATCHED || order_status === OrderStatus.PARTIALLY_DISPATCHED) {
-                if (!courier_name || !courier_tracking_number) {
-                    return res.status(400).json({ error: 'Courier name and tracking number are required' });
-                }
-                order.courier_name = courier_name;
-                order.courier_tracking_number = courier_tracking_number;
+                return res.status(409).json({ error: 'Use the Dispatch form to send pieces' });
             }
-            if (order_status === OrderStatus.PARTIALLY_DISPATCHED) {
-                if (!partial_dispatch_qty) {
-                    return res.status(400).json({ error: 'Partial dispatch quantity is required' });
+            if (order_status === OrderStatus.COMPLETED) {
+                return res.status(409).json({ error: 'Use Mark completed' });
+            }
+            let cancelReason = null;
+            if (order_status === OrderStatus.CANCELLED && currentStatus !== OrderStatus.CANCELLED) {
+                cancelReason = String(req.body.cancel_reason ?? '').trim();
+                if (cancelReason.length < 3 || cancelReason.length > 500) {
+                    return res.status(400).json({ error: 'Please give a reason for cancelling (3 to 500 characters).' });
                 }
-                const dispatchQty = Number(partial_dispatch_qty);
-                let orderedQty = 0;
-                try {
-                    const its = typeof order.order_items === 'string' ? JSON.parse(order.order_items) : order.order_items;
-                    orderedQty = (Array.isArray(its) ? its : []).reduce((sum, it) => sum + (Number(it && (it.quantity ?? it.qty)) || 0), 0);
-                } catch (e) { orderedQty = 0; }
-                if (!Number.isInteger(dispatchQty) || dispatchQty < 1) {
-                    return res.status(400).json({ error: 'Dispatched quantity must be a whole number, 1 or more.' });
-                }
-                if (orderedQty && dispatchQty > orderedQty) {
-                    return res.status(400).json({ error: `Dispatched quantity cannot be more than the ordered quantity (${orderedQty}).` });
-                }
-                order.partial_dispatch_qty = dispatchQty;
+            }
+            if (order_status === OrderStatus.PROCESSED && currentStatus !== OrderStatus.PROCESSED) {
+                order.processed_by = user ? user.user_id : null;
+                order.processed_at = new Date();
             }
             // Reverse stock only when an order first transitions INTO cancelled,
             // not on a cancelled -> cancelled no-op (which would reverse twice).
@@ -1001,6 +1052,10 @@ class OrderController {
                 // Two people can press Cancel at the same moment. Lock the order row and
                 // read its status again INSIDE the transaction: the second request waits
                 // here, then sees "cancelled" and returns the stock zero times, not twice.
+                const cancelledAt = new Date();
+                order.cancel_reason = cancelReason;
+                order.cancelled_by = user ? user.user_id : null;
+                order.cancelled_at = cancelledAt;
                 const outcome = await sequelize.transaction(async (transaction) => {
                     const locked = await Order.findOne({
                         where: { order_id: order.order_id },
@@ -1008,14 +1063,22 @@ class OrderController {
                         lock: transaction.LOCK.UPDATE,
                     });
                     if (!locked || locked.order_status === OrderStatus.CANCELLED) return 'already';
+                    const sent = await OrderShipment.sum('qty', { where: { order_id: locked.order_id }, transaction });
+                    if (Number(sent) > 0) return 'shipped';
                     await reverseOrderOperation(locked.order_id, transaction, req.user);
                     locked.order_status = OrderStatus.CANCELLED;
+                    locked.cancel_reason = cancelReason;
+                    locked.cancelled_by = user ? user.user_id : null;
+                    locked.cancelled_at = cancelledAt;
                     locked.updated_at = new Date();
                     await locked.save({ transaction });
                     return 'done';
                 });
                 if (outcome === 'already') {
                     return res.status(409).json({ error: 'This order was just cancelled by someone else.' });
+                }
+                if (outcome === 'shipped') {
+                    return res.status(409).json({ error: 'Some pieces were already sent, so this order can no longer be cancelled. Complete it instead.' });
                 }
             }
             order.order_status = order_status;
@@ -1030,7 +1093,7 @@ class OrderController {
                 oldValues: oldSnapshot,
                 newValues: order,
             });
-            res.status(200).json(order);
+            res.status(200).json(await decorateOrder(order));
         }
         catch (error) {
             console.error('Error updating order status:', error);
@@ -1038,6 +1101,8 @@ class OrderController {
         }
     }
 
+    // POST /:id/dispatch  { courier_name, courier_tracking_number, qty? }
+    // Records one shipment. Can be called again for the remaining pieces.
     async dispatchOrder(req, res) {
         try {
             if (!canManageOrders(req.userRoleNames)) {
@@ -1052,33 +1117,158 @@ class OrderController {
             if (courierName.length > 255 || trackingNumber.length > 255) {
                 return res.status(400).json({ error: 'Courier name and tracking number must be 255 characters or fewer' });
             }
-            const order = await Order.findOne({ where: { order_id: id } });
-            if (!order) {
+            const rawQty = req.body?.qty;
+            const qtyGiven = rawQty !== undefined && rawQty !== null && rawQty !== '';
+            const wantedQty = qtyGiven ? Number(rawQty) : null;
+            if (qtyGiven && (!Number.isInteger(wantedQty) || wantedQty < 1)) {
+                return res.status(400).json({ error: 'Quantity must be a whole number, 1 or more.' });
+            }
+            const exists = await Order.findOne({ where: { order_id: id }, attributes: ['order_id'] });
+            if (!exists) {
                 return res.status(404).json({ error: 'Order not found' });
             }
-            const currentStatus = order.order_status;
-            if (!(OrderStatusTransitions[currentStatus] || []).includes(OrderStatus.DISPATCHED)) {
-                return res.status(409).json({ error: statusMoveMessage(currentStatus, OrderStatus.DISPATCHED) });
-            }
-            const oldSnapshot = order.toJSON();
-            order.courier_name = courierName;
-            order.courier_tracking_number = trackingNumber;
-            order.order_status = OrderStatus.DISPATCHED;
-            order.updated_at = new Date();
-            await order.save();
-            await logAudit({
-                req,
-                action: 'update',
-                description: 'Order marked dispatched',
-                tableName: 'order',
-                recordId: order.order_id,
-                oldValues: oldSnapshot,
-                newValues: order,
+            const result = await sequelize.transaction(async (transaction) => {
+                // Lock the order so two people dispatching at once cannot send the same pieces twice.
+                const order = await Order.findOne({ where: { order_id: id }, transaction, lock: transaction.LOCK.UPDATE });
+                if (!order) return { status: 404, error: 'Order not found' };
+                const currentStatus = order.order_status;
+                if (![OrderStatus.PROCESSED, OrderStatus.HOLD_BY_TRAY, OrderStatus.PARTIALLY_DISPATCHED].includes(currentStatus)) {
+                    return { status: 409, error: `This order is ${statusLabel(currentStatus)}, so pieces cannot be dispatched.` };
+                }
+                const fig = await decorateOrder(order, { transaction });
+                const qty = qtyGiven ? wantedQty : fig.ready_qty;
+                if (fig.ready_qty < 1) {
+                    return fig.held_qty > 0
+                        ? { status: 409, error: `No pieces are ready yet. All ${fig.held_qty} remaining are held by sample tray.` }
+                        : { status: 400, error: 'There are no pieces left to dispatch.' };
+                }
+                if (qty > fig.ready_qty) {
+                    return fig.held_qty > 0
+                        ? { status: 409, error: `Only ${fig.ready_qty} pieces are ready. The other ${fig.held_qty} are held by sample tray.` }
+                        : { status: 400, error: `Only ${fig.ready_qty} pieces are left to dispatch.` };
+                }
+                const oldSnapshot = order.toJSON();
+                const now = new Date();
+                await OrderShipment.create({
+                    order_id: order.order_id,
+                    courier_name: courierName,
+                    tracking_number: trackingNumber,
+                    qty,
+                    shipped_at: now,
+                    created_by: req.user ? req.user.user_id : null,
+                }, { transaction });
+                const shippedTotal = fig.shipped_qty + qty;
+                const allSent = fig.total_qty - shippedTotal <= 0;
+                order.courier_name = courierName;
+                order.courier_tracking_number = trackingNumber;
+                order.partial_dispatch_qty = shippedTotal;
+                order.order_status = allSent ? OrderStatus.DISPATCHED : OrderStatus.PARTIALLY_DISPATCHED;
+                if (allSent) order.dispatched_at = now;
+                order.updated_at = now;
+                await order.save({ transaction });
+                await logAudit({
+                    req,
+                    transaction,
+                    action: 'update',
+                    description: `Order dispatched: ${qty} pieces via ${courierName} (${trackingNumber})`,
+                    tableName: 'order',
+                    recordId: order.order_id,
+                    oldValues: oldSnapshot,
+                    newValues: order,
+                });
+                return { status: 200, body: await decorateOrder(order, { transaction }) };
             });
-            res.status(200).json(order);
+            if (result.error) return res.status(result.status).json({ error: result.error });
+            res.status(200).json(result.body);
         } catch (error) {
             console.error('Error dispatching order:', error);
-            res.status(500).json({ error: 'Failed to mark order dispatched' });
+            res.status(500).json({ error: 'Failed to dispatch order' });
+        }
+    }
+
+    // POST /:id/trays-returned  Sample trays handed back the held pieces; they become ready.
+    async traysReturned(req, res) {
+        try {
+            if (!hasRole(req.userRoleNames, TRAY_RETURN_ROLES)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const { id } = req.params;
+            const result = await sequelize.transaction(async (transaction) => {
+                const order = await Order.findOne({ where: { order_id: id }, transaction, lock: transaction.LOCK.UPDATE });
+                if (!order) return { status: 404, error: 'Order not found' };
+                if (order.order_status === OrderStatus.CANCELLED || order.order_status === OrderStatus.COMPLETED) {
+                    return { status: 409, error: `This order is ${statusLabel(order.order_status)}, so there is nothing to release.` };
+                }
+                const fig = await decorateOrder(order, { transaction });
+                if (order.tray_released_at || fig.held_qty < 1) {
+                    return { status: 409, error: 'No pieces are held by sample tray for this order.' };
+                }
+                const oldSnapshot = order.toJSON();
+                order.tray_released_at = new Date();
+                order.tray_released_by = req.user ? req.user.user_id : null;
+                order.updated_at = new Date();
+                await order.save({ transaction });
+                await logAudit({
+                    req,
+                    transaction,
+                    action: 'update',
+                    description: `Sample trays returned ${fig.held_qty} pieces for this order`,
+                    tableName: 'order',
+                    recordId: order.order_id,
+                    oldValues: oldSnapshot,
+                    newValues: order,
+                });
+                return { status: 200, body: await decorateOrder(order, { transaction }) };
+            });
+            if (result.error) return res.status(result.status).json({ error: result.error });
+            res.status(200).json(result.body);
+        } catch (error) {
+            console.error('Error releasing tray pieces:', error);
+            res.status(500).json({ error: 'Failed to mark sample trays returned' });
+        }
+    }
+
+    // POST /:id/complete  { received_by? }  Dispatched -> completed.
+    async completeOrder(req, res) {
+        try {
+            if (!canManageOrders(req.userRoleNames)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const { id } = req.params;
+            const receivedBy = String(req.body?.received_by ?? '').trim();
+            if (receivedBy.length > 255) {
+                return res.status(400).json({ error: 'Received by must be 255 characters or fewer' });
+            }
+            const result = await sequelize.transaction(async (transaction) => {
+                const order = await Order.findOne({ where: { order_id: id }, transaction, lock: transaction.LOCK.UPDATE });
+                if (!order) return { status: 404, error: 'Order not found' };
+                if (!(OrderStatusTransitions[order.order_status] || []).includes(OrderStatus.COMPLETED)
+                    || order.order_status !== OrderStatus.DISPATCHED) {
+                    return { status: 409, error: 'Only a fully dispatched order can be marked completed.' };
+                }
+                const oldSnapshot = order.toJSON();
+                order.order_status = OrderStatus.COMPLETED;
+                order.delivered_at = new Date();
+                order.received_by = receivedBy || null;
+                order.updated_at = new Date();
+                await order.save({ transaction });
+                await logAudit({
+                    req,
+                    transaction,
+                    action: 'update',
+                    description: 'Order marked completed',
+                    tableName: 'order',
+                    recordId: order.order_id,
+                    oldValues: oldSnapshot,
+                    newValues: order,
+                });
+                return { status: 200, body: await decorateOrder(order, { transaction }) };
+            });
+            if (result.error) return res.status(result.status).json({ error: result.error });
+            res.status(200).json(result.body);
+        } catch (error) {
+            console.error('Error completing order:', error);
+            res.status(500).json({ error: 'Failed to mark order completed' });
         }
     }
 

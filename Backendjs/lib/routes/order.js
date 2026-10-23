@@ -11,6 +11,8 @@ router.post('/quote', authenticateToken, orderController.quoteOrder);
 router.post('/', authenticateToken, orderController.createOrder);
 router.put('/:id', authenticateToken, orderController.updateOrderStatus);
 router.post('/:id/dispatch', authenticateToken, orderController.dispatchOrder);
+router.post('/:id/trays-returned', authenticateToken, orderController.traysReturned);
+router.post('/:id/complete', authenticateToken, orderController.completeOrder);
 router.delete('/:id', authenticateToken, noDelete('An order'));
 
 
