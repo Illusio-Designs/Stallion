@@ -19,6 +19,7 @@ import {
 import { showError, showSuccess } from '../services/notificationService';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard.css';
+import '../styles/redesign-n-tray.css';
 
 const TrayStatus = {
   AVAILABLE: 'available',
@@ -67,11 +68,8 @@ const getStatusColor = (status) => {
 };
 
 // Display-only helpers for the tray cards (use whatever the row carries).
-const trayCount = (t) => {
-  const v = t.product_count ?? t.products_count ?? t.frames_count ?? t.total_products ?? t.item_count;
-  const n = Number(v);
-  return v == null || v === '' || Number.isNaN(n) ? null : n;
-};
+const TRAY_SLOTS = 12;
+const trayFrames = (t) => (Array.isArray(t.frames) ? t.frames : []);
 const trayHolder = (t) => t.salesman_name || t.holder_name || t.assigned_to_name || t.salesman?.full_name || null;
 const traySince = (t) => {
   const d = t.assigned_at || t.assigned_since || t.assigned_on;
@@ -428,6 +426,44 @@ const DashboardTray = () => {
     }
   };
 
+  // Tray cards: pick frames in a card (by slot), then "Take back" returns them to the warehouse
+  // (same transfer API as the Assign Products tab). With nothing picked it takes back every frame.
+  const [cardPick, setCardPick] = useState({}); // { [trayId]: [product_id] }
+  const [cardBusy, setCardBusy] = useState('');
+  const toggleCardPick = (trayId, productId) => {
+    setCardPick((prev) => {
+      const cur = prev[trayId] || [];
+      return { ...prev, [trayId]: cur.includes(productId) ? cur.filter((id) => id !== productId) : [...cur, productId] };
+    });
+  };
+  const handleAssignFrame = (tray) => {
+    const trayId = tray.tray_id || tray.id;
+    if (!trayId) return;
+    setActiveTab('assign-products');
+    handleTrayChange(trayId);
+  };
+  const handleTakeBack = async (tray) => {
+    const trayId = tray.tray_id || tray.id;
+    const frames = trayFrames(tray);
+    if (!trayId || frames.length === 0) return;
+    const picked = cardPick[trayId] || [];
+    const list = picked.length ? frames.filter((f) => picked.includes(f.product_id)) : frames;
+    const confirmed = await confirm(`Take ${list.length} ${list.length === 1 ? 'frame' : 'frames'} back from "${tray.tray_name}" to the warehouse?`);
+    if (!confirmed) return;
+    setCardBusy(trayId);
+    setError(null);
+    try {
+      await transferTrayProducts(list.map((f) => ({ from_tray_id: trayId, product_id: f.product_id })));
+      showSuccess('Taken back to the warehouse');
+      setCardPick((prev) => ({ ...prev, [trayId]: [] }));
+      await fetchTrays();
+    } catch (err) {
+      showError(err.message || 'Failed to take the frames back');
+    } finally {
+      setCardBusy('');
+    }
+  };
+
   const startEditProduct = (trayProduct) => {
     setEditingProduct(trayProduct);
     setEditProductStatus(trayProduct.status || TrayProductStatus.ALLOTED);
@@ -569,28 +605,55 @@ const DashboardTray = () => {
                 {visibleTrays.map((t) => {
                   const state = trayState(t);
                   const [pillCls, pillLabel] = TRAY_PILL[state];
-                  const n = trayCount(t);
                   const holder = trayHolder(t);
                   const since = traySince(t);
-                  const total = n == null ? 0 : Math.max(12, n);
-                  const meta = [
-                    n != null ? `${n} ${n === 1 ? 'frame' : 'frames'}` : null,
-                    holder ? `With ${holder}${since ? `, since ${since}` : ''}` : (state === 'available' ? 'In the office' : null),
-                  ].filter(Boolean).join(' · ');
+                  const trayId = t.tray_id || t.id;
+                  const frames = trayFrames(t);
+                  const picked = cardPick[trayId] || [];
+                  const shown = frames.slice(0, TRAY_SLOTS);
+                  const busy = cardBusy === trayId;
+                  const canAssign = state === 'available' || state === 'assigned' || state === 'overdue';
                   return (
-                    <div key={t.tray_id || t.id || t.tray_name} className="tray-card">
+                    <div key={trayId || t.tray_name} className="tray-card trn-card">
                       <div className="tray-card__top">
-                        <h3>{t.tray_name || 'Untitled tray'}</h3>
+                        <div className="trn-title">
+                          <h3>{t.tray_name || 'Untitled tray'}</h3>
+                          <span className={`trn-who${holder ? '' : ' trn-who--none'}`}>
+                            {holder ? `${holder}${since ? ` · since ${since}` : ''}` : 'Not assigned'}
+                          </span>
+                        </div>
                         <span className={`pill ${pillCls}`}>{pillLabel}</span>
                       </div>
-                      {n != null && (
-                        <div className="tray-slots" aria-hidden="true">
-                          {Array.from({ length: total }).map((_, i) => <i key={i} className={i < n ? '' : 'e'} />)}
-                        </div>
-                      )}
-                      {meta && <span className="tray-meta">{meta}</span>}
-                      <div className="tray-card__actions">
-                        <button className="ui-btn ui-btn--secondary" onClick={() => openEdit(t)}>Open</button>
+                      <div className="trn-fill">
+                        <span className="trn-fill__pill">{frames.length} of {TRAY_SLOTS}</span>
+                        {frames.length > TRAY_SLOTS && <span className="trn-fill__more">+{frames.length - TRAY_SLOTS} more in Assign Products</span>}
+                      </div>
+                      <div className="trn-slots" role="group" aria-label={`Frames in ${t.tray_name}`}>
+                        {Array.from({ length: TRAY_SLOTS }).map((_, i) => {
+                          const f = shown[i];
+                          if (!f) return <span key={i} className="trn-slot trn-slot--empty" aria-hidden="true" />;
+                          const on = picked.includes(f.product_id);
+                          return (
+                            <button
+                              key={f.product_id}
+                              type="button"
+                              className={`trn-slot trn-slot--full${on ? ' on' : ''}`}
+                              aria-pressed={on}
+                              title={`${f.model_no || 'Frame'}${f.qty > 1 ? ` x${f.qty}` : ''} (${getStatusLabel(f.status)})`}
+                              onClick={() => toggleCardPick(trayId, f.product_id)}
+                            >
+                              {String(f.model_no || '?').slice(0, 5)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {frames.length === 0 && <span className="tray-meta">No frames yet.</span>}
+                      <div className="tray-card__actions trn-actions">
+                        <button type="button" className="ui-btn ui-btn--primary" onClick={() => handleAssignFrame(t)} disabled={!canAssign || saving || busy}>Assign frame</button>
+                        <button type="button" className="ui-btn ui-btn--secondary" onClick={() => handleTakeBack(t)} disabled={frames.length === 0 || saving || busy}>
+                          {busy ? 'Taking back…' : picked.length ? `Take back (${picked.length})` : 'Take back'}
+                        </button>
+                        <button type="button" className="ui-btn ui-btn--secondary" onClick={() => openEdit(t)}>Edit</button>
                       </div>
                     </div>
                   );

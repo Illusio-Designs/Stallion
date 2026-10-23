@@ -1,3 +1,4 @@
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const FrameColor = require('../models/FrameColor');
 const { logAudit } = require('../utils/auditLogger');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
@@ -12,7 +13,7 @@ class FrameColorController {
                 nameFields: ['frame_color'],
                 phoneFields: [],
             });
-            const where = mergeWhere({}, searchFilter);
+            const where = mergeWhere(activeOnlyWhere(req), searchFilter);
             const frameColors = await FrameColor.findAll({ where });
             res.status(200).json(frameColors);
         } catch (error) {
@@ -75,6 +76,7 @@ class FrameColorController {
             }
             const oldSnapshot = frameColor.toJSON();
             const payload = {
+                ...activeUpdate(req.body),
                 frame_color: frame_color,
                 updated_at: new Date(),
             };

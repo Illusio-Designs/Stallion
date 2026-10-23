@@ -512,6 +512,23 @@ export const updateOrderStatus = async (orderId, orderStatusData) => {
 };
 
 /**
+ * Mark a processing order as dispatched with its courier details.
+ * POST /orders/:id/dispatch
+ * @param {string} orderId - Order ID (UUID)
+ * @param {{courier_name: string, courier_tracking_number: string}} data
+ * @returns {Promise<Object>} Updated order object
+ */
+export const dispatchOrder = async (orderId, { courier_name, courier_tracking_number }) => {
+  const result = await apiRequest(`/orders/${orderId}/dispatch`, {
+    method: 'POST',
+    body: { courier_name, courier_tracking_number },
+    includeAuth: true,
+  });
+  invalidateCache('orders');
+  return result;
+};
+
+/**
  * Delete an order
  * @param {string} orderId - Order ID (UUID)
  * @returns {Promise<Object>} Response with message

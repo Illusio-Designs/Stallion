@@ -1,0 +1,17 @@
+/* Party list: keep every column inside its card at 1280px */
+:root .party-n-table .ui-table__scroll table { width: 100%; table-layout: auto; }
+:root .party-n-table .ui-table__scroll th,
+:root .party-n-table .ui-table__scroll td { padding-left: 10px; padding-right: 10px; }
+:root .party-n-table .party-who { max-width: 260px; min-width: 0; }
+:root .party-n-table .party-who__name {
+  min-width: 0; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere;
+}
+:root .party-n-table .party-who__pic { flex: none; }
+:root .party-n-table .party-who__off { flex: none; }
+:root .party-n-table .loc-pill { white-space: nowrap; }
+:root .party-n-table .party-credit { white-space: nowrap; }
+:root .party-n-table td[data-label="CITY"],
+:root .party-n-table td[data-label="SALESMAN"] { max-width: 150px; overflow-wrap: anywhere; }
+@media (max-width: 1100px) {
+  :root .party-n-table .party-who { max-width: 190px; }
+}

@@ -1,0 +1,14 @@
+/* Orders: dispatch panel in the order detail */
+:root .ordn-dispatch { display: flex; flex-direction: column; gap: 10px; padding: 12px; border: 1px solid #e5e5e5; border-radius: 10px; background: #fff; }
+:root .ordn-dispatch .ord-view__section-title { margin: 0; }
+:root .ordn-dispatch__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+:root .ordn-dispatch__ro { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+:root .ordn-dispatch__field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+:root .ordn-dispatch .ui-input { width: 100%; min-width: 0; font-size: 13px; padding: 7px 10px; }
+:root .ordn-dispatch .ui-input[aria-invalid="true"] { border-color: #000; }
+:root .ordn-dispatch__err { margin: 0; font-size: 12px; color: #b00020; }
+:root .ordn-dispatch > button { align-self: flex-start; }
+@media (max-width: 520px) {
+  :root .ordn-dispatch__grid, :root .ordn-dispatch__ro { grid-template-columns: 1fr; }
+  :root .ordn-dispatch > button { align-self: stretch; }
+}

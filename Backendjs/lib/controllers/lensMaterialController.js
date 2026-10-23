@@ -1,3 +1,4 @@
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const LensMaterial = require('../models/LensMaterial');
 const { logAudit } = require('../utils/auditLogger');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
@@ -12,7 +13,7 @@ class LensMaterialController {
                 nameFields: ['lens_material'],
                 phoneFields: [],
             });
-            const where = mergeWhere({}, searchFilter);
+            const where = mergeWhere(activeOnlyWhere(req), searchFilter);
             const lensMaterials = await LensMaterial.findAll({ where });
             res.status(200).json(lensMaterials);
         } catch (error) {
@@ -73,6 +74,7 @@ class LensMaterialController {
             }
             const oldSnapshot = lensMaterial.toJSON();
             const payload = {
+                ...activeUpdate(req.body),
                 lens_material: lens_material,
                 updated_at: new Date(),
             };

@@ -38,6 +38,7 @@ import { getUser, getUserRole } from '../services/authService';
 import { showError, showSuccess, showInfo } from '../services/notificationService';
 import { queueCheckin, isNetworkError } from '../services/offlineQueue';
 import { captureCurrentPosition } from '../utils/geolocation';
+import '../styles/redesign-n-salesmen.css';
 
 // Geofence radius used when a visit/order is recorded (mirror of the backend
 // GEOFENCE_RADIUS_M). A recorded location within this distance of the party's
@@ -795,31 +796,29 @@ const DashboardSuppliers = () => {
 
   const columns = useMemo(() => ([
     {
-      key: 'full_name', label: 'NAME', render: (v, row) => (
-        <span className="sm-who">
-          <span className="sm-pic" aria-hidden="true">
-            {String(v || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
-          </span>
-          <span className="sm-who__txt">
-            {v}
-            {row.employee_code ? <small className="sm-sub">{row.employee_code}</small> : null}
-          </span>
-        </span>
-      )
-    },
-    {
-      key: 'zones', label: 'ZONES', render: (_v, row) => {
-        const names = (Array.isArray(row.zones) ? row.zones : [])
+      key: 'full_name', label: 'NAME', render: (v, row) => {
+        const zoneNames = (Array.isArray(row.zones) ? row.zones : [])
           .map(z => (z && typeof z === 'object') ? (z.zone_name || z.name || '') : '')
           .filter(Boolean);
-        return names.length ? names.join(', ') : '-';
+        const sub = [row.employee_code, zoneNames.join(', ')].filter(Boolean).join(' · ');
+        return (
+          <span className="sm-who sn-who">
+            <span className="sm-pic" aria-hidden="true">
+              {String(v || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
+            </span>
+            <span className="sm-who__txt sn-trunc" title={`${v || ''}${sub ? ` (${sub})` : ''}`}>
+              {v}
+              {sub ? <small className="sm-sub sn-trunc">{sub}</small> : null}
+            </span>
+          </span>
+        );
       }
     },
     {
       key: 'phone', label: 'CONTACT', render: (v, row) => (
-        <span className="sm-contact">
+        <span className="sm-contact sn-trunc" title={`${v || ''} ${row.email || ''}`.trim()}>
           {v || '-'}
-          {row.email ? <small className="sm-sub">{row.email}</small> : null}
+          {row.email ? <small className="sm-sub sn-trunc">{row.email}</small> : null}
         </span>
       )
     },
@@ -1402,6 +1401,9 @@ const DashboardSuppliers = () => {
       setTargetsLoading(false);
     }
   };
+
+  // A target that has started keeps its date, party and order type; only the amount changes.
+  const targetLocked = !!editTarget?.start_date && new Date(editTarget.start_date).getTime() <= Date.now();
 
   const handleTargetEdit = (row) => {
     setEditTarget(row);
@@ -2209,6 +2211,7 @@ const DashboardSuppliers = () => {
                 ]}
                 value={targetForm.salesman_id}
                 onChange={(v) => setTargetForm(prev => ({ ...prev, salesman_id: v }))}
+                disabled={targetLocked}
                 placeholder="Select Salesman"
                 className="ui-dropdown-custom--full-width"
               />
@@ -2220,6 +2223,7 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Target Period (Start – End)</label>
+            <div className={targetLocked ? 'sn-locked' : undefined} inert={targetLocked || undefined}>
             <DateRangePicker
               from={targetForm.start_date || null}
               to={targetForm.end_date || null}
@@ -2227,6 +2231,10 @@ const DashboardSuppliers = () => {
               placeholder="Select start & end date"
               fullWidth
             />
+            </div>
+            {targetLocked && (
+              <p className="sn-lock-note">Date and party are locked once a target has started. Only the amount can change.</p>
+            )}
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Order Type</label>
@@ -2241,6 +2249,7 @@ const DashboardSuppliers = () => {
               ]}
               value={targetForm.order_type}
               onChange={(v) => setTargetForm(prev => ({ ...prev, order_type: v }))}
+              disabled={targetLocked}
               placeholder="Select Order Type"
               className="ui-dropdown-custom--full-width"
             />

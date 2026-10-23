@@ -17,6 +17,11 @@ const Gender = sequelize.define('Gender', {
         allowNull: false,
         unique: true
     }
+    ,is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    }
 }, {
     tableName: 'gender',
     timestamps: true,

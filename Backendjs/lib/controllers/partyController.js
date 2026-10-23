@@ -29,6 +29,16 @@ const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationPa
 
 // PAN and GSTIN are tax identifiers: only managers (and the party itself) see them. A salesman or
 // distributor still gets the name, phone and address they need for visits and orders.
+/** Adds `salesman_name` (from Salesman.full_name via salesman_id) to party rows. One extra query per page. */
+const withSalesmanNames = async (rows) => {
+    const plain = (rows || []).map((r) => (typeof r.toJSON === 'function' ? r.toJSON() : { ...r }));
+    const ids = [...new Set(plain.map((p) => p.salesman_id).filter(Boolean))];
+    if (ids.length === 0) return plain;
+    const sms = await Salesman.findAll({ where: { salesman_id: { [Op.in]: ids } }, attributes: ['salesman_id', 'full_name'] });
+    const names = new Map(sms.map((m) => [m.salesman_id, m.full_name]));
+    return plain.map((p) => ({ ...p, salesman_name: names.get(p.salesman_id) || null }));
+};
+
 const PARTY_SECRET_FIELDS = ['pan', 'gstin'];
 function hidePartySecrets(req, data) {
     if (canManageParties(req.userRoleNames)) return data;
@@ -96,7 +106,7 @@ class PartyController {
                 limit: pagination.limit,
                 offset: pagination.offset,
             });
-            res.status(200).json(buildPaginatedResponse(parties, pagination, count));
+            res.status(200).json(buildPaginatedResponse(await withSalesmanNames(parties), pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -192,7 +202,7 @@ class PartyController {
                 limit: pagination.limit,
                 offset: pagination.offset,
             });
-            res.status(200).json(hidePartySecrets(req, buildPaginatedResponse(parties, pagination, count)));
+            res.status(200).json(hidePartySecrets(req, buildPaginatedResponse(await withSalesmanNames(parties), pagination, count)));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

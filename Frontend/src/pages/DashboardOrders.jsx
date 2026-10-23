@@ -9,7 +9,8 @@ import DropdownSelector from '../components/ui/DropdownSelector';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   getOrdersForRole,
-  updateOrderStatus, 
+  updateOrderStatus,
+  dispatchOrder,
   deleteOrder,
   getPartiesForRole,
   getProductsByIds,
@@ -20,6 +21,7 @@ import { downloadCsv } from '../utils/exportCsv';
 import { showSuccess, showError } from '../services/notificationService';
 import { getUserRole, getUser, getUserRoles } from '../services/authService';
 import '../styles/pages/dashboard-orders.css';
+import '../styles/redesign-n-orders.css';
 
 // Map API status to UI status
 const mapApiStatusToUI = (apiStatus) => {
@@ -73,6 +75,10 @@ const DashboardOrders = () => {
   const [courierTracking, setCourierTracking] = useState('');
   const [partialQty, setPartialQty] = useState('');
   const [viewRow, setViewRow] = useState(null);
+  const [dispatchCourier, setDispatchCourier] = useState('');
+  const [dispatchTracking, setDispatchTracking] = useState('');
+  const [dispatchErrors, setDispatchErrors] = useState({});
+  const [dispatching, setDispatching] = useState(false);
   const [viewItems, setViewItems] = useState([]);
   const [viewItemsLoading, setViewItemsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
@@ -101,6 +107,12 @@ const DashboardOrders = () => {
     []
   );
   
+  useEffect(() => {
+    setDispatchCourier('');
+    setDispatchTracking('');
+    setDispatchErrors({});
+  }, [viewRow?.originalOrder?.order_id]);
+
   // Fetch orders from API
   const fetchOrders = async (suppressError = false) => {
     try {
@@ -522,17 +534,34 @@ const DashboardOrders = () => {
     }
   };
 
-  // "Mark dispatched" (order detail): same status update as the edit panel. When
-  // the order already has courier details it dispatches straight away; otherwise
-  // the edit panel opens on Dispatch so the courier details can be entered.
-  const handleMarkDispatched = (row) => {
-    const o = row?.originalOrder || {};
-    if (o.courier_name && o.courier_tracking_number) {
-      handleUpdateStatus(row, 'DISPATCH', { courierName: o.courier_name, courierTracking: o.courier_tracking_number });
-    } else {
-      setViewRow(null);
-      openEditPanel(row);
-      setEditStatus('DISPATCH');
+  // "Mark dispatched" (order detail panel): courier + tracking, then
+  // POST /orders/:id/dispatch. Only offered for processing orders.
+  const handleMarkDispatched = async (row) => {
+    const orderId = row?.originalOrder?.order_id || row?.originalOrder?.id;
+    if (!orderId || dispatching) return;
+    const name = dispatchCourier.trim();
+    const tracking = dispatchTracking.trim();
+    const errs = {};
+    if (!name) errs.courier = 'Enter the courier name.';
+    if (!tracking) errs.tracking = 'Enter the tracking number.';
+    setDispatchErrors(errs);
+    if (Object.keys(errs).length) return;
+    try {
+      setDispatching(true);
+      const updated = await dispatchOrder(orderId, { courier_name: name, courier_tracking_number: tracking });
+      showSuccess('Order marked as dispatched', null, 'Order dispatched', `${row.orderId || 'Order'} is now dispatched.`);
+      setViewRow((cur) => (cur ? {
+        ...cur,
+        status: mapApiStatusToUI('dispatched'),
+        originalOrder: { ...cur.originalOrder, ...(updated || {}), order_status: 'dispatched', courier_name: name, courier_tracking_number: tracking },
+      } : cur));
+      fetchOrders(true);
+    } catch (err) {
+      const message = err?.response?.data?.error || err?.message || 'Could not mark this order dispatched';
+      setDispatchErrors({ form: message });
+      showError(message, null, 'Order not dispatched', message);
+    } finally {
+      setDispatching(false);
     }
   };
 
@@ -685,9 +714,6 @@ const DashboardOrders = () => {
       {/* View Order Modal */}
       <AsidePanel open={!!viewRow} onClose={() => setViewRow(null)} title="Order Details" footer={(
         <>
-          {viewRow && canEditOrder && !['DISPATCH', 'COMPLETED', 'CANCEL'].includes(viewRow.status) && (
-            <Button variant="secondary" onClick={() => handleMarkDispatched(viewRow)} disabled={loading}>Mark dispatched</Button>
-          )}
           <Button onClick={() => setViewRow(null)}>Close</Button>
         </>
       )}>
@@ -716,10 +742,10 @@ const DashboardOrders = () => {
                   <span className="ord-field__label">Placed By</span>
                   <span className="ord-field__value">{viewRow.salesman || '—'}</span>
                 </div>
-                {(order?.distance_meters ?? order?.distance_at_checkout) != null && (
+                {order?.distance_m != null && (
                   <div className="ord-field">
                     <span className="ord-field__label">Distance at checkout</span>
-                    <span className="ord-field__value">{Math.round(Number(order?.distance_meters ?? order?.distance_at_checkout))} m</span>
+                    <span className="ord-field__value">{Number(order.distance_m) >= 1000 ? `${(Number(order.distance_m) / 1000).toFixed(1)} km` : `${Math.round(Number(order.distance_m))} m`}</span>
                   </div>
                 )}
                 <div className="ord-field">
@@ -737,6 +763,60 @@ const DashboardOrders = () => {
                   <span className="ord-field__value ord-field__value--strong">{viewRow.value || '—'}</span>
                 </div>
               </div>
+
+              {(order?.courier_name || order?.courier_tracking_number) && order?.order_status !== 'processed' && (
+                <div className="ordn-dispatch ordn-dispatch--done">
+                  <h5 className="ord-view__section-title">Dispatch</h5>
+                  <div className="ordn-dispatch__ro">
+                    <div className="ord-field"><span className="ord-field__label">Courier</span><span className="ord-field__value">{order.courier_name || '—'}</span></div>
+                    <div className="ord-field"><span className="ord-field__label">Tracking number</span><span className="ord-field__value">{order.courier_tracking_number || '—'}</span></div>
+                  </div>
+                </div>
+              )}
+
+              {canEditOrder && order?.order_status === 'processed' && (
+                <form
+                  className="ordn-dispatch"
+                  noValidate
+                  onSubmit={(e) => { e.preventDefault(); handleMarkDispatched(viewRow); }}
+                >
+                  <h5 className="ord-view__section-title">Mark dispatched</h5>
+                  <div className="ordn-dispatch__grid">
+                    <label className="ordn-dispatch__field">
+                      <span className="ui-label">Courier</span>
+                      <input
+                        className="ui-input"
+                        list="ordn-couriers"
+                        placeholder="e.g., Blue Dart, DTDC"
+                        value={dispatchCourier}
+                        maxLength={255}
+                        disabled={dispatching}
+                        aria-invalid={!!dispatchErrors.courier}
+                        onChange={(e) => { setDispatchCourier(e.target.value); setDispatchErrors((x) => ({ ...x, courier: undefined, form: undefined })); }}
+                      />
+                      <datalist id="ordn-couriers">
+                        {['Blue Dart', 'DTDC', 'Delhivery', 'India Post', 'Professional Couriers', 'Gati'].map((c) => <option key={c} value={c} />)}
+                      </datalist>
+                      {dispatchErrors.courier && <span className="ordn-dispatch__err" role="alert">{dispatchErrors.courier}</span>}
+                    </label>
+                    <label className="ordn-dispatch__field">
+                      <span className="ui-label">Tracking number</span>
+                      <input
+                        className="ui-input"
+                        placeholder="Enter tracking number"
+                        value={dispatchTracking}
+                        maxLength={255}
+                        disabled={dispatching}
+                        aria-invalid={!!dispatchErrors.tracking}
+                        onChange={(e) => { setDispatchTracking(e.target.value); setDispatchErrors((x) => ({ ...x, tracking: undefined, form: undefined })); }}
+                      />
+                      {dispatchErrors.tracking && <span className="ordn-dispatch__err" role="alert">{dispatchErrors.tracking}</span>}
+                    </label>
+                  </div>
+                  {dispatchErrors.form && <p className="ordn-dispatch__err" role="alert">{dispatchErrors.form}</p>}
+                  <Button type="submit" variant="secondary" disabled={dispatching}>{dispatching ? 'Marking…' : 'Mark dispatched'}</Button>
+                </form>
+              )}
 
               {!canEditOrder && (
                 <p className="ord-view__lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Only admin and order managers can edit or cancel this order.</span></p>

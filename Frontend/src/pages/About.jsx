@@ -61,7 +61,7 @@ const About = () => {
             <img
               src="/images/banners/hero4.webp"
               alt="Sunglasses and frames collection"
-              className="w-full h-full object-cover block"
+              className="w-full h-full object-cover block grayscale"
             />
           </div>
         </div>

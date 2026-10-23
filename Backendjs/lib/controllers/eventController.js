@@ -1,5 +1,7 @@
 const { logAudit } = require('../utils/auditLogger');
 const Event = require('../models/event');
+const Order = require('../models/Order');
+const { fn, col } = require('sequelize');
 const { EventStatus } = require('../constants/enums');
 const { UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 // past = already ended, ongoing = started and not ended, upcoming = not started.
@@ -27,7 +29,19 @@ class EventController {
                     await event.save();
                 }
             }
-            res.status(200).json(events);
+            // Orders taken at each event: one grouped query for the whole list.
+            // Cancelled orders are counted too (they still count toward targets).
+            const counts = await Order.findAll({
+                attributes: ['event_id', [fn('COUNT', col('order_id')), 'n']],
+                where: { event_id: events.map((e) => e.event_id) },
+                group: ['event_id'],
+                raw: true,
+            });
+            const byEvent = new Map(counts.map((c) => [String(c.event_id), Number(c.n) || 0]));
+            res.status(200).json(events.map((e) => ({
+                ...e.toJSON(),
+                order_count: byEvent.get(String(e.event_id)) || 0,
+            })));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

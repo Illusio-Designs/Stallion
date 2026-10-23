@@ -24,6 +24,7 @@ import { getUser, getUserRole, getUserRoles } from '../services/authService';
 import { showError, showSuccess, showWarning } from '../services/notificationService';
 import { captureCurrentPosition } from '../utils/geolocation';
 import { downloadCsv } from '../utils/exportCsv';
+import '../styles/redesign-n-party.css';
 
 const DashboardClients = () => {
   const confirm = useConfirm();
@@ -366,7 +367,7 @@ const DashboardClients = () => {
         <span className={`loc-pill loc-pill--${row.locationState}`}>{v}</span>
       )
     },
-    { key: 'creditLabel', label: 'CREDIT', render: (v) => <span className="party-credit">{v}</span> },
+    { key: 'creditLabel', label: 'CREDIT DAYS', render: (v) => <span className="party-credit">{v}</span> },
     {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
@@ -431,37 +432,42 @@ const DashboardClients = () => {
 
   // List tools (display only): client-side search + location chips over loaded rows.
   const [partySearch, setPartySearch] = useState('');
+  const [partyQuery, setPartyQuery] = useState(''); // debounced copy of partySearch
+  useEffect(() => {
+    const t = setTimeout(() => setPartyQuery(partySearch), 250);
+    return () => clearTimeout(t);
+  }, [partySearch]);
   const [locChip, setLocChip] = useState('');
   const LOC_CHIPS = [
-    { key: 'ok', label: 'Shop verified' },
+    { key: '', label: 'All' },
+    { key: 'ok', label: 'Verified' },
     { key: 'warn', label: 'Address only' },
-    { key: 'idle', label: 'No location' },
+    { key: 'idle', label: 'Not set' },
   ];
   const locCounts = useMemo(() => {
-    const c = { ok: 0, warn: 0, idle: 0 };
+    const c = { '': rowsByTab.length, ok: 0, warn: 0, idle: 0 };
     rowsByTab.forEach(r => { c[r.locationState] = (c[r.locationState] || 0) + 1; });
     return c;
   }, [rowsByTab]);
+  // The list endpoints return every page of the user's parties, so search runs over the loaded rows.
   const filteredRowsByTab = useMemo(() => {
-    const q = partySearch.trim().toLowerCase();
+    const q = partyQuery.trim().toLowerCase();
     return rowsByTab.filter(r => {
       if (locChip && r.locationState !== locChip) return false;
       if (!q) return true;
-      return [r.party_name, r.trade_name, r.contact_person, r.phone, r.cityLabel]
+      return [r.party_name, r.trade_name, r.contact_person, r.phone, r.cityLabel, r.gstin]
         .some(v => String(v || '').toLowerCase().includes(q));
     });
-  }, [rowsByTab, partySearch, locChip]);
+  }, [rowsByTab, partyQuery, locChip]);
   const handleExportParties = () => {
     downloadCsv('parties', [
-      { label: 'Party', value: r => r.party_name },
-      { label: 'Trade name', value: r => r.trade_name },
-      { label: 'Contact', value: r => r.contact_person },
-      { label: 'Phone', value: r => r.phone },
+      { label: 'Party name', value: r => r.party_name },
       { label: 'City', value: r => r.cityLabel },
       { label: 'Salesman', value: r => r.salesmanLabel },
-      { label: 'Location', value: r => r.locationLabel },
+      { label: 'Location status', value: r => r.locationLabel },
       { label: 'Credit days', value: r => Number(r.credit_days) || 0 },
-      { label: 'Status', value: r => (r.isActive ? 'Active' : 'Inactive') },
+      { label: 'Phone', value: r => r.phone },
+      { label: 'GST', value: r => r.gstin },
     ], filteredRowsByTab);
   };
 
@@ -1570,13 +1576,13 @@ const DashboardClients = () => {
           <div className="gtools">
             <label className="gsearch">
               <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14zM20 20l-4-4" /></svg>
-              <input type="search" value={partySearch} onChange={e => setPartySearch(e.target.value)} placeholder="Search parties" aria-label="Search parties" />
+              <input type="search" value={partySearch} onChange={e => setPartySearch(e.target.value)} placeholder="Search name, city, phone or GST" aria-label="Search parties" />
             </label>
             <button type="button" className="gbtn" onClick={handleExportParties} disabled={loading || filteredRowsByTab.length === 0}>Export CSV</button>
           </div>
           <div className="gchips" role="group" aria-label="Location">
             {LOC_CHIPS.map(c => (
-              <button key={c.key} type="button" aria-pressed={locChip === c.key} className={`gchip ${locChip === c.key ? 'on' : ''}`} onClick={() => setLocChip(locChip === c.key ? '' : c.key)}>
+              <button key={c.key} type="button" aria-pressed={locChip === c.key} className={`gchip ${locChip === c.key ? 'on' : ''}`} onClick={() => setLocChip(c.key)}>
                 {c.label} <b>{locCounts[c.key] || 0}</b>
               </button>
             ))}
@@ -1667,7 +1673,7 @@ const DashboardClients = () => {
           </div>
         ) : null}
         <div className="dash-row" style={(!loading && (error || filteredRowsByTab.length === 0)) ? { display: 'none' } : undefined}>
-          <div className="dash-card full">
+          <div className="dash-card full party-n-table">
             <TableWithControls
               title="Party"
               columns={columns}

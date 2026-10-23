@@ -9,6 +9,7 @@ const { isAdmin } = require('../middleware/roleAuth');
 router.get('/', authenticateToken, isAdmin, offerController.getOffers);
 router.post('/', authenticateToken, isAdmin, offerController.createOffer);
 router.put('/:id', authenticateToken, isAdmin, offerController.updateOffer);
+router.patch('/:id/active', authenticateToken, isAdmin, offerController.setOfferActive);
 router.delete('/:id', authenticateToken, noDelete('An offer'));
 
 // Any authenticated order-placing user (salesman/distributor/party) — list the

@@ -6,10 +6,11 @@ import TableWithControls from '../components/ui/TableWithControls';
 import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import OrdersPerDayChart from '../components/charts/OrdersPerDayChart';
-import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets, getTrays, getIndianCountries, getSalesmen, getAllSalesmanCheckins } from '../services/apiService';
-import { getAllAdminExpenses } from '../services/expenseService';
+import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets, getTrays } from '../services/apiService';
+import { getDashboardSummary } from '../services/api/dashboardApi';
+import { SalesRevenueCard, QuickActionsCard, OrderOverviewCard, FieldCard, ShopCheckInCard, MySalesmanCard } from '../components/home/HomeBlocks';
 import { getUserRole, getUserRoles, getUser } from '../services/authService';
-import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiPackage, FiInbox, FiNavigation2 } from '../components/icons/hugeicons';
+import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiPackage, FiInbox } from '../components/icons/hugeicons';
 import RupeeIcon from '../components/icons/RupeeIcon';
 
 // A link that switches pages inside the app instead of reloading the whole page.
@@ -50,10 +51,10 @@ const Dashboard = () => {
   const [userRole] = useState(() => getUserRole());
   const [user] = useState(() => getUser());
   const [userRoles] = useState(() => getUserRoles());
-  const [pendingExpenses, setPendingExpenses] = useState(null); // office: expense claims waiting for approval
+  const [summary, setSummary] = useState(null); // office: GET /dashboard/summary
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState(false);
   const [traysOut, setTraysOut] = useState(null); // office: sample trays still with a salesman
-  const [fieldStats, setFieldStats] = useState(null); // office: { active, total, visitsToday }
-  const [coords, setCoords] = useState(null); // salesman: current position (only when the browser allows it)
 
   // The role comes from localStorage, which doesn't exist during SSR, so the
   // server renders with no role (admin-default blocks) while the client renders
@@ -172,62 +173,35 @@ const Dashboard = () => {
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Office view extras. Each call is made only for the roles that can open that page and fails
-  // silently (the item or number is just left out): no error toast.
+  // Office view: one server call for the field numbers, weekly sales, pending expenses and unused trays.
+  const loadSummary = async () => {
+    setSummaryLoading(true);
+    setSummaryError(false);
+    try {
+      const res = await getDashboardSummary();
+      setSummary(res && typeof res === 'object' ? res : null);
+    } catch {
+      setSummaryError(true);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
   useEffect(() => {
-    if (['salesman', 'party', 'distributor'].includes(userRole)) return;
-    const has = (...names) => userRoles.some((r) => names.includes(r));
-    let cancelled = false;
-    if (has('admin', 'expense_manager', 'sales_manager')) {
-      (async () => {
-        try {
-          const res = await getAllAdminExpenses();
-          const list = Array.isArray(res) ? res : (res?.data || []);
-          if (!cancelled) setPendingExpenses(list.filter((e) => String(e.status || 'pending').toLowerCase() === 'pending').length);
-        } catch { /* item omitted */ }
-      })();
-    }
-    if (has('admin', 'tray_manager')) {
-      (async () => {
-        try {
-          const list = await getTrays();
-          if (!cancelled) setTraysOut((list || []).filter((t) => String(t.tray_status || '').toLowerCase() === 'assigned').length);
-        } catch { /* item omitted */ }
-      })();
-    }
-    if (has('admin', 'sales_manager')) {
-      (async () => {
-        let active = null;
-        let visitsToday = null;
-        try {
-          const cr = await getIndianCountries();
-          const countries = Array.isArray(cr) ? cr : (cr?.data || []);
-          const lists = await Promise.all(countries.map((c) => getSalesmen(c.id || c.country_id).catch(() => [])));
-          const all = lists.flat().filter(Boolean);
-          active = { on: all.filter((s) => s.is_active !== false).length, total: all.length };
-        } catch { /* number omitted */ }
-        try {
-          const cr = await getAllSalesmanCheckins(100);
-          const rows = Array.isArray(cr) ? cr : (cr?.data || []);
-          const t = new Date().toDateString();
-          visitsToday = rows.filter((c) => { const d = new Date(c.check_in_date || c.created_at); return !isNaN(d.getTime()) && d.toDateString() === t; }).length;
-        } catch { /* number omitted */ }
-        if (!cancelled) setFieldStats({ active, visitsToday });
-      })();
-    }
-    return () => { cancelled = true; };
+    if (['salesman', 'party', 'distributor'].includes(userRole)) { setSummaryLoading(false); return; }
+    loadSummary();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Salesman: where am I, only if the browser already lets us (never prompts on load)
+  // Office view: sample trays still with a salesman (only roles that can open the Tray page).
   useEffect(() => {
-    if (userRole !== 'salesman' || typeof navigator === 'undefined' || !navigator.geolocation || !navigator.permissions) return;
+    if (['salesman', 'party', 'distributor'].includes(userRole)) return;
+    if (!userRoles.some((r) => ['admin', 'tray_manager'].includes(r))) return;
     let cancelled = false;
-    navigator.permissions.query({ name: 'geolocation' }).then((st) => {
-      if (st.state !== 'granted' || cancelled) return;
-      navigator.geolocation.getCurrentPosition(
-        (p) => { if (!cancelled) setCoords({ lat: p.coords.latitude, lng: p.coords.longitude }); },
-        () => {}, { maximumAge: 120000, timeout: 8000 });
-    }).catch(() => {});
+    (async () => {
+      try {
+        const list = await getTrays();
+        if (!cancelled) setTraysOut((list || []).filter((t) => String(t.tray_status || '').toLowerCase() === 'assigned').length);
+      } catch { /* item omitted */ }
+    })();
     return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -542,11 +516,16 @@ const Dashboard = () => {
     if (partiesNoLocation > 0) {
       attention.push({ icon: FiMapPin, tone: 'warn', title: `${partiesNoLocation} part${partiesNoLocation > 1 ? 'ies have' : 'y has'} no shop location`, desc: 'Salesmen cannot place visit orders for them', onClick: go('/dashboard/party') });
     }
+    const pendingExpenses = userRoles.some((r) => ['admin', 'expense_manager', 'sales_manager'].includes(r)) ? summary?.pending_expenses : 0;
     if (pendingExpenses > 0) {
       attention.push({ icon: RupeeIcon, tone: 'warn', title: `${pendingExpenses} expense claim${pendingExpenses > 1 ? 's' : ''} to approve`, desc: 'Waiting for approval or rejection', onClick: go('/dashboard/expenses') });
     }
     if (traysOut > 0) {
       attention.push({ icon: FiInbox, tone: 'warn', title: `${traysOut} sample tray${traysOut > 1 ? 's' : ''} not returned`, desc: 'Still with a salesman', onClick: go('/dashboard/tray') });
+    }
+    const unusedTrays = userRoles.some((r) => ['admin', 'tray_manager'].includes(r)) ? summary?.unused_trays : 0;
+    if (unusedTrays > 0) {
+      attention.push({ icon: FiPackage, tone: 'warn', title: `${unusedTrays} unused tray${unusedTrays > 1 ? 's' : ''}`, desc: 'Empty and untouched for 30 days or more', onClick: go('/dashboard/tray') });
     }
     if (stats.openCount > 0) {
       attention.push({ icon: FiClock, tone: 'info', title: `${stats.openCount} open order${stats.openCount > 1 ? 's' : ''} waiting`, desc: 'Pending, processing or ready to dispatch', onClick: go('/dashboard/orders') });
@@ -570,19 +549,6 @@ const Dashboard = () => {
         { icon: FiBarChart2, label: 'Report', onClick: go('/dashboard/analytics') },
       ]
     : [];
-  // Salesman "I'm at the shop" card: the nearest party with a saved location when the browser shared
-  // where they are, else the first one. The capture itself happens on the Party page.
-  const kmBetween = (p) => {
-    const rad = (x) => (x * Math.PI) / 180;
-    const dLat = rad(Number(p.latitude) - coords.lat);
-    const dLng = rad(Number(p.longitude) - coords.lng);
-    const a = Math.sin(dLat / 2) ** 2 + Math.cos(rad(coords.lat)) * Math.cos(rad(Number(p.latitude))) * Math.sin(dLng / 2) ** 2;
-    return 2 * 6371 * Math.asin(Math.sqrt(a));
-  };
-  const located = ownParties.filter((p) => p.latitude != null && p.longitude != null);
-  const shopParty = (coords && located.length ? [...located].sort((x, y) => kmBetween(x) - kmBetween(y))[0] : located[0]) || null;
-  const shopCity = shopParty ? (shopParty.city?.name || shopParty.city_name || (typeof shopParty.city === 'string' ? shopParty.city : '')) : '';
-  const shopKm = shopParty && coords ? Math.round(kmBetween(shopParty) * 10) / 10 : null;
   const ownData = isParty || isDistributor; // their own orders only: no warehouse stock
 
   // Greeting header
@@ -660,10 +626,10 @@ const Dashboard = () => {
           <div>
             <h1>{heading}</h1>
             <p>{subline}</p>
-            {isOfficeView && fieldStats && (fieldStats.active || fieldStats.visitsToday != null) && (
+            {isOfficeView && summary && (
               <div className="rda-subnums">
-                {fieldStats.active && <span><b>{fieldStats.active.on}</b> / {fieldStats.active.total} salesmen in the field</span>}
-                {fieldStats.visitsToday != null && <span><b>{fieldStats.visitsToday}</b> visit{fieldStats.visitsToday === 1 ? '' : 's'} today</span>}
+                <span><b>{summary.salesmen_in_field}</b> / {summary.salesmen_total} salesmen in the field</span>
+                <span><b>{summary.visits_today}</b> visit{summary.visits_today === 1 ? '' : 's'} today</span>
               </div>
             )}
           </div>
@@ -703,16 +669,7 @@ const Dashboard = () => {
           </div>
         )}
 
-        {isSalesman && (
-          <section className="rda-shop" aria-label="Nearest shop">
-            <div>
-              <h2>{shopParty ? (shopParty.party_name || shopParty.name) : 'At a shop?'}</h2>
-              <span>{[shopCity, shopKm != null ? `${shopKm} km away` : null].filter(Boolean).join(', ') || (shopParty ? 'Shop location saved' : 'Pick the party and save its location')}</span>
-            </div>
-            <button type="button" className="rda-shop__at" onClick={go('/dashboard/party')}><FiNavigation2 size={18} aria-hidden="true" />I'm at the shop</button>
-            <button type="button" className="rda-btn rda-btn--ghost rda-shop__new" onClick={go('/products')}><FiShoppingCart size={16} aria-hidden="true" />New order</button>
-          </section>
-        )}
+        {isSalesman && <ShopCheckInCard parties={ownParties} salesmanId={mySalesmanId || user?.salesman_id || null} loading={loading && ownParties.length === 0} />}
 
         <div className="dash-row dash-kpis rda-kpis" aria-label="Key figures">
           {kpis.map((k) => {
@@ -769,39 +726,45 @@ const Dashboard = () => {
         )}
 
         {isOfficeView && (
-          <div className={`rda-cols rda-cols--even${targetRows.length === 0 ? ' rda-cols--one' : ''}`}>
-            {targetRows.length > 0 && (
-              <section className="rda-card" aria-label="Salesmen against target">
-                <div className="rda-card__head">
-                  <div><h2>Salesmen against target</h2><p>By order value</p></div>
-                  <AppLink href="/dashboard/salesmen" className="rda-link">All salesmen</AppLink>
-                </div>
-                <div className="rda-tw">
-                  <table className="rda-table">
-                    <thead><tr><th>Salesman</th><th>Target</th><th>Progress</th><th className="r">Done</th></tr></thead>
-                    <tbody>
-                      {targetRows.map((r) => {
-                        const pct = Math.round((r.done / r.target) * 100);
-                        return (
-                          <tr key={r.id}>
-                            <td><div className="rda-who"><span className="rda-pic">{initialsOf(r.name)}</span>{r.name}</div></td>
-                            <td>{shortMoney(r.target).sym} {shortMoney(r.target).num}</td>
-                            <td><div className="rda-prog" role="img" aria-label={`${pct} percent`}><i className={pct >= 100 ? 'hit' : ''} style={{ width: `${Math.min(100, pct)}%` }} /></div></td>
-                            <td className="r">{pct}%</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
-            )}
-            {ordersCard('Latest orders', 'Newest first', 'All orders', [
-              { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
-              { h: 'Party', cell: partyOf },
-              { h: 'Status', cell: (o) => statusPill(o.order_status) },
-              { h: 'Amount', r: true, cell: (o) => money(amountOf(o)) },
-            ])}
+          <div className="rda-cols">
+            <SalesRevenueCard weekly={summary?.weekly_sales} loading={summaryLoading} error={summaryError} onRetry={loadSummary} />
+            <QuickActionsCard roles={userRoles} />
+          </div>
+        )}
+
+        {isOfficeView && (
+          <div className="rda-cols rda-cols--even">
+            <OrderOverviewCard orders={orders} loading={loading} loadError={loadError} partyOf={partyOf} onAll={go('/dashboard/orders')} />
+            <FieldCard summary={summary} loading={summaryLoading} error={summaryError} onRetry={loadSummary} />
+          </div>
+        )}
+
+        {isOfficeView && targetRows.length > 0 && (
+          <div className="rda-cols rda-cols--one">
+            <section className="rda-card" aria-label="Salesmen against target">
+              <div className="rda-card__head">
+                <div><h2>Salesmen against target</h2><p>By order value</p></div>
+                <AppLink href="/dashboard/salesmen" className="rda-link">All salesmen</AppLink>
+              </div>
+              <div className="rda-tw">
+                <table className="rda-table">
+                  <thead><tr><th>Salesman</th><th>Target</th><th>Progress</th><th className="r">Done</th></tr></thead>
+                  <tbody>
+                    {targetRows.map((r) => {
+                      const pct = Math.round((r.done / r.target) * 100);
+                      return (
+                        <tr key={r.id}>
+                          <td><div className="rda-who"><span className="rda-pic">{initialsOf(r.name)}</span>{r.name}</div></td>
+                          <td>{shortMoney(r.target).sym} {shortMoney(r.target).num}</td>
+                          <td><div className="rda-prog" role="img" aria-label={`${pct} percent`}><i className={pct >= 100 ? 'hit' : ''} style={{ width: `${Math.min(100, pct)}%` }} /></div></td>
+                          <td className="r">{pct}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         )}
 
@@ -876,9 +839,11 @@ const Dashboard = () => {
             ])}
           </div>
         )}
+        {isDistributor && <MySalesmanCard plural />}
 
         {isParty && (
           <>
+            <MySalesmanCard />
             {ordersCard('My orders', null, 'All orders', [
               { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
               { h: 'Placed', cell: (o) => { const d = o.created_at || o.order_date; return d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '-'; } },
@@ -978,7 +943,7 @@ const Dashboard = () => {
         <div className="dash-row rda-overview">
           <div className="dash-card full">
             <TableWithControls
-              title="Order Overview"
+              title="All orders"
               itemName="Order"
               rows={recentOrders}
               loading={loading}

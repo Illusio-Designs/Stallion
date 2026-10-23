@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import "../styles/pages/ProductDetail.css";
+import "../styles/redesign-n-product.css";
 import Skeleton from "../components/ui/Skeleton";
 import { addToCart } from "../services/cartService";
 import { showAddToCartSuccess } from "../services/notificationService";
@@ -720,9 +721,28 @@ const ProductDetail = ({ productId: propProductId = null }) => {
 
   return (
     <div className="product-detail-page pdx bg-bg">
-      <div className="pdx-grid">
-        <div className="pdx-gallery">
-          <div className="pdx-big">
+      <div className="pdx-grid pdn-grid">
+        <div className="pdx-gallery pdn-gallery">
+          {galleryThumbs.length > 1 && (
+            <div className="pdx-thumbs pdn-thumbs" role="listbox" aria-orientation="vertical" aria-label="Product images">
+              {galleryThumbs.map((t, i) => (
+                <div
+                  key={`${t.src}-${i}`}
+                  ref={(node) => { thumbnailRefs.current[i] = node; }}
+                  className={`pdx-thumb pdn-thumb ${t.active ? "on" : ""}`}
+                  role="option"
+                  tabIndex={t.active ? 0 : -1}
+                  aria-selected={t.active}
+                  aria-label={t.label}
+                  onClick={t.onSelect}
+                  onKeyDown={(e) => handleThumbnailKeyDown(e, i, galleryThumbs.length)}
+                >
+                  <img src={t.src} alt={t.label} onError={(e) => { if (!e.target.src.endsWith('/images/products/spac1.webp')) e.target.src = '/images/products/spac1.webp'; }} />
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="pdx-big pdn-big">
             {brokenMainImageSrc === mainImageSrc ? (
               <div className="main-product-image-unavailable pdx-unavail" role="img" aria-label="Image unavailable">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -737,28 +757,9 @@ const ProductDetail = ({ productId: propProductId = null }) => {
               <img src={mainImageSrc} alt={cur.name} onError={onImgError} />
             )}
           </div>
-          {galleryThumbs.length > 1 && (
-            <div className="pdx-thumbs" role="listbox" aria-label="Product images">
-              {galleryThumbs.map((t, i) => (
-                <div
-                  key={`${t.src}-${i}`}
-                  ref={(node) => { thumbnailRefs.current[i] = node; }}
-                  className={`pdx-thumb ${t.active ? "on" : ""}`}
-                  role="option"
-                  tabIndex={t.active ? 0 : -1}
-                  aria-selected={t.active}
-                  aria-label={t.label}
-                  onClick={t.onSelect}
-                  onKeyDown={(e) => handleThumbnailKeyDown(e, i, galleryThumbs.length)}
-                >
-                  <img src={t.src} alt={t.label} onError={(e) => { if (!e.target.src.endsWith('/images/products/spac1.webp')) e.target.src = '/images/products/spac1.webp'; }} />
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
-        <div className="pdx-info">
+        <div className="pdx-info pdn-info">
           <div>
             <span className={`pdx-pill ${stockState.cls}`}>{stockState.text}</span>
             <h1 className="product-title pdx-title">{display(cur.name)}</h1>
@@ -830,30 +831,26 @@ const ProductDetail = ({ productId: propProductId = null }) => {
           <p className="pdx-hint">Quantity cannot be more than the stock, and sold out frames cannot be ordered.</p>
 
           {totalVariations > 1 && (
-            <div className="pdx-vars">
-              <h2 className="pdx-vars-h">Colours and sizes <span>{totalVariations} options</span></h2>
-              <div className="pdx-var-list" role="radiogroup" aria-label="Choose a variation">
+            <div className="pdn-vars">
+              <h2 className="pdn-vars-h">Colour and size <span>{totalVariations} options</span></h2>
+              <div className="pdn-chips" role="radiogroup" aria-label="Choose a colour and size">
                 {productVariations.map((v, index) => {
                   const st = Number(v.stock ?? 0);
                   const on = selectedVariation === index;
-                  const vs = st <= 0 ? { cls: "bad", text: "Sold out" } : st <= 10 ? { cls: "warn", text: `Low, ${st} left` } : { cls: "ok", text: `${st} in stock` };
                   const colour = [display(v.frameColour), display(v.lenseColour)].filter((x) => x !== "—");
+                  const label = colour.length ? colour.join(" / ") : display(v.name);
+                  const size = display(v.size);
                   return (
                     <button
                       key={v.id}
                       type="button"
                       role="radio"
                       aria-checked={on}
-                      className={`pdx-var ${on ? "on" : ""}`}
+                      disabled={st <= 0}
+                      className={`pdn-chip ${on ? "on" : ""}`}
                       onClick={() => handleVariationClick(index)}
                     >
-                      <span className="pdx-var-img"><img src={v.image || '/images/products/spac1.webp'} alt="" onError={(e) => { if (!e.target.src.endsWith('/images/products/spac1.webp')) e.target.src = '/images/products/spac1.webp'; }} /></span>
-                      <span className="pdx-var-main">
-                        <b>{colour.length ? colour.join(" / ") : display(v.name)}</b>
-                        <small>{display(v.size)}</small>
-                      </span>
-                      <span className="pdx-var-price">{display(v.whp)}</span>
-                      <span className={`pdx-pill ${vs.cls}`}>{vs.text}</span>
+                      {label}{size !== "—" ? ` · ${size}` : ""}{st <= 0 ? " (sold out)" : ""}
                     </button>
                   );
                 })}

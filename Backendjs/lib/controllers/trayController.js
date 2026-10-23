@@ -1,6 +1,53 @@
 const Tray = require('../models/Tray');
 const { logAudit } = require('../utils/auditLogger');
-const { parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const TrayProducts = require('../models/TrayProducts');
+const Product = require('../models/Product');
+const SalesmanTray = require('../models/SalesmanTray');
+const Salesman = require('../models/Salesman');
+const { Op } = require('sequelize');
+const { parsePaginationParams, buildPaginatedResponse, getListSearchParams, buildNamePhoneFilter } = require('../utils/listSearchHelpers');
+
+// Adds what the tray cards show: the frames inside (model_no + status), a piece count and the
+// salesman who holds the tray. Three extra queries per page, no matter how many trays.
+async function withTrayDetails(rows) {
+    const trays = rows.map((r) => (typeof r.toJSON === 'function' ? r.toJSON() : { ...r }));
+    const ids = trays.map((t) => t.tray_id);
+    if (ids.length === 0) return trays;
+    const [items, links] = await Promise.all([
+        TrayProducts.findAll({ where: { tray_id: { [Op.in]: ids } }, order: [['assigned_at', 'ASC']] }),
+        SalesmanTray.findAll({ where: { tray_id: { [Op.in]: ids } }, order: [['assigned_at', 'DESC']] }),
+    ]);
+    const productIds = [...new Set(items.map((i) => i.product_id))];
+    const salesmanIds = [...new Set(links.map((l) => l.salesman_id))];
+    const [products, salesmen] = await Promise.all([
+        productIds.length ? Product.findAll({ where: { product_id: { [Op.in]: productIds } }, attributes: ['product_id', 'model_no'] }) : [],
+        salesmanIds.length ? Salesman.findAll({ where: { salesman_id: { [Op.in]: salesmanIds } }, attributes: ['salesman_id', 'full_name', 'is_active'] }) : [],
+    ]);
+    const modelById = new Map(products.map((p) => [p.product_id, p.model_no]));
+    const salesmanById = new Map(salesmen.map((s) => [s.salesman_id, s]));
+    const framesByTray = new Map();
+    items.forEach((i) => {
+        const list = framesByTray.get(i.tray_id) || [];
+        list.push({ product_id: i.product_id, model_no: modelById.get(i.product_id) || null, qty: Number(i.qty) || 1, status: i.status });
+        framesByTray.set(i.tray_id, list);
+    });
+    const linkByTray = new Map();
+    links.forEach((l) => { if (!linkByTray.has(l.tray_id)) linkByTray.set(l.tray_id, l); });
+    return trays.map((t) => {
+        const frames = framesByTray.get(t.tray_id) || [];
+        const link = linkByTray.get(t.tray_id);
+        const sm = link ? salesmanById.get(link.salesman_id) : null;
+        return {
+            ...t,
+            frames,
+            product_count: frames.reduce((n, f) => n + f.qty, 0),
+            salesman_id: link ? link.salesman_id : null,
+            salesman_name: sm ? sm.full_name : null,
+            salesman_active: sm ? sm.is_active !== false : null,
+            assigned_at: link ? link.assigned_at : null,
+        };
+    });
+}
 
 class TrayController {
     async getTrays(req, res) {
@@ -9,11 +56,15 @@ class TrayController {
             if (pagination.error) {
                 return res.status(pagination.status).json({ error: pagination.error });
             }
+            const { name } = getListSearchParams(req);
+            const searchFilter = buildNamePhoneFilter({ name, nameFields: ['tray_name'] });
             const { count, rows: trays } = await Tray.findAndCountAll({
+                where: searchFilter || undefined,
+                order: [['tray_name', 'ASC']],
                 limit: pagination.limit,
                 offset: pagination.offset,
             });
-            res.status(200).json(buildPaginatedResponse(trays, pagination, count));
+            res.status(200).json(buildPaginatedResponse(await withTrayDetails(trays), pagination, count));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

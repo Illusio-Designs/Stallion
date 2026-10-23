@@ -10,6 +10,7 @@ router.get('/', authenticateToken, orderController.getOrders);
 router.post('/quote', authenticateToken, orderController.quoteOrder);
 router.post('/', authenticateToken, orderController.createOrder);
 router.put('/:id', authenticateToken, orderController.updateOrderStatus);
+router.post('/:id/dispatch', authenticateToken, orderController.dispatchOrder);
 router.delete('/:id', authenticateToken, noDelete('An order'));
 
 
