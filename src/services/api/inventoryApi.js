@@ -494,13 +494,14 @@ export const createOrder = async (orderData) => {
  * @returns {Promise<Object>} Updated order object
  */
 export const updateOrderStatus = async (orderId, orderStatusData) => {
-  const { order_status, courier_name, courier_tracking_number, partial_dispatch_qty } = orderStatusData;
+  const { order_status, courier_name, courier_tracking_number, partial_dispatch_qty, cancel_reason } = orderStatusData;
 
   const body = { order_status };
 
   if (courier_name) body.courier_name = courier_name;
   if (courier_tracking_number) body.courier_tracking_number = courier_tracking_number;
   if (partial_dispatch_qty !== undefined) body.partial_dispatch_qty = partial_dispatch_qty;
+  if (cancel_reason) body.cancel_reason = cancel_reason;
 
   const result = await apiRequest(`/orders/${orderId}`, {
     method: 'PUT',
@@ -518,10 +519,47 @@ export const updateOrderStatus = async (orderId, orderStatusData) => {
  * @param {{courier_name: string, courier_tracking_number: string}} data
  * @returns {Promise<Object>} Updated order object
  */
-export const dispatchOrder = async (orderId, { courier_name, courier_tracking_number }) => {
+export const dispatchOrder = async (orderId, { courier_name, courier_tracking_number, qty } = {}) => {
+  const body = { courier_name, courier_tracking_number };
+  if (qty !== undefined && qty !== null && qty !== '') body.qty = Number(qty);
   const result = await apiRequest(`/orders/${orderId}/dispatch`, {
     method: 'POST',
-    body: { courier_name, courier_tracking_number },
+    body,
+    includeAuth: true,
+  });
+  invalidateCache('orders');
+  return result;
+};
+
+/**
+ * Sample trays returned the held pieces: they become ready to send.
+ * POST /orders/:id/trays-returned
+ * @param {string} orderId - Order ID (UUID)
+ * @returns {Promise<Object>} Updated order object
+ */
+export const returnOrderTrays = async (orderId) => {
+  const result = await apiRequest(`/orders/${orderId}/trays-returned`, {
+    method: 'POST',
+    body: {},
+    includeAuth: true,
+  });
+  invalidateCache('orders');
+  return result;
+};
+
+/**
+ * Mark a fully dispatched order as completed (delivered).
+ * POST /orders/:id/complete
+ * @param {string} orderId - Order ID (UUID)
+ * @param {{received_by?: string}} [data]
+ * @returns {Promise<Object>} Updated order object
+ */
+export const completeOrder = async (orderId, { received_by } = {}) => {
+  const body = {};
+  if (received_by && String(received_by).trim()) body.received_by = String(received_by).trim();
+  const result = await apiRequest(`/orders/${orderId}/complete`, {
+    method: 'POST',
+    body,
     includeAuth: true,
   });
   invalidateCache('orders');
