@@ -1,0 +1,13 @@
+/* Touch targets on phone and tablet: small buttons get a finger-sized hit area without changing the look much. */
+@media (max-width: 1023px) {
+  :root .breadcrumb .breadcrumb-item { min-height: 32px; min-width: 36px; display: inline-flex; align-items: center; justify-content: center; }
+  :root .rdn-linkbtn { min-height: 32px; padding-inline: 8px; display: inline-flex; align-items: center; }
+  :root footer a { min-height: 32px; display: inline-flex; align-items: center; }
+  :root .reset-button { min-height: 32px; }
+  :root button[aria-label="Decrease quantity"], :root button[aria-label="Increase quantity"] { min-width: 34px; }
+}
+/* The closed gooey search keeps its hidden text field off screen; hide it so it cannot stick out of the page. */
+:root .gsr:not(.is-open) .gsr__form { visibility: hidden; transition: visibility 0s linear .25s; }
+/* Once the gooey search has folded back to the round glass, cut off the empty part of its drawing that sits left of the glass. */
+@keyframes gsr-clip { to { clip-path: inset(0 0 0 calc(100% - 40px)); } }
+:root .gsr:not(.is-open) .gsr__svg { animation: gsr-clip 0s linear .35s forwards; }

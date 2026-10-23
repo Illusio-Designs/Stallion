@@ -1,5 +1,5 @@
 import React from 'react';
-import { pieceSummary, getPieceCounts, getShipments, fmtDate, fmtDateTime } from '../../utils/orderStatus';
+import { pieceSummaryLine, getPieceCounts, getShipments, fmtDate, fmtDateTime } from '../../utils/orderStatus';
 import '../../styles/redesign-n-orders.css';
 
 // Read-only order progress for distributors, parties and salesmen:
@@ -9,17 +9,16 @@ export default function OrderProgressInfo({ order }) {
   if (!order) return null;
   const status = String(order.order_status || 'pending').toLowerCase();
   const counts = getPieceCounts(order);
-  const sum = pieceSummary(order);
   const shipments = getShipments(order);
-  const line = sum.total
-    ? `${sum.sent} of ${sum.total} sent${sum.held > 0 ? `, ${sum.held} held by sample tray` : ''}`
-    : '';
+  const line = pieceSummaryLine(order);
   const seg = (cls, n, label) => (n > 0 ? <div className={`ordn-seg ordn-seg--${cls}`} style={{ flex: `${n} 1 0` }} title={`${n} ${label}`}>{n}</div> : null);
   const rows = [];
   if (status === 'completed' && order.delivered_at) rows.push(['Delivered', fmtDateTime(order.delivered_at)]);
   if (status === 'completed' && order.received_by) rows.push(['Received by', order.received_by]);
-  if (status === 'cancelled') {
-    if (order.cancel_reason) rows.push(['Cancel reason', order.cancel_reason]);
+  if (status === 'cancelled' || counts.cancelled > 0) {
+    if (counts.cancelled > 0 && status !== 'cancelled') {
+      rows.push(['Cancelled pieces', `Cancelled ${counts.cancelled} pieces${order.cancel_reason ? `: ${order.cancel_reason}` : ''}`]);
+    } else if (order.cancel_reason) rows.push(['Cancel reason', order.cancel_reason]);
     if (order.cancelled_at) rows.push(['Cancelled', fmtDateTime(order.cancelled_at)]);
   }
   if (!line && !shipments.length && !rows.length) return null;

@@ -135,12 +135,16 @@ export const getPieceCounts = (order) => {
   const ready = order?.ready_qty != null
     ? toInt(order.ready_qty)
     : (status === 'processed' || status === 'partially_dispatched' ? Math.max(total - shipped - held, 0) : 0);
-  const cancelled = status === 'cancelled' ? Math.max(total - shipped, 0) : 0;
+  // Fully cancelled order: everything not sent. Partly cancelled (some pieces were
+  // already sent): the server's cancelled_qty.
+  const cancelled = status === 'cancelled'
+    ? Math.max(total - shipped, 0)
+    : toInt(order?.cancelled_qty);
   const tasks = getTrayTasksOf(order);
   const taskSum = (state) => tasks.filter((t) => t.status === state).reduce((sum, t) => sum + toInt(t.qty), 0);
   const inTransit = order?.in_transit_qty != null ? toInt(order.in_transit_qty) : taskSum('in_transit');
   const receivedTray = order?.received_tray_qty != null ? toInt(order.received_tray_qty) : taskSum('received');
-  const gone = status === 'cancelled';
+  const gone = status === 'cancelled' || cancelled > 0;
   return {
     total,
     shipped,
@@ -153,18 +157,20 @@ export const getPieceCounts = (order) => {
   };
 };
 
-// { total, sent, ready, held, inTransit } with safe fallbacks for old orders.
+// { total, sent, ready, held, inTransit, cancelled } with safe fallbacks for old orders.
 export const pieceSummary = (order) => {
   const c = getPieceCounts(order);
-  return { total: c.total, sent: c.shipped, ready: c.ready, held: c.held, inTransit: c.inTransit };
+  return { total: c.total, sent: c.shipped, ready: c.ready, held: c.held, inTransit: c.inTransit, cancelled: c.cancelled };
 };
 
-// "80 of 100 sent, 20 held by sample tray" (empty when the order has no pieces)
+// "80 of 100 sent, 20 held by sample tray" or "80 of 100 sent, 20 cancelled"
+// (empty when the order has no pieces)
 export const pieceSummaryLine = (order) => {
-  const { total, sent, held } = pieceSummary(order);
+  const { total, sent, held, cancelled } = pieceSummary(order);
   if (!total) return '';
   const parts = [`${sent} of ${total} sent`];
   if (held > 0) parts.push(`${held} held by sample tray`);
+  if (cancelled > 0) parts.push(`${cancelled} cancelled`);
   return parts.join(', ');
 };
 
