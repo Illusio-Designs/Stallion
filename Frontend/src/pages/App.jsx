@@ -52,6 +52,9 @@ const DashboardSupport = lazy(() => import('./DashboardSupport'));
 const DashboardSettings = lazy(() => import('./DashboardSettings'));
 const DashboardExpenses = lazy(() => import('./DashboardExpenses'));
 
+// Pages a logged-out visitor may open.
+const PUBLIC_PAGES = ['login', 'privacy-policy'];
+
 const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   const router = useRouter();
   
@@ -123,9 +126,10 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
     }
   }, [initialPage, initialProductId]);
 
-  // Dashboard pages and the cart need a login. Logged-out visitors are sent to
-  // the sign-in page and brought back to the same page afterwards (?returnUrl=).
-  const needsLogin = currentPage === 'cart' || isDashboardPage(currentPage);
+  // Everything except the sign-in page and the privacy policy needs a login.
+  // Logged-out visitors are sent to the sign-in page and brought back to the
+  // same page afterwards (?returnUrl=).
+  const needsLogin = !PUBLIC_PAGES.includes(currentPage);
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
