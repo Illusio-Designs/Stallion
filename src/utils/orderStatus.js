@@ -1,7 +1,7 @@
 // One place for how an order status is written, coloured and counted.
 // Stored values (order_status) match Backendjs/lib/constants/enums.js.
 // Screen wording: PENDING, PROCESSING, PARTIALLY DISPATCH, DISPATCH, COMPLETED, CANCEL.
-// 'HOLD BY SAMPLE' (hold_by_tray) exists only for old orders; pieces held in
+// 'HOLD BY TRAY' (hold_by_tray) exists only for old orders; pieces held in
 // sample trays are shown as "N held by sample tray" next to the status.
 
 export const ORDER_STATUS = {
@@ -18,7 +18,7 @@ export const ORDER_STATUS = {
 export const ORDER_STATUS_LABEL = {
   pending: 'PENDING',
   processed: 'PROCESSING',
-  hold_by_tray: 'HOLD BY SAMPLE',
+  hold_by_tray: 'HOLD BY TRAY',
   partially_dispatched: 'PARTIALLY DISPATCH',
   dispatched: 'DISPATCH',
   completed: 'COMPLETED',
@@ -29,7 +29,7 @@ export const ORDER_STATUS_LABEL = {
 export const ORDER_STATUS_TITLE = {
   pending: 'Pending',
   processed: 'Processing',
-  hold_by_tray: 'Hold by sample',
+  hold_by_tray: 'Hold by tray',
   partially_dispatched: 'Partially dispatch',
   dispatched: 'Dispatch',
   completed: 'Completed',
@@ -41,11 +41,11 @@ export const ORDER_LABEL_TO_STATUS = Object.fromEntries(
   Object.entries(ORDER_STATUS_LABEL).map(([stored, label]) => [label, stored]),
 );
 
-// filter chip text -> stored. 'Hold by Sample' is only for old orders.
+// filter chip text -> stored. 'Hold by Tray' is only for old orders.
 export const ORDER_TAB_TO_STATUS = {
   Pending: 'pending',
   Processing: 'processed',
-  'Hold by Sample': 'hold_by_tray',
+  'Hold by Tray': 'hold_by_tray',
   'Partially Dispatch': 'partially_dispatched',
   Dispatch: 'dispatched',
   Completed: 'completed',
@@ -54,7 +54,7 @@ export const ORDER_TAB_TO_STATUS = {
 // Chips for the current flow (no legacy hold chip)
 export const ORDER_FILTER_TABS = ['Pending', 'Processing', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'];
 // Chips including the legacy one (office Orders page)
-export const ORDER_FILTER_TABS_WITH_LEGACY = ['Pending', 'Processing', 'Hold by Sample', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'];
+export const ORDER_FILTER_TABS_WITH_LEGACY = ['Pending', 'Processing', 'Hold by Tray', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'];
 
 const norm = (s) => String(s || '').toLowerCase().trim();
 
@@ -172,6 +172,14 @@ export const pieceSummaryLine = (order) => {
   if (held > 0) parts.push(`${held} held by sample tray`);
   if (cancelled > 0) parts.push(`${cancelled} cancelled`);
   return parts.join(', ');
+};
+
+// Pill text: a partly sent order with pieces still in a sample tray reads
+// "HOLD BY TRAY"; everything else uses the normal status label.
+export const orderPillLabel = (order, fallbackLabel) => {
+  const key = norm(order?.order_status);
+  if (key === 'partially_dispatched' && pieceSummary(order).held > 0) return 'HOLD BY TRAY';
+  return fallbackLabel || orderStatusLabel(key);
 };
 
 export const heldNote = (order) => {

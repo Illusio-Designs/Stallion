@@ -21,6 +21,7 @@ import { downloadOrderPdf } from '../utils/orderPdf';
 import {
   orderStatusLabel,
   orderStatusBadgeKey,
+  orderPillLabel,
   ORDER_STATUS_TITLE,
   ORDER_TAB_TO_STATUS,
   ORDER_LABEL_TO_STATUS,
@@ -633,7 +634,7 @@ const DashboardOrders = () => {
       const held = heldNote(row?.originalOrder);
       return (
         <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
-          <StatusBadge status={orderStatusBadgeKey(UI_TO_API_STATUS[v])}>{v}</StatusBadge>
+          <StatusBadge status={orderStatusBadgeKey(UI_TO_API_STATUS[v])}>{orderPillLabel(row?.originalOrder, v)}</StatusBadge>
           {held && <small className="text-text-muted">{held}</small>}
         </span>
       );
@@ -849,7 +850,7 @@ const DashboardOrders = () => {
                 <div className="ord-field">
                   <span className="ord-field__label">Status</span>
                   <span>
-                    <StatusBadge status={orderStatusBadgeKey(apiStatus)}>{viewRow.status}</StatusBadge>
+                    <StatusBadge status={orderStatusBadgeKey(apiStatus)}>{orderPillLabel(order, viewRow.status)}</StatusBadge>
                     {counts.held > 0 && <small className="ml-2 text-text-muted">{counts.held} held by sample tray</small>}
                   </span>
                 </div>

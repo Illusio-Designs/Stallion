@@ -2928,7 +2928,7 @@ const DashboardProducts = () => {
               options={[
                 { value: 'draft', label: 'Draft' },
                 { value: 'active', label: 'Active' },
-                { value: 'inactive', label: 'Inactive' }
+                ...(formData.status === 'inactive' ? [{ value: 'inactive', label: 'Inactive (use Availability below)' }] : [])
               ]}
               value={formData.status}
               onChange={(value) => handleInputChange('status', value)}
@@ -3140,7 +3140,7 @@ const DashboardProducts = () => {
               options={[
                 { value: 'draft', label: 'Draft' },
                 { value: 'active', label: 'Active' },
-                { value: 'inactive', label: 'Inactive' }
+                ...(formData.status === 'inactive' ? [{ value: 'inactive', label: 'Inactive (use Availability below)' }] : [])
               ]}
               value={formData.status}
               onChange={(value) => handleInputChange('status', value)}

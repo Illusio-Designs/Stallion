@@ -830,33 +830,6 @@ const ProductDetail = ({ productId: propProductId = null }) => {
           </div>
           <p className="pdx-hint">Quantity cannot be more than the stock, and sold out frames cannot be ordered.</p>
 
-          {totalVariations > 1 && (
-            <div className="pdn-vars">
-              <h2 className="pdn-vars-h">Colour and size <span>{totalVariations} options</span></h2>
-              <div className="pdn-chips" role="radiogroup" aria-label="Choose a colour and size">
-                {productVariations.map((v, index) => {
-                  const st = Number(v.stock ?? 0);
-                  const on = selectedVariation === index;
-                  const colour = [display(v.frameColour), display(v.lenseColour)].filter((x) => x !== "—");
-                  const label = colour.length ? colour.join(" / ") : display(v.name);
-                  const size = display(v.size);
-                  return (
-                    <button
-                      key={v.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={on}
-                      disabled={st <= 0}
-                      className={`pdn-chip ${on ? "on" : ""}`}
-                      onClick={() => handleVariationClick(index)}
-                    >
-                      {label}{size !== "—" ? ` · ${size}` : ""}{st <= 0 ? " (sold out)" : ""}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       </div>
     </div>
