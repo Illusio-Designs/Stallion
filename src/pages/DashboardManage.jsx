@@ -31,6 +31,7 @@ import {
 import StatusBadge from '../components/ui/StatusBadge';
 import { apiRequest } from '../services/api/client';
 import { invalidateCache } from '../services/cacheService';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/redesign-n-manage.css';
 import '../styles/redesign-n-headings.css';
@@ -71,6 +72,7 @@ const GEO_TABS = ['Country', 'State', 'City', 'Zone'];
 const attrRowId = (cfg, item) => item[cfg.idKey] ?? item.id;
 
 const DashboardManage = () => {
+  const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('Country');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -694,7 +696,18 @@ const DashboardManage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
+    // Switching a country, state or city off also hides everything under it.
+    const UNDER = { Country: 'states, cities and zones', State: 'cities and zones', City: 'zones' };
+    if (editRow && UNDER[formData.type] && formData.is_active === false && editRow.isActive !== false) {
+      const ok = await confirm({
+        title: `Switch off this ${formData.type.toLowerCase()}?`,
+        message: `All ${UNDER[formData.type]} under it will also be hidden from forms, filters and the shop. Nothing is deleted, and switching it back on shows them again. Saved parties and orders keep their place.`,
+        confirmLabel: 'Switch off',
+      });
+      if (!ok) return;
+    }
+
     try {
       setLoading(true);
       const { type } = formData;
@@ -1267,7 +1280,10 @@ const DashboardManage = () => {
                 </span>
                 <span className="mng-switch__label">{formData.is_active !== false ? 'Active' : 'Inactive'}</span>
               </button>
-              <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted.</p>
+              <p className="mng-note">
+                {{ Country: 'Switching a country off also hides its states, cities and zones. ', State: 'Switching a state off also hides its cities and zones. ', City: 'Switching a city off also hides its zones. ' }[formData.type] || ''}
+                Inactive items are hidden from forms. Nothing is ever deleted.
+              </p>
             </div>
           )}
         </form>
