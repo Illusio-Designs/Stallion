@@ -8,7 +8,7 @@ const SalesmanZones = require('../models/SalesmanZones');
 const Distributor = require('../models/distributor');
 const DistributorZones = require('../models/DistributorZones');
 const User = require('../models/User');
-const { activeFilter, activeUpdate } = require('../utils/geoActive');
+const { activeFilter, activeUpdate, withActiveParents } = require('../utils/geoActive');
 const { Op } = require('sequelize');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 class ZoneController {
@@ -23,7 +23,7 @@ class ZoneController {
                 nameFields: ['name', 'zone_code'],
                 phoneFields: [],
             });
-            const where = mergeWhere({ ...activeFilter(req), city_id }, searchFilter);
+            const where = withActiveParents(req, mergeWhere({ ...activeFilter(req), city_id }, searchFilter), 'zone');
             const zones = await Zone.findAll({ where });
             res.status(200).json(zones);
         } catch (error) {
@@ -69,7 +69,7 @@ class ZoneController {
                     return res.status(404).json({ error: 'Party record not found for this user' });
                 }
 
-                zones = await Zone.findAll({ where: { is_active: true, id: party.zone_id } });
+                zones = await Zone.findAll({ where: withActiveParents(req, { is_active: true, id: party.zone_id }, 'zone') });
 
             } else if (roleName === 'salesman') {
                 // Get zone_preference from Salesman model (stored as text)
@@ -82,7 +82,7 @@ class ZoneController {
                 }
 
                 const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
-                zones = await Zone.findAll({ where: { is_active: true, id: salesmanZones.map(zone => zone.zone_id) } });
+                zones = await Zone.findAll({ where: withActiveParents(req, { is_active: true, id: salesmanZones.map(zone => zone.zone_id) }, 'zone') });
 
             } else if (roleName === 'distributor') {
                 // Get zone_id from Distributor model
@@ -119,7 +119,7 @@ class ZoneController {
                     }
                 }
                 const distributorZones = await DistributorZones.findAll({ where: { distributor_id: distributor.distributor_id } });
-                zones = await Zone.findAll({ where: { is_active: true, id: distributorZones.map(zone => zone.zone_id) } });
+                zones = await Zone.findAll({ where: withActiveParents(req, { is_active: true, id: distributorZones.map(zone => zone.zone_id) }, 'zone') });
 
             } else {
                 return res.status(400).json({ error: `Role '${roleName}' is not supported for this operation` });
