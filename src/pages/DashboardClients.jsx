@@ -1,3 +1,4 @@
+import { searchRows } from '../utils/search';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
@@ -450,15 +451,11 @@ const DashboardClients = () => {
     return () => clearTimeout(t);
   }, [partySearch]);
   // The list endpoints return every page of the user's parties, so search runs over the loaded rows.
-  const filteredRowsByTab = useMemo(() => {
-    const q = partyQuery.trim().toLowerCase();
-    const tight = q.replace(/\s+/g, ''); // "rajopti" also finds "Raj Optical"
-    return rowsByTab.filter(r => {
-      if (!q) return true;
-      return [r.party_name, r.trade_name, r.contact_person, r.phone, r.cityLabel, r.gstin]
-        .some(v => { const t = String(v || '').toLowerCase(); return t.includes(q) || t.replace(/\s+/g, '').includes(tight); });
-    });
-  }, [rowsByTab, partyQuery]);
+  const filteredRowsByTab = useMemo(() => searchRows(
+    rowsByTab,
+    partyQuery,
+    (r) => [r.party_name, r.trade_name, r.contact_person, r.phone, r.cityLabel, r.state_name, r.salesmanLabel, r.gstin, r.pincode],
+  ), [rowsByTab, partyQuery]);
   const handleExportParties = () => {
     downloadCsv('parties', [
       { label: 'Party name', value: r => r.party_name },
@@ -1599,7 +1596,7 @@ const DashboardClients = () => {
             <GooeySearch
               value={partySearch}
               onChange={setPartySearch}
-              placeholder="Search name, city, phone or GST"
+              placeholder="Search name, city, phone, salesman or GST"
               label="Search parties"
               openWidth={260}
               rowOnPhone
