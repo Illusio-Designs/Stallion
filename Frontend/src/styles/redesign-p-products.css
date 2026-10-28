@@ -1,0 +1,85 @@
+/* Products (admin list) refinement. Every rule is scoped to a pp- class. */
+
+/* Tabs and touch targets */
+.pp-tabs .order-tab { min-height: 44px; }
+
+/* Filter bar: stacked on phone, one row from tablet */
+.pp-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 0 12px; }
+.pp-filters__field { flex: 1 1 100%; min-width: 0; }
+.pp-filters__field .ui-dropdown-custom__trigger { min-height: 44px !important; }
+.pp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 44px; padding: 0 16px; border: 1px solid var(--color-border-strong);
+  border-radius: 10px; background: var(--color-surface); color: var(--color-text);
+  font-size: 14px; font-weight: 600; line-height: 1; cursor: pointer; white-space: nowrap;
+}
+.pp-btn:hover:not(:disabled) { background: var(--color-primary-soft); }
+.pp-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.pp-btn:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
+.pp-filters__export { margin-left: auto; }
+
+/* Stock chips */
+.pp-stock { display: inline-flex; align-items: center; gap: 8px; }
+.pp-qty { font-variant-numeric: tabular-nums; color: var(--color-text-muted); font-size: 13px; }
+.pp-chip {
+  display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px;
+  border: 1px solid var(--color-border-strong); font-size: 12px; font-weight: 600;
+  line-height: 1.3; white-space: nowrap; background: var(--color-surface); color: var(--color-text);
+}
+.pp-chip--in { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+.pp-chip--low { background: var(--color-primary-soft); }
+.pp-chip--out, .pp-chip--off { background: var(--color-grey-100); color: var(--color-text-muted); border-style: dashed; }
+.pp-chip--draft { color: var(--color-text-muted); }
+
+/* Phone cards: hidden until the phone breakpoint */
+.pp-cards { list-style: none; margin: 0; padding: 0; display: none; flex-direction: column; gap: 8px; }
+.pp-cards__note { padding: 24px 0; text-align: center; color: var(--color-text-muted); font-size: 14px; }
+.pp-card {
+  display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 12px; align-items: center;
+  padding: 10px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface);
+}
+.pp-card__main { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; min-width: 0; }
+.pp-card__model { font-size: 14px; overflow-wrap: anywhere; }
+.pp-card__brand { font-size: 13px; color: var(--color-text-muted); }
+.pp-card__side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: 12px; color: var(--color-text-muted); }
+.pp-card__side b { font-size: 15px; color: var(--color-text); }
+.pp-card__side button { min-width: 44px; min-height: 44px; }
+
+/* Phone: cards replace the table body; the table toolbar and pager stay */
+@media (max-width: 639px) {
+  .pp-list--cards { display: flex; flex-direction: column; gap: 12px; }
+  .pp-list--cards .ui-table-container,
+  .pp-list--cards .ui-table { display: contents; }
+  .pp-list--cards .ui-table__top { order: 1; }
+  .pp-list--cards .pp-cards { order: 2; display: flex; }
+  .pp-list--cards .ui-table__scroll { display: none; }
+  .pp-list--cards .ui-table__footer { order: 3; }
+}
+
+/* Tablet: drop gender and shape (columns 6 and 7 after the tick box and SR NO) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .pp-list--cards table th:nth-child(6), .pp-list--cards table td:nth-child(6),
+  .pp-list--cards table th:nth-child(7), .pp-list--cards table td:nth-child(7) { display: none; }
+}
+
+/* Tablet and desktop: filters in one row, WHP and MRP (columns 9 and 10) right-aligned */
+@media (min-width: 640px) {
+  .pp-filters__field { flex: 0 1 200px; }
+  .pp-list--cards table th:nth-child(9), .pp-list--cards table td:nth-child(9),
+  .pp-list--cards table th:nth-child(10), .pp-list--cards table td:nth-child(10) { text-align: right; }
+  .pp-list--cards table th:nth-child(9) .ui-th__btn,
+  .pp-list--cards table th:nth-child(10) .ui-th__btn { margin-left: auto; }
+}
+
+/* Form: grouped, one column on phone, two per row from tablet */
+.ui-aside-panel__body .ui-form.pp-form { grid-template-columns: 1fr; gap: 12px; }
+.pp-group {
+  grid-column: 1 / -1;
+  margin: 8px 0 0; padding-top: 12px; border-top: 1px solid var(--color-border);
+  font-size: 14px; font-weight: 700; color: var(--color-text);
+}
+.pp-group:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.pp-form .ui-input, .pp-form .ui-dropdown-custom__trigger { min-height: 44px !important; }
+@media (min-width: 640px) {
+  .ui-aside-panel__body .ui-form.pp-form { grid-template-columns: 1fr 1fr; }
+}
