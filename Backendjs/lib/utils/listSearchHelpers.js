@@ -25,6 +25,13 @@ function buildNamePhoneFilter({ name, phone, nameFields = [], phoneFields = [], 
         if (ignoreSpaces && tight) {
             ors.push(...nameFields.map((field) => sqlWhere(fn('REPLACE', col(field), ' ', ''), { [Op.like]: likeContains(tight) })));
         }
+        // Several words match in any order: "optical raj" finds "Raj Optical".
+        const words = name.split(/\s+/).filter(Boolean);
+        if (ignoreSpaces && words.length > 1) {
+            ors.push({
+                [Op.and]: words.map((w) => ({ [Op.or]: nameFields.map((field) => ({ [field]: { [Op.like]: likeContains(w) } })) })),
+            });
+        }
         conditions.push({ [Op.or]: ors });
     }
 
