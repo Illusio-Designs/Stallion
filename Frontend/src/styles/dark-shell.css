@@ -154,3 +154,8 @@
 /* ---- goey-toast (blob is an SVG): hairline so it separates from panels ---- */
 :root[data-theme="dark"] .gooey-blobSvg path { stroke: #3a3a3e; stroke-width: 1px; }
 :root[data-theme="dark"] .gooey-blobSvg { filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.6)); }
+
+/* Full-page loader stays a dark surface with light content in dark mode. */
+:root[data-theme="dark"] .loader-overlay {
+  background: linear-gradient(252.71deg, #000000 -19.47%, #0a0a0a 30.79%, #000000 81.06%);
+}
