@@ -118,4 +118,46 @@ async function ensurePartyCoords(party) {
   return party;
 }
 
-module.exports = { geocodeAddress, geocodeDiagnostic, ensurePartyCoords };
+// Reverse geocoding: GPS point -> written address (what delivery apps do). Best-effort:
+// returns null when the service cannot be reached or knows nothing at that spot.
+const GEOCODER_REVERSE_URL = process.env.GEOCODER_REVERSE_URL || GEOCODER_URL.replace(/\/search\/?$/, '/reverse');
+
+async function reverseGeocode(latitude, longitude) {
+  const lat = Number(latitude), lon = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const url = new URL(GEOCODER_REVERSE_URL);
+  url.searchParams.set('lat', String(lat));
+  url.searchParams.set('lon', String(lon));
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('zoom', '18');
+  url.searchParams.set('addressdetails', '1');
+  if (GEOCODER_KEY) url.searchParams.set('key', GEOCODER_KEY);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': GEOCODER_UA, Accept: 'application/json' }, signal: controller.signal });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || data.error || !data.display_name) return null;
+    const a = data.address || {};
+    // Short street-level line first (shop/house, road, area), then city, state, pincode.
+    const street = [a.shop || a.building || a.amenity, a.house_number, a.road, a.neighbourhood || a.suburb || a.quarter]
+      .filter(Boolean).join(', ');
+    const city = a.city || a.town || a.village || a.county || a.state_district || '';
+    const pincode = a.postcode ? String(a.postcode).replace(/\D/g, '') : '';
+    return {
+      address: String(data.display_name).slice(0, 500),
+      street,
+      city,
+      state: a.state || '',
+      pincode,
+    };
+  } catch (e) {
+    console.warn('[reverse-geocode] failed:', e && e.message);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+module.exports = { geocodeAddress, geocodeDiagnostic, ensurePartyCoords, reverseGeocode };

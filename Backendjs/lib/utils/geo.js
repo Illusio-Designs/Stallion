@@ -96,7 +96,7 @@ const CAPTURE_MAX_PINCODE_DISTANCE_M = Number(process.env.CAPTURE_MAX_PINCODE_DI
  * accepted as it is (noReference: true) when the GPS fix itself is good.
  * @returns {{ ok: boolean, distance: number|null, reason?: string, noReference?: boolean }}
  */
-function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng, refPrecision }) {
+function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng, refPrecision, allowFarFromAddress = false }) {
   const lat = Number(deviceLat), lng = Number(deviceLng);
   if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
     return { ok: false, distance: null, reason: 'A valid current location is required. Please enable GPS and try again.' };
@@ -123,11 +123,15 @@ function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng,
   const limit = precision === 'pincode' ? CAPTURE_MAX_PINCODE_DISTANCE_M : CAPTURE_MAX_ADDRESS_DISTANCE_M;
   const distance = distanceMeters(lat, lng, refLat, refLng);
   if (distance != null && distance > limit) {
+    // The written address may simply be wrong or incomplete. With a good GPS fix the
+    // salesman can confirm he is at the right shop and save the spot anyway.
+    if (allowFarFromAddress) return { ok: true, distance, farFromAddress: true };
     const km = (distance / 1000).toFixed(distance >= 10000 ? 0 : 1);
     return {
       ok: false,
       distance,
-      reason: `You are about ${km} km from this party's registered address. Make sure you selected the correct party and are standing at its shop before capturing.`,
+      farFromAddress: true,
+      reason: `You are about ${km} km from this party's written address. If you are at the right shop and the address is wrong, you can save this spot anyway. Otherwise check that you picked the correct party.`,
     };
   }
   return { ok: true, distance };

@@ -6,7 +6,8 @@ import StatusBadge from '../ui/StatusBadge';
 import { FiMapPin, FiShoppingCart, FiUsers, FiPackage, FiCreditCard, FiNavigation2, FiUser, FiChevronRight } from '../icons/hugeicons';
 import { captureCurrentPosition, distanceMeters, GEOFENCE_RADIUS_M } from '../../utils/geolocation';
 import { createSalesmanCheckin } from '../../services/api/salesmanApi';
-import { verifyPartyLocation } from '../../services/api/partnersApi';
+import { verifyPartyLocationAsking, ADDRESS_FAR_CONFIRM } from '../../services/api/partnersApi';
+import { useConfirm } from '../ui/ConfirmProvider';
 import { getMySalesman } from '../../services/api/dashboardApi';
 import { getTrayTasks, markTrayTaskInTransit } from '../../services/api/inventoryApi';
 import { queueCheckin, isNetworkError } from '../../services/offlineQueue';
@@ -194,6 +195,7 @@ export function FieldCard({ summary, loading, error, onRetry }) {
 // ---------- Salesman: "I'm at the shop" ----------
 export function ShopCheckInCard({ parties, salesmanId, loading }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [partyId, setPartyId] = useState('');
   const [dist, setDist] = useState(null); // { meters } | { error }
   const [measuring, setMeasuring] = useState(false);
@@ -246,7 +248,7 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
     setTesting(true);
     try {
       const pos = await captureCurrentPosition();
-      const res = await verifyPartyLocation(id, pos);
+      const res = await verifyPartyLocationAsking(id, pos, (m) => confirm(ADDRESS_FAR_CONFIRM(m)));
       setSaved((m) => ({ ...m, [id]: { latitude: Number(res?.latitude), longitude: Number(res?.longitude), location_source: 'verified', location_accuracy_m: Number(res?.accuracy) } }));
       setFailed((m) => { const n = { ...m }; delete n[id]; return n; });
       showSuccess('Shop test passed. This party is good to go.');

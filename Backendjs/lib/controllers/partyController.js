@@ -15,7 +15,7 @@ const { Op, fn, col, where } = require('sequelize');
 // so "gujarat", "Gujarat" and "GUJARAT" all resolve to the same row and we never
 // create case-variant duplicates during bulk upload.
 const ciNameEq = (value) => where(fn('LOWER', col('name')), String(value || '').trim().toLowerCase());
-const { geocodeAddress, geocodeDiagnostic } = require('../utils/geocode');
+const { geocodeAddress, geocodeDiagnostic, reverseGeocode } = require('../utils/geocode');
 const { validateOnsiteCapture } = require('../utils/geo');
 const DistributorZones = require('../models/DistributorZones');
 const SalesmanStates = require('../models/SalesmanStates');
@@ -361,7 +361,8 @@ class PartyController {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const user = req.user;
-            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, latitude, longitude, accuracy, location_accuracy_m } = req.body;
+            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, latitude, longitude, accuracy, location_accuracy_m, confirm_address_mismatch } = req.body;
+            const confirmMismatch = confirm_address_mismatch === true || confirm_address_mismatch === 'true';
             // address, city, state and pincode are required so the party can be
             // geocoded accurately for the visit/check-in geofence.
             if (!party_name || !phone || !address) {
@@ -440,6 +441,7 @@ class PartyController {
                     deviceLat: latitude, deviceLng: longitude, accuracy: acc,
                     refLat: geo ? geo.latitude : null, refLng: geo ? geo.longitude : null,
                     refPrecision: geo ? geo.precision : null,
+                    allowFarFromAddress: confirmMismatch,
                 });
                 if (check.ok) {
                     finalLat = Number(latitude);
@@ -449,8 +451,14 @@ class PartyController {
                     locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
                     captured = true;
                 } else {
-                    return res.status(422).json({ error: check.reason });
+                    return res.status(422).json({ error: check.reason, code: check.farFromAddress ? 'address_far' : undefined });
                 }
+            }
+            // Written address of the captured spot (best-effort, never blocks the save).
+            let capturedAddress = null;
+            if (captured) {
+                const rev = await reverseGeocode(finalLat, finalLng);
+                capturedAddress = rev ? rev.address : null;
             }
             if (!captured && geo) {
                 finalLat = geo.latitude;
@@ -481,6 +489,7 @@ class PartyController {
                 longitude: finalLng,
                 location_source: locationSource,
                 location_accuracy_m: locationAccuracyM,
+                location_address: capturedAddress,
                 created_by: user.user_id,
                 created_at: new Date(),
                 updated_at: new Date(),
@@ -632,11 +641,13 @@ class PartyController {
                     if (ref) { refLat = ref.latitude; refLng = ref.longitude; refPrecision = ref.precision; }
                 } catch (_) { /* no reference: validateOnsiteCapture rejects with a clear message */ }
 
+                const confirmMismatch = req.body && (req.body.confirm_address_mismatch === true || req.body.confirm_address_mismatch === 'true');
                 check = validateOnsiteCapture({
                     deviceLat: latitude, deviceLng: longitude, accuracy, refLat, refLng, refPrecision,
+                    allowFarFromAddress: confirmMismatch,
                 });
                 if (!check.ok) {
-                    return res.status(422).json({ error: check.reason });
+                    return res.status(422).json({ error: check.reason, code: check.farFromAddress ? 'address_far' : undefined });
                 }
             }
 
@@ -646,6 +657,8 @@ class PartyController {
             party.longitude = Number(longitude);
             party.location_source = 'verified';
             party.location_accuracy_m = Number.isFinite(acc) ? acc : null;
+            const capturedRev = await reverseGeocode(party.latitude, party.longitude);
+            party.location_address = capturedRev ? capturedRev.address : null;
             party.updated_at = new Date();
             await party.save();
 
@@ -654,7 +667,7 @@ class PartyController {
                 action: 'update',
                 description: adminOverride
                     ? `Party location set by admin (±${Number.isFinite(acc) ? Math.round(acc) : '?'}m)`
-                    : `Party location verified on-site (±${Math.round(acc)}m)`,
+                    : `Party location verified on-site (±${Math.round(acc)}m)${check.farFromAddress ? ', salesman confirmed the written address is wrong' : ''}`,
                 tableName: 'parties',
                 recordId: party.party_id,
                 oldValues: oldSnapshot,
@@ -664,13 +677,37 @@ class PartyController {
             return res.status(200).json({
                 message: adminOverride
                     ? 'Party location set from your current position.'
-                    : 'On-site location verified and saved.',
+                    : (check.farFromAddress
+                        ? 'Location saved. It is far from the written address, so please correct the address.'
+                        : 'On-site location verified and saved.'),
+                address_mismatch: !!check.farFromAddress,
+                location_address: party.location_address,
+                location_address_parts: capturedRev || null,
                 latitude: party.latitude,
                 longitude: party.longitude,
                 location_source: 'verified',
                 accuracy: party.location_accuracy_m,
                 distance_from_address_m: check.distance,
             });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
+    // GPS point -> written address, so the party form can be filled from where the
+    // salesman is standing (like delivery apps). Nothing is saved here.
+    async reverseGeocodeLocation(req, res) {
+        try {
+            const { latitude, longitude } = req.body || {};
+            const lat = Number(latitude), lng = Number(longitude);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                return res.status(400).json({ error: 'A valid current location is required.' });
+            }
+            const rev = await reverseGeocode(lat, lng);
+            if (!rev) {
+                return res.status(200).json({ found: false });
+            }
+            return res.status(200).json({ found: true, ...rev });
         } catch (error) {
             return res.status(500).json({ error: error.message });
         }
@@ -699,6 +736,7 @@ class PartyController {
             party.longitude = null;
             party.location_source = null;
             party.location_accuracy_m = null;
+            party.location_address = null;
             party.updated_at = new Date();
             await party.save();
 

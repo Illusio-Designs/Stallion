@@ -993,10 +993,46 @@ export const verifyPartyLocation = async (partyId, pos) => {
       latitude: pos.latitude,
       longitude: pos.longitude,
       accuracy: pos.accuracy,
+      ...(pos.confirmMismatch ? { confirm_address_mismatch: true } : {}),
     },
     includeAuth: true,
   });
 };
+
+/**
+ * Read the written address at a GPS point (like delivery apps). Nothing is saved.
+ * @returns {Promise<{found:boolean, address?:string, street?:string, city?:string, state?:string, pincode?:string}>}
+ */
+export const reverseGeocodeLocation = async (pos) => {
+  return apiRequest('/parties/reverse-geocode', {
+    method: 'POST',
+    body: { latitude: pos.latitude, longitude: pos.longitude },
+    includeAuth: true,
+  });
+};
+
+/**
+ * Same as verifyPartyLocation, but when the server says the phone is far from the
+ * written address it asks the salesman (ask(message) -> boolean) whether he is at the
+ * right shop and the address is wrong, and saves the spot anyway if he confirms.
+ */
+export const verifyPartyLocationAsking = async (partyId, pos, ask) => {
+  try {
+    return await verifyPartyLocation(partyId, pos);
+  } catch (err) {
+    if (err?.errorData?.code === 'address_far' && typeof ask === 'function' && (await ask(err.message))) {
+      return verifyPartyLocation(partyId, { ...pos, confirmMismatch: true });
+    }
+    throw err;
+  }
+};
+
+// Dialog text for the "far from the written address" question.
+export const ADDRESS_FAR_CONFIRM = (message) => ({
+  title: 'Far from the written address',
+  message: `${message}`,
+  confirmLabel: 'Save this spot',
+});
 
 /**
  * Remove a party's saved location (managers only) so "I'm at shop" can capture it

@@ -17,6 +17,7 @@ import { getUserRole, getUser } from "../services/authService";
 import { encodeUploadName } from "../utils/imageUrl";
 import DropdownSelector from "../components/ui/DropdownSelector";
 import AsidePanel from "../components/ui/AsidePanel";
+import { useConfirm } from "../components/ui/ConfirmProvider";
 import {
   getMyParties,
   getPartyById,
@@ -29,7 +30,8 @@ import {
   getAvailableOffers,
   quoteOrder,
   getProductsByIds,
-  verifyPartyLocation,
+  verifyPartyLocationAsking,
+  ADDRESS_FAR_CONFIRM,
 } from "../services/apiService";
 import { captureCurrentPosition, distanceMeters, GEOFENCE_RADIUS_M } from "../utils/geolocation";
 
@@ -48,6 +50,7 @@ const resolveCartImage = (img) => {
 };
 
 const Cart = ({ onPageChange = null }) => {
+  const confirm = useConfirm();
   const handlePageChange = (page) => {
     if (onPageChange) {
       onPageChange(page);
@@ -331,7 +334,7 @@ const Cart = ({ onPageChange = null }) => {
         showError(geoErr?.message || 'Could not get your location. Please try again.');
         return;
       }
-      const res = await verifyPartyLocation(selectedParty, pos);
+      const res = await verifyPartyLocationAsking(selectedParty, pos, (m) => confirm(ADDRESS_FAR_CONFIRM(m)));
       const acc = Number(res?.accuracy);
       showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 100m geofence is now active for this party.`);
       setParties(prev => prev.map(p => {

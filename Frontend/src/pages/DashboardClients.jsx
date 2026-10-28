@@ -18,7 +18,9 @@ import {
   getZones,
   removePartyLocation,
   updateParty,
-  verifyPartyLocation,
+  verifyPartyLocationAsking,
+  reverseGeocodeLocation,
+  ADDRESS_FAR_CONFIRM,
 } from '../services/apiService';
 import { getUser, getUserRole, getUserRoles } from '../services/authService';
 import { showError, showSuccess, showWarning } from '../services/notificationService';
@@ -48,6 +50,8 @@ const DashboardClients = () => {
   const canEditParty = isPartyManager || isSalesman;
   // Admin-only party-location capture (geofence anchor).
   const [savingLoc, setSavingLoc] = useState(false);
+  // Address read from the GPS spot: { address, pincode } offered as the party address.
+  const [addrSuggest, setAddrSuggest] = useState(null);
   const [activeTab, setActiveTab] = useState('All');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -485,6 +489,7 @@ const DashboardClients = () => {
   };
 
   const resetForm = () => {
+    setAddrSuggest(null);
     setFormData({
       party_name: '',
       trade_name: '',
@@ -598,12 +603,18 @@ const DashboardClients = () => {
       const acc = Number(pos.accuracy);
 
       if (editRow && partyId) {
-        const res = await verifyPartyLocation(partyId, pos);
+        const res = await verifyPartyLocationAsking(partyId, pos, (m) => confirm(ADDRESS_FAR_CONFIRM(m)));
         const savedLat = Number(res?.latitude);
         const savedLng = Number(res?.longitude);
         const savedAcc = Number(res?.accuracy);
         showSuccess(`Location verified & saved${Number.isFinite(savedAcc) ? ` (±${Math.round(savedAcc)}m)` : ''}. The 100m geofence is now active for this party.`);
-        const saved = { latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc };
+        const saved = { latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc, location_address: res?.location_address || null };
+        if (res?.location_address) {
+          setAddrSuggest({ address: res.location_address, pincode: res?.location_address_parts?.pincode || '' });
+        }
+        if (res?.address_mismatch) {
+          showWarning('Location saved. It is far from the written address. Use the address read from the shop spot below if it is right.');
+        }
         setParties(prev => prev.map(p => {
           const id = p.id || p.party_id;
           return id === partyId ? { ...p, ...saved } : p;
@@ -619,6 +630,20 @@ const DashboardClients = () => {
           location_accuracy_m: Number.isFinite(acc) ? acc : null,
         }));
         showSuccess(`Shop location captured${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. It will be saved when you create the party.`);
+        // Read the written address at this spot. An empty address field is filled in
+        // straight away; otherwise it is offered below the location.
+        try {
+          const rev = await reverseGeocodeLocation(pos);
+          if (rev?.found && rev.address) {
+            if (!String(formData.address || '').trim()) {
+              setFormData(prev => ({ ...prev, address: rev.address, pincode: prev.pincode || rev.pincode || '' }));
+              showSuccess('Address filled from the shop location. Please check it.');
+              setAddrSuggest(null);
+            } else {
+              setAddrSuggest({ address: rev.address, pincode: rev.pincode || '' });
+            }
+          }
+        } catch { /* the address is optional help, never blocks the capture */ }
       }
     } catch (err) {
       showError(err?.message || 'Could not verify location. Please try again from the shop.');
@@ -628,6 +653,13 @@ const DashboardClients = () => {
   };
 
   // Remove a wrong saved location (managers only) so "I'm at shop" shows again.
+  const handleUseSuggestedAddress = () => {
+    if (!addrSuggest?.address) return;
+    setFormData(prev => ({ ...prev, address: addrSuggest.address, pincode: addrSuggest.pincode || prev.pincode }));
+    setAddrSuggest(null);
+    showSuccess('Address updated. Save the party to keep it.');
+  };
+
   const handleRemoveLocation = async () => {
     const partyId = editRow?.id || editRow?.party_id;
     if (!partyId) return;
@@ -664,6 +696,7 @@ const DashboardClients = () => {
       return;
     }
 
+    setAddrSuggest(null);
     // Set flag to prevent useEffect from resetting fields during initialization
     isInitializingEditRef.current = true;
     setOpenAdd(false);
@@ -1099,7 +1132,17 @@ const DashboardClients = () => {
         // endpoints (/roles, /auth/register) and returned "Access denied -
         // insufficient permissions" for salesmen / field roles creating a party.
         try {
-          const newParty = await createParty(dataToSend);
+          let newParty;
+          try {
+            newParty = await createParty(dataToSend);
+          } catch (createErr) {
+            // The written address may be wrong: let the salesman confirm he is at the right shop.
+            if (createErr?.errorData?.code === 'address_far' && await confirm(ADDRESS_FAR_CONFIRM(createErr.message))) {
+              newParty = await createParty({ ...dataToSend, confirm_address_mismatch: true });
+            } else {
+              throw createErr;
+            }
+          }
           // Say what happened to the shop location, never more than was saved.
           const locStatus = newParty?.location_status;
           const needsCapture = locStatus === 'none' || locStatus === 'address_only';
@@ -1559,6 +1602,15 @@ const DashboardClients = () => {
                 </a>
               )}
             </div>
+            {(addrSuggest?.address || (isVerified && editRow?.location_address)) && (
+              <div className="party-loc__addr">
+                <span className="ui-label">Address read from the shop spot</span>
+                <p className="mt-1 mb-2 text-[length:var(--text-xs)] text-text-muted">{addrSuggest?.address || editRow?.location_address}</p>
+                {addrSuggest?.address && String(formData.address || '').trim() !== addrSuggest.address && (
+                  <button type="button" className="ui-btn ui-btn--secondary" onClick={handleUseSuggestedAddress}>Use as party address</button>
+                )}
+              </div>
+            )}
             {hasLocationSet && (
               <p className="mt-2 mb-0 text-[length:var(--text-xs)] text-text-subtle">
                 {Number(locLat).toFixed(5)}, {Number(locLng).toFixed(5)}
