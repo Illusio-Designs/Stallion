@@ -131,7 +131,7 @@ function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng,
       ok: false,
       distance,
       farFromAddress: true,
-      reason: `You are about ${km} km from this party's written address. If you are at the right shop and the address is wrong, you can save this spot anyway. Otherwise check that you picked the correct party.`,
+      reason: `You are about ${km} km from this party's written address. If you are at the right shop and the address is wrong, open Edit party: the address is updated from your location and the spot is kept. Otherwise check that you picked the correct party.`,
     };
   }
   return { ok: true, distance };

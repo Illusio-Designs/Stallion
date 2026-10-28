@@ -435,6 +435,7 @@ class PartyController {
             // Geocode once; it is both the validation reference and the fallback.
             const geo = await geocodeAddress(address, { pincode });
             let captured = false;
+            let createFarFromAddress = false;
             if (hasDeviceLoc) {
                 const acc = accuracy != null && accuracy !== '' ? accuracy : location_accuracy_m;
                 const check = validateOnsiteCapture({
@@ -450,6 +451,7 @@ class PartyController {
                     const accNum = Number(acc);
                     locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
                     captured = true;
+                    createFarFromAddress = !!check.farFromAddress;
                 } else {
                     return res.status(422).json({ error: check.reason, code: check.farFromAddress ? 'address_far' : undefined });
                 }
@@ -512,6 +514,7 @@ class PartyController {
                 ? 'verified'
                 : (locationSource === 'geocoded' ? 'address_only' : 'none');
             out.location_capture_sent = hasDeviceLoc;
+            out.address_mismatch = createFarFromAddress;
             res.status(200).json(out);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -860,11 +863,16 @@ class PartyController {
             // new pincode, state or city, or an address that mostly differs.
             const movedShop = pincodeChanged || stateChanged || cityChanged
                 || (addressChanged && addressSimilarity(address, party.address) < 0.6);
+            // Fixing the written address from the shop's GPS spot (Edit party after "I'm at
+            // shop" did not match): the verified spot is the truth, so it stays.
+            const fixedFromGps = party.location_source === 'verified' && !!party.location_address
+                && address !== undefined && addressSimilarity(address, party.location_address) >= 0.6;
             let locationReset = false;
             if (addressChanged || pincodeChanged || stateChanged || cityChanged) {
                 const wasVerified = party.location_source === 'verified';
-                if (wasVerified && !movedShop) {
-                    // Wording-only edit: keep the verified shop point as it is.
+                if (wasVerified && (!movedShop || fixedFromGps)) {
+                    // Wording-only edit, or the address was corrected from the GPS spot:
+                    // keep the verified shop point as it is.
                 } else {
                     const geo = await geocodeAddress(
                         address !== undefined ? address : party.address,
