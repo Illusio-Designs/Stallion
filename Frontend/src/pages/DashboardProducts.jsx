@@ -38,6 +38,8 @@ import { getProductImageUrl, PRODUCT_IMAGE_PLACEHOLDER } from '../utils/imageUrl
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard-products.css';
 import '../styles/redesign-n-manage.css';
+import '../styles/redesign-p-products.css';
+import { FiDownload } from '../components/icons/hugeicons';
 
 // Picker options for the add/edit form: active items only, plus the item the
 // product currently uses (even if it has since been made inactive) so it stays
@@ -172,6 +174,22 @@ const ProductThumb = ({ product, alt }) => {
   );
 };
 
+// Stock state of one product row: drives the chip in the table and the phone card.
+const stockInfo = (row) => {
+  const st = String(row.status || '').toLowerCase();
+  const qty = Number(row.total_qty) || 0;
+  if (row.is_active === false) return { label: 'Inactive', tone: 'off' };
+  if (st !== 'active') return { label: st ? st.charAt(0).toUpperCase() + st.slice(1) : 'Draft', tone: 'draft' };
+  if (qty <= 0) return { label: 'Sold out', tone: 'out' };
+  if (qty <= 5) return { label: 'Low stock', tone: 'low' };
+  return { label: 'In stock', tone: 'in' };
+};
+
+const StockChip = ({ row }) => {
+  const info = stockInfo(row);
+  return <span className={`pp-chip pp-chip--${info.tone}`}>{info.label}</span>;
+};
+
 const DashboardProducts = () => {
   const confirm = useConfirm();
   const PRODUCTS_PER_PAGE = 20;
@@ -183,6 +201,10 @@ const DashboardProducts = () => {
   const [productPage, setProductPage] = useState(1);
   const [productPageCount, setProductPageCount] = useState(1);
   const [productSearch, setProductSearch] = useState('');
+  // Server-side list filters (brand, frame type, in-stock). The ref is read by
+  // fetchProductsPage so every reload (after a save too) keeps the filters.
+  const [listFilters, setListFilters] = useState({ brand_id: '', frame_type_id: '', stock: '' });
+  const listFiltersRef = useRef(listFilters);
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [openBulkUpload, setOpenBulkUpload] = useState(false);
@@ -459,7 +481,13 @@ const DashboardProducts = () => {
       // The Unuploaded Media Gallery reuses THIS paginated endpoint with an
       // image_status filter, so it no longer pulls the whole catalogue.
       const unuploaded = activeTab === 'Unuploaded Media Gallery';
-      let filters = term ? { search: term, status: null } : null;
+      const lf = unuploaded ? { brand_id: '', frame_type_id: '', stock: '' } : listFiltersRef.current;
+      const hasListFilter = !!(lf.brand_id || lf.frame_type_id || lf.stock);
+      let filters = (term || hasListFilter) ? { status: null } : null;
+      if (term) filters.search = term;
+      if (lf.brand_id) filters.brand_id = lf.brand_id;
+      if (lf.frame_type_id) filters.frame_type_id = lf.frame_type_id;
+      if (lf.stock === 'in') filters.in_stock = true;
       if (unuploaded) filters = { ...(filters || {}), image_status: 'unuploaded', status: null };
       const result = await getProducts(targetPage, PRODUCTS_PER_PAGE, filters);
       const list = result.data || [];
@@ -2073,6 +2101,34 @@ const DashboardProducts = () => {
     }
   };
 
+  const applyListFilter = (patch) => {
+    const next = { ...listFiltersRef.current, ...patch };
+    listFiltersRef.current = next;
+    setListFilters(next);
+    fetchProductsPage(1, productSearch);
+  };
+  const clearListFilters = () => applyListFilter({ brand_id: '', frame_type_id: '', stock: '' });
+  const anyListFilter = !!(listFilters.brand_id || listFilters.frame_type_id || listFilters.stock);
+
+  // Export the rows on screen (this page of results) as a CSV file.
+  const handleExportRows = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const head = ['Model no', 'Brand', 'Collection', 'Gender', 'Shape', 'Frame type', 'Stock', 'Status', 'WHP', 'MRP'];
+    const lines = rows.map(r => [
+      r.model_no, r.brand, r.collection, r.gender_name, r.shape_name, r.frame_type_name,
+      r.total_qty, stockInfo(r).label, r.whp, r.mrp,
+    ].map(esc).join(','));
+    const blob = new Blob([[head.map(esc).join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'stallion-products.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const columns = useMemo(() => ([
     {
       key: 'image',
@@ -2084,21 +2140,14 @@ const DashboardProducts = () => {
     { key: 'brand', label: 'BRAND', width: '90px' },
     { key: 'gender_name', label: 'GENDER', width: '80px' },
     { key: 'shape_name', label: 'SHAPE', width: '80px' },
-    { key: 'total_qty', label: 'STOCK', width: '70px' },
     {
-      key: 'status', label: 'STATUS', width: '110px',
-      render: (v, row) => {
-        const st = String(v || '').toLowerCase();
-        const qty = Number(row.total_qty) || 0;
-        if (row.is_active === false) return <StatusBadge status="cancelled">Inactive</StatusBadge>;
-        if (st === 'active' && qty <= 0) return <StatusBadge status="cancelled">Sold out</StatusBadge>;
-        if (st === 'active' && qty <= 5) return <StatusBadge status="pending">Low stock</StatusBadge>;
-        if (st === 'active') return <StatusBadge status="completed">Active</StatusBadge>;
-        const label = st ? st.charAt(0).toUpperCase() + st.slice(1) : 'Draft';
-        return <StatusBadge status="default">{label}</StatusBadge>;
-      },
+      key: 'total_qty', label: 'STOCK', width: '110px',
+      render: (v, row) => (
+        <span className="pp-stock"><StockChip row={row} /><span className="pp-qty">{Number(v) || 0}</span></span>
+      ),
     },
-    { key: 'whp_formatted', label: 'PRICE', width: '100px', render: (v) => <b>{v}</b> },
+    { key: 'whp', label: 'WHP', width: '90px', render: (_v, row) => <b>{row.whp_formatted}</b> },
+    { key: 'mrp', label: 'MRP', width: '90px', render: (_v, row) => row.mrp_formatted },
     {
       key: 'action', label: 'ACTION', width: '100px', render: (_v, row) => (
         <RowActions
@@ -2545,7 +2594,7 @@ const DashboardProducts = () => {
           </div>
         )}
         <div className="dash-row flex flex-wrap justify-between items-center gap-3">
-          <div className="order-tabs-container min-w-0 flex-1">
+          <div className="order-tabs-container pp-tabs min-w-0 flex-1">
             {['Products', 'Media Gallery', 'Unuploaded Media Gallery'].map(tab => (
               <button
                 key={tab}
@@ -2697,6 +2746,69 @@ const DashboardProducts = () => {
                 )}
               </div>
             ) : (
+              <>
+              {activeTab === 'Products' && (
+                <div className="pp-filters">
+                  <div className="pp-filters__field">
+                    <DropdownSelector
+                      options={[{ value: '', label: 'All brands' }, ...(brands || []).map(b => ({ value: b.brand_id || b.id, label: b.brand_name }))]}
+                      value={listFilters.brand_id}
+                      onChange={(v) => applyListFilter({ brand_id: v })}
+                      placeholder="Brand"
+                      onOpen={loadBrands}
+                    />
+                  </div>
+                  <div className="pp-filters__field">
+                    <DropdownSelector
+                      options={[{ value: '', label: 'All frame types' }, ...(frameTypes || []).map(f => ({ value: f.frame_type_id || f.id, label: f.frame_type }))]}
+                      value={listFilters.frame_type_id}
+                      onChange={(v) => applyListFilter({ frame_type_id: v })}
+                      placeholder="Frame type"
+                      onOpen={loadFrameTypes}
+                    />
+                  </div>
+                  <div className="pp-filters__field">
+                    <DropdownSelector
+                      options={[{ value: '', label: 'All stock' }, { value: 'in', label: 'In stock' }]}
+                      value={listFilters.stock}
+                      onChange={(v) => applyListFilter({ stock: v })}
+                      placeholder="Stock"
+                      searchable={false}
+                    />
+                  </div>
+                  {anyListFilter && (
+                    <button type="button" className="pp-btn" onClick={clearListFilters}>Clear filters</button>
+                  )}
+                  <button type="button" className="pp-btn pp-filters__export" onClick={handleExportRows} disabled={rows.length === 0}>
+                    <FiDownload size={16} aria-hidden="true" /> Export
+                  </button>
+                </div>
+              )}
+              <div className={`pp-list ${activeTab === 'Products' ? 'pp-list--cards' : ''}`}>
+              {activeTab === 'Products' && (
+                <ul className="pp-cards" aria-label="Products">
+                  {loading && filteredRowsByTab.length === 0 && <li className="pp-cards__note">Loading products…</li>}
+                  {!loading && filteredRowsByTab.length === 0 && <li className="pp-cards__note">No products found.</li>}
+                  {filteredRowsByTab.map(row => (
+                    <li key={row.id} className="pp-card">
+                      <ProductThumb product={row.data} alt={row.model_no} />
+                      <div className="pp-card__main">
+                        <b className="pp-card__model">{row.model_no}</b>
+                        <span className="pp-card__brand">{row.brand}</span>
+                        <StockChip row={row} />
+                      </div>
+                      <div className="pp-card__side">
+                        <b>{row.whp_formatted}</b>
+                        <span>MRP {row.mrp_formatted}</span>
+                        <RowActions
+                          onEdit={() => handleEdit(row)}
+                          onHistory={() => setHistoryProduct({ id: row.product_id || row.id, model_no: row.model_no })}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <TableWithControls
                 title={activeTab === 'Unuploaded Media Gallery' ? 'Unuploaded Media Gallery' : 'Products'}
                 columns={columns}
@@ -2715,6 +2827,8 @@ const DashboardProducts = () => {
                 onServerPageChange={(p) => fetchProductsPage(p, productSearch)}
                 onServerSearch={(s) => { setProductSearch(s); fetchProductsPage(1, s); }}
               />
+              </div>
+              </>
             )}
           </div>
         </div>
@@ -2754,7 +2868,8 @@ const DashboardProducts = () => {
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
+        <form className="ui-form pp-form" onSubmit={handleSubmit}>
+          <h3 className="pp-group form-group--full">Model and brand</h3>
           <div className="form-group form-group--full">
             <label className="ui-label">Model No *</label>
             <input
@@ -2795,6 +2910,7 @@ const DashboardProducts = () => {
               onOpen={loadGenders}
             />
           </div>
+          <h3 className="pp-group form-group--full">Look</h3>
           <div className="form-group">
             <label className="ui-label">Color Code</label>
             <DropdownSelector
@@ -2865,6 +2981,7 @@ const DashboardProducts = () => {
               onOpen={loadFrameMaterials}
             />
           </div>
+          <h3 className="pp-group form-group--full">Price and stock</h3>
           <div className="form-group">
             <label className="ui-label">MRP *</label>
             <input
@@ -2966,7 +3083,8 @@ const DashboardProducts = () => {
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
+        <form className="ui-form pp-form" onSubmit={handleSubmit}>
+          <h3 className="pp-group form-group--full">Model and brand</h3>
           <div className="form-group form-group--full">
             <label className="ui-label">Model No *</label>
             <input
@@ -3007,6 +3125,7 @@ const DashboardProducts = () => {
               onOpen={loadGenders}
             />
           </div>
+          <h3 className="pp-group form-group--full">Look</h3>
           <div className="form-group">
             <label className="ui-label">Color Code</label>
             <DropdownSelector
@@ -3077,6 +3196,7 @@ const DashboardProducts = () => {
               onOpen={loadFrameMaterials}
             />
           </div>
+          <h3 className="pp-group form-group--full">Price and stock</h3>
           <div className="form-group">
             <label className="ui-label">MRP *</label>
             <input
@@ -3164,6 +3284,7 @@ const DashboardProducts = () => {
             <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted.</p>
           </div>
 
+          {editRow && <h3 className="pp-group form-group--full">Images</h3>}
           {/* Assigned Images Preview + Assign Button */}
           {editRow && (() => {
             const imgs = parseImageUrls(editRow.data);
