@@ -6,7 +6,8 @@ import Loader from '../components/Loader';
 
 function AppWrapper() {
   const pathname = usePathname();
-  const page = pathname === '/' ? 'home' : pathname.slice(1);
+  // The sign-in page is the front page: the home page is gone. A signed-in visitor on / is sent on to the dashboard.
+  const page = pathname === '/' ? 'login' : pathname.slice(1);
   return <App initialPage={page} />;
 }
 
