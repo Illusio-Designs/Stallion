@@ -637,10 +637,9 @@ class OrderController {
                 if (!hasRole(req.userRoleNames, 'salesman') || !scope.salesmanId) {
                     return res.status(403).json({ error: 'Access denied' });
                 }
-                const ids = await salesmanStateIds(scope.salesmanId);
-                if (!ids.length) return res.status(200).json({ from: null, to: null, states: [], total_sales: 0 });
-                stateFilter = ' AND p.state_id IN (:stateIds)';
-                replacements.stateIds = ids;
+                // A salesman's report holds only his own orders (event orders in other states included).
+                stateFilter = ' AND o.salesman_id = :ownSalesmanId';
+                replacements.ownSalesmanId = scope.salesmanId;
             }
             const toDate = req.query.to ? new Date(`${String(req.query.to).slice(0, 10)}T00:00:00`) : new Date();
             const fromDate = req.query.from ? new Date(`${String(req.query.from).slice(0, 10)}T00:00:00`) : new Date(toDate.getTime() - 30 * 86400000);
