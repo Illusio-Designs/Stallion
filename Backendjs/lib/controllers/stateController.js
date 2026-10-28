@@ -1,5 +1,9 @@
 const State = require('../models/State');
 const { activeFilter, activeUpdate, withActiveParents } = require('../utils/geoActive');
+const { resolveUserScope } = require('../utils/scopeHelpers');
+const { salesmanStateIds } = require('../utils/workingStates');
+const { isOfficeRole } = require('../utils/roleHelpers');
+const { Op } = require('sequelize');
 const { logAudit } = require('../utils/auditLogger');
 const Country = require('../models/Country');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
@@ -15,7 +19,13 @@ class StateController {
                 nameFields: ['name', 'code'],
                 phoneFields: [],
             });
-            const where = withActiveParents(req, mergeWhere({ ...activeFilter(req), country_id }, searchFilter), 'state');
+            let where = withActiveParents(req, mergeWhere({ ...activeFilter(req), country_id }, searchFilter), 'state');
+            // A salesman only sees the states he works in (his allotted working states).
+            if (!isOfficeRole(req.userRoleNames || []) && String(req.userRoleName || '').toLowerCase() === 'salesman') {
+                const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                const ids = await salesmanStateIds(scope && scope.salesmanId);
+                where = { [Op.and]: [where || {}, { id: { [Op.in]: ids } }] };
+            }
             const states = await State.findAll({ where });
             res.status(200).json(states);
         } catch (error) {

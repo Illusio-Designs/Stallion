@@ -4,6 +4,9 @@ const State = require('../models/State');
 const City = require('../models/Cities');
 const { logAudit } = require('../utils/auditLogger');
 const places = require('../utils/googlePlaces');
+const { resolveUserScope } = require('../utils/scopeHelpers');
+const { salesmanStateIds } = require('../utils/workingStates');
+const { isOfficeRole } = require('../utils/roleHelpers');
 
 const ci = (column, value) => sqlWhere(fn('LOWER', col(column)), String(value).trim().toLowerCase());
 
@@ -39,7 +42,7 @@ class AddressController {
         } catch (error) {
             // Never block the form: typing by hand always works.
             console.warn('[address-suggest]', error.message);
-            return res.status(200).json({ configured: true, suggestions: [], unavailable: true });
+            return res.status(200).json({ configured: true, suggestions: [], unavailable: true, reason: String(error.message || '').slice(0, 240) });
         }
     }
 
@@ -61,6 +64,16 @@ class AddressController {
                     { name: d.country, code: d.country_code || null });
                 if (r.inactive) return res.status(200).json({ ...out, blocked: { what: 'country', name: d.country } });
                 country = r.row; if (r.created) out.added.push(`country ${d.country}`);
+            }
+            // A salesman only works in his allotted states: nothing is added for another state.
+            let allowedStateIds = null;
+            if (!isOfficeRole(req.userRoleNames || []) && String(req.userRoleName || '').toLowerCase() === 'salesman') {
+                const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                allowedStateIds = await salesmanStateIds(scope && scope.salesmanId);
+                const existing = d.state ? await State.findOne({ where: ci('name', d.state) }) : null;
+                if (!existing || !allowedStateIds.includes(String(existing.id))) {
+                    return res.status(200).json({ ...out, blocked: { what: 'state_not_allotted', name: d.state || '' }, names: { state: d.state } });
+                }
             }
             if (country && d.state) {
                 // State names are unique across the table, so match by name only.
@@ -86,7 +99,7 @@ class AddressController {
             return res.status(200).json(out);
         } catch (error) {
             console.warn('[address-details]', error.message);
-            return res.status(200).json({ configured: true, unavailable: true });
+            return res.status(200).json({ configured: true, unavailable: true, reason: String(error.message || '').slice(0, 240) });
         }
     }
 }
