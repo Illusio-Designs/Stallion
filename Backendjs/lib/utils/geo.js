@@ -4,11 +4,11 @@
 // check in. We compare the device GPS (sent from the app) against the party's
 // stored coordinates and require the distance to be within GEOFENCE_RADIUS_M.
 
-// Radius of the geofence in metres. 50m by default: coordinates come from
-// GEOCODING the party's address, which is rarely accurate to 50m (especially
-// for Indian addresses), so a tighter fence would wrongly reject real visits.
+// Radius of the geofence in metres. 100m by default: phone GPS inside a shop drifts
+// 20-60m and the saved point can be off by up to 50m, so a tighter fence would
+// wrongly reject real visits.
 // Overridable via env (GEOFENCE_RADIUS_M) without a redeploy.
-const GEOFENCE_RADIUS_M = Number(process.env.GEOFENCE_RADIUS_M) || 50;
+const GEOFENCE_RADIUS_M = Number(process.env.GEOFENCE_RADIUS_M) || 100;
 
 const toRad = (deg) => (Number(deg) * Math.PI) / 180;
 
@@ -92,9 +92,9 @@ const CAPTURE_MAX_PINCODE_DISTANCE_M = Number(process.env.CAPTURE_MAX_PINCODE_DI
  * The phone must be near the party's geocoded address. How near depends on how
  * precisely the address resolved (refPrecision): 'address' uses the tight limit,
  * 'pincode' the wider one. A city/state centroid, or no result at all, cannot
- * prove the person is at the shop, so the capture is rejected (noReference:true)
- * rather than accepted from anywhere.
- * @returns {{ ok: boolean, distance: number|null, reason?: string, noReference?: boolean }}
+ * prove the person is at the shop, so the capture is accepted but flagged
+ * `unchecked: true` for a manager to approve.
+ * @returns {{ ok: boolean, distance: number|null, reason?: string, noReference?: boolean, unchecked?: boolean }}
  */
 function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng, refPrecision }) {
   const lat = Number(deviceLat), lng = Number(deviceLng);
@@ -116,12 +116,10 @@ function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng,
   // 'precise' is the default for callers that don't say how the address resolved.
   const precision = refPrecision || 'address';
   if (!hasRef || precision === 'city' || precision === 'state') {
-    return {
-      ok: false,
-      distance: null,
-      noReference: true,
-      reason: "We couldn't locate this party's address on the map, so we can't confirm you are at the shop. Try again in a moment, or ask a manager to correct the party's address and pincode.",
-    };
+    // The map cannot place this address, so the phone cannot be compared with it.
+    // The capture still works (good GPS fix) but is flagged `unchecked` so a manager
+    // can approve it; the geofence is enforced against it in the meantime.
+    return { ok: true, distance: null, noReference: true, unchecked: true };
   }
   const limit = precision === 'pincode' ? CAPTURE_MAX_PINCODE_DISTANCE_M : CAPTURE_MAX_ADDRESS_DISTANCE_M;
   const distance = distanceMeters(lat, lng, refLat, refLng);

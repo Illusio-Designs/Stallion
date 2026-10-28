@@ -54,6 +54,16 @@ function hidePartySecrets(req, data) {
     return strip(data);
 }
 
+// How alike two address texts are (0 to 1): the share of words they have in common.
+function addressSimilarity(a, b) {
+    const words = (v) => new Set(String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(' ').filter(Boolean));
+    const x = words(a), y = words(b);
+    if (!x.size && !y.size) return 1;
+    let common = 0;
+    x.forEach((w) => { if (y.has(w)) common += 1; });
+    return common / (x.size + y.size - common);
+}
+
 class PartyController {
     async getPartie(req, res) {
         try {
@@ -424,6 +434,7 @@ class PartyController {
             // Geocode once; it is both the validation reference and the fallback.
             const geo = await geocodeAddress(address, { pincode });
             let captured = false;
+            let locationUnchecked = false;
             if (hasDeviceLoc) {
                 const acc = accuracy != null && accuracy !== '' ? accuracy : location_accuracy_m;
                 const check = validateOnsiteCapture({
@@ -438,12 +449,11 @@ class PartyController {
                     const accNum = Number(acc);
                     locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
                     captured = true;
-                } else if (!check.noReference) {
+                    // Address not found on the map: kept, but a manager approves it.
+                    locationUnchecked = !!check.unchecked;
+                } else {
                     return res.status(422).json({ error: check.reason });
                 }
-                // noReference: the address could not be located well enough to
-                // verify the capture, so the party is still created, just without a
-                // verified location. Capture it later with "I'm at shop".
             }
             if (!captured && geo) {
                 finalLat = geo.latitude;
@@ -474,6 +484,7 @@ class PartyController {
                 longitude: finalLng,
                 location_source: locationSource,
                 location_accuracy_m: locationAccuracyM,
+                location_unchecked: locationUnchecked,
                 created_by: user.user_id,
                 created_at: new Date(),
                 updated_at: new Date(),
@@ -490,7 +501,13 @@ class PartyController {
                 oldValues: null,
                 newValues: party,
             });
-            res.status(200).json(party);
+            // Tell the app what happened to the location so it never claims more than was saved.
+            const out = party.toJSON();
+            out.location_status = locationSource === 'verified'
+                ? (locationUnchecked ? 'unchecked' : 'verified')
+                : (locationSource === 'geocoded' ? 'address_only' : 'none');
+            out.location_capture_sent = hasDeviceLoc;
+            res.status(200).json(out);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -551,6 +568,7 @@ class PartyController {
             party.latitude = finalLat;
             party.longitude = finalLng;
             party.location_source = source;
+            party.location_unchecked = false;
             party.updated_at = new Date();
             await party.save();
             await logAudit({
@@ -633,6 +651,7 @@ class PartyController {
             party.longitude = Number(longitude);
             party.location_source = 'verified';
             party.location_accuracy_m = Number.isFinite(acc) ? acc : null;
+            party.location_unchecked = !!check.unchecked;
             party.updated_at = new Date();
             await party.save();
 
@@ -641,7 +660,7 @@ class PartyController {
                 action: 'update',
                 description: adminOverride
                     ? `Party location set by admin (±${Number.isFinite(acc) ? Math.round(acc) : '?'}m)`
-                    : `Party location verified on-site (±${Math.round(acc)}m)`,
+                    : `Party location verified on-site (±${Math.round(acc)}m)${check.unchecked ? ', address not found on the map, to be approved' : ''}`,
                 tableName: 'parties',
                 recordId: party.party_id,
                 oldValues: oldSnapshot,
@@ -651,13 +670,46 @@ class PartyController {
             return res.status(200).json({
                 message: adminOverride
                     ? 'Party location set from your current position.'
-                    : 'On-site location verified and saved.',
+                    : (check.unchecked
+                        ? 'Location saved. The map could not find this address, so a manager will check it.'
+                        : 'On-site location verified and saved.'),
+                location_unchecked: !!check.unchecked,
                 latitude: party.latitude,
                 longitude: party.longitude,
                 location_source: 'verified',
                 accuracy: party.location_accuracy_m,
                 distance_from_address_m: check.distance,
             });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
+    // A manager confirms a location that was captured on-site while the address could
+    // not be found on the map. Clears the "to be checked" flag; the point stays as it is.
+    async approvePartyLocation(req, res) {
+        try {
+            const party = await Party.findOne({ where: { party_id: req.params.id } });
+            if (!party) {
+                return res.status(404).json({ error: 'Party not found' });
+            }
+            if (!party.location_unchecked) {
+                return res.status(409).json({ error: 'This location does not need approval.' });
+            }
+            const oldSnapshot = party.toJSON();
+            party.location_unchecked = false;
+            party.updated_at = new Date();
+            await party.save();
+            await logAudit({
+                req,
+                action: 'update',
+                description: 'Party location approved',
+                tableName: 'parties',
+                recordId: party.party_id,
+                oldValues: oldSnapshot,
+                newValues: party,
+            });
+            return res.status(200).json({ message: 'Location approved.', location_unchecked: false });
         } catch (error) {
             return res.status(500).json({ error: error.message });
         }
@@ -686,6 +738,7 @@ class PartyController {
             party.longitude = null;
             party.location_source = null;
             party.location_accuracy_m = null;
+            party.location_unchecked = false;
             party.updated_at = new Date();
             await party.save();
 
@@ -802,26 +855,39 @@ class PartyController {
             const normPin = (v) => String(v || '').replace(/\D/g, '');
             const addressChanged = address !== undefined && !!address && normText(address) !== normText(party.address);
             const pincodeChanged = pincode !== undefined && normPin(pincode) !== normPin(party.pincode);
+            const stateChanged = state_id !== undefined && String(state_id || '') !== String(party.state_id || '');
+            const cityChanged = city_id !== undefined && String(city_id || '') !== String(party.city_id || '');
+            // A verified point stays when only the wording changed (a spelling fix, a
+            // flat number, punctuation). It is cleared only when the shop really moved:
+            // new pincode, state or city, or an address that mostly differs.
+            const movedShop = pincodeChanged || stateChanged || cityChanged
+                || (addressChanged && addressSimilarity(address, party.address) < 0.6);
             let locationReset = false;
-            if (addressChanged || pincodeChanged) {
+            if (addressChanged || pincodeChanged || stateChanged || cityChanged) {
                 const wasVerified = party.location_source === 'verified';
-                const geo = await geocodeAddress(
-                    address !== undefined ? address : party.address,
-                    { pincode: pincode !== undefined ? pincode : party.pincode }
-                );
-                if (geo) {
-                    payload.latitude = geo.latitude;
-                    payload.longitude = geo.longitude;
-                    payload.location_source = 'geocoded';
-                    payload.location_accuracy_m = null;
-                } else if (wasVerified) {
-                    // Never keep a verified point that belonged to the old address.
-                    payload.latitude = null;
-                    payload.longitude = null;
-                    payload.location_source = null;
-                    payload.location_accuracy_m = null;
+                if (wasVerified && !movedShop) {
+                    // Wording-only edit: keep the verified shop point as it is.
+                } else {
+                    const geo = await geocodeAddress(
+                        address !== undefined ? address : party.address,
+                        { pincode: pincode !== undefined ? pincode : party.pincode }
+                    );
+                    if (geo) {
+                        payload.latitude = geo.latitude;
+                        payload.longitude = geo.longitude;
+                        payload.location_source = 'geocoded';
+                        payload.location_accuracy_m = null;
+                        payload.location_unchecked = false;
+                    } else if (wasVerified) {
+                        // Never keep a verified point that belonged to the old address.
+                        payload.latitude = null;
+                        payload.longitude = null;
+                        payload.location_source = null;
+                        payload.location_accuracy_m = null;
+                        payload.location_unchecked = false;
+                    }
+                    locationReset = wasVerified;
                 }
-                locationReset = wasVerified;
             }
             await Party.update(payload, { where: { party_id: id } });
 
