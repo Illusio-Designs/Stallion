@@ -187,24 +187,22 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
               </a>
             </li>
           ))}
-          {/* Back to Shop — lives in the drawer on mobile (the header button is
-              hidden below md). A real CTA button (dark fill, white label), not a
-              flat nav row. */}
-          <li className="mb-1 mt-3 md:hidden">
-            {/* inline color: the global `.dashboard-sidebar-nav a` rule forces a
-                grey/dark text colour (and its :hover flips it dark) which outranks
-                the Tailwind text-on-primary utility. Since the button fill is dark
-                (bg-primary), pin the label WHITE inline so it stays visible in
-                every state — not just on hover. */}
+          {/* The shop is one more row of this menu (there is no separate shop navigation
+              or "Back to Shop" button any more). */}
+          <li className="relative mb-1 overflow-visible">
             <a
               href="/products"
-              style={{ color: 'var(--color-text-on-primary)' }}
-              className="flex min-h-10 items-center justify-center gap-2 rounded-md bg-primary text-text-on-primary px-4 py-2.5 text-[length:var(--text-sm)] font-semibold no-underline shadow-sm outline-none transition-[background-color,transform] duration-200 ease-[ease] hover:bg-primary-hover focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] active:scale-[0.98] motion-reduce:transition-none"
+              className={`group relative flex items-center overflow-visible rounded-md text-text-muted no-underline transition-[background-color,color] duration-200 ease-[ease] outline-none hover:bg-grey-100 hover:text-text focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] active:scale-[0.98] motion-reduce:transition-none ${
+                isCollapsed ? 'mx-auto h-11 w-11 justify-center p-0' : 'min-h-10 gap-3 px-3 py-2'
+              }`}
               onClick={() => onMobileClose?.()}
-              aria-label="Back to Shop"
+              aria-label="Shop"
+              {...tipHandlers('Shop')}
             >
-              <FiShoppingBag size={18} aria-hidden="true" className="flex-shrink-0" />
-              Back to Shop
+              <span className="sidebar-icon inline-flex h-5 w-5 flex-shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5 [&>svg]:flex-shrink-0">
+                <FiShoppingBag size={20} aria-hidden="true" />
+              </span>
+              {!isCollapsed && <span className="sidebar-text whitespace-nowrap text-[length:var(--text-base)]">Shop</span>}
             </a>
           </li>
         </ul>

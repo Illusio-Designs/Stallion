@@ -29,7 +29,6 @@ const MobileBottomNav = ({ onPageChange, currentPage }) => {
   };
 
   const items = [
-    { key: 'home', id: '', label: 'Home', icon: ICONS.home, match: [''] },
     { key: 'shop', id: 'products', label: 'Shop', icon: ICONS.shop, match: ['products'] },
     { key: 'cart', id: 'cart', label: 'Cart', icon: ICONS.cart, match: ['cart'], badge: cartCount },
     {

@@ -238,7 +238,7 @@ const Header = ({ onPageChange, currentPage }) => {
   };
 
   const navItems = [
-    { id: '', text: 'Home' },
+    { id: 'dashboard', text: 'Dashboard' },
     { id: 'products', text: 'Shop' },
     { id: 'about', text: 'About' }
   ];
