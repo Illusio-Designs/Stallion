@@ -3,6 +3,8 @@ import '../styles/components/DashboardHeader.css';
 import { FiBell, FiMenu, FiSidebar } from './icons/hugeicons';
 import Tooltip from './ui/Tooltip';
 import InstallAppButton from './InstallAppButton';
+import NotificationPermissionPrompt from './NotificationPermissionPrompt';
+import { announceNew } from '../utils/systemNotify';
 import { resolveProfileImageUrl } from '../utils/profileImage';
 import { logout as authLogout, getUser, getUserRole } from '../services/authService';
 import { showLogoutSuccess } from '../services/notificationService';
@@ -31,6 +33,7 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
       setNotes(res.data);
       setUnread(res.unread_count);
       setNotesError(false);
+      announceNew(res.data);
     } catch (_e) {
       setNotesError(true); // keep what we had; the bell must never break the header
     }
@@ -295,6 +298,7 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
 
           <div className="dashboard-action-icons flex items-center gap-2">
             <InstallAppButton />
+            <NotificationPermissionPrompt />
             <div className="rdb" ref={bellRef}>
               <Tooltip label="Notifications" placement="bottom">
                 <button
