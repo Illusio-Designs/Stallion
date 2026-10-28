@@ -16,6 +16,8 @@ import {
 import { isLoggedIn } from '../services/authService';
 import '../styles/components/filter-chips.css';
 import '../styles/pages/Products.css';
+import '../styles/redesign-p-shop.css';
+import { FiChevronRight, FiSearch, FiSliders, FiX } from '../components/icons/hugeicons';
 import { productPath } from '../utils/dashboardRoutes';
 import { encodeUploadName } from '../utils/imageUrl';
 
@@ -112,7 +114,7 @@ const Products = ({ onPageChange }) => {
 
   // Dropdown states for collapsible sections
   const [expandedSections, setExpandedSections] = useState({
-    brands: true,
+    brands: false,
     frameMaterial: false,
     shape: false,
     type: false,
@@ -168,11 +170,10 @@ const Products = ({ onPageChange }) => {
     }
   };
 
-  // Load only the section(s) expanded by default (brands) on mount.
+  // Groups start collapsed; only the shape list loads on mount, for the quick
+  // shape chips. Other lists load the first time their group opens.
   useEffect(() => {
-    Object.keys(expandedSections).forEach((s) => {
-      if (expandedSections[s]) loadFilterData(s);
-    });
+    loadFilterData('shape');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -523,396 +524,205 @@ const Products = ({ onPageChange }) => {
     return '/images/products/spac1.webp';
   };
 
-  const sectionHeaderClass = "filter-section-header flex justify-between items-center cursor-pointer py-4 select-none group";
-  const sectionTitleClass = "text-[length:var(--text-base)] font-semibold text-text transition-colors duration-[120ms] group-hover:text-primary";
-  const chevronBaseClass = "chevron flex items-center justify-center text-text-subtle transition-[transform,color] duration-300 group-hover:text-text-muted";
-  const checkboxLabelClass = "checkbox-label flex items-center gap-3 text-text-muted mb-1 p-2 -mx-2 rounded-sm cursor-pointer text-[length:var(--text-base)] min-h-[40px] box-border transition-[background,color] duration-[120ms] hover:text-text hover:bg-surface-muted";
-  const radioLabelClass = "radio-label flex items-center gap-3 text-text-muted mb-1 p-2 -mx-2 rounded-sm cursor-pointer text-[length:var(--text-base)] min-h-[40px] box-border transition-[background,color] duration-[120ms] hover:text-text hover:bg-surface-muted";
+  // Filter groups, in the same order and with the same ids as before.
+  const filterGroups = [
+    { key: 'brands', title: 'Brand', kind: 'check', data: brandsData, idKeys: ['brand_id', 'id'], nameKeys: ['brand_name', 'name'], selected: selectedBrands, set: setSelectedBrands },
+    { key: 'frameMaterial', title: 'Frame material', kind: 'check', data: frameMaterialsData, idKeys: ['frame_material_id', 'id'], nameKeys: ['frame_material', 'frame_material_name', 'name'], selected: selectedFrameMaterials, set: setSelectedFrameMaterials },
+    { key: 'shape', title: 'Shape', kind: 'check', data: shapesData, idKeys: ['shape_id', 'id'], nameKeys: ['shape_name', 'name'], selected: selectedShapes, set: setSelectedShapes },
+    { key: 'type', title: 'Frame type', kind: 'radio', data: frameTypesData, idKeys: ['frame_type_id', 'id'], nameKeys: ['frame_type', 'frame_type_name', 'name'], selected: selectedType, set: setSelectedType },
+    { key: 'gender', title: 'Gender', kind: 'check', data: gendersData, idKeys: ['gender_id', 'id'], nameKeys: ['gender_name', 'name'], selected: selectedGender, set: setSelectedGender },
+    { key: 'lensColor', title: 'Lens colour', kind: 'swatch', data: lensColorsData, idKeys: ['lens_color_id', 'id'], nameKeys: ['lens_color', 'name'], selected: selectedLensColor, set: setSelectedLensColor },
+    { key: 'lensMaterial', title: 'Lens material', kind: 'check', data: lensMaterialsData, idKeys: ['lens_material_id', 'id'], nameKeys: ['lens_material', 'lens_material_name', 'name'], selected: selectedLensMaterial, set: setSelectedLensMaterial },
+    { key: 'frameColor', title: 'Frame colour', kind: 'swatch', data: frameColorsData, idKeys: ['frame_color_id', 'id'], nameKeys: ['frame_color', 'name'], selected: selectedFrameColor, set: setSelectedFrameColor },
+  ];
+  const firstOf = (obj, keys) => keys.map(k => obj[k]).find(v => v !== undefined && v !== null && v !== '');
 
-  const FilterContent = () => (
+  const renderFilters = (idPrefix) => (
     <>
-      <div className="filter-header flex justify-between items-center mb-5">
-        <h2 className="text-[length:var(--text-lg)] font-semibold tracking-[-0.01em] text-text m-0">Filter</h2>
-        <button type="button" className="reset-button bg-transparent text-primary border-none py-1 px-2 -m-1 -mx-2 rounded-sm text-[length:var(--text-sm)] font-semibold cursor-pointer transition-[background,color] duration-[120ms] hover:bg-primary-soft hover:text-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-primary-soft-hover" onClick={handleReset}>Reset</button>
-      </div>
-
-      {/* Brands Filter */}
-      <div className="filter-section border-b border-border last:border-b-0">
-        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.brands} onClick={() => toggleSection('brands')} onKeyDown={onKeyActivate(() => toggleSection('brands'))}>
-          <h3 className={sectionTitleClass}>Brands</h3>
-          <span className={`${chevronBaseClass} ${expandedSections.brands ? 'expanded rotate-180 !text-primary' : ''}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </div>
-        {expandedSections.brands && (
-          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
-            {brandsData.map(brand => {
-              const brandId = brand.brand_id || brand.id;
-              const brandName = brand.brand_name || brand.name || '';
-              return (
-                <label key={brandId} className={checkboxLabelClass}>
-                  <input
-                    type="checkbox"
-                    checked={selectedBrands.includes(brandId)}
-                    onChange={() => toggleSelection(brandId, selectedBrands, setSelectedBrands)}
-                  />
-                  <span>{brandName}</span>
-                </label>
-              );
-            })}
+      {filterGroups.map(group => {
+        const open = expandedSections[group.key];
+        const count = Array.isArray(group.selected) ? group.selected.length : (group.selected != null ? 1 : 0);
+        const panelId = `${idPrefix}-${group.key}`;
+        return (
+          <div key={group.key} className="shop-group">
+            <button
+              type="button"
+              className="shop-group__head"
+              aria-expanded={open}
+              aria-controls={panelId}
+              onClick={() => toggleSection(group.key)}
+            >
+              <span className="shop-group__title">{group.title}</span>
+              {count > 0 && <span className="shop-group__count">{count}</span>}
+              <span className={`shop-group__chev${open ? ' is-open' : ''}`} aria-hidden="true"><FiChevronRight size={16} /></span>
+            </button>
+            {open && (
+              <div id={panelId} className={`shop-group__body${group.kind === 'swatch' ? ' shop-group__body--swatch' : ''}`}>
+                {group.data.length === 0 && <p className="shop-group__empty">Loading…</p>}
+                {group.data.map(item => {
+                  const id = firstOf(item, group.idKeys);
+                  const name = firstOf(item, group.nameKeys) || '';
+                  if (group.kind === 'check') {
+                    return (
+                      <label key={id} className="shop-opt">
+                        <input type="checkbox" checked={group.selected.includes(id)} onChange={() => toggleSelection(id, group.selected, group.set)} />
+                        <span>{name}</span>
+                      </label>
+                    );
+                  }
+                  if (group.kind === 'radio') {
+                    return (
+                      <label key={id} className="shop-opt">
+                        <input type="radio" name={`${idPrefix}-type`} checked={group.selected === id} onChange={() => group.set(group.selected === id ? null : id)} />
+                        <span>{name}</span>
+                      </label>
+                    );
+                  }
+                  const hex = item.hex || item.color_hex || getColorHex(name);
+                  const on = group.selected === id;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      aria-pressed={on}
+                      aria-label={name}
+                      title={name}
+                      className={`shop-swatch${on ? ' is-on' : ''}`}
+                      onClick={() => group.set(on ? null : id)}
+                    >
+                      <span style={{ backgroundColor: hex }} />
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
-        )}
-      </div>
-
-      {/* Frame Material Filter */}
-      <div className="filter-section border-b border-border last:border-b-0">
-        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.frameMaterial} onClick={() => toggleSection('frameMaterial')} onKeyDown={onKeyActivate(() => toggleSection('frameMaterial'))}>
-          <h3 className={sectionTitleClass}>Frame Material</h3>
-          <span className={`${chevronBaseClass} ${expandedSections.frameMaterial ? 'expanded rotate-180 !text-primary' : ''}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </div>
-        {expandedSections.frameMaterial && (
-          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
-            {frameMaterialsData.map(material => {
-              const materialId = material.frame_material_id || material.id;
-              const materialName = material.frame_material || material.frame_material_name || material.name || '';
-              return (
-                <label key={materialId} className={checkboxLabelClass}>
-                  <input
-                    type="checkbox"
-                    checked={selectedFrameMaterials.includes(materialId)}
-                    onChange={() => toggleSelection(materialId, selectedFrameMaterials, setSelectedFrameMaterials)}
-                  />
-                  <span>{materialName}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Shape Filter */}
-      <div className="filter-section border-b border-border last:border-b-0">
-        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.shape} onClick={() => toggleSection('shape')} onKeyDown={onKeyActivate(() => toggleSection('shape'))}>
-          <h3 className={sectionTitleClass}>Shape</h3>
-          <span className={`${chevronBaseClass} ${expandedSections.shape ? 'expanded rotate-180 !text-primary' : ''}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </div>
-        {expandedSections.shape && (
-          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
-            {shapesData.map(shape => {
-              const shapeId = shape.shape_id || shape.id;
-              const shapeName = shape.shape_name || shape.name || '';
-              return (
-                <label key={shapeId} className={checkboxLabelClass}>
-                  <input
-                    type="checkbox"
-                    checked={selectedShapes.includes(shapeId)}
-                    onChange={() => toggleSelection(shapeId, selectedShapes, setSelectedShapes)}
-                  />
-                  <span>{shapeName}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Frame Type Filter */}
-      <div className="filter-section border-b border-border last:border-b-0">
-        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.type} onClick={() => toggleSection('type')} onKeyDown={onKeyActivate(() => toggleSection('type'))}>
-          <h3 className={sectionTitleClass}>Frame Type</h3>
-          <span className={`${chevronBaseClass} ${expandedSections.type ? 'expanded rotate-180 !text-primary' : ''}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </div>
-        {expandedSections.type && (
-          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
-            {frameTypesData.map(frameType => {
-              const typeId = frameType.frame_type_id || frameType.id;
-              const typeName = frameType.frame_type || frameType.frame_type_name || frameType.name || '';
-              return (
-                <label key={typeId} className={radioLabelClass}>
-                  <input
-                    type="radio"
-                    name="type"
-                    checked={selectedType === typeId}
-                    onChange={() => setSelectedType(selectedType === typeId ? null : typeId)}
-                  />
-                  <span>{typeName}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Gender Filter */}
-      <div className="filter-section border-b border-border last:border-b-0">
-        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.gender} onClick={() => toggleSection('gender')} onKeyDown={onKeyActivate(() => toggleSection('gender'))}>
-          <h3 className={sectionTitleClass}>Gender</h3>
-          <span className={`${chevronBaseClass} ${expandedSections.gender ? 'expanded rotate-180 !text-primary' : ''}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </div>
-        {expandedSections.gender && (
-          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
-            {gendersData.map(gender => {
-              const genderId = gender.gender_id || gender.id;
-              const genderName = gender.gender_name || gender.name || '';
-              return (
-                <label key={genderId} className={checkboxLabelClass}>
-                  <input
-                    type="checkbox"
-                    checked={selectedGender.includes(genderId)}
-                    onChange={() => toggleSelection(genderId, selectedGender, setSelectedGender)}
-                  />
-                  <span>{genderName}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Lens Colour Filter */}
-      <div className="filter-section border-b border-border last:border-b-0">
-        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.lensColor} onClick={() => toggleSection('lensColor')} onKeyDown={onKeyActivate(() => toggleSection('lensColor'))}>
-          <h3 className={sectionTitleClass}>Lens Colour</h3>
-          <span className={`${chevronBaseClass} ${expandedSections.lensColor ? 'expanded rotate-180 !text-primary' : ''}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </div>
-        {expandedSections.lensColor && (
-          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
-            <div className="color-swatches flex flex-wrap gap-3 py-1">
-              {lensColorsData.map(lensColor => {
-                const colorId = lensColor.lens_color_id || lensColor.id;
-                const colorName = lensColor.lens_color || lensColor.name || '';
-                const colorHex = lensColor.hex || lensColor.color_hex || getColorHex(colorName);
-                return (
-                  <div
-                    key={colorId}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={selectedLensColor === colorId}
-                    aria-label={colorName}
-                    className={`color-swatch w-7 h-7 rounded-pill cursor-pointer border border-border-strong shadow-xs transition-[transform,box-shadow] duration-[120ms] hover:scale-110 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] ${selectedLensColor === colorId ? 'active' : ''}`}
-                    style={{ backgroundColor: colorHex }}
-                    onClick={() => setSelectedLensColor(selectedLensColor === colorId ? null : colorId)}
-                    onKeyDown={onKeyActivate(() => setSelectedLensColor(selectedLensColor === colorId ? null : colorId))}
-                    title={colorName}
-                  ></div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Lens Material Filter */}
-      <div className="filter-section border-b border-border last:border-b-0">
-        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.lensMaterial} onClick={() => toggleSection('lensMaterial')} onKeyDown={onKeyActivate(() => toggleSection('lensMaterial'))}>
-          <h3 className={sectionTitleClass}>Lens Material</h3>
-          <span className={`${chevronBaseClass} ${expandedSections.lensMaterial ? 'expanded rotate-180 !text-primary' : ''}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </div>
-        {expandedSections.lensMaterial && (
-          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
-            {lensMaterialsData.map(material => {
-              const materialId = material.lens_material_id || material.id;
-              const materialName = material.lens_material || material.lens_material_name || material.name || '';
-              return (
-                <label key={materialId} className={checkboxLabelClass}>
-                  <input
-                    type="checkbox"
-                    checked={selectedLensMaterial.includes(materialId)}
-                    onChange={() => toggleSelection(materialId, selectedLensMaterial, setSelectedLensMaterial)}
-                  />
-                  <span>{materialName}</span>
-                </label>
-              );
-            })}
-          </div>
-        )}
-      </div>
-
-      {/* Frame Colour Filter */}
-      <div className="filter-section border-b border-border last:border-b-0">
-        <div className={sectionHeaderClass} role="button" tabIndex={0} aria-expanded={expandedSections.frameColor} onClick={() => toggleSection('frameColor')} onKeyDown={onKeyActivate(() => toggleSection('frameColor'))}>
-          <h3 className={sectionTitleClass}>Frame Colour</h3>
-          <span className={`${chevronBaseClass} ${expandedSections.frameColor ? 'expanded rotate-180 !text-primary' : ''}`}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M6 9L12 15L18 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </span>
-        </div>
-        {expandedSections.frameColor && (
-          <div className="filter-section-content mt-2 pb-2 motion-reduce:animate-none">
-            <div className="color-swatches flex flex-wrap gap-3 py-1">
-              {frameColorsData.map(frameColor => {
-                const colorId = frameColor.frame_color_id || frameColor.id;
-                const colorName = frameColor.frame_color || frameColor.name || '';
-                const colorHex = frameColor.hex || frameColor.color_hex || getColorHex(colorName);
-                return (
-                  <div
-                    key={colorId}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={selectedFrameColor === colorId}
-                    aria-label={colorName}
-                    className={`color-swatch w-7 h-7 rounded-pill cursor-pointer border border-border-strong shadow-xs transition-[transform,box-shadow] duration-[120ms] hover:scale-110 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] ${selectedFrameColor === colorId ? 'active' : ''}`}
-                    style={{ backgroundColor: colorHex }}
-                    onClick={() => setSelectedFrameColor(selectedFrameColor === colorId ? null : colorId)}
-                    onKeyDown={onKeyActivate(() => setSelectedFrameColor(selectedFrameColor === colorId ? null : colorId))}
-                    title={colorName}
-                  ></div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+        );
+      })}
     </>
   );
 
+  // Quick shape chips use the same shape filter as the Refine panel; a chip is
+  // shown only when that shape exists in the shape list.
+  const quickShapes = ['Square', 'Round', 'Aviator']
+    .map(label => {
+      const item = shapesData.find(s => String(firstOf(s, ['shape_name', 'name']) || '').toLowerCase().includes(label.toLowerCase()));
+      return item ? { label, id: firstOf(item, ['shape_id', 'id']) } : null;
+    })
+    .filter(Boolean);
+
+  const filterCount = activeFilterChips.length;
+  const framesLabel = `${totalResults} ${totalResults === 1 ? 'frame' : 'frames'}`;
+
+  const applySearch = (value) => {
+    setSearchQuery(value);
+    setPage(1);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location);
+      if (value.trim()) url.searchParams.set('search', value.trim());
+      else url.searchParams.delete('search');
+      window.history.replaceState({}, '', url);
+    }
+  };
+
   return (
-    <div className="products-page bg-bg mt-0 py-5 px-3 sm:py-6 sm:px-4 md:py-10 md:px-[5%]">
-      <div className="products-container block md:flex md:items-start gap-6 lg:gap-8 max-w-[1440px] mx-auto pt-0">
-        {/* Desktop Filter Sidebar (kept for larger viewports) */}
-        <aside className="filter-sidebar hidden md:block md:w-[280px] md:flex-[0_0_280px] lg:w-[300px] lg:flex-[0_0_300px] bg-surface p-6 overflow-y-auto overflow-x-hidden border border-border rounded-lg shadow-sm max-h-[calc(100vh-64px-var(--header-height))] sticky top-[calc(var(--header-height)+8px)] [scrollbar-width:thin]">
-          <FilterContent />
+    <div className="products-page shop-page bg-bg mt-0">
+      <div className="products-container shop-layout">
+        {/* Desktop Refine column: compact, groups collapsed */}
+        <aside className="filter-sidebar shop-refine" aria-label="Refine">
+          <div className="shop-refine__head">
+            <h2>Refine</h2>
+            {filterCount > 0 && <button type="button" className="shop-link" onClick={handleReset}>Clear all</button>}
+          </div>
+          {renderFilters('side')}
         </aside>
 
-        {/* Mobile filter drawer — slides in from the right (aside panel style),
-            full height, with its own scroll area and a sticky footer. */}
+        {/* Refine sheet (mobile and tablet): every filter, with Show N frames */}
         {mobileFilterOpen && typeof document !== 'undefined' && createPortal(
-          <div className="fixed inset-0 z-[1500] md:hidden" role="dialog" aria-modal="true" aria-label="Product filters">
-            <div
-              className={`absolute inset-0 bg-[rgba(26,27,35,0.55)] backdrop-blur-[2px] transition-opacity duration-300 ${drawerIn ? 'opacity-100' : 'opacity-0'}`}
-              onClick={() => setMobileFilterOpen(false)}
-            />
-            <aside
-              className={`absolute right-0 top-0 flex h-full w-[min(88vw,400px)] flex-col bg-surface shadow-2xl transition-transform duration-300 ease-out ${drawerIn ? 'translate-x-0' : 'translate-x-full'}`}
-            >
-              <div className="flex items-center justify-between border-b border-border px-5 py-4">
-                <h3 className="m-0 text-[length:var(--text-lg)] font-semibold text-text">Filters</h3>
-                <button
-                  type="button"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-md bg-surface-muted text-text-muted text-[length:var(--text-xl)] leading-none transition-[background,color] duration-[120ms] hover:bg-grey-200 hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
-                  onClick={() => setMobileFilterOpen(false)}
-                  aria-label="Close filters"
-                >
-                  <span aria-hidden="true">&times;</span>
+          <div className="shop-sheet-root" role="dialog" aria-modal="true" aria-label="Refine">
+            <div className={`shop-sheet-scrim${drawerIn ? ' is-in' : ''}`} onClick={() => setMobileFilterOpen(false)} />
+            <div className={`shop-sheet${drawerIn ? ' is-in' : ''}`}>
+              <div className="shop-sheet__head">
+                <h3>Refine</h3>
+                <button type="button" className="shop-icon-btn" onClick={() => setMobileFilterOpen(false)} aria-label="Close refine">
+                  <FiX size={20} />
                 </button>
               </div>
-              <div className="flex-1 overflow-y-auto px-5 py-4 [scrollbar-width:thin]">
-                <FilterContent />
-              </div>
-              <div className="flex items-center gap-3 border-t border-border px-5 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-                {activeFilterChips.length > 0 && (
-                  <button
-                    type="button"
-                    className="inline-flex min-h-[44px] items-center justify-center rounded-md border border-border-strong bg-surface px-4 text-[length:var(--text-base)] font-semibold text-text transition-colors hover:bg-surface-muted"
-                    onClick={handleReset}
-                  >
-                    Clear all
-                  </button>
+              <div className="shop-sheet__body">{renderFilters('sheet')}</div>
+              <div className="shop-sheet__foot">
+                {filterCount > 0 && (
+                  <button type="button" className="shop-btn" onClick={handleReset}>Clear all</button>
                 )}
-                <button
-                  type="button"
-                  className="inline-flex min-h-[44px] flex-1 items-center justify-center rounded-md border-none bg-primary px-4 text-[length:var(--text-base)] font-semibold text-text-on-primary transition-colors hover:bg-primary-hover active:bg-primary-active"
-                  onClick={() => setMobileFilterOpen(false)}
-                >
-                  Show {totalResults != null ? totalResults : ''} results
+                <button type="button" className="shop-btn shop-btn--pri" onClick={() => setMobileFilterOpen(false)}>
+                  Show {framesLabel}
                 </button>
               </div>
-            </aside>
+            </div>
           </div>,
           document.body
         )}
 
-        {/* Products Grid */}
-        <main className="products-main flex-1 min-w-0 bg-transparent px-0 pt-0 pb-28 md:pb-0 min-h-[calc(100vh-var(--header-height))]">
-          <div className="products-header flex justify-between items-center gap-4 mb-6 flex-wrap">
-            <div className="products-title-block">
-            <h2 className="text-[length:var(--text-lg)] sm:text-[length:var(--text-xl)] font-semibold tracking-[-0.01em] leading-[1.2] text-text m-0">
-              {loading ? '' : searchQuery ?
-                `${totalResults} results for "${searchQuery}"` :
-                'Products'
-              }
+        <main className="products-main shop-main">
+          <div className="products-header shop-head">
+            <h2>
+              {loading ? 'Shop' : searchQuery ? `${totalResults} results for "${searchQuery}"` : 'Shop'}
             </h2>
             {!loading && !searchQuery && totalResults > 0 && (
-              <p className="products-count">{totalResults} {totalResults === 1 ? 'frame' : 'frames'}</p>
+              <p className="products-count">{framesLabel} in stock</p>
             )}
-            </div>
-            <div className="flex items-center gap-2 ml-auto">
+          </div>
+
+          <div className="shop-tools">
+            <div className="shop-search">
+              <FiSearch size={18} aria-hidden="true" />
+              <input
+                type="search"
+                value={searchQuery}
+                onChange={(e) => applySearch(e.target.value)}
+                placeholder="Search model or colour"
+                aria-label="Search frames"
+                enterKeyHint="search"
+              />
               {searchQuery && (
-                <button
-                  type="button"
-                  className="clear-search-btn inline-flex items-center justify-center min-h-[40px] bg-surface text-text border border-border-strong py-2 px-4 rounded-md cursor-pointer text-[length:var(--text-base)] font-medium transition-[background,border-color] duration-[120ms] hover:bg-surface-muted hover:border-grey-400 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-grey-200"
-                  onClick={() => {
-                    setSearchQuery('');
-                    setPage(1);
-                    // Update URL to remove search parameter
-                    if (typeof window !== 'undefined') {
-                      const url = new URL(window.location);
-                      url.searchParams.delete('search');
-                      window.history.replaceState({}, '', url);
-                    }
-                  }}
-                >
-                  Clear Search
+                <button type="button" className="shop-icon-btn shop-search__clear" onClick={() => applySearch('')} aria-label="Clear search">
+                  <FiX size={16} />
                 </button>
               )}
-              {/* Filters trigger — on the right of the page heading (mobile only;
-                  desktop uses the sticky sidebar). Opens the right-side drawer. */}
-              <button
-                type="button"
-                className="md:hidden inline-flex items-center gap-2 min-h-[40px] rounded-md border border-primary bg-primary px-4 text-[length:var(--text-base)] font-semibold text-text-on-primary transition-colors duration-[120ms] hover:bg-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
-                onClick={() => setMobileFilterOpen(true)}
-                aria-label="Open filters"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M4 6h16M7 12h10M10 18h4" />
-                </svg>
-                Filters
-                {activeFilterChips.length > 0 && (
-                  <span className="inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-pill bg-text-on-primary/25 px-1.5 text-[length:var(--text-xs)] font-bold leading-none">
-                    {activeFilterChips.length}
-                  </span>
-                )}
-              </button>
             </div>
+            <button type="button" className="shop-btn shop-btn--pri shop-refine-btn" onClick={() => setMobileFilterOpen(true)} aria-label={`Open refine${filterCount ? `, ${filterCount} active` : ''}`}>
+              <FiSliders size={18} aria-hidden="true" />
+              Refine
+              {filterCount > 0 && <span className="shop-refine-btn__count">{filterCount}</span>}
+            </button>
+          </div>
+
+          <div className="shop-chips" role="group" aria-label="Quick filters">
+            <span className="shop-chip is-on" aria-label="Showing only frames in stock">In stock</span>
+            {quickShapes.map(q => {
+              const on = selectedShapes.includes(q.id);
+              return (
+                <button
+                  key={q.label}
+                  type="button"
+                  className={`shop-chip${on ? ' is-on' : ''}`}
+                  aria-pressed={on}
+                  onClick={() => toggleSelection(q.id, selectedShapes, setSelectedShapes)}
+                >
+                  {q.label}
+                </button>
+              );
+            })}
           </div>
 
           {activeFilterChips.length > 0 && (
-            <div className="active-filters flex flex-wrap items-center gap-2 mb-5">
-              <span className="active-filters__label text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle mr-1">Filters:</span>
+            <div className="active-filters shop-active">
               {activeFilterChips.map(chip => (
-                <button key={chip.key} type="button" className="filter-chip group inline-flex items-center gap-2 min-h-[32px] py-1 pr-2 pl-3 border border-border-strong rounded-pill bg-surface text-primary text-[length:var(--text-sm)] font-medium cursor-pointer transition-[background,border-color,color] duration-[120ms] hover:bg-primary-soft hover:border-primary focus-visible:outline-none focus-visible:border-primary focus-visible:shadow-[var(--focus-ring)] active:bg-primary-soft-hover" onClick={chip.remove} aria-label={`Remove filter ${chip.label}`} title={`Remove ${chip.label}`}>
-                  <span className="filter-chip__label leading-none">{chip.label}</span>
-                  <span className="filter-chip__x inline-flex items-center justify-center w-[18px] h-[18px] rounded-pill text-[length:var(--text-md)] leading-none text-text-subtle transition-[background,color] duration-[120ms] group-hover:bg-primary-soft-hover group-hover:text-primary" aria-hidden="true">&times;</span>
+                <button key={chip.key} type="button" className="filter-chip shop-chip shop-chip--x" onClick={chip.remove} aria-label={`Remove filter ${chip.label}`} title={`Remove ${chip.label}`}>
+                  <span>{chip.label}</span>
+                  <FiX size={14} aria-hidden="true" />
                 </button>
               ))}
-              <button type="button" className="filter-chip-clear inline-flex items-center min-h-[32px] py-1 px-3 border-none bg-transparent text-error text-[length:var(--text-sm)] font-semibold cursor-pointer rounded-sm transition-[background] duration-[120ms] hover:bg-error-soft focus-visible:outline-none focus-visible:shadow-[var(--focus-ring-error)] active:bg-error-soft active:brightness-[0.97]" onClick={handleReset}>Clear all</button>
+              <button type="button" className="filter-chip-clear shop-link" onClick={handleReset}>Clear all</button>
             </div>
           )}
 
@@ -934,7 +744,7 @@ const Products = ({ onPageChange }) => {
               </div>
             </div>
           ) : loading ? (
-            <div className="products-grid-container grid grid-cols-2 lg:grid-cols-3 gap-2 min-[381px]:gap-3 sm:gap-6 w-full items-stretch pb-16 md:pb-0" aria-busy="true" aria-live="polite">
+            <div className="products-grid-container grid" aria-busy="true" aria-live="polite">
               {Array.from({ length: limit }).map((_, i) => (
                 <div key={`product-skeleton-${i}`} className="product-skeleton flex flex-col box-border bg-surface border border-border rounded-lg p-3 min-[381px]:p-4 sm:p-5 shadow-sm">
                   <Skeleton width="100%" height={180} radius={12} />
@@ -944,7 +754,7 @@ const Products = ({ onPageChange }) => {
               ))}
             </div>
           ) : products.length > 0 ? (
-            <div className="products-grid-container grid grid-cols-2 lg:grid-cols-3 gap-2 min-[381px]:gap-3 sm:gap-6 w-full items-stretch pb-16 md:pb-0">
+            <div className="products-grid-container grid">
               {products.map(product => {
                 const productId = product.product_id || product.id;
                 const productName = product.model_no || product.name || 'Product';

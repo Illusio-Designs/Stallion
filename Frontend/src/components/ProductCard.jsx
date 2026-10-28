@@ -3,6 +3,8 @@ import '../styles/components/ProductCard.css';
 import { addToCart } from '../services/cartService';
 import { showAddToCartSuccess } from '../services/notificationService';
 import { encodeUploadName } from '../utils/imageUrl';
+import { FiShoppingCart } from './icons/hugeicons';
+import '../styles/redesign-p-shop.css';
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-IN', {
@@ -230,10 +232,8 @@ const ProductCard = ({
           title={outOfStock ? 'Out of stock' : 'Add to cart'}
           className="pc-add-btn inline-flex items-center justify-center flex-1 min-w-0 min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle disabled:opacity-100 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-            <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
-          </svg>
+          <FiShoppingCart size={18} aria-hidden="true" />
+          <span className="pc-add-label">{outOfStock ? 'Sold out' : 'Add to cart'}</span>
         </button>
       </div>
     </div>
