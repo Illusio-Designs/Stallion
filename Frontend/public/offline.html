@@ -15,7 +15,14 @@
   p{margin:0 0 20px;color:#595959;line-height:1.5}
   button{height:48px;padding:0 28px;border-radius:12px;border:0;background:#0a0a0a;color:#fff;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
   button:focus-visible{outline:2px solid #0a0a0a;outline-offset:3px}
+  html[data-theme=dark] body{background:#0b0b0c;color:#f2f2f2}
+  html[data-theme=dark] p{color:#a3a3a8}
+  html[data-theme=dark] .ic,html[data-theme=dark] button{background:#f2f2f2;color:#0a0a0a}
+  html[data-theme=dark] button:focus-visible{outline-color:#f2f2f2}
 </style>
+<script>
+(function(){try{var t=localStorage.getItem('stl-theme');if(t==='dark'||(t!=='light'&&matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.setAttribute('data-theme','dark')}catch(e){}})();
+</script>
 </head>
 <body>
 <main>
