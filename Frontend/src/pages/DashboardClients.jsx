@@ -30,6 +30,7 @@ import { downloadCsv } from '../utils/exportCsv';
 import '../styles/redesign-n-party.css';
 import '../styles/redesign-n-headings.css';
 import GooeySearch from '../components/ui/GooeySearch';
+import AddressAutocomplete from '../components/ui/AddressAutocomplete';
 
 const DashboardClients = () => {
   const confirm = useConfirm();
@@ -657,6 +658,38 @@ const DashboardClients = () => {
   };
 
   // Remove a wrong saved location (managers only) so "I'm at shop" shows again.
+  // A Google address was picked: fill the address, pincode, country, state and city. Anything
+  // the lists did not have was added by the server, so the dropdowns are reloaded first.
+  const handleAddressPick = async (d) => {
+    if (d.blocked) {
+      const names = d.names || {};
+      showWarning(`${names[d.blocked.what] || d.blocked.name} is switched off in Manage. The address is filled in; ask an admin to switch it on, then pick the ${d.blocked.what} yourself.`);
+      setFormData(prev => ({ ...prev, address: d.address, pincode: d.pincode || prev.pincode }));
+      return;
+    }
+    isInitializingEditRef.current = true;
+    try {
+      if (d.country_id) {
+        try { setCountries((await getIndianCountries()) || []); } catch { /* the old list stays */ }
+        await fetchStates(d.country_id);
+        if (d.state_id) await fetchCities(d.state_id);
+        if (d.city_id) await fetchZones(d.city_id);
+        prevCountryIdRef.current = d.country_id;
+        prevStateIdRef.current = d.state_id || '';
+        prevCityIdRef.current = d.city_id || '';
+      }
+      setFormData(prev => ({
+        ...prev,
+        address: d.address,
+        pincode: d.pincode || prev.pincode,
+        ...(d.country_id ? { country_id: d.country_id, state_id: d.state_id || '', city_id: d.city_id || '', zone_id: '' } : {}),
+      }));
+      if (d.added && d.added.length) showSuccess(`Added to your lists: ${d.added.join(', ')}.`);
+    } finally {
+      setTimeout(() => { isInitializingEditRef.current = false; }, 300);
+    }
+  };
+
   const handleUseSuggestedAddress = () => {
     if (!addrSuggest?.address) return;
     setFormData(prev => ({ ...prev, address: addrSuggest.address, pincode: addrSuggest.pincode || prev.pincode }));
@@ -1420,11 +1453,10 @@ const DashboardClients = () => {
       <div className="form-group form-group--full party-form__section"><h5>Address</h5></div>
       <div className="form-group">
         <label className="ui-label">Address *</label>
-        <input
-          className="ui-input"
-          placeholder="Address"
+        <AddressAutocomplete
           value={formData.address}
-          onChange={(e) => handleInputChange('address', e.target.value)}
+          onChange={(text) => handleInputChange('address', text)}
+          onPick={handleAddressPick}
         />
       </div>
       <div className="form-group form-group--full">

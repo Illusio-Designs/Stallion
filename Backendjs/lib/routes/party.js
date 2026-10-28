@@ -1,4 +1,5 @@
 const express = require('express');
+const addressController = require('../controllers/addressController');
 const router = express.Router();
 const partyController = require('../controllers/partyController');
 const { authenticateToken } = require('../middleware/auth');
@@ -22,6 +23,9 @@ router.post('/', authenticateToken, isPartyCreator, partyController.createParty)
 router.put('/:id/location', authenticateToken, partyController.setPartyLocation);
 // On-site capture ("I'm at the shop"): salesman/admin/party managers send device
 // GPS + accuracy to set the TRUSTED verified location. Before '/:id'.
+// Address search while typing (Google Places) and the parts of the picked address.
+router.post('/address-suggest', authenticateToken, isPartyCreator, addressController.suggest);
+router.post('/address-details', authenticateToken, isPartyCreator, addressController.details);
 router.post('/reverse-geocode', authenticateToken, isPartyCreator, partyController.reverseGeocodeLocation);
 router.put('/:id/verify-location', authenticateToken, isPartyCreator, partyController.verifyPartyLocation);
 // Remove a wrong saved location so "I'm at shop" can capture it again.
