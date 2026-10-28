@@ -6,6 +6,7 @@ import {
 } from './icons/hugeicons';
 import RupeeIcon from './icons/RupeeIcon';
 import { getUserRoles } from '../services/authService';
+import { getCartCount, registerCartListener } from '../services/cartService';
 import { filterMenuItemsByRoles } from '../utils/rolePermissions';
 
 // Floating pill-style bottom navigation for the dashboard on phones
@@ -28,6 +29,7 @@ const ICONS = {
   support: FiHelpCircle,
   settings: FiSettings,
   shop: FiShoppingBag,
+  cart: FiShoppingCart,
 };
 
 const ALL_ITEMS = [
@@ -57,17 +59,22 @@ const DashboardBottomNav = ({ onPageChange, currentPage }) => {
   // Union of every role the member holds (multi-role support).
   const userRoles = mounted ? getUserRoles() : [];
   const rolesKey = userRoles.join(',');
+  const [cartCount, setCartCount] = useState(0);
+  useEffect(() => {
+    setCartCount(getCartCount());
+    return registerCartListener(() => setCartCount(getCartCount()));
+  }, []);
 
   const primary = useMemo(() => {
     const items = (userRoles.length ? filterMenuItemsByRoles(ALL_ITEMS, userRoles) : ALL_ITEMS)
-      .filter((it) => it.id !== 'orders'); // orders are reached from the menu, not the bottom bar
+      .filter((it) => it.id !== 'orders' && it.id !== 'salesmen'); // those are reached from the menu; the cart takes the last place
     // Dashboard first, then the shop, then the next role-allowed pages.
-    return [{ id: 'shop', text: 'Shop' }, ...items].sort((a, b) => (a.id === 'dashboard' ? -1 : b.id === 'dashboard' ? 1 : 0)).slice(0, 5);
+    return [{ id: 'shop', text: 'Shop' }, ...items].sort((a, b) => (a.id === 'dashboard' ? -1 : b.id === 'dashboard' ? 1 : 0)).slice(0, 4).concat([{ id: 'cart', text: 'Cart' }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolesKey]);
 
   const go = (id) => {
-    const page = id === 'shop' ? 'products' : id;
+    const page = id === 'shop' ? 'products' : id; // shop and cart are the order pages
     if (onPageChange) onPageChange(page); else if (typeof window !== 'undefined') window.location.href = id === 'shop' ? '/products' : `/${id}`;
   };
 
@@ -88,7 +95,14 @@ const DashboardBottomNav = ({ onPageChange, currentPage }) => {
             aria-label={it.text}
             className="relative inline-flex flex-col items-center justify-center"
           >
-            <Icon size={21} aria-hidden="true" />
+            <span className="relative inline-flex">
+              <Icon size={21} aria-hidden="true" />
+              {it.id === 'cart' && cartCount > 0 && (
+                <span className="absolute -right-2.5 -top-1.5 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-pill bg-primary px-1 text-[10px] font-bold leading-none text-text-on-primary">
+                  {cartCount > 99 ? '99+' : cartCount}
+                </span>
+              )}
+            </span>
             <span className="dashboard-bottom-nav__label">{SHORT[it.id] || it.text}</span>
           </button>
         );
