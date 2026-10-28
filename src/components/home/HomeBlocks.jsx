@@ -6,6 +6,7 @@ import StatusBadge from '../ui/StatusBadge';
 import { FiMapPin, FiShoppingCart, FiUsers, FiPackage, FiCreditCard, FiNavigation2, FiUser, FiChevronRight } from '../icons/hugeicons';
 import { captureCurrentPosition, distanceMeters, GEOFENCE_RADIUS_M } from '../../utils/geolocation';
 import { createSalesmanCheckin } from '../../services/api/salesmanApi';
+import { verifyPartyLocation } from '../../services/api/partnersApi';
 import { getMySalesman } from '../../services/api/dashboardApi';
 import { getTrayTasks, markTrayTaskInTransit } from '../../services/api/inventoryApi';
 import { queueCheckin, isNetworkError } from '../../services/offlineQueue';
@@ -197,11 +198,20 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
   const [dist, setDist] = useState(null); // { meters } | { error }
   const [measuring, setMeasuring] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [saved, setSaved] = useState({}); // partyId -> spot saved by the shop test
+  const [failed, setFailed] = useState({}); // partyId -> why the last shop test failed
 
-  const list = useMemo(() => (parties || []).filter((p) => p.is_active !== false), [parties]);
   const idOf = (p) => String(p.party_id || p.id);
+  const list = useMemo(
+    () => (parties || []).filter((p) => p.is_active !== false).map((p) => (saved[idOf(p)] ? { ...p, ...saved[idOf(p)] } : p)),
+    [parties, saved],
+  );
+  const isReady = (p) => p.location_source === 'verified' && p.latitude != null && p.longitude != null;
+  const readyList = list.filter(isReady);
+  const toVisit = list.filter((p) => !isReady(p));
   const party = list.find((p) => idOf(p) === partyId) || null;
-  const hasLocation = !!party && party.location_source === 'verified' && party.latitude != null && party.longitude != null;
+  const hasLocation = !!party && isReady(party);
   const cityOf = (p) => p.city?.name || p.city_name || (typeof p.city === 'string' ? p.city : '');
 
   const measure = useCallback(async (p) => {
@@ -227,6 +237,28 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
     if (party && hasLocation) measure(party);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partyId]);
+
+  // Shop test: read the GPS at the shop and save the spot. When it works the party is
+  // good to go; when it fails the party stays on the "To visit" list with the reason.
+  const testShop = async () => {
+    if (!party || testing) return;
+    const id = idOf(party);
+    setTesting(true);
+    try {
+      const pos = await captureCurrentPosition();
+      const res = await verifyPartyLocation(id, pos);
+      setSaved((m) => ({ ...m, [id]: { latitude: Number(res?.latitude), longitude: Number(res?.longitude), location_source: 'verified', location_accuracy_m: Number(res?.accuracy) } }));
+      setFailed((m) => { const n = { ...m }; delete n[id]; return n; });
+      showSuccess('Shop test passed. This party is good to go.');
+      measure({ ...party, latitude: Number(res?.latitude), longitude: Number(res?.longitude) });
+    } catch (e) {
+      const why = e?.message || 'The shop test did not work. Try again at the shop.';
+      setFailed((m) => ({ ...m, [id]: why }));
+      showError(why);
+    } finally {
+      setTesting(false);
+    }
+  };
 
   const distText = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
   const within = dist && dist.meters != null && dist.meters <= GEOFENCE_RADIUS_M;
@@ -298,15 +330,32 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
             <span>Party</span>
             <select value={partyId} onChange={(e) => setPartyId(e.target.value)} disabled={busy}>
               <option value="">Choose a party</option>
-              {list.map((p) => <option key={idOf(p)} value={idOf(p)}>{p.party_name || p.name}{cityOf(p) ? `, ${cityOf(p)}` : ''}</option>)}
+              {readyList.length > 0 && (
+                <optgroup label="Good to go">
+                  {readyList.map((p) => <option key={idOf(p)} value={idOf(p)}>{p.party_name || p.name}{cityOf(p) ? `, ${cityOf(p)}` : ''}</option>)}
+                </optgroup>
+              )}
+              {toVisit.length > 0 && (
+                <optgroup label="To visit (test the shop first)">
+                  {toVisit.map((p) => <option key={idOf(p)} value={idOf(p)}>{p.party_name || p.name}{cityOf(p) ? `, ${cityOf(p)}` : ''}</option>)}
+                </optgroup>
+              )}
             </select>
           </label>
           {party && !hasLocation && (
-            <p className="rdn-shop__note rdn-shop__note--warn" role="alert">
-              <FiMapPin size={16} aria-hidden="true" />
-              <span>This party&apos;s shop location is not saved yet, so you cannot check in. Open Parties and tap &ldquo;I&apos;m at shop&rdquo; while you are there.{' '}
-                <button type="button" className="rdn-linkbtn" onClick={() => router.push('/dashboard/party')}>Open Parties</button></span>
-            </p>
+            <div className="rdn-shop__test">
+              <p className="rdn-shop__note rdn-shop__note--warn" role="status" aria-live="polite">
+                <FiMapPin size={16} aria-hidden="true" />
+                <span>
+                  {failed[idOf(party)]
+                    ? `Shop test did not pass: ${failed[idOf(party)]} This party stays on your visit list.`
+                    : 'This party has no shop spot yet. Stand at the shop and run the shop test. If it works, you are good to go.'}
+                </span>
+              </p>
+              <button type="button" className="rdn-shop__test-btn" onClick={testShop} disabled={testing || busy}>
+                {testing ? 'Testing...' : failed[idOf(party)] ? 'Test again at the shop' : 'Test shop location'}
+              </button>
+            </div>
           )}
           {party && hasLocation && (
             <p className={`rdn-shop__dist${dist && !dist.error ? (within ? ' ok' : ' far') : ''}`} aria-live="polite">
@@ -321,6 +370,21 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
           <button type="button" className="rdn-shop__go" onClick={checkIn} disabled={!party || !hasLocation || busy || !salesmanId}>
             {busy ? 'Checking in...' : 'Check in and start order'}
           </button>
+          {toVisit.length > 0 && (
+            <details className="rdn-shop__visit">
+              <summary>To visit ({toVisit.length}): no shop spot yet</summary>
+              <ul>
+                {toVisit.map((p) => (
+                  <li key={idOf(p)}>
+                    <button type="button" className="rdn-linkbtn" onClick={() => setPartyId(idOf(p))}>
+                      {p.party_name || p.name}{cityOf(p) ? `, ${cityOf(p)}` : ''}
+                    </button>
+                    {failed[idOf(p)] && <small>{failed[idOf(p)]}</small>}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
         </>
       )}
     </section>
