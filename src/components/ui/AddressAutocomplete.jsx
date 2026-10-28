@@ -1,5 +1,6 @@
 'use client';
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { suggestAddress, addressDetails } from '../../services/api/partnersApi';
 import '../../styles/redesign-n-address.css';
 
@@ -22,6 +23,9 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
   const typed = useRef(false); // suggestions only after the person types, not after a pick or a fill
   const timer = useRef(null);
   const wrap = useRef(null);
+  const areaRef = useRef(null);
+  const listRef = useRef(null);
+  const [pos, setPos] = useState(null); // where the list is drawn, in screen coordinates
 
   useEffect(() => {
     if (!typed.current || !enabled.current) return undefined;
@@ -45,10 +49,38 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
   }, [value]);
 
   useEffect(() => {
-    const away = (e) => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); };
+    const away = (e) => {
+      const inside = (wrap.current && wrap.current.contains(e.target)) || (listRef.current && listRef.current.contains(e.target));
+      if (!inside) setOpen(false);
+    };
     document.addEventListener('mousedown', away);
     return () => document.removeEventListener('mousedown', away);
   }, []);
+
+  // The list is drawn on the page itself (not inside the side panel), so the panel's footer or its
+  // scrolling can never hide it. It opens below the box, or above it when there is no room below.
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const place = () => {
+      const el = areaRef.current;
+      if (!el) return;
+      const r = el.getBoundingClientRect();
+      const below = window.innerHeight - r.bottom - 8;
+      const above = r.top - 8;
+      const up = below < 200 && above > below;
+      setPos({
+        left: r.left,
+        width: r.width,
+        top: up ? 'auto' : r.bottom + 4,
+        bottom: up ? window.innerHeight - r.top + 4 : 'auto',
+        maxHeight: Math.max(120, Math.min(320, up ? above : below)),
+      });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
+  }, [open, items.length]);
 
   const choose = async (item) => {
     setOpen(false);
@@ -78,6 +110,7 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
     <div className="addr-ac" ref={wrap}>
       <textarea
         id={id}
+        ref={areaRef}
         className="ui-input addr-ac__input"
         rows={2}
         placeholder={placeholder}
@@ -93,8 +126,8 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
       />
       {busy && <span className="addr-ac__busy" role="status">Filling in the address...</span>}
       {showStatus && status && <span className="addr-ac__status" role="status">{status}</span>}
-      {open && items.length > 0 && (
-        <ul className="addr-ac__list" id={listId} role="listbox">
+      {open && items.length > 0 && pos && typeof document !== 'undefined' && createPortal(
+        <ul className="addr-ac__list" id={listId} role="listbox" ref={listRef} style={{ left: pos.left, width: pos.width, top: pos.top, bottom: pos.bottom, maxHeight: pos.maxHeight }}>
           {items.map((it, i) => (
             <li
               key={it.place_id}
@@ -109,7 +142,8 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
             </li>
           ))}
           <li className="addr-ac__credit" aria-hidden="true">Powered by Google</li>
-        </ul>
+        </ul>,
+        document.body,
       )}
     </div>
   );
