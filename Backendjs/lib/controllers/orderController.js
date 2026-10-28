@@ -1,7 +1,8 @@
 const Order = require('../models/Order');
 const { logAudit } = require('../utils/auditLogger');
 const Party = require('../models/Party');
-const { checkAddressProximity, checkGeofence, distanceMeters } = require('../utils/geo');
+const { checkVisitLocation, distanceMeters } = require('../utils/geo');
+const { learnShopSpot } = require('../utils/shopSpot');
 const { ensurePartyCoords } = require('../utils/geocode');
 const Distributor = require('../models/distributor');
 const Salesman = require('../models/Salesman');
@@ -776,9 +777,6 @@ class OrderController {
                 isDistributorRequired = false;
                 isPartyRequired = true;
                 isSalesmanRequired = true;
-                // Geofence: the salesman must be within 50m of the party. For older
-                // parties with no stored coordinates, geocode the address on the
-                // spot (ensurePartyCoords) and then enforce.
                 if (!party_id) {
                     return res.status(400).json({ error: 'Party ID is required for visit orders' });
                 }
@@ -786,25 +784,18 @@ class OrderController {
                 if (!visitParty) {
                     return res.status(404).json({ error: 'Party not found' });
                 }
-                // The party's coordinates ALWAYS come from its ADDRESS (geocoded),
-                // never from the salesman's device — so a party's pin can never be
-                // dragged onto wherever a salesman happens to be. We geocode the
-                // address on demand, then only VERIFY the salesman's device GPS is
-                // plausibly near it. This blocks placing (e.g.) a Navi Mumbai
-                // party's order from Rajkot; the exact distance still shows in the
-                // report's location match meter.
-                if (visitParty.location_source === 'verified' && visitParty.latitude != null && visitParty.longitude != null) {
-                    // Trusted on-site location -> enforce the strict 50m geofence
-                    // against the EXACT captured spot.
-                    const geo = checkGeofence({ deviceLat: latitude, deviceLng: longitude, party: visitParty, action: 'place a visit order' });
-                    if (!geo.ok) {
-                        return res.status(403).json({ error: geo.reason });
-                    }
-                } else {
-                    // No trusted on-site location yet -> block until it's captured.
-                    return res.status(403).json({
-                        error: 'This party\'s exact location is not set yet. Open Add/Edit Party and use "I\'m at shop" to set it, then place the visit order.',
-                    });
+                // Distance between the party's saved latitude/longitude and the phone's:
+                // 50m for a precise spot, 150m the first time (the point still comes from the
+                // address), after which the phone's position is saved as the precise spot.
+                const visitCheck = checkVisitLocation({
+                    deviceLat: latitude, deviceLng: longitude, accuracy: req.body.accuracy,
+                    party: visitParty, action: 'place a visit order',
+                });
+                if (!visitCheck.ok) {
+                    return res.status(visitCheck.code === 'no_location' ? 409 : 403).json({ error: visitCheck.reason, code: visitCheck.code });
+                }
+                if (visitCheck.learn) {
+                    await learnShopSpot(req, visitParty, { latitude, longitude, accuracy: req.body.accuracy });
                 }
             }
             else {

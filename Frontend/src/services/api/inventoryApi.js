@@ -410,6 +410,7 @@ export const createOrder = async (orderData) => {
     order_notes,
     latitude,
     longitude,
+    accuracy,
     offer_id,
   } = orderData;
 
@@ -467,6 +468,10 @@ export const createOrder = async (orderData) => {
   }
   if (longitude !== undefined && longitude !== null) {
     body.longitude = Number(longitude);
+  }
+  // GPS accuracy of the phone reading, so the server can allow a little extra for a weak signal.
+  if (accuracy !== undefined && accuracy !== null && Number.isFinite(Number(accuracy))) {
+    body.accuracy = Number(accuracy);
   }
 
   if (API_DEBUG) {

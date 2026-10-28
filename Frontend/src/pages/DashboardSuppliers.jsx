@@ -1301,6 +1301,7 @@ const DashboardSuppliers = () => {
       // Auto-capture location and date for salesman
       let latitude = checkinForm.latitude;
       let longitude = checkinForm.longitude;
+      let accuracy;
       // Keep the original date when editing; only a new check-in gets today's date.
       const checkInDate = editCheckin?.check_in_date || new Date().toISOString().split('T')[0];
 
@@ -1311,6 +1312,7 @@ const DashboardSuppliers = () => {
           const pos = await captureCurrentPosition();
           latitude = String(pos.latitude);
           longitude = String(pos.longitude);
+          accuracy = Number.isFinite(Number(pos.accuracy)) ? Number(pos.accuracy) : undefined;
         } catch (geoErr) {
           showError(geoErr?.message || 'Could not get your location. Please allow location access and try again.');
           return;
@@ -1334,6 +1336,7 @@ const DashboardSuppliers = () => {
         next_visit_date: checkinForm.next_visit_date,
         latitude,
         longitude,
+        ...(accuracy !== undefined ? { accuracy } : {}),
         check_in_remarks: checkinForm.check_in_remarks,
       };
       if (checkinType === 'ordered' && editCheckin?.order_id) {
@@ -2164,11 +2167,14 @@ const DashboardSuppliers = () => {
               {isSalesman && checkinForm.party_id && (() => {
                 const sp = zoneParties.find(p => (p.party_id || p.id) === checkinForm.party_id);
                 const verified = sp && sp.location_source === 'verified';
+                const hasPoint = sp && sp.latitude != null && sp.longitude != null;
                 return (
                   <p className="mt-2 mb-0 text-[length:var(--text-xs)] text-text-muted">
                     {verified
-                      ? `Party location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — you must be within 100m to check in.`
-                      : 'This party’s location is not set yet. Set it from Party → Edit (“I’m at shop”) before checking in.'}
+                      ? 'Shop spot saved: you must be within 50 m to check in.'
+                      : hasPoint
+                        ? 'Location from the address: you can be within 150 m, and this check-in saves the exact shop spot.'
+                        : 'This party has no location yet. Pick its address in Party → Edit before checking in.'}
                   </p>
                 );
               })()}

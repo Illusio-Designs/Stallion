@@ -18,10 +18,7 @@ import {
   getZones,
   removePartyLocation,
   updateParty,
-  verifyPartyLocationAsking,
-  reverseGeocodeLocation,
-  ADDRESS_FAR_CONFIRM,
-  takeAddressFix,
+  takeEditParty,
 } from '../services/apiService';
 import { getUser, getUserRole, getUserRoles } from '../services/authService';
 import { showError, showSuccess, showWarning } from '../services/notificationService';
@@ -52,8 +49,8 @@ const DashboardClients = () => {
   const canEditParty = isPartyManager || isSalesman;
   // Admin-only party-location capture (geofence anchor).
   const [savingLoc, setSavingLoc] = useState(false);
-  // Address read from the GPS spot: { address, pincode } offered as the party address.
-  const [addrSuggest, setAddrSuggest] = useState(null);
+  // Where to go after saving, when Edit party was opened from the cart or Home for a party with no location.
+  const editReturnRef = useRef(null);
   const [activeTab, setActiveTab] = useState('All');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
@@ -425,8 +422,8 @@ const DashboardClients = () => {
         salesmanLabel: party.salesman?.full_name || party.salesman?.salesman_name || party.salesman_name || '—',
         locationState: party.location_source === 'verified' ? 'ok'
           : (Number.isFinite(Number(party.latitude)) && party.latitude !== null && Number.isFinite(Number(party.longitude)) && party.longitude !== null ? 'warn' : 'idle'),
-        locationLabel: party.location_source === 'verified' ? 'Verified at shop'
-          : (Number.isFinite(Number(party.latitude)) && party.latitude !== null && Number.isFinite(Number(party.longitude)) && party.longitude !== null ? 'Address only' : 'Not set'),
+        locationLabel: party.location_source === 'verified' ? 'Exact spot saved'
+          : (Number.isFinite(Number(party.latitude)) && party.latitude !== null && Number.isFinite(Number(party.longitude)) && party.longitude !== null ? 'From address' : 'Not set'),
         creditLabel: `${Number(party.credit_days) || 0} days`,
       };
     });
@@ -448,8 +445,8 @@ const DashboardClients = () => {
   const [locChip, setLocChip] = useState('');
   const LOC_CHIPS = [
     { key: '', label: 'Any location' },
-    { key: 'ok', label: 'Verified' },
-    { key: 'warn', label: 'Address only' },
+    { key: 'ok', label: 'Exact spot' },
+    { key: 'warn', label: 'From address' },
     { key: 'idle', label: 'Not set' },
   ];
   const locCounts = useMemo(() => {
@@ -491,7 +488,6 @@ const DashboardClients = () => {
   };
 
   const resetForm = () => {
-    setAddrSuggest(null);
     setFormData({
       party_name: '',
       trade_name: '',
@@ -575,96 +571,13 @@ const DashboardClients = () => {
     }
   };
 
-  // On-site capture ("I'm at the shop — capture location").
-  // Add: store GPS in form state and send with create.
-  // Edit (non-admin): only when verified location is not set.
-  // Admin/superadmin: may set or overwrite any party's location with current GPS.
-  const handleCaptureAtShop = async () => {
-    const partyId = editRow?.id || editRow?.party_id;
-    const isVerified = (editRow?.location_source || formData.location_source) === 'verified';
-
-    // "I'm at shop" works once. To fix a wrong location, a manager removes it first.
-    if (isVerified) return;
-
-    try {
-      setSavingLoc(true);
-      let pos;
-      try {
-        pos = await captureCurrentPosition();
-      } catch (geoErr) {
-        showError(geoErr?.message || 'Could not get your location. Please try again.');
-        return;
-      }
-      if (!Number.isFinite(Number(pos?.latitude)) || !Number.isFinite(Number(pos?.longitude))) {
-        showError('Could not read your GPS position. Please try again from the shop.');
-        return;
-      }
-
-      const lat = Number(pos.latitude);
-      const lng = Number(pos.longitude);
-      const acc = Number(pos.accuracy);
-
-      if (editRow && partyId) {
-        const res = await verifyPartyLocationAsking(partyId, pos, (m) => confirm(ADDRESS_FAR_CONFIRM(m)));
-        const savedLat = Number(res?.latitude);
-        const savedLng = Number(res?.longitude);
-        const savedAcc = Number(res?.accuracy);
-        showSuccess(`Location verified & saved${Number.isFinite(savedAcc) ? ` (±${Math.round(savedAcc)}m)` : ''}. The 100m geofence is now active for this party.`);
-        const saved = { latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc, location_address: res?.location_address || null };
-        if (res?.location_address) {
-          setAddrSuggest({ address: res.location_address, pincode: res?.location_address_parts?.pincode || '' });
-        }
-        if (res?.address_mismatch && res?.location_address) {
-          // Final address follows the GPS spot: the form is updated, the salesman checks and saves.
-          setFormData(prev => ({ ...prev, address: res.location_address, pincode: res?.location_address_parts?.pincode || prev.pincode }));
-          setAddrSuggest(null);
-          showWarning('Address updated from your location. Check it, then press Save.');
-        }
-        setParties(prev => prev.map(p => {
-          const id = p.id || p.party_id;
-          return id === partyId ? { ...p, ...saved } : p;
-        }));
-        setEditRow(prev => (prev ? { ...prev, ...saved } : prev));
-        setFormData(prev => ({ ...prev, ...saved }));
-      } else {
-        setFormData(prev => ({
-          ...prev,
-          latitude: lat,
-          longitude: lng,
-          location_source: 'verified',
-          location_accuracy_m: Number.isFinite(acc) ? acc : null,
-        }));
-        showSuccess(`Shop location captured${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. It will be saved when you create the party.`);
-        // Read the written address at this spot. An empty address field is filled in
-        // straight away; otherwise it is offered below the location.
-        try {
-          const rev = await reverseGeocodeLocation(pos);
-          if (rev?.found && rev.address) {
-            if (!String(formData.address || '').trim()) {
-              setFormData(prev => ({ ...prev, address: rev.address, pincode: prev.pincode || rev.pincode || '' }));
-              showSuccess('Address filled from the shop location. Please check it.');
-              setAddrSuggest(null);
-            } else {
-              setAddrSuggest({ address: rev.address, pincode: rev.pincode || '' });
-            }
-          }
-        } catch { /* the address is optional help, never blocks the capture */ }
-      }
-    } catch (err) {
-      showError(err?.message || 'Could not verify location. Please try again from the shop.');
-    } finally {
-      setSavingLoc(false);
-    }
-  };
-
-  // Remove a wrong saved location (managers only) so "I'm at shop" shows again.
   // A Google address was picked: fill the address, pincode, country, state and city. Anything
   // the lists did not have was added by the server, so the dropdowns are reloaded first.
   const handleAddressPick = async (d) => {
     if (d.blocked) {
       const names = d.names || {};
       showWarning(`${names[d.blocked.what] || d.blocked.name} is switched off in Manage. The address is filled in; ask an admin to switch it on, then pick the ${d.blocked.what} yourself.`);
-      setFormData(prev => ({ ...prev, address: d.address, pincode: d.pincode || prev.pincode }));
+      setFormData(prev => ({ ...prev, address: d.address, pincode: d.pincode || prev.pincode, address_lat: d.latitude ?? null, address_lng: d.longitude ?? null }));
       return;
     }
     isInitializingEditRef.current = true;
@@ -682,6 +595,9 @@ const DashboardClients = () => {
         ...prev,
         address: d.address,
         pincode: d.pincode || prev.pincode,
+        // The shop's point comes from the picked address; it is saved with the party.
+        address_lat: d.latitude ?? null,
+        address_lng: d.longitude ?? null,
         ...(d.country_id ? { country_id: d.country_id, state_id: d.state_id || '', city_id: d.city_id || '', zone_id: '' } : {}),
       }));
       if (d.added && d.added.length) showSuccess(`Added to your lists: ${d.added.join(', ')}.`);
@@ -690,17 +606,10 @@ const DashboardClients = () => {
     }
   };
 
-  const handleUseSuggestedAddress = () => {
-    if (!addrSuggest?.address) return;
-    setFormData(prev => ({ ...prev, address: addrSuggest.address, pincode: addrSuggest.pincode || prev.pincode }));
-    setAddrSuggest(null);
-    showSuccess('Address updated. Save the party to keep it.');
-  };
-
   const handleRemoveLocation = async () => {
     const partyId = editRow?.id || editRow?.party_id;
     if (!partyId) return;
-    if (!(await confirm('Remove this party\'s saved location? Visit orders and check-ins stay blocked until someone captures it again with "I\'m at shop".'))) {
+    if (!(await confirm('Remove this party\'s saved location? Visit orders and check-ins stay blocked until its address is picked again in Edit party.'))) {
       return;
     }
     try {
@@ -710,7 +619,7 @@ const DashboardClients = () => {
       setParties(prev => prev.map(p => ((p.id || p.party_id) === partyId ? { ...p, ...cleared } : p)));
       setEditRow(prev => (prev ? { ...prev, ...cleared } : prev));
       setFormData(prev => ({ ...prev, ...cleared }));
-      showSuccess('Location removed. Use "I\'m at shop" to set it again.');
+      showSuccess('Location removed. Pick the address again in Edit party to set it.');
     } catch (err) {
       showError(err?.message || 'Could not remove the location. Please try again.');
     } finally {
@@ -733,7 +642,6 @@ const DashboardClients = () => {
       return;
     }
 
-    setAddrSuggest(null);
     // Set flag to prevent useEffect from resetting fields during initialization
     isInitializingEditRef.current = true;
     setOpenAdd(false);
@@ -793,20 +701,20 @@ const DashboardClients = () => {
     }
   };
 
-  // Coming from "I'm at shop" on Home or in the cart when the written address did not match:
-  // open that party with the address already updated from the GPS spot.
-  const addressFixDone = useRef(false);
+  // Coming from the cart or Home for a party that has no location: open that party's Edit form.
+  // After saving, the app goes back to where the salesman came from.
+  const editOpenDone = useRef(false);
   useEffect(() => {
-    if (addressFixDone.current || !parties.length) return;
-    const fix = takeAddressFix();
-    addressFixDone.current = true;
-    if (!fix) return;
-    const raw = parties.find((p) => String(p.party_id || p.id) === fix.party_id);
+    if (editOpenDone.current || !parties.length) return;
+    const want = takeEditParty();
+    editOpenDone.current = true;
+    if (!want) return;
+    const raw = parties.find((p) => String(p.party_id || p.id) === want.party_id);
     if (!raw) return;
+    editReturnRef.current = { to: want.returnTo || null, orderType: want.orderType || null, party_id: want.party_id };
     (async () => {
       await handleEdit({ ...raw, id: raw.party_id || raw.id });
-      setFormData(prev => ({ ...prev, address: fix.address, pincode: fix.pincode || prev.pincode }));
-      showWarning('Address updated from your location. Check it, then press Save.');
+      showWarning('This party has no location yet. Pick its address from the suggestions, then press Update.');
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [parties]);
@@ -1091,17 +999,11 @@ const DashboardClients = () => {
       console.log('[DashboardClients] Has undefined:', Object.values(dataToSend).some(v => v === undefined));
       console.log('[DashboardClients] All fields present:', allFields.every(f => dataToSend.hasOwnProperty(f)));
 
-      // On create, send an on-site capture from "I'm at shop" when the user
-      // captured one. Backend validates and stores it as location_source=verified.
-      if (!editRow
-        && formData.location_source === 'verified'
-        && Number.isFinite(Number(formData.latitude))
-        && Number.isFinite(Number(formData.longitude))) {
-        dataToSend.latitude = Number(formData.latitude);
-        dataToSend.longitude = Number(formData.longitude);
-        if (Number.isFinite(Number(formData.location_accuracy_m))) {
-          dataToSend.accuracy = Number(formData.location_accuracy_m);
-        }
+      // The point of the picked Google address (the shop's location until the first visit saves the exact spot).
+      if (formData.address_lat !== null && formData.address_lat !== undefined && formData.address_lng !== null && formData.address_lng !== undefined
+        && Number.isFinite(Number(formData.address_lat)) && Number.isFinite(Number(formData.address_lng))) {
+        dataToSend.address_lat = Number(formData.address_lat);
+        dataToSend.address_lng = Number(formData.address_lng);
       }
 
       if (editRow) {
@@ -1149,11 +1051,27 @@ const DashboardClients = () => {
           setEditRow(null);
           resetForm();
           showSuccess(updatedParty?.location_reset
-            ? 'Party updated. The address changed, so the saved shop location was cleared. Open the party at the new shop and tap "I\'m at shop" to set it again.'
+            ? 'Party updated. The address changed, so the saved shop spot was cleared. The new address sets the location; the next visit saves the exact spot.'
             : 'Party updated successfully!');
           setError(null);
 
           await fetchPartiesForCountry(selectedCountryFilter);
+
+          // Opened from the cart or Home for a party with no location: go back there once it has one.
+          const back = editReturnRef.current;
+          if (back && back.to) {
+            if (dataToSend.address_lat !== undefined || updatedParty?.latitude != null) {
+              editReturnRef.current = null;
+              try {
+                if (back.to === '/cart') {
+                  sessionStorage.setItem('stallion.cartReturn', JSON.stringify({ party_id: back.party_id, orderType: back.orderType || 'visit_order', at: Date.now() }));
+                }
+              } catch { /* storage unavailable: the cart asks for the order type and party again */ }
+              window.location.href = back.to;
+              return;
+            }
+            showWarning('Pick the address from the suggestions so the party gets a location, then press Update.');
+          }
         } catch (apiError) {
           const errorMsg = String(apiError.message || apiError.error || 'Failed to update party');
           const isInitError = apiError.isInitializationError ||
@@ -1187,24 +1105,11 @@ const DashboardClients = () => {
         // endpoints (/roles, /auth/register) and returned "Access denied -
         // insufficient permissions" for salesmen / field roles creating a party.
         try {
-          let newParty;
-          try {
-            newParty = await createParty(dataToSend);
-          } catch (createErr) {
-            // The written address may be wrong: let the salesman confirm he is at the right shop.
-            if (createErr?.errorData?.code === 'address_far' && await confirm(ADDRESS_FAR_CONFIRM(createErr.message))) {
-              newParty = await createParty({ ...dataToSend, confirm_address_mismatch: true });
-            } else {
-              throw createErr;
-            }
-          }
-          // Say what happened to the shop location, never more than was saved.
-          const locStatus = newParty?.location_status;
-          const needsCapture = locStatus === 'none' || locStatus === 'address_only';
-          if (needsCapture) {
-            showWarning(newParty?.location_capture_sent
-              ? 'Party created, but the shop location was not saved. Stand at the shop and tap "I\'m at shop" below.'
-              : 'Party created. Stand at the shop and tap "I\'m at shop" below to set its location.');
+          const newParty = await createParty(dataToSend);
+          // The location comes from the picked address; say so when none could be found.
+          const noLocation = newParty?.location_status === 'none';
+          if (noLocation) {
+            showWarning('Party created, but no location was found for this address. Pick the address from the suggestions so the shop gets a location.');
           } else {
             showSuccess('Party created successfully!');
           }
@@ -1225,16 +1130,9 @@ const DashboardClients = () => {
           setOpenAdd(false);
           setEditRow(null);
           resetForm();
-          // Reopen the new party so the salesman can capture the location right now.
-          if (needsCapture && (newParty?.party_id || newParty?.id)) {
+          // Reopen the new party so the address can be picked from the suggestions right now.
+          if (noLocation && (newParty?.party_id || newParty?.id)) {
             await handleEdit({ ...newParty, id: newParty.party_id || newParty.id });
-          }
-          // The written address did not match the shop: reopen the party with the address
-          // updated from the GPS spot so the final address follows the location.
-          if (newParty?.address_mismatch && newParty?.location_address && (newParty?.party_id || newParty?.id)) {
-            await handleEdit({ ...newParty, id: newParty.party_id || newParty.id });
-            setFormData(prev => ({ ...prev, address: newParty.location_address }));
-            showWarning('Address updated from your location. Check it, then press Save.');
           }
         } catch (error) {
           // Handle foreign key constraint errors by retrying with null values
@@ -1455,7 +1353,7 @@ const DashboardClients = () => {
         <label className="ui-label">Address *</label>
         <AddressAutocomplete
           value={formData.address}
-          onChange={(text) => handleInputChange('address', text)}
+          onChange={(text) => setFormData(prev => ({ ...prev, address: text, address_lat: null, address_lng: null }))}
           onPick={handleAddressPick}
         />
       </div>
@@ -1622,31 +1520,30 @@ const DashboardClients = () => {
         const locLat = editRow?.latitude ?? formData.latitude;
         const locLng = editRow?.longitude ?? formData.longitude;
         const locSource = editRow?.location_source || formData.location_source;
-        const locAcc = editRow?.location_accuracy_m ?? formData.location_accuracy_m;
-        const hasLocationSet = Number.isFinite(Number(locLat)) && Number.isFinite(Number(locLng));
+        const hasLocationSet = locLat !== null && locLat !== undefined && locLat !== '' && locLng !== null && locLng !== undefined && locLng !== ''
+          && Number.isFinite(Number(locLat)) && Number.isFinite(Number(locLng));
         const isVerified = locSource === 'verified';
-        // Capture works once for everyone. A wrong location is fixed by a manager
-        // removing it first, which brings the button back.
-        const canCapture = !isVerified;
+        const pickedNow = Number.isFinite(Number(formData.address_lat)) && formData.address_lat !== null && formData.address_lat !== '';
         const canRemoveLocation = !!editRow && hasLocationSet
           && (isAdmin || userRole === 'party_manager' || userRole === 'sales_manager');
         return (
           <div className="form-group form-group--full party-loc">
-            <label className="ui-label">Shop location (visit geofence)</label>
+            <label className="ui-label">Shop location</label>
             <div className="party-loc__chip">
-              <span className={`loc-pill loc-pill--${isVerified ? 'ok' : hasLocationSet ? 'warn' : 'idle'}`}>{isVerified ? 'Verified at shop' : hasLocationSet ? 'Address only' : 'Not set'}</span>
+              <span className={`loc-pill loc-pill--${isVerified || pickedNow ? 'ok' : hasLocationSet ? 'warn' : 'idle'}`}>
+                {isVerified ? 'Exact spot saved' : pickedNow ? 'From the picked address' : hasLocationSet ? 'From the address' : 'Not set'}
+              </span>
             </div>
             <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
               {isVerified
-                ? `Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. The 100m geofence is active for visit orders and check-ins.${canRemoveLocation ? ' If it is wrong, press “Remove location” and capture it again.' : ' If it is wrong, ask a manager to remove it.'}`
-                : 'Stand at the shop and tap below to lock the exact spot — the 100m geofence turns on once it is verified.'}
+                ? 'The exact shop spot was saved on a visit. Visit orders and check-ins must be within 50 m of it.'
+                : pickedNow
+                  ? 'The location comes from the picked address and is saved with the party. The first visit order or check-in saves the exact spot.'
+                  : hasLocationSet
+                    ? 'The location comes from the address. Until the first visit saves the exact spot, a visit can be within 150 m.'
+                    : 'Pick the address from the suggestions above. That sets the shop location.'}
             </p>
             <div className="flex flex-wrap items-center gap-2">
-              {canCapture && (
-                <button type="button" className="ui-btn ui-btn--primary" onClick={handleCaptureAtShop} disabled={savingLoc}>
-                  {savingLoc ? 'Capturing…' : 'I’m at shop'}
-                </button>
-              )}
               {canRemoveLocation && (
                 <button type="button" className="ui-btn ui-btn--secondary" onClick={handleRemoveLocation} disabled={savingLoc}>
                   {savingLoc ? 'Removing…' : 'Remove location'}
@@ -1663,15 +1560,6 @@ const DashboardClients = () => {
                 </a>
               )}
             </div>
-            {(addrSuggest?.address || (isVerified && editRow?.location_address)) && (
-              <div className="party-loc__addr">
-                <span className="ui-label">Address read from the shop spot</span>
-                <p className="mt-1 mb-2 text-[length:var(--text-xs)] text-text-muted">{addrSuggest?.address || editRow?.location_address}</p>
-                {addrSuggest?.address && String(formData.address || '').trim() !== addrSuggest.address && (
-                  <button type="button" className="ui-btn ui-btn--secondary" onClick={handleUseSuggestedAddress}>Use as party address</button>
-                )}
-              </div>
-            )}
             {hasLocationSet && (
               <p className="mt-2 mb-0 text-[length:var(--text-xs)] text-text-subtle">
                 {Number(locLat).toFixed(5)}, {Number(locLng).toFixed(5)}
@@ -1686,7 +1574,7 @@ const DashboardClients = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
-        <div className="pg-head"><div><h1>Parties</h1><p>Each shop's location is captured once, at the shop, and reused for orders and visits.</p></div></div>
+        <div className="pg-head"><div><h1>Parties</h1><p>A shop's location comes from the address you pick. The first visit saves the exact spot.</p></div></div>
         <div className="dash-row">
           <div className="order-tabs-container">
             {['All', 'Activate', 'Deactivate'].map(tab => (

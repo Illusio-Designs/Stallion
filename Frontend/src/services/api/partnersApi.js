@@ -764,6 +764,13 @@ const getCityId = () => {
     user_id: (user_id && isValidUUID(user_id)) ? String(user_id).trim() : undefined,
   };
   
+  // The point of the picked Google address: the shop's location until a visit saves the exact spot.
+  if (partyData.address_lat !== null && partyData.address_lat !== undefined && partyData.address_lng !== null && partyData.address_lng !== undefined
+    && Number.isFinite(Number(partyData.address_lat)) && Number.isFinite(Number(partyData.address_lng))) {
+    requestBody.address_lat = Number(partyData.address_lat);
+    requestBody.address_lng = Number(partyData.address_lng);
+  }
+
   // Validate that all required fields are present (no undefined)
   const requiredFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'country_id', 'pincode', 'gstin', 'pan'];
   for (const field of requiredFields) {
@@ -890,6 +897,13 @@ export const updateParty = async (partyId, partyData) => {
     prefered_courier: prefered_courier ? String(prefered_courier) : undefined,
   };
   
+  // The point of the picked Google address: the shop's location until a visit saves the exact spot.
+  if (partyData.address_lat !== null && partyData.address_lat !== undefined && partyData.address_lng !== null && partyData.address_lng !== undefined
+    && Number.isFinite(Number(partyData.address_lat)) && Number.isFinite(Number(partyData.address_lng))) {
+    requestBody.address_lat = Number(partyData.address_lat);
+    requestBody.address_lng = Number(partyData.address_lng);
+  }
+
   // Validate that all required fields are present (no undefined)
   const requiredFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'country_id', 'pincode', 'gstin', 'pan'];
   for (const field of requiredFields) {
@@ -907,7 +921,7 @@ export const updateParty = async (partyId, partyData) => {
   // Final validation: ensure absolutely no undefined values for required fields
   // Optional fields (credit_days, prefered_courier) can be undefined and will be omitted from JSON
   const finalRequestBody = {};
-  const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'billing_address', 'billing_same_as_shipping', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier', 'is_active'];
+  const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'billing_address', 'billing_same_as_shipping', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier', 'address_lat', 'address_lng', 'is_active'];
   allFields.forEach(field => {
     const value = requestBody[field];
     // Only include the field if it has a value (undefined will be omitted during JSON.stringify)
@@ -1049,6 +1063,24 @@ export const ADDRESS_FAR_CONFIRM = (message) => ({
   message: `${message}`,
   confirmLabel: 'Open Edit party',
 });
+
+// Send the salesman to Edit party for one party and bring him back to returnTo after he saves
+// (used when a party has no location yet). Carried across the page change in sessionStorage.
+const EDIT_PARTY_KEY = 'stallion.editParty';
+export const rememberEditParty = (partyId, returnTo, extra = {}) => {
+  try {
+    sessionStorage.setItem(EDIT_PARTY_KEY, JSON.stringify({ party_id: String(partyId), returnTo, ...extra, at: Date.now() }));
+  } catch { /* storage unavailable: the party can still be opened by hand */ }
+};
+export const takeEditParty = () => {
+  try {
+    const raw = sessionStorage.getItem(EDIT_PARTY_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(EDIT_PARTY_KEY);
+    const v = JSON.parse(raw);
+    return v && v.party_id && Date.now() - Number(v.at || 0) < 30 * 60 * 1000 ? v : null;
+  } catch { return null; }
+};
 
 // After the spot is saved, Edit party opens with the address already updated from the
 // GPS spot. The address is carried across the page change in sessionStorage.
