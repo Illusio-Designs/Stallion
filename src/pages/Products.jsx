@@ -178,7 +178,8 @@ const Products = ({ onPageChange }) => {
 
   // Build filter object for API - Only include fields with actual values
   const buildFilters = useCallback(() => {
-    const filters = {};
+    // The shop shows only frames that are in stock (also when searching).
+    const filters = { in_stock: true };
 
     // Only include filter fields that have values (don't include null/empty fields)
     // gender_id

@@ -126,6 +126,11 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
       filterBody.status = filters.status;
     }
 
+    // in_stock: true -> only frames with stock (the shop never lists sold-out ones)
+    if (filters.in_stock === true) {
+      filterBody.in_stock = true;
+    }
+
     // active: true -> only products that are switched on (shop and pickers)
     if (filters.active === true) {
       filterBody.active = true;
