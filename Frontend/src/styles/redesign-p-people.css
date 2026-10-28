@@ -1,0 +1,109 @@
+/* Distributors + Office team: compact lists (table on tablet and desktop, cards on a phone)
+   and sectioned forms. Black and white, 44px touch targets, mobile first. */
+
+/* ---------- page bar: search, filters, actions ---------- */
+:root .pp-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+:root .pp-search {
+  position: relative; display: flex; align-items: center; flex: 1 1 100%; min-width: 0;
+  border: 1px solid #cfcfcf; border-radius: 10px; background: #fff; min-height: 44px; padding: 0 12px; gap: 8px; color: #595959;
+}
+:root .pp-search:focus-within { border-color: #0a0a0a; }
+:root .pp-search input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 15px; color: #0a0a0a; min-height: 42px;
+}
+:root .pp-sel { flex: 1 1 calc(50% - 4px); min-width: 0; }
+:root .pp-sel .ui-dropdown-custom__trigger { min-height: 44px; font-size: 14px; }
+:root .pp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 16px;
+  border-radius: 10px; border: 1px solid #0a0a0a; background: #fff; color: #0a0a0a; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+:root .pp-btn:hover { background: #f4f4f4; }
+:root .pp-btn--pri { background: #0a0a0a; color: #fff; }
+:root .pp-btn--pri:hover { background: #262626; }
+:root .pp-btn:disabled { opacity: .55; cursor: not-allowed; }
+:root .pp-btn:focus-visible, :root .pp-chip:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
+:root .pg-head .pp-btn { flex: none; }
+
+:root .pp-chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+:root .pp-chip {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border-radius: 999px;
+  border: 1px solid #cfcfcf; background: #fff; color: #0a0a0a; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+:root .pp-chip b { font-weight: 600; color: #595959; font-size: 13px; }
+:root .pp-chip[aria-pressed="true"] { background: #0a0a0a; border-color: #0a0a0a; color: #fff; }
+:root .pp-chip[aria-pressed="true"] b { color: #d4d4d4; }
+
+/* ---------- list card + table ---------- */
+:root .pp-list { background: #fff; border: 1px solid #e1e1e1; border-radius: 12px; overflow: hidden; }
+:root .pp-desk { display: none; }
+:root .pp-desk .ui-table__top { display: none; }
+:root .pp-mob { display: flex; flex-direction: column; gap: 10px; }
+
+:root .pp-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+:root .pp-av {
+  flex: none; width: 36px; height: 36px; border-radius: 50%; background: #0a0a0a; color: #fff; display: inline-flex;
+  align-items: center; justify-content: center; font-size: 14px; font-weight: 700; text-transform: uppercase;
+}
+:root .pp-who__t { min-width: 0; display: flex; flex-direction: column; }
+:root .pp-who__n { font-weight: 700; color: #0a0a0a; overflow-wrap: anywhere; }
+:root .pp-sub { font-size: 12.5px; color: #595959; overflow-wrap: anywhere; }
+:root .pp-pills { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+:root .pp-pill {
+  display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; background: #f4f4f4;
+  border: 1px solid #e1e1e1; color: #0a0a0a; font-size: 12px; font-weight: 600; white-space: nowrap;
+}
+:root .pp-pill--ok { background: #eaf6ee; border-color: #bfe0c9; color: #17603a; }
+:root .pp-pill--off { background: #f4f4f4; border-color: #cfcfcf; color: #595959; }
+:root .pp-num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+:root .pp-empty { padding: 28px 16px; text-align: center; color: #595959; }
+
+/* card (phone) */
+:root .pp-card { background: #fff; border: 1px solid #e1e1e1; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+:root .pp-card__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+:root .pp-card__nums { display: flex; gap: 20px; }
+:root .pp-card__nums div { display: flex; flex-direction: column; font-size: 12px; color: #595959; }
+:root .pp-card__nums b { font-size: 16px; color: #0a0a0a; font-variant-numeric: tabular-nums; }
+:root .pp-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; }
+:root .pp-card__foot a { color: #0a0a0a; font-weight: 600; text-decoration: underline; min-height: 44px; display: inline-flex; align-items: center; }
+:root .pp-more { align-self: center; }
+
+/* ---------- tablet: table, fewer columns ---------- */
+@media (min-width: 768px) {
+  :root .pp-desk { display: block; }
+  :root .pp-mob { display: none; }
+  :root .pp-search { flex: 1 1 260px; }
+  :root .pp-sel { flex: 0 0 170px; }
+  :root .pp-desk .ui-table__scroll table { width: 100%; }
+  :root .pp-desk th, :root .pp-desk td { padding-left: 10px; padding-right: 10px; }
+  :root .pp-desk td { vertical-align: middle; }
+  /* distributors: Distributor | Contact | States | Parties | Orders | Status | Action */
+  :root .pp-dist .pp-desk th:nth-child(2), :root .pp-dist .pp-desk td:nth-child(2),
+  :root .pp-dist .pp-desk th:nth-child(6), :root .pp-dist .pp-desk td:nth-child(6) { display: none; }
+}
+@media (min-width: 1200px) {
+  :root .pp-dist .pp-desk th:nth-child(2), :root .pp-dist .pp-desk td:nth-child(2),
+  :root .pp-dist .pp-desk th:nth-child(6), :root .pp-dist .pp-desk td:nth-child(6) { display: table-cell; }
+}
+:root .pp-dist .pp-inactive-tag { display: none; }
+@media (min-width: 768px) and (max-width: 1199.98px) {
+  :root .pp-dist .pp-inactive-tag { display: inline-flex; margin-top: 4px; align-self: flex-start; }
+}
+
+/* ---------- forms: grouped under short headings ---------- */
+:root .pp-form { display: flex; flex-direction: column; gap: 18px; }
+:root .pp-sec { display: flex; flex-direction: column; gap: 12px; }
+:root .pp-sec + .pp-sec { padding-top: 16px; border-top: 1px solid #e1e1e1; }
+:root .pp-sec__h { margin: 0; font-size: 16px; font-weight: 700; color: #0a0a0a; }
+:root .pp-sec__d { margin: 2px 0 0; font-size: 13px; color: #595959; }
+:root .pp-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+:root .pp-grid > .form-group { margin: 0; min-width: 0; }
+:root .pp-form .ui-input, :root .pp-form .ui-dropdown-custom__trigger, :root .pp-form .phone-intl input { min-height: 44px; }
+:root .pp-form .phone-intl { width: 100%; }
+:root .pp-form .phone-intl input { flex: 1; min-width: 0; }
+:root .pp-check { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+:root .pp-check input { width: 20px; height: 20px; accent-color: #0a0a0a; }
+@media (min-width: 768px) {
+  :root .pp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root .pp-grid > .pp-full { grid-column: 1 / -1; }
+}
+:root .pp-foot-note { margin-right: auto; font-size: 12.5px; color: #595959; align-self: center; }
