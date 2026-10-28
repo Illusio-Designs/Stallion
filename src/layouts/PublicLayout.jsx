@@ -2,7 +2,7 @@ import React from 'react';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import Breadcrumb from '../components/Breadcrumb';
-import MobileBottomNav from '../components/MobileBottomNav';
+import DashboardBottomNav from '../components/DashboardBottomNav';
 
 const PublicLayout = ({ children, onPageChange, currentPage }) => {
   return (
@@ -18,7 +18,8 @@ const PublicLayout = ({ children, onPageChange, currentPage }) => {
       </div>
       {/* Bottom room on mobile so the floating nav never covers page content. */}
       <div className="md:hidden h-[calc(84px+env(safe-area-inset-bottom))]" aria-hidden="true" />
-      <MobileBottomNav onPageChange={onPageChange} currentPage={currentPage} />
+      {/* The same bottom bar as the dashboard, so there is one bar everywhere. */}
+      <DashboardBottomNav onPageChange={onPageChange} currentPage={currentPage} />
     </div>
   );
 };
