@@ -7,3 +7,18 @@
 :root .mng-note{margin:6px 0 0;font-size:12px;color:#666}
 :root .manage-tabs .order-tab{min-height:34px;padding:6px 12px;font-size:13px}
 :root .manage-tabs{max-width:100%}
+
+/* The list tabs: on tablets and computers they wrap onto more lines so every list is visible at once.
+   On a phone they stay in one row that scrolls sideways, with a soft fade at the edges and no scrollbar. */
+@media (min-width: 768px) {
+  :root .manage-tabs { flex-wrap: wrap; overflow-x: visible; }
+}
+@media (max-width: 767px) {
+  :root .manage-tabs {
+    overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0, #000 12px, #000 calc(100% - 28px), transparent 100%);
+  }
+  :root .manage-tabs::-webkit-scrollbar { display: none; }
+  :root .manage-tabs .order-tab { scroll-snap-align: center; }
+}

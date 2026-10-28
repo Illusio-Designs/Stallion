@@ -1056,7 +1056,8 @@ const DashboardManage = () => {
                     ? 'active bg-primary text-text-on-primary hover:bg-primary'
                     : 'text-text-muted hover:bg-primary-soft hover:text-primary'
                 }`}
-                onClick={() => setActiveTab(tab)}
+                onClick={(e) => { setActiveTab(tab); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); }}
+                aria-pressed={activeTab === tab}
               >
                 {tab}
               </button>
