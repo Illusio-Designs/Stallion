@@ -162,3 +162,8 @@ span.shop-chip { cursor: default; }
 @media (min-width: 1280px) {
   .products-page .products-main div.products-grid-container.grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+/* No tall empty gap between the last cards and the pager: the page is only as tall as its content. */
+:root .products-page .products-main { min-height: 0; }
+:root .products-page .products-grid-container { padding-bottom: 0; }
+:root .products-page .products-pagination { margin-top: 16px; padding-top: 8px; padding-bottom: 8px; }
