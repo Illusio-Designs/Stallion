@@ -1,0 +1,67 @@
+/* Cart: compact black and white. Items first, then the order form; on a phone a bar above the
+   tab bar always shows the total and Place order. */
+:root .cart-page { padding-top: 16px; padding-bottom: 24px; }
+:root .cart-page .cart-content { gap: 14px; }
+:root .cart-page .shopping-cart-section,
+:root .cart-page .summary-section { padding: 16px; border-radius: 14px; }
+:root .cart-page .section-title { font-size: 18px; margin-bottom: 10px; }
+:root .cart-page .summary-section .section-title { font-size: 16px; }
+
+/* Items: slim rows */
+:root .cart-page .cart-item { padding-block: 12px; }
+:root .cart-page .item-info { gap: 12px; }
+:root .cart-page .item-image { width: 56px; height: 56px; border-radius: 10px; padding: 4px; }
+:root .cart-page .item-name { font-size: 14px; }
+:root .cart-page .item-unit-price { font-size: 12px; margin-top: 2px; }
+:root .cart-page .item-subtotal { font-size: 15px; }
+:root .cart-page .quantity-selector-cart { padding: 2px; gap: 2px; }
+:root .cart-page .qty-btn-cart { width: 44px; height: 44px; border-radius: 9px; }
+:root .cart-page .qty-number-cart { width: 44px; height: 44px; font-size: 15px; }
+:root .cart-page .remove-btn { width: 44px; height: 44px; font-size: 22px; }
+:root .cart-page .item-remove { width: 44px; }
+:root .cart-page .item-stock-note { font-size: 11.5px; }
+:root .cart-page .cart-items-header { padding-bottom: 10px; }
+
+/* Order form */
+:root .cart-page .summary-form { gap: 14px; }
+:root .cart-page .form-label { font-size: 13px; font-weight: 600; }
+:root .cart-page #order-note { min-height: 64px; border-radius: 10px; font-size: 16px; }
+:root .cart-page .cart-summary-total { margin-bottom: 12px; padding-top: 14px; margin-top: 14px; gap: 10px; }
+:root .cart-page .cart-summary-total .breakdown-item.total { padding-top: 12px; }
+:root .cart-page .cart-place-desktop { margin-top: 12px; min-height: 48px; border-radius: 11px; box-shadow: none; }
+
+/* The bar is phone only */
+:root .cart-bar { display: none; }
+
+@media (max-width: 767px) {
+  :root .cart-page.has-cart-bar { padding-bottom: calc(150px + env(safe-area-inset-bottom)); }
+  /* Total and Place order live in the bar */
+  :root .cart-page.has-cart-bar .cart-place-desktop { display: none; }
+  :root .cart-page.has-cart-bar .cart-summary-total { margin-bottom: 0; }
+  :root .cart-bar {
+    display: flex; align-items: center; gap: 14px;
+    position: fixed; left: 0; right: 0; z-index: 880;
+    bottom: calc(66px + env(safe-area-inset-bottom));
+    padding: 10px 16px; background: #ffffff; border-top: 1px solid #e1e1e1;
+    box-shadow: 0 -6px 16px -12px rgba(0,0,0,.25);
+  }
+  :root .cart-bar__total { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+  :root .cart-bar__label { font-size: 12px; color: #595959; }
+  :root .cart-bar__amount { font-size: 18px; font-weight: 700; color: #0a0a0a; font-variant-numeric: tabular-nums; }
+  :root .cart-bar__btn {
+    flex: 1; min-height: 48px; border-radius: 11px; border: 1px solid #0a0a0a;
+    background: #0a0a0a; color: #fff; font-size: 15px; font-weight: 600;
+    text-transform: none; letter-spacing: 0; cursor: pointer;
+  }
+  :root .cart-bar__btn:disabled { background: #f4f4f4; color: #8c8c8c; border-color: #e1e1e1; cursor: not-allowed; }
+  :root .cart-bar__btn:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
+}
+
+/* Tablet and up: no bar, the form card holds the total and the button */
+@media (min-width: 768px) {
+  :root .cart-page { padding-top: 24px; }
+  :root .cart-page .shopping-cart-section,
+  :root .cart-page .summary-section { padding: 20px; }
+  :root .cart-page .item-image { width: 64px; height: 64px; }
+  :root .cart-page .section-title { font-size: 20px; }
+}
