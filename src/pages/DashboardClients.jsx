@@ -446,7 +446,7 @@ const DashboardClients = () => {
   }, [partySearch]);
   const [locChip, setLocChip] = useState('');
   const LOC_CHIPS = [
-    { key: '', label: 'All' },
+    { key: '', label: 'Any location' },
     { key: 'ok', label: 'Verified' },
     { key: 'warn', label: 'Address only' },
     { key: 'idle', label: 'Not set' },
@@ -1682,6 +1682,7 @@ const DashboardClients = () => {
             <button type="button" className="gbtn" onClick={handleExportParties} disabled={loading || filteredRowsByTab.length === 0}>Export CSV</button>
           </div>
           <div className="gchips" role="group" aria-label="Location">
+            <span className="party-tools__label" aria-hidden="true">Shop location</span>
             {LOC_CHIPS.map(c => (
               <button key={c.key} type="button" aria-pressed={locChip === c.key} className={`gchip ${locChip === c.key ? 'on' : ''}`} onClick={() => setLocChip(c.key)}>
                 {c.label} <b>{locCounts[c.key] || 0}</b>

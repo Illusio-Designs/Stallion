@@ -1,0 +1,20 @@
+/* Polish found in the desktop check of every page (unlayered, outranks Tailwind utilities). */
+
+/* Tables: no big empty band between the title row and the rows-per-page control */
+:root .ui-table__header { padding-bottom: 12px; }
+:root .ui-table__controls { padding-top: 0; padding-bottom: 12px; }
+
+/* Expenses: the table sits inside the page card, so it needs no border or padding of its own */
+:root .exp-page .dash-card .ui-table { border: 0; border-radius: 0; padding: 0 24px 8px; background: transparent; }
+
+/* Parties: one toolbar row, location filter on the left, search and export on the right */
+:root .party-tools__label { align-self: center; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #595959; margin-right: 2px; white-space: nowrap; }
+:root .party-tools .gchip { min-height: 34px; padding: 5px 12px; font-size: 13px; }
+@media (min-width: 900px) {
+  :root .party-tools { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+  :root .party-tools .gchips { order: 1; align-items: center; }
+  :root .party-tools .gtools { order: 2; flex-wrap: nowrap; margin-left: auto; }
+}
+@media (max-width: 899px) {
+  :root .party-tools__label { display: none; }
+}
