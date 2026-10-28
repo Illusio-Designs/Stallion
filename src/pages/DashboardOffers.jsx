@@ -9,6 +9,7 @@ import {
   updateOffer,
   setOfferActive,
   getProductsPage,
+  getProductsByIds,
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
@@ -114,6 +115,11 @@ const summarise = (offer) => {
   return '—';
 };
 
+const localYmd = (d) => {
+  const x = new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+};
+
 const fmtDate = (d) => {
   if (!d) return '—';
   try { return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
@@ -164,7 +170,7 @@ const DashboardOffers = () => {
 
   const openAdd = () => { setForm(emptyForm()); setPanelOpen(true); };
 
-  const openEdit = (offer) => {
+  const openEdit = async (offer) => {
     const c = offer.config || {};
     const isFlat = offer.offer_type === 'flat';
     const isProduct = offer.offer_type === 'product';
@@ -175,6 +181,14 @@ const DashboardOffers = () => {
       : (isProduct
         ? (c.items || []).map((it) => ({ id: String(it.product_id), label: String(it.product_id) }))
         : (c.product_ids || []).map((id) => ({ id: String(id), label: String(id) })));
+    // The offer stores only product ids; fetch the model numbers so the chips read properly.
+    if (products.length > 0) {
+      try {
+        const found = await getProductsByIds(products.map((p) => p.id));
+        const names = new Map(found.map((p) => [String(p.product_id || p.id), p.model_no || p.product_name || p.name]));
+        products.forEach((p) => { p.label = names.get(p.id) || p.label; });
+      } catch { /* keep ids as labels */ }
+    }
     // For product offers the rate lives per-item, EXCEPT all_products where it's
     // top-level; flat keeps it top-level too.
     const rateSource = (isFlat || (isProduct && allProducts)) ? c : firstItem;
@@ -184,8 +198,8 @@ const DashboardOffers = () => {
       offer_type: offer.offer_type || 'flat',
       is_active: offer.is_active !== false,
       priority: offer.priority || 0,
-      start_date: offer.start_date ? new Date(offer.start_date).toISOString().split('T')[0] : '',
-      end_date: offer.end_date ? new Date(offer.end_date).toISOString().split('T')[0] : '',
+      start_date: offer.start_date ? localYmd(offer.start_date) : '',
+      end_date: offer.end_date ? localYmd(offer.end_date) : '',
       discount_mode: rateSource.discount_mode || 'percent',
       discount_value: rateSource.discount_value ?? '',
       min_order_amount: c.min_order_amount ?? '',
