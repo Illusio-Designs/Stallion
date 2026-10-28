@@ -23,3 +23,15 @@ self.addEventListener('fetch', (event) => {
     fetch(req).catch(() => caches.match(OFFLINE_URL).then((r) => r || Response.error())),
   );
 });
+
+// Tapping a system notification opens (or focuses) the app.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/dashboard';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
+      for (const c of list) { if ('focus' in c) return c.focus(); }
+      return self.clients.openWindow(url);
+    }),
+  );
+});
