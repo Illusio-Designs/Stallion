@@ -22,6 +22,7 @@ import { getUserRole, getUserRoles, getUser } from '../services/authService';
 import '../styles/pages/dashboard-expenses.css';
 import '../styles/redesign-n-headings.css';
 import '../styles/redesign-p-expenses.css';
+import '../styles/redesign-p-forms.css';
 
 
 const EXPENSE_TYPE_OPTIONS = [
@@ -592,8 +593,27 @@ const DashboardExpenses = () => {
           resetCreateForm();
         }}
         title="Add expense"
+        footer={(
+          <>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setCreateModalOpen(false);
+                resetCreateForm();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateExpense}
+              disabled={loading || uploadingImages}
+            >
+              {uploadingImages ? 'Uploading...' : loading ? 'Submitting...' : 'Submit claim'}
+            </Button>
+          </>
+        )}
       >
-        <div className="modal-form exp-form">
+        <div className="modal-form exp-form rf-form">
           <section className="exp-form__sec">
             <h3 className="exp-form__h">Claim</h3>
             <div className="exp-form__grid">
@@ -726,23 +746,6 @@ const DashboardExpenses = () => {
             )}
           </section>
 
-          <div className="modal-actions exp-form__actions">
-            <Button 
-              variant="secondary" 
-              onClick={() => {
-                setCreateModalOpen(false);
-                resetCreateForm();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreateExpense}
-              disabled={loading || uploadingImages}
-            >
-              {uploadingImages ? 'Uploading...' : loading ? 'Submitting...' : 'Submit claim'}
-            </Button>
-          </div>
         </div>
       </AsidePanel>
 

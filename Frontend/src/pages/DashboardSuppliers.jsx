@@ -42,6 +42,8 @@ import { queueCheckin, isNetworkError } from '../services/offlineQueue';
 import { captureCurrentPosition } from '../utils/geolocation';
 import '../styles/redesign-n-salesmen.css';
 import '../styles/redesign-p-salesmen.css';
+import '../styles/redesign-p-forms.css';
+import { FormProgress } from '../components/forms/FormBits';
 import { FiSearch, FiMapPin } from '../components/icons/hugeicons';
 
 // Geofence radius used when a visit/order is recorded (mirror of the backend
@@ -1101,8 +1103,12 @@ const DashboardSuppliers = () => {
       { key: 'cancel_cheque', urlKey: 'cancel_cheque_url', label: 'Cancelled cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
       { key: 'photo', urlKey: 'photo_url', label: 'Photo', accept: 'image/*', hint: 'Image only' },
     ];
+    const reqDone = [formData.employee_code, formData.full_name, formData.email, formData.phone, formData.country_id]
+      .filter((v) => String(v ?? '').trim() !== '').length
+      + (Array.isArray(formData.state_ids) && formData.state_ids.length > 0 ? 1 : 0);
     return (
       <>
+        <FormProgress label="Details, states, documents" done={reqDone} total={6} />
         <section className="sx-sec">
           <h3 className="sx-sec__h">Basics</h3>
           <div className="sx-grid">
@@ -2052,7 +2058,7 @@ const DashboardSuppliers = () => {
           </>
         )}
       >
-        <form className="ui-form sx-form" onSubmit={handleSubmit}>{renderSalesmanFields(false)}</form>
+        <form className="ui-form sx-form rf-form" onSubmit={handleSubmit}>{renderSalesmanFields(false)}</form>
       </AsidePanel>
       <AsidePanel
         open={!!editRow}
@@ -2078,12 +2084,12 @@ const DashboardSuppliers = () => {
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? 'Updating...' : 'Update'}
+              {loading ? 'Updating...' : 'Update salesman'}
             </button>
           </>
         )}
       >
-        <form className="ui-form sx-form" onSubmit={handleSubmit}>{renderSalesmanFields(true)}</form>
+        <form className="ui-form sx-form rf-form" onSubmit={handleSubmit}>{renderSalesmanFields(true)}</form>
       </AsidePanel>
 
       {/* Check-in Modal - salesman only */}
@@ -2101,7 +2107,7 @@ const DashboardSuppliers = () => {
             </>
           )}
         >
-          <form className="ui-form" onSubmit={handleCheckinSubmit}>
+          <form className="ui-form rf-form" onSubmit={handleCheckinSubmit}>
             {editCheckin && (
               <>
                 <div className="form-group form-group--full">
@@ -2177,7 +2183,7 @@ const DashboardSuppliers = () => {
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleTargetSubmit}>
+        <form className="ui-form rf-form" onSubmit={handleTargetSubmit}>
           {!isSalesman && (
             <div className="form-group form-group--full">
               <label className="ui-label">Salesman</label>

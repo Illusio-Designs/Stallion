@@ -12,6 +12,7 @@ import { showSuccess, showError } from '../services/notificationService';
 import { FiSearch } from '../components/icons/hugeicons';
 import { Avatar, FormSection, usePeopleQuery } from '../components/people/PeopleBits';
 import '../styles/redesign-p-people.css';
+import '../styles/redesign-p-forms.css';
 
 const PAGE_STEP = 20;
 
@@ -658,7 +659,7 @@ const DashboardOfficeTeam = () => {
       ? setEditFormData(prev => ({ ...prev, ...obj }))
       : setFormData(prev => ({ ...prev, ...obj })));
     return (
-      <form className="ui-form pp-form" onSubmit={isEdit ? handleEditSubmit : handleSubmit}>
+      <form className="ui-form pp-form rf-form" onSubmit={isEdit ? handleEditSubmit : handleSubmit}>
         <FormSection title="Person" hint="Who they are and how to reach them.">
           <div className="form-group pp-full">
             <label className="ui-label">Full name *</label>

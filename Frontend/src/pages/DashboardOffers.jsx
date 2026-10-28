@@ -15,6 +15,8 @@ import '../styles/pages/dashboard.css';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/redesign-n-offers.css';
 import '../styles/redesign-p-offers.css';
+import '../styles/redesign-p-forms.css';
+import { FormSec } from '../components/forms/FormBits';
 
 const TYPE_LABELS = { flat: 'Flat (whole order)', product: 'Product-wise', bogo: 'Buy X get Y' };
 const TYPE_OPTIONS = [
@@ -414,25 +416,29 @@ const DashboardOffers = () => {
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => setPanelOpen(false)} disabled={saving}>Cancel</button>
             <button className="ui-btn ui-btn--primary" onClick={handleSubmit} disabled={saving}>
-              {saving ? 'Saving...' : (form.offer_id ? 'Update' : 'Create')}
+              {saving ? 'Saving...' : (form.offer_id ? 'Update offer' : 'Save offer')}
             </button>
           </>
         )}
       >
-        <div className="pof-form">
-          <div className="form-group pof-full">
+        <div className="pof-form rf-form">
+          <FormSec title="Offer" className="pof-full">
+          <div className="form-group rf-full">
             <label className="ui-label">Title *</label>
             <input className="ui-input" placeholder="e.g. Diwali 10% off" value={form.title} onChange={(e) => set('title', e.target.value)} />
           </div>
 
-          <div className="form-group pof-full">
+          <div className="form-group rf-full">
             <label className="ui-label">Type *</label>
             <ChipGroup label="Offer type" options={TYPE_OPTIONS} value={form.offer_type} onChange={(v) => set('offer_type', v)} />
           </div>
+          </FormSec>
+
+          <FormSec title="Discount" className="pof-full">
 
           {showRate && (
             <>
-              <div className="form-group pof-full">
+              <div className="form-group rf-full">
                 <label className="ui-label">Discount mode *</label>
                 <ChipGroup label="Discount mode" options={MODE_OPTIONS} value={form.discount_mode} onChange={(v) => set('discount_mode', v)} />
               </div>
@@ -460,7 +466,7 @@ const DashboardOffers = () => {
                 <label className="ui-label">Get qty *</label>
                 <input type="number" min="1" className="ui-input" value={form.get_qty} onChange={(e) => set('get_qty', e.target.value)} />
               </div>
-              <div className="form-group pof-full">
+              <div className="form-group rf-full">
                 <label className="ui-label">Get discount %</label>
                 <input type="number" min="0" max="100" className="ui-input" placeholder="100 = free" value={form.get_discount_percent} onChange={(e) => set('get_discount_percent', e.target.value)} />
                 <p className="pof-hint">
@@ -472,7 +478,7 @@ const DashboardOffers = () => {
           )}
 
           {showScope && (
-            <div className="form-group pof-full">
+            <div className="form-group rf-full">
               <label className="ui-label">
                 Products *{' '}
                 <span className="pof-sub">
@@ -507,6 +513,9 @@ const DashboardOffers = () => {
             </div>
           )}
 
+          </FormSec>
+
+          <FormSec title="When" className="pof-full">
           <div className="form-group">
             <label className="ui-label">Start date</label>
             <DatePicker value={form.start_date} onChange={(v) => set('start_date', v)} placeholder="Select date" />
@@ -520,7 +529,7 @@ const DashboardOffers = () => {
             <label className="ui-label">Priority</label>
             <input type="number" className="ui-input" value={form.priority} onChange={(e) => set('priority', e.target.value)} />
           </div>
-          <div className="form-group">
+          <div className="form-group rf-full">
             <label className="ui-label">Active</label>
             <button
               type="button"
@@ -534,7 +543,9 @@ const DashboardOffers = () => {
               </span>
               <span className="mng-switch__label">{form.is_active ? 'On' : 'Off'}</span>
             </button>
+            <p className="pof-hint">Shown on the home page and in the cart.</p>
           </div>
+          </FormSec>
         </div>
       </AsidePanel>
     </div>
