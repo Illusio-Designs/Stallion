@@ -41,6 +41,8 @@ import { showError, showSuccess, showInfo } from '../services/notificationServic
 import { queueCheckin, isNetworkError } from '../services/offlineQueue';
 import { captureCurrentPosition } from '../utils/geolocation';
 import '../styles/redesign-n-salesmen.css';
+import '../styles/redesign-p-salesmen.css';
+import { FiSearch, FiMapPin } from '../components/icons/hugeicons';
 
 // Geofence radius used when a visit/order is recorded (mirror of the backend
 // GEOFENCE_RADIUS_M). A recorded location within this distance of the party's
@@ -285,6 +287,9 @@ const DashboardSuppliers = () => {
   const [countries, setCountries] = useState([]);
   const [selectedCountryFilter, setSelectedCountryFilter] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [listQuery, setListQuery] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
@@ -729,6 +734,7 @@ const DashboardSuppliers = () => {
 
   // Fetch checkins/targets when switching to those tabs
   useEffect(() => {
+    if (mainTab === 'Salesmen' && !isSalesman) fetchCheckins();
     if (mainTab === 'Visit Report') {
       fetchCheckins();
       // For admin: fetch all parties for name lookup
@@ -796,18 +802,73 @@ const DashboardSuppliers = () => {
     return out;
   }, [targets]);
 
+  // States each salesman works in, as plain names (the API may return objects or ids).
+  const stateNamesOf = (row) => {
+    const src = row.states || row.working_states || row.salesman_states || [];
+    if (!Array.isArray(src)) return [];
+    return src
+      .map(x => (x && typeof x === 'object') ? (x.state_name || x.name || '') : String(x || ''))
+      .filter(Boolean);
+  };
+
+  // Visits today (IST) per salesman, from the visit report list (orders are not visits).
+  const visitsTodayMap = useMemo(() => {
+    const today = istNow().slice(0, 10);
+    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
+    const out = {};
+    (checkins || []).forEach(c => {
+      if (!c || c.type === 'ordered' || !c.salesman_id || !c.check_in_date) return;
+      const d = new Date(c.check_in_date);
+      if (Number.isNaN(d.getTime())) return;
+      if (fmt.format(d) === today) out[c.salesman_id] = (out[c.salesman_id] || 0) + 1;
+    });
+    return out;
+  }, [checkins]);
+
+  const renderStatePills = (row) => {
+    const names = stateNamesOf(row);
+    if (names.length === 0) return <span className="text-text-subtle">-</span>;
+    return (
+      <span className="sx-pills">
+        {names.slice(0, 3).map(n => <span key={n} className="sx-pill">{n}</span>)}
+        {names.length > 3 ? <span className="sx-pill sx-pill--more">+{names.length - 3}</span> : null}
+      </span>
+    );
+  };
+
+  const renderTargetBar = (row) => {
+    const pct = salesmanTargetPct[row.id || row.salesman_id];
+    if (pct == null) return <span className="text-text-subtle">No target</span>;
+    return (
+      <span className="sm-prog" title={`${pct}% of target`}>
+        <span className="prog" role="img" aria-label={`${pct} percent of target`}><i style={{ width: `${Math.min(100, pct)}%` }} /></span>
+        <span className="sm-prog__n">{pct}%</span>
+      </span>
+    );
+  };
+
+  const renderStatusButton = (row) => (
+    <button
+      type="button"
+      onClick={() => handleToggleActive(row)}
+      title={row.isActive ? 'Active. Tap to deactivate' : 'Inactive. Tap to activate'}
+      className="sx-status cursor-pointer border-0 bg-transparent p-0"
+    >
+      <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>
+        {row.isActive ? 'Active' : 'Inactive'}
+      </StatusBadge>
+    </button>
+  );
+
+  const initialsOf = (name) => String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+
   const columns = useMemo(() => ([
     {
-      key: 'full_name', label: 'NAME', render: (v, row) => {
-        const zoneNames = (Array.isArray(row.zones) ? row.zones : [])
-          .map(z => (z && typeof z === 'object') ? (z.zone_name || z.name || '') : '')
-          .filter(Boolean);
-        const sub = [row.employee_code, zoneNames.join(', ')].filter(Boolean).join(' · ');
+      key: 'full_name', label: 'SALESMAN', render: (v, row) => {
+        const sub = [row.employee_code, row.phone].filter(Boolean).join(' · ');
         return (
           <span className="sm-who sn-who">
-            <span className="sm-pic" aria-hidden="true">
-              {String(v || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase()}
-            </span>
+            <span className="sm-pic" aria-hidden="true">{initialsOf(v)}</span>
             <span className="sm-who__txt sn-trunc" title={`${v || ''}${sub ? ` (${sub})` : ''}`}>
               <span className="sn-name">{v}</span>
               {sub ? <small className="sm-sub sn-trunc">{sub}</small> : null}
@@ -816,40 +877,10 @@ const DashboardSuppliers = () => {
         );
       }
     },
-    {
-      key: 'phone', label: 'CONTACT', render: (v, row) => (
-        <span className="sm-contact sn-trunc" title={`${v || ''} ${row.email || ''}`.trim()}>
-          {v || '-'}
-          {row.email ? <small className="sm-sub sn-trunc">{row.email}</small> : null}
-        </span>
-      )
-    },
-    {
-      key: 'status', label: 'STATUS', render: (_v, row) => (
-        <button
-          type="button"
-          onClick={() => handleToggleActive(row)}
-          title={row.isActive ? 'Active — click to deactivate' : 'Inactive — click to activate'}
-          className="cursor-pointer border-0 bg-transparent p-0"
-        >
-          <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>
-            {row.isActive ? 'Active' : 'Inactive'}
-          </StatusBadge>
-        </button>
-      )
-    },
-    {
-      key: 'target', label: 'TARGET', render: (_v, row) => {
-        const pct = salesmanTargetPct[row.id || row.salesman_id];
-        if (pct == null) return <span className="text-text-subtle">-</span>;
-        return (
-          <span className="sm-prog" title={`${pct}% of target`}>
-            <span className="prog" role="img" aria-label={`${pct} percent of target`}><i style={{ width: `${Math.min(100, pct)}%` }} /></span>
-            <span className="sm-prog__n">{pct}%</span>
-          </span>
-        );
-      }
-    },
+    { key: 'states', label: 'STATES', render: (_v, row) => renderStatePills(row) },
+    { key: 'visits_today', label: 'VISITS TODAY', render: (_v, row) => visitsTodayMap[row.id || row.salesman_id] || 0 },
+    { key: 'target', label: 'TARGET', render: (_v, row) => renderTargetBar(row) },
+    { key: 'status', label: 'STATUS', render: (_v, row) => renderStatusButton(row) },
     {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
@@ -857,7 +888,7 @@ const DashboardSuppliers = () => {
         />
       )
     },
-  ]), [salesmanTargetPct]);
+  ]), [salesmanTargetPct, visitsTodayMap]);
 
   const rows = useMemo(() => {
     let filteredSalesmen = [];
@@ -869,11 +900,24 @@ const DashboardSuppliers = () => {
         return salesmanCountryId === cleanFilterId;
       });
     }
+    const q = listQuery.trim().toLowerCase();
     return filteredSalesmen.map(salesman => ({
       ...salesman,
       isActive: salesman.is_active !== false,
-    }));
-  }, [salesmen, selectedCountryFilter]);
+    })).filter(r => {
+      if (statusFilter === 'active' && !r.isActive) return false;
+      if (statusFilter === 'inactive' && r.isActive) return false;
+      if (stateFilter && !stateNamesOf(r).includes(stateFilter)) return false;
+      if (q && !`${r.full_name || ''} ${r.employee_code || ''} ${r.phone || ''} ${r.email || ''}`.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [salesmen, selectedCountryFilter, listQuery, stateFilter, statusFilter]);
+
+  const stateFilterOptions = useMemo(() => {
+    const set = new Set();
+    salesmen.forEach(r => stateNamesOf(r).forEach(n => set.add(n)));
+    return Array.from(set).sort((x, y) => x.localeCompare(y));
+  }, [salesmen]);
 
   const filteredRowsByTab = useMemo(() => {
     if (activeTab === 'All') return rows;
@@ -1045,6 +1089,145 @@ const DashboardSuppliers = () => {
           </span>
         </button>
       </div>
+    );
+  };
+
+  // Add / Edit form body: Basics, Contact, Working states, Documents.
+  const renderSalesmanFields = (isEdit) => {
+    const phoneVal = (v) => (v ? (String(v).startsWith('+') ? String(v) : '+' + v) : '');
+    const docs = [
+      { key: 'pan_card', urlKey: 'pan_card_url', label: 'PAN card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+      { key: 'aadhar_card', urlKey: 'aadhar_card_url', label: 'Aadhaar card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+      { key: 'cancel_cheque', urlKey: 'cancel_cheque_url', label: 'Cancelled cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+      { key: 'photo', urlKey: 'photo_url', label: 'Photo', accept: 'image/*', hint: 'Image only' },
+    ];
+    return (
+      <>
+        <section className="sx-sec">
+          <h3 className="sx-sec__h">Basics</h3>
+          <div className="sx-grid">
+            <div className="form-group">
+              <label className="ui-label">Employee code *</label>
+              <input className="ui-input" placeholder="Employee code" value={formData.employee_code} onChange={(e) => handleInputChange('employee_code', e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Full name *</label>
+              <input className="ui-input" placeholder="Full name" value={formData.full_name} onChange={(e) => handleInputChange('full_name', e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Reporting manager</label>
+              <input className="ui-input" placeholder="Reporting manager" value={formData.reporting_manager} onChange={(e) => handleInputChange('reporting_manager', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Joining date</label>
+              <DatePicker value={formData.joining_date} onChange={(v) => handleInputChange('joining_date', v)} placeholder="Joining date" />
+            </div>
+            {renderActiveToggle()}
+          </div>
+        </section>
+
+        <section className="sx-sec">
+          <h3 className="sx-sec__h">Contact</h3>
+          <div className="sx-grid">
+            <div className="form-group">
+              <label className="ui-label">Phone *</label>
+              <PhoneInput
+                defaultCountry="in"
+                value={phoneVal(formData.phone)}
+                onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
+                className="phone-intl"
+                inputProps={{ required: true, placeholder: 'Enter your phone number' }}
+              />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Alternate phone</label>
+              <PhoneInput
+                defaultCountry="in"
+                value={phoneVal(formData.alternate_phone)}
+                onChange={(phone) => handleInputChange('alternate_phone', phone.replace(/^\+/, ''))}
+                className="phone-intl"
+                inputProps={{ placeholder: 'Enter alternate phone number' }}
+              />
+            </div>
+            <div className="form-group form-group--full">
+              <label className="ui-label">Email *</label>
+              <input className="ui-input" type="email" placeholder="Email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} required />
+            </div>
+            <div className="form-group form-group--full">
+              <label className="ui-label">Address *</label>
+              <input className="ui-input" placeholder="Address" required value={formData.address} onChange={(e) => handleInputChange('address', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Country *</label>
+              <DropdownSelector
+                options={[{ value: '', label: 'Select Country' }, ...countries.map(country => ({ value: country.id, label: country.name }))]}
+                value={formData.country_id || ''}
+                onChange={(value) => handleInputChange('country_id', value || '')}
+                placeholder="Select Country"
+                className="ui-dropdown-custom--full-width"
+              />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">State</label>
+              <DropdownSelector
+                options={[{ value: '', label: 'Select State' }, ...states.map(state => ({ value: state.id, label: state.name }))]}
+                value={formData.state_id || ''}
+                onChange={(value) => handleInputChange('state_id', value || '')}
+                placeholder="Select State"
+                disabled={!formData.country_id}
+                className="ui-dropdown-custom--full-width"
+              />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">City</label>
+              <DropdownSelector
+                options={[{ value: '', label: 'Select City' }, ...cities.map(city => ({ value: city.id, label: city.name }))]}
+                value={formData.city_id || ''}
+                onChange={(value) => handleInputChange('city_id', value || '')}
+                placeholder="Select City"
+                disabled={!formData.state_id}
+                className="ui-dropdown-custom--full-width"
+              />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Zones</label>
+              <ZonesMultiDropdown zones={zones} selectedZones={formData.zones} onChange={(selected) => handleInputChange('zones', selected)} onOpen={fetchZones} />
+            </div>
+          </div>
+        </section>
+
+        <section className="sx-sec">
+          <h3 className="sx-sec__h">Working states</h3>
+          <p className="sx-sec__d">Parties, orders and reports are limited to these states. Parties in these states are assigned to this salesman automatically.</p>
+          <div className="form-group form-group--full">
+            <label className="ui-label">States *</label>
+            <StatesMultiDropdown
+              states={states}
+              selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
+              onChange={(selected) => handleInputChange('state_ids', selected)}
+            />
+          </div>
+        </section>
+
+        <section className="sx-sec">
+          <h3 className="sx-sec__h">Documents{isEdit ? <span className="sx-sec__opt"> (upload only to replace)</span> : null}</h3>
+          <p className="sx-sec__d">PAN, Aadhaar and cheque accept an image or PDF; the photo must be an image. Max 5MB each.</p>
+          <p className="ord-view__lock party-form__lock sx-lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Only admin and sales managers can open these files.</span></p>
+          <div className="sx-grid sx-docs">
+            {docs.map((doc) => (
+              <FileUpload
+                key={doc.key}
+                label={doc.label}
+                accept={doc.accept}
+                hint={doc.hint}
+                {...(isEdit ? { existingUrl: resolveUploadUrl(editRow && editRow[doc.urlKey]) } : { required: true })}
+                file={formData[doc.key]}
+                onChange={(f) => handleInputChange(doc.key, f)}
+              />
+            ))}
+          </div>
+        </section>
+      </>
     );
   };
 
@@ -1434,7 +1617,7 @@ const DashboardSuppliers = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
-        <div className="pg-head"><div><h1>Salesmen</h1><p>Admin and sales managers add and edit salesmen. Documents are visible to them only.</p></div></div>
+        <div className="pg-head"><div><h1>Salesmen</h1><p>Targets, visits and the states each one works in.</p></div></div>
         {/* Main tabs */}
         <div className="dash-row">
           <div className="order-tabs-container">
@@ -1459,26 +1642,45 @@ const DashboardSuppliers = () => {
         {!isSalesman && mainTab === 'Salesmen' && (
           <div className="dash-row">
             <div className="dash-card full sm-fit">
-              <div className="mb-4" style={{ maxWidth: 360 }}>
-                <label className="mb-2 block text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
-                  Filter by Country
+              <div className="sx-filters" role="search">
+                <label className="sx-search">
+                  <FiSearch size={16} aria-hidden="true" />
+                  <input
+                    type="search"
+                    className="sx-search__input"
+                    placeholder="Search name, code or phone"
+                    aria-label="Search salesmen"
+                    value={listQuery}
+                    onChange={(e) => setListQuery(e.target.value)}
+                  />
                 </label>
-                <DropdownSelector
-                  options={countries.map(country => ({
-                    value: country.id,
-                    label: country.name
-                  }))}
+                <select
+                  className="sx-select"
+                  aria-label="Country"
                   value={selectedCountryFilter || ''}
-                  onChange={(value) => {
+                  onChange={(e) => {
                     // Salesmen are always loaded per country, so there is no "All" option
+                    const value = e.target.value;
                     if (!value) return;
                     setSalesmen([]);
                     setHasSearched(false);
+                    setStateFilter('');
                     setSelectedCountryFilter(value);
                   }}
-                  placeholder="Select a country"
-                  className="ui-dropdown-custom--full-width"
-                />
+                >
+                  {!selectedCountryFilter ? <option value="">Country</option> : null}
+                  {countries.map(country => <option key={country.id} value={country.id}>{country.name}</option>)}
+                </select>
+                <select className="sx-select" aria-label="State" value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>
+                  <option value="">All states</option>
+                  {stateFilterOptions.map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <select className="sx-select" aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+                  <option value="">All status</option>
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+                <button type="button" className="ui-btn ui-btn--primary sx-add" onClick={handleAdd}>Add salesman</button>
               </div>
               {error ? (
                 <div className="ui-state ui-state--error">
@@ -1526,22 +1728,53 @@ const DashboardSuppliers = () => {
                   </button>
                 </div>
               ) : (
-                <TableWithControls
-                  title="Salesmen"
-                  columns={columns}
-                  rows={rows}
-                  onAddNew={handleAdd}
-                  addNewText="Add New Salesman"
-                  onImport={() => {
-                    setError(null);
-                    if (selectedCountryFilter) {
-                      fetchSalesmenForCountry(selectedCountryFilter);
-                    }
-                  }}
-                  importText="Refresh Data"
-                  showFilter={false}
-                  loading={loading}
-                />
+<>
+                  <div className="sx-cards" aria-label="Salesmen">
+                    {loading ? <p className="sx-cards__note">Loading salesmen...</p> : rows.length === 0 ? <p className="sx-cards__note">No salesmen match these filters.</p> : rows.map(row => {
+                      const sid = row.id || row.salesman_id;
+                      return (
+                        <article key={sid} className="sx-card">
+                          <div className="sx-card__top">
+                            <span className="sm-pic" aria-hidden="true">{initialsOf(row.full_name)}</span>
+                            <div className="sx-card__who">
+                              <strong>{row.full_name}</strong>
+                              <small>{[row.employee_code, row.phone].filter(Boolean).join(' · ')}</small>
+                            </div>
+                            {renderStatusButton(row)}
+                          </div>
+                          <div className="sx-card__states">{renderStatePills(row)}</div>
+                          <div className="sx-card__meta">
+                            <span><b>{visitsTodayMap[sid] || 0}</b> visits today</span>
+                            {renderTargetBar(row)}
+                          </div>
+                          <div className="sx-card__act">
+                            <button type="button" className="ui-btn ui-btn--secondary" onClick={() => handleEdit(row)}>Edit</button>
+                            {row.phone ? <a className="ui-btn ui-btn--secondary" href={`tel:${row.phone}`}>Call</a> : null}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                  <div className="sx-tablewrap">
+                    <TableWithControls
+                      title="Salesmen"
+                      columns={columns}
+                      rows={rows}
+                      onAddNew={handleAdd}
+                      addNewText="Add salesman"
+                      onImport={() => {
+                        setError(null);
+                        if (selectedCountryFilter) {
+                          fetchSalesmenForCountry(selectedCountryFilter);
+                        }
+                      }}
+                      importText="Refresh"
+                      showFilter={false}
+                      showSerialNumber={false}
+                      loading={loading}
+                    />
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1575,6 +1808,40 @@ const DashboardSuppliers = () => {
                   )}
                 </div>
               ) : (
+                <>
+                <div className="sx-cards" aria-label="Visit report">
+                  {checkinsLoading ? <p className="sx-cards__note">Loading visits...</p> : checkins.map((row, i) => {
+                    const raw = String(row.order_notes || row.check_in_remarks || '');
+                    const text = raw.replace(/^\s*\[In progress\]\s*/i, '').trim();
+                    const inProgress = row.in_progress === true || /^\s*\[In progress\]/i.test(raw);
+                    return (
+                      <article key={row.id || row.check_in_id || i} className="sx-card">
+                        <div className="sx-card__top">
+                          <div className="sx-card__who">
+                            <strong>{row.party_name || partyNameMap[row.party_id] || row.party_id || '-'}</strong>
+                            <small>
+                              {!isSalesman ? `${salesmanNameMap[row.salesman_id] || row.salesman_id || '-'} · ` : ''}
+                              {row.check_in_date ? new Date(row.check_in_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
+                            </small>
+                          </div>
+                          <StatusBadge status={row.type === 'ordered' ? 'completed' : 'processing'}>{row.type === 'ordered' ? 'Order' : 'Visit'}</StatusBadge>
+                        </div>
+                        {(Number(row.order_total) > 0 || text || inProgress) ? (
+                          <div className="sx-card__meta">
+                            {Number(row.order_total) > 0 ? <b>{`₹${Number(row.order_total).toLocaleString('en-IN')}`}</b> : null}
+                            <span className="sn-reason">{inProgress ? <span className="sn-prog-pill">In progress</span> : null}{text}</span>
+                          </div>
+                        ) : null}
+                        {row.latitude != null && row.longitude != null ? (
+                          <div className="sx-card__act">
+                            <a className="ui-btn ui-btn--secondary" href={`https://www.google.com/maps?q=${row.latitude},${row.longitude}`} target="_blank" rel="noopener noreferrer"><FiMapPin size={16} aria-hidden="true" /> View on map</a>
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+                <div className="sx-tablewrap">
                 <TableWithControls
                   title="Visit Report"
                   columns={[
@@ -1629,8 +1896,11 @@ const DashboardSuppliers = () => {
                   addNewText="Add Visit Report"
                   onImport={fetchCheckins}
                   importText="Refresh"
+                  showSerialNumber={false}
                   loading={checkinsLoading}
                 />
+                </div>
+                </>
               )}
             </div>
           </div>
@@ -1672,6 +1942,37 @@ const DashboardSuppliers = () => {
                   </button>
                 </div>
               ) : (
+                <>
+                <div className="sx-cards" aria-label="Targets">
+                  {targetsLoading ? <p className="sx-cards__note">Loading targets...</p> : targets.map((row, i) => {
+                    const fmtD = (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
+                    const goal = Number(row.target_amount) || 0;
+                    const done = Number(row.completed_amount) || 0;
+                    const pct = goal > 0 ? Math.min(100, Math.round((done / goal) * 100)) : 0;
+                    return (
+                      <article key={row.id || row.target_id || i} className="sx-card">
+                        <div className="sx-card__top">
+                          <div className="sx-card__who">
+                            <strong>{!isSalesman ? (salesmanNameMap[row.salesman_id] || row.salesman_id || '-') : (row.order_type || 'Overall')}</strong>
+                            <small>{fmtD(row.start_date)} to {fmtD(row.end_date)}{!isSalesman ? ` · ${row.order_type || 'Overall'}` : ''}</small>
+                          </div>
+                          <span className={`ui-badge ${row.target_status === 'pending' || !row.target_status ? 'ui-badge--warning' : 'ui-badge--success'}`}>{row.target_status || 'pending'}</span>
+                        </div>
+                        <div className="sx-card__meta">
+                          <b>{goal ? `₹${goal.toLocaleString('en-IN')}` : '-'}</b>
+                          <span className="sm-prog"><span className="prog" role="img" aria-label={`${pct} percent`}><i style={{ width: `${pct}%` }} /></span><span className="sm-prog__n">{pct}%</span></span>
+                        </div>
+                        {row.target_description ? <p className="sx-card__note">{row.target_description}</p> : null}
+                        {!isSalesman ? (
+                          <div className="sx-card__act">
+                            <button type="button" className="ui-btn ui-btn--secondary" onClick={() => handleTargetEdit(row)}>Edit</button>
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+                <div className="sx-tablewrap">
                 <TableWithControls
                   title="Salesman Targets"
                   columns={[
@@ -1702,8 +2003,11 @@ const DashboardSuppliers = () => {
                   addNewText="Set Target"
                   onImport={fetchTargets}
                   importText="Refresh"
+                  showSerialNumber={false}
                   loading={targetsLoading}
                 />
+                </div>
+                </>
               )}
             </div>
           </div>
@@ -1715,11 +2019,11 @@ const DashboardSuppliers = () => {
           setOpenAdd(false);
           resetForm();
         }}
-        title="Add New Salesman"
+        title="Add salesman"
         footer={(
           <>
             <button
-              className="ui-btn ui-btn--secondary"
+              className="ui-btn ui-btn--secondary sx-foot-btn"
               onClick={() => {
                 setOpenAdd(false);
                 resetForm();
@@ -1729,192 +2033,16 @@ const DashboardSuppliers = () => {
               Cancel
             </button>
             <button
-              className="ui-btn ui-btn--primary"
+              className="ui-btn ui-btn--primary sx-foot-btn"
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? 'Saving...' : 'Save salesman'}
             </button>
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Employee Code *</label>
-            <input
-              className="ui-input"
-              placeholder="Employee code"
-              value={formData.employee_code}
-              onChange={(e) => handleInputChange('employee_code', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Full Name *</label>
-            <input
-              className="ui-input"
-              placeholder="Full name"
-              value={formData.full_name}
-              onChange={(e) => handleInputChange('full_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Email *</label>
-            <input
-              className="ui-input"
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Phone *</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
-              onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                required: true,
-                placeholder: 'Enter your phone number',
-              }}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Alternate Phone</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.alternate_phone ? (String(formData.alternate_phone).startsWith('+') ? String(formData.alternate_phone) : '+' + formData.alternate_phone) : ''}
-              onChange={(phone) => handleInputChange('alternate_phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                placeholder: 'Enter alternate phone number',
-              }}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address *</label>
-            <input
-              className="ui-input"
-              placeholder="Address"
-              required
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Country *</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Country' },
-                ...countries.map(country => ({
-                  value: country.id,
-                  label: country.name
-                }))
-              ]}
-              value={formData.country_id || ''}
-              onChange={(value) => handleInputChange('country_id', value || '')}
-              placeholder="Select Country"
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">State</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select State' },
-                ...states.map(state => ({
-                  value: state.id,
-                  label: state.name
-                }))
-              ]}
-              value={formData.state_id || ''}
-              onChange={(value) => handleInputChange('state_id', value || '')}
-              placeholder="Select State"
-              disabled={!formData.country_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">City</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select City' },
-                ...cities.map(city => ({
-                  value: city.id,
-                  label: city.name
-                }))
-              ]}
-              value={formData.city_id || ''}
-              onChange={(value) => handleInputChange('city_id', value || '')}
-              placeholder="Select City"
-              disabled={!formData.state_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Zones</label>
-            <ZonesMultiDropdown
-              zones={zones}
-              selectedZones={formData.zones}
-              onChange={(selected) => handleInputChange('zones', selected)}
-              onOpen={fetchZones}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Working States * <span className="text-[#5c5c5c] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
-            <StatesMultiDropdown
-              states={states}
-              selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
-              onChange={(selected) => handleInputChange('state_ids', selected)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Reporting Manager</label>
-            <input
-              className="ui-input"
-              placeholder="Reporting manager"
-              value={formData.reporting_manager}
-              onChange={(e) => handleInputChange('reporting_manager', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Joining Date</label>
-            <DatePicker
-              value={formData.joining_date}
-              onChange={(v) => handleInputChange('joining_date', v)}
-              placeholder="Joining date"
-            />
-          </div>
-          {renderActiveToggle()}
-          {/* KYC documents — all compulsory on create */}
-          <div className="form-group form-group--full">
-            <label className="ui-label">KYC Documents *</label>
-            <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
-            <p className="ord-view__lock party-form__lock mb-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Only admin and sales managers can open these files.</span></p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[
-                { key: 'pan_card', label: 'PAN Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'aadhar_card', label: 'Aadhar Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'cancel_cheque', label: 'Cancel Cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'photo', label: 'Photo', accept: 'image/*', hint: 'Image only' },
-              ].map((doc) => (
-                <FileUpload
-                  key={doc.key}
-                  label={doc.label}
-                  accept={doc.accept}
-                  hint={doc.hint}
-                  required
-                  file={formData[doc.key]}
-                  onChange={(f) => handleInputChange(doc.key, f)}
-                />
-              ))}
-            </div>
-          </div>
-        </form>
+        <form className="ui-form sx-form" onSubmit={handleSubmit}>{renderSalesmanFields(false)}</form>
       </AsidePanel>
       <AsidePanel
         open={!!editRow}
@@ -1922,11 +2050,11 @@ const DashboardSuppliers = () => {
           setEditRow(null);
           resetForm();
         }}
-        title="Edit Salesman"
+        title="Edit salesman"
         footer={(
           <>
             <button
-              className="ui-btn ui-btn--secondary"
+              className="ui-btn ui-btn--secondary sx-foot-btn"
               onClick={() => {
                 setEditRow(null);
                 resetForm();
@@ -1936,7 +2064,7 @@ const DashboardSuppliers = () => {
               Cancel
             </button>
             <button
-              className="ui-btn ui-btn--primary"
+              className="ui-btn ui-btn--primary sx-foot-btn"
               onClick={handleSubmit}
               disabled={loading}
             >
@@ -1945,183 +2073,7 @@ const DashboardSuppliers = () => {
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Employee Code *</label>
-            <input
-              className="ui-input"
-              placeholder="Employee code"
-              value={formData.employee_code}
-              onChange={(e) => handleInputChange('employee_code', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Full Name *</label>
-            <input
-              className="ui-input"
-              placeholder="Full name"
-              value={formData.full_name}
-              onChange={(e) => handleInputChange('full_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Email *</label>
-            <input
-              className="ui-input"
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Phone *</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
-              onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                required: true,
-                placeholder: 'Enter your phone number',
-              }}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Alternate Phone</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.alternate_phone ? (String(formData.alternate_phone).startsWith('+') ? String(formData.alternate_phone) : '+' + formData.alternate_phone) : ''}
-              onChange={(phone) => handleInputChange('alternate_phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                placeholder: 'Enter alternate phone number',
-              }}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address *</label>
-            <input
-              className="ui-input"
-              placeholder="Address"
-              required
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Country *</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Country' },
-                ...countries.map(country => ({
-                  value: country.id,
-                  label: country.name
-                }))
-              ]}
-              value={formData.country_id || ''}
-              onChange={(value) => handleInputChange('country_id', value || '')}
-              placeholder="Select Country"
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">State</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select State' },
-                ...states.map(state => ({
-                  value: state.id,
-                  label: state.name
-                }))
-              ]}
-              value={formData.state_id || ''}
-              onChange={(value) => handleInputChange('state_id', value || '')}
-              placeholder="Select State"
-              disabled={!formData.country_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">City</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select City' },
-                ...cities.map(city => ({
-                  value: city.id,
-                  label: city.name
-                }))
-              ]}
-              value={formData.city_id || ''}
-              onChange={(value) => handleInputChange('city_id', value || '')}
-              placeholder="Select City"
-              disabled={!formData.state_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Zones</label>
-            <ZonesMultiDropdown
-              zones={zones}
-              selectedZones={formData.zones}
-              onChange={(selected) => handleInputChange('zones', selected)}
-              onOpen={fetchZones}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Working States * <span className="text-[#5c5c5c] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
-            <StatesMultiDropdown
-              states={states}
-              selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
-              onChange={(selected) => handleInputChange('state_ids', selected)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Reporting Manager</label>
-            <input
-              className="ui-input"
-              placeholder="Reporting manager"
-              value={formData.reporting_manager}
-              onChange={(e) => handleInputChange('reporting_manager', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Joining Date</label>
-            <DatePicker
-              value={formData.joining_date}
-              onChange={(v) => handleInputChange('joining_date', v)}
-              placeholder="Joining date"
-            />
-          </div>
-          {renderActiveToggle()}
-          {/* KYC documents — optional on edit (upload only to replace an existing one) */}
-          <div className="form-group form-group--full">
-            <label className="ui-label">KYC Documents <span className="text-text-muted font-normal">(upload only to replace)</span></label>
-            <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
-            <p className="ord-view__lock party-form__lock mb-2"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Only admin and sales managers can open these files.</span></p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[
-                { key: 'pan_card', urlKey: 'pan_card_url', label: 'PAN Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'aadhar_card', urlKey: 'aadhar_card_url', label: 'Aadhar Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'cancel_cheque', urlKey: 'cancel_cheque_url', label: 'Cancel Cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'photo', urlKey: 'photo_url', label: 'Photo', accept: 'image/*', hint: 'Image only' },
-              ].map((doc) => (
-                <FileUpload
-                  key={doc.key}
-                  label={doc.label}
-                  accept={doc.accept}
-                  hint={doc.hint}
-                  file={formData[doc.key]}
-                  existingUrl={resolveUploadUrl(editRow && editRow[doc.urlKey])}
-                  onChange={(f) => handleInputChange(doc.key, f)}
-                />
-              ))}
-            </div>
-          </div>
-        </form>
+        <form className="ui-form sx-form" onSubmit={handleSubmit}>{renderSalesmanFields(true)}</form>
       </AsidePanel>
 
       {/* Check-in Modal - salesman only */}
