@@ -27,11 +27,14 @@ const InstallAppButton = () => {
   const [deferred, setDeferred] = useState(null);
   const [guideOpen, setGuideOpen] = useState(false);
   const [ios, setIos] = useState(false);
+  const [phoneOrTablet, setPhoneOrTablet] = useState(false);
 
   useEffect(() => {
     setMounted(true);
     setInstalled(isStandalone());
     setIos(isIos());
+    // Only phones and tablets (touch screens) offer it; on a computer's browser the button is not shown.
+    setPhoneOrTablet(!!(window.matchMedia && window.matchMedia('(pointer: coarse)').matches));
 
     const onPrompt = (e) => {
       e.preventDefault(); // keep it so our own button can trigger it
@@ -58,7 +61,7 @@ const InstallAppButton = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [guideOpen]);
 
-  if (!mounted || installed) return null;
+  if (!mounted || installed || !phoneOrTablet) return null;
 
   const handleClick = async () => {
     if (deferred) {
