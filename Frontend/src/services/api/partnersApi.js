@@ -1029,10 +1029,33 @@ export const verifyPartyLocationAsking = async (partyId, pos, ask) => {
 
 // Dialog text for the "far from the written address" question.
 export const ADDRESS_FAR_CONFIRM = (message) => ({
-  title: 'Far from the written address',
+  title: 'Address does not match',
   message: `${message}`,
-  confirmLabel: 'Save this spot',
+  confirmLabel: 'Open Edit party',
 });
+
+// After the spot is saved, Edit party opens with the address already updated from the
+// GPS spot. The address is carried across the page change in sessionStorage.
+const ADDRESS_FIX_KEY = 'stallion.addressFix';
+export const rememberAddressFix = (partyId, res) => {
+  try {
+    sessionStorage.setItem(ADDRESS_FIX_KEY, JSON.stringify({
+      party_id: String(partyId),
+      address: res?.location_address || '',
+      pincode: res?.location_address_parts?.pincode || '',
+      at: Date.now(),
+    }));
+  } catch { /* storage unavailable: the party can still be edited by hand */ }
+};
+export const takeAddressFix = () => {
+  try {
+    const raw = sessionStorage.getItem(ADDRESS_FIX_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(ADDRESS_FIX_KEY);
+    const fix = JSON.parse(raw);
+    return fix && fix.address && Date.now() - Number(fix.at || 0) < 30 * 60 * 1000 ? fix : null;
+  } catch { return null; }
+};
 
 /**
  * Remove a party's saved location (managers only) so "I'm at shop" can capture it

@@ -32,6 +32,7 @@ import {
   getProductsByIds,
   verifyPartyLocationAsking,
   ADDRESS_FAR_CONFIRM,
+  rememberAddressFix,
 } from "../services/apiService";
 import { captureCurrentPosition, distanceMeters, GEOFENCE_RADIUS_M } from "../utils/geolocation";
 
@@ -336,6 +337,13 @@ const Cart = ({ onPageChange = null }) => {
       }
       const res = await verifyPartyLocationAsking(selectedParty, pos, (m) => confirm(ADDRESS_FAR_CONFIRM(m)));
       const acc = Number(res?.accuracy);
+      if (res?.address_mismatch && res?.location_address) {
+        // Written address does not match the shop: open Edit party with the GPS address.
+        rememberAddressFix(selectedParty, res);
+        showSuccess('Shop spot saved. Update the party address from your location.');
+        if (onPageChange) onPageChange('party'); else window.location.href = '/dashboard/party';
+        return;
+      }
       showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 100m geofence is now active for this party.`);
       setParties(prev => prev.map(p => {
         const id = p.id || p.party_id;
