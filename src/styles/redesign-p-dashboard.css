@@ -5,13 +5,13 @@
 
 /* Field strip: salesmen in the field, visits today */
 :root .rdp-field { gap: 6px 10px; margin-top: 10px; }
-:root .rdp-field > span { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid #e1e1e1; border-radius: 999px; background: #ffffff; font-size: 13px; color: #595959; }
+:root .rdp-field > span { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid var(--l-line); border-radius: 999px; background: var(--b-card); font-size: 13px; color: var(--t-mute); }
 
 /* Needs attention card, first on the page; items in two columns when there is room */
 :root .rdp-attn { padding: 16px; }
 :root .rdp-attn .needs-attention__list { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 24px; }
 :root .rdp-attn .needs-attention__item { min-height: 44px; }
-:root .rdp-attn .needs-attention__item:nth-child(2) { border-top: 1px solid #e1e1e1; padding-top: 12px; }
+:root .rdp-attn .needs-attention__item:nth-child(2) { border-top: 1px solid var(--l-line); padding-top: 12px; }
 @media (min-width: 900px) {
   :root .rdp-attn .needs-attention__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   :root .rdp-attn .needs-attention__item:nth-child(2) { border-top: 0; padding-top: 0; }

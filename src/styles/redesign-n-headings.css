@@ -13,7 +13,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  color: #595959;
+  color: var(--t-mute);
   margin: 0 0 var(--space-2) 0;
 }
 
@@ -25,7 +25,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  color: #595959;
+  color: var(--t-mute);
   margin: 0 0 var(--space-2) 0;
 }
 

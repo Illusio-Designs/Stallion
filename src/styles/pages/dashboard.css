@@ -58,7 +58,7 @@
   font-weight: var(--font-weight-semibold);
   letter-spacing: var(--tracking-label);
   text-transform: uppercase;
-  color: #595959;
+  color: var(--t-mute);
   margin: 0 0 var(--space-2) 0;
 }
 .card-title {
@@ -120,8 +120,8 @@
   font-variant-numeric: tabular-nums;
 }
 .stock-badge.warn {
-  background: #ececec;
-  color: #0a0a0a;
+  background: var(--b-soft2);
+  color: var(--t-ink);
 }
 .stock-badge.danger {
   background: var(--color-error-soft);

@@ -84,7 +84,7 @@
   align-items: center;
   gap: var(--space-2);
   background: var(--color-surface);
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
   border-radius: 11px;
   height: 44px;
   padding: 0 14px;
@@ -124,7 +124,7 @@
 .dashboard-menu-btn,
 .dashboard-sidebar-toggle {
   background: var(--color-surface);
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--b-side-on);
   width: 44px;
   height: 44px;
   border-radius: 11px;
@@ -148,7 +148,7 @@
   .dashboard-menu-btn:hover,
   .dashboard-sidebar-toggle:hover {
     background: var(--color-surface);
-    border-color: #0a0a0a;
+    border-color: #ffffff;
     color: var(--color-text);
   }
 }
@@ -182,7 +182,7 @@
   bottom: -36px;
   left: 50%;
   transform: translateX(-50%) translateY(-6px);
-  background: #0a0a0a;
+  background: var(--b-ink);
   color: var(--color-text-on-primary);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
@@ -221,8 +221,8 @@
 
 /* Avatar */
 .dashboard-avatar-btn {
-  background: #0a0a0a;
-  border: 1px solid #0a0a0a;
+  background: var(--b-ink);
+  border: 1px solid var(--t-ink);
   width: 44px;
   height: 44px;
   border-radius: var(--radius-pill);
@@ -251,7 +251,7 @@
 .dashboard-avatar-initials {
   font-size: var(--text-sm);
   font-weight: var(--font-weight-bold);
-  color: #ffffff;
+  color: var(--t-on-ink);
   font-family: var(--font-display);
   line-height: 1;
 }

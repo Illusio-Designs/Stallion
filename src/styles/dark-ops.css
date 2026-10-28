@@ -1,0 +1,64 @@
+/* Dark-mode fixes: ops pages (Expenses, Events, Offers, Sample trays, Products, Reports).
+   Dark only. Every rule sits under :root[data-theme="dark"], so light mode is untouched. */
+:root[data-theme="dark"] {
+  /* values read by inline var(--ops-*, light-fallback) in the page JSX */
+  --ops-partial: #c4c4c8;
+  --ops-sel: #f2f2f2;
+  --ops-sel-bg: #232325;
+  --ops-line: #2b2b2e;
+  --ops-card: #151516;
+  --ops-chk-bg: rgba(21, 21, 22, 0.9);
+  --ops-tick: #0a0a0a;
+  --ops-ok-bg: #12332a;
+  --ops-bad-bg: #3a1c1a;
+  --ops-ok-line: #1f5a44;
+  --ops-bad-line: #6b2f2b;
+  --ops-ok-ink: #6fd1a2;
+  --ops-bad-ink: #ff8f84;
+  --ops-photo: #f1f1f2; /* neutral panel that product photos sit on */
+}
+
+/* ---- Status pills (.pill.ok was a light-green literal) ---- */
+:root[data-theme="dark"] .pill.ok { background: var(--c-ok-soft); color: var(--c-ok); }
+:root[data-theme="dark"] .pp-pill--ok { background: var(--c-ok-soft); border-color: #1f5a44; color: var(--c-ok); }
+
+/* ---- Sample trays ---- */
+:root[data-theme="dark"] .trn-slot--empty { background: var(--b-soft); border-color: var(--color-grey-300); }
+:root[data-theme="dark"] .tra-chip button:hover { background: var(--b-soft2); }
+:root[data-theme="dark"] .tra-btn--pri:hover { background: #ffffff; }
+:root[data-theme="dark"] .tra-error { border-color: #6b2f2b; }
+:root[data-theme="dark"] .tra-opt.is-on { border-left-color: var(--t-ink); }
+:root[data-theme="dark"] .tra-opt input { accent-color: var(--t-ink); }
+:root[data-theme="dark"] .tra-desk td { border-bottom-color: var(--l-line); }
+:root[data-theme="dark"] .tra-panel { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55); }
+:root[data-theme="dark"] .tra-panel__foot { border-top-color: var(--l-line); }
+
+/* ---- Tray return tasks and notification bell ---- */
+:root[data-theme="dark"] .rdt-pill--done { border-color: var(--color-grey-300); color: var(--t-mute); }
+:root[data-theme="dark"] .rdt-field select,
+:root[data-theme="dark"] .rdt-field input { border-color: var(--color-grey-300); }
+:root[data-theme="dark"] .rdt-field select:focus-visible,
+:root[data-theme="dark"] .rdt-field input:focus-visible,
+:root[data-theme="dark"] .rdb-link:focus-visible,
+:root[data-theme="dark"] .rdb-item:focus-visible { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.28); }
+:root[data-theme="dark"] .rdt-err { color: var(--c-bad); }
+:root[data-theme="dark"] .rdb-item { border-top-color: var(--l-line); }
+:root[data-theme="dark"] .rdb-item__msg { color: var(--t-mute); }
+:root[data-theme="dark"] .rdb-panel { box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6); }
+
+/* ---- Offers / events / expenses forms ---- */
+:root[data-theme="dark"] .pof-chip { border-color: var(--color-grey-300); }
+:root[data-theme="dark"] .pof-chip:hover { border-color: var(--t-ink); }
+:root[data-theme="dark"] .pev-form .pev-req { color: var(--c-bad); }
+:root[data-theme="dark"] .exp-tile { border-color: var(--color-grey-400); }
+:root[data-theme="dark"] .exp-file { color: var(--t-mute); }
+
+/* ---- Products: photos sit on a light neutral panel ---- */
+:root[data-theme="dark"] .dash-page .product-thumb,
+:root[data-theme="dark"] .dash-page .product-thumb--sm,
+:root[data-theme="dark"] .product-thumb--sm,
+:root[data-theme="dark"] .product-media-card img { background: var(--ops-photo); }
+:root[data-theme="dark"] .dash-page .product-banner__close:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* ---- Reports: the dark KPI card is a light (ink) surface in dark mode ---- */
+:root[data-theme="dark"] .rep-kpi--dk small { color: var(--t-on-ink); opacity: 0.65; }

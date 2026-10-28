@@ -11,11 +11,11 @@
 
 /* Orders table cells */
 :root .ord-cell { display: inline-flex; flex-direction: column; line-height: 1.35; }
-:root .ord-cell b { font-weight: 600; color: #0a0a0a; }
+:root .ord-cell b { font-weight: 600; color: var(--t-ink); }
 :root .ord-cell__id { font-variant-numeric: tabular-nums; }
-:root .ord-cell__sub { font-size: 12.5px; color: #595959; }
-:root .ord-muted { color: #595959; }
-:root .ord-amount { font-weight: 600; color: #0a0a0a; font-variant-numeric: tabular-nums; }
+:root .ord-cell__sub { font-size: 12.5px; color: var(--t-mute); }
+:root .ord-muted { color: var(--t-mute); }
+:root .ord-amount { font-weight: 600; color: var(--t-ink); font-variant-numeric: tabular-nums; }
 :root .dash-card .ui-table tbody td:has(.ord-amount) { text-align: right; }
 :root .dash-card .ui-table:has(.ord-amount) thead th:nth-last-child(2),
 :root .dash-card .ui-table:has(.party-credit) thead th:nth-last-child(2) { text-align: right; }
@@ -25,14 +25,14 @@
 :root .ord-view__lock svg { flex: none; margin-top: 2px; }
 
 /* Party table: avatar + name */
-:root .party-who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; color: #0a0a0a; }
+:root .party-who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; color: var(--t-ink); }
 :root .party-who__pic {
   width: 30px; height: 30px; border-radius: 50%; flex: none;
   display: grid; place-items: center;
-  background: #f4f4f4; color: #0a0a0a; font-size: 13px; font-weight: 700;
+  background: var(--b-soft); color: var(--t-ink); font-size: 13px; font-weight: 700;
 }
-:root .party-who__off { font-size: 11px; font-weight: 600; color: #b3261e; background: #fbe5e3; border-radius: 99px; padding: 2px 8px; }
-:root .party-credit { font-variant-numeric: tabular-nums; color: #0a0a0a; }
+:root .party-who__off { font-size: 11px; font-weight: 600; color: var(--c-bad); background: var(--c-bad-soft); border-radius: 99px; padding: 2px 8px; }
+:root .party-credit { font-variant-numeric: tabular-nums; color: var(--t-ink); }
 :root .dash-card .ui-table tbody td:has(.party-credit) { text-align: right; }
 
 /* Location pill: leading dot, green / neutral / grey */
@@ -42,23 +42,23 @@
   font-size: 12px; font-weight: 600; white-space: nowrap;
 }
 :root .loc-pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
-:root .loc-pill--ok { background: #dcf2e8; color: #0b7a53; }
-:root .loc-pill--warn { background: #ececec; color: #0a0a0a; }
-:root .loc-pill--idle { background: #f4f4f4; color: #595959; }
+:root .loc-pill--ok { background: var(--c-ok-soft); color: var(--c-ok); }
+:root .loc-pill--warn { background: var(--b-soft2); color: var(--t-ink); }
+:root .loc-pill--idle { background: var(--b-soft); color: var(--t-mute); }
 
 /* Add / Edit party panel */
 :root .party-form__section { padding-top: 6px; }
 :root .party-form__section h5 {
-  margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: #0a0a0a;
+  margin: 0; font-family: var(--font-display); font-size: 15px; font-weight: 700; letter-spacing: -0.01em; color: var(--t-ink);
 }
-:root .party-form__section:not(:first-child) { border-top: 1px solid #e1e1e1; padding-top: 16px; margin-top: 4px; }
+:root .party-form__section:not(:first-child) { border-top: 1px solid var(--l-line); padding-top: 16px; margin-top: 4px; }
 :root .party-form__lock { margin: 0; display: flex; align-items: flex-start; gap: 10px; }
 :root .party-form__lock svg { flex: none; margin-top: 2px; }
 :root .party-loc {
-  border: 1px solid #e1e1e1; border-radius: 12px; padding: 14px; background: #ffffff;
+  border: 1px solid var(--l-line); border-radius: 12px; padding: 14px; background: var(--b-card);
 }
 :root .party-loc__chip { margin: 2px 0 4px; }
-:root .ui-form input:disabled { background: #f4f4f4; color: #595959; cursor: not-allowed; }
+:root .ui-form input:disabled { background: var(--b-soft); color: var(--t-mute); cursor: not-allowed; }
 
 @media (max-width: 640px) {
   :root .order-tabs-container { flex-wrap: nowrap; overflow-x: auto; }
@@ -77,4 +77,4 @@
 }
 
 :root .sm-pills { display: inline-flex; flex-wrap: wrap; gap: 4px; }
-:root .sm-pill { display: inline-block; border-radius: 99px; padding: 3px 10px; font-size: 12px; font-weight: 600; background: #ececec; color: #0a0a0a; white-space: nowrap; }
+:root .sm-pill { display: inline-block; border-radius: 99px; padding: 3px 10px; font-size: 12px; font-weight: 600; background: var(--b-soft2); color: var(--t-ink); white-space: nowrap; }

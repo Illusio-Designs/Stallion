@@ -1,10 +1,10 @@
 /* Login refinement: short brand strip on phones, one card for number and code. */
 .auth-split .login-card {
   max-width: 400px;
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
   border-radius: 14px;
   padding: 20px;
-  background: #ffffff;
+  background: var(--b-card);
 }
 .auth-split .login-form { gap: 16px; }
 .auth-split .login-phone-row {
@@ -14,25 +14,25 @@
   gap: 12px;
   min-height: 44px;
   padding: 8px 12px;
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
   border-radius: 10px;
   background: #f6f6f6;
 }
-.auth-split .login-phone-label { display: block; font-size: 12px; color: #595959; }
-.auth-split .login-phone-hint { font-weight: 600; color: #0a0a0a; white-space: nowrap; }
+.auth-split .login-phone-label { display: block; font-size: 12px; color: var(--t-mute); }
+.auth-split .login-phone-hint { font-weight: 600; color: var(--t-ink); white-space: nowrap; }
 .auth-split .login-link-btn {
   min-height: 44px;
   padding: 0 4px;
   background: none;
   border: 0;
-  color: #0a0a0a;
+  color: var(--t-ink);
   font-weight: 600;
   font-size: 14px;
   text-decoration: underline;
   cursor: pointer;
   border-radius: 6px;
 }
-.auth-split .login-link-btn:disabled { color: #595959; cursor: not-allowed; }
+.auth-split .login-link-btn:disabled { color: var(--t-mute); cursor: not-allowed; }
 .auth-split .login-resend { margin-top: -4px; text-align: left; }
 .auth-split .login-resend .resend-otp-btn { min-height: 44px; padding: 0; background: none; }
 .auth-split .login-submit { min-height: 48px; }

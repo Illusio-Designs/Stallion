@@ -12,6 +12,8 @@ import '../styles/pages/dashboard-orders.css';
 import '../styles/redesign-n-events.css';
 import '../styles/redesign-n-manage.css';
 import '../styles/redesign-p-events.css';
+import '../styles/redesign-p-forms.css';
+import { FormSec, ChipRow } from '../components/forms/FormBits';
 
 const DashboardEvents = () => {
   const [when, setWhen] = useState('upcoming');
@@ -29,6 +31,11 @@ const DashboardEvents = () => {
   });
   const [error, setError] = useState(null);       // the list could not load
   const [formError, setFormError] = useState(null); // a problem in the open form
+
+  // "One day" keeps the end date equal to the start date. Null means: follow the dates already in the form.
+  const [oneDay, setOneDay] = useState(null);
+  useEffect(() => { setOneDay(null); }, [openAdd, editRow]);
+  const isOneDay = oneDay === null ? form.start_date === form.end_date : oneDay;
 
   const fetchEvents = async () => {
     setLoading(true);
@@ -215,51 +222,72 @@ const DashboardEvents = () => {
   };
 
   const eventFields = (isEdit) => (
-    <div className="pev-form">
+    <div className="pev-form rf-form">
       {formError && <p className="ui-field-error pev-full" role="alert">{formError}</p>}
-      <div className="form-group pev-full">
-        <label className="ui-label">Event name <span className="pev-req">*</span></label>
-        <input
-          className="ui-input w-full"
-          placeholder="Optical Expo Mumbai"
-          value={form.event_name}
-          onChange={(e) => setForm((p) => ({ ...p, event_name: e.target.value }))}
-        />
-      </div>
-      <div className="form-group pev-full">
-        <label className="ui-label">City and venue <span className="pev-req">*</span></label>
-        <input
-          className="ui-input w-full"
-          placeholder="Mumbai, Bombay Exhibition Centre"
-          value={form.event_location}
-          onChange={(e) => setForm((p) => ({ ...p, event_location: e.target.value }))}
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Start date <span className="pev-req">*</span></label>
-        <DatePicker value={form.start_date} onChange={(v) => setForm((p) => ({ ...p, start_date: v }))} placeholder="Select date" />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">End date <span className="pev-req">*</span></label>
-        <DatePicker value={form.end_date} onChange={(v) => setForm((p) => ({ ...p, end_date: v }))} placeholder="Select date" />
-      </div>
-      {isEdit && (
-        <div className="form-group pev-full">
-          <label className="ui-label">Status</label>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={form.is_active !== false}
-            onClick={() => setForm((p) => ({ ...p, is_active: p.is_active === false }))}
-            className="mng-switch pev-switch"
-          >
-            <span className={`mng-switch__track ${form.is_active !== false ? 'is-on' : ''}`}>
-              <span className="mng-switch__dot" />
-            </span>
-            <span className="mng-switch__label">{form.is_active !== false ? 'Active' : 'Inactive'}</span>
-          </button>
-          <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted.</p>
+      <FormSec title="Event" className="pev-full">
+        <div className="form-group rf-full">
+          <label className="ui-label">Event name <span className="pev-req">*</span></label>
+          <input
+            className="ui-input w-full"
+            placeholder="Optical Expo Mumbai"
+            value={form.event_name}
+            onChange={(e) => setForm((p) => ({ ...p, event_name: e.target.value }))}
+          />
         </div>
+        <div className="form-group rf-full">
+          <label className="ui-label">City and venue <span className="pev-req">*</span></label>
+          <input
+            className="ui-input w-full"
+            placeholder="Mumbai, Bombay Exhibition Centre"
+            value={form.event_location}
+            onChange={(e) => setForm((p) => ({ ...p, event_location: e.target.value }))}
+          />
+        </div>
+      </FormSec>
+      <FormSec title="Dates" hint="Pick One day and the end date follows the start date." className="pev-full">
+        <div className="form-group rf-full">
+          <label className="ui-label">Length</label>
+          <ChipRow
+            label="Event length"
+            options={[{ value: 'one', label: 'One day' }, { value: 'several', label: 'Several days' }]}
+            value={isOneDay ? 'one' : 'several'}
+            onChange={(v) => {
+              setOneDay(v === 'one');
+              if (v === 'one') setForm((p) => ({ ...p, end_date: p.start_date }));
+            }}
+          />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">Start date <span className="pev-req">*</span></label>
+          <DatePicker
+            value={form.start_date}
+            onChange={(v) => setForm((p) => ({ ...p, start_date: v, ...(isOneDay ? { end_date: v } : {}) }))}
+            placeholder="Select date"
+          />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">End date <span className="pev-req">*</span></label>
+          <DatePicker value={form.end_date} onChange={(v) => setForm((p) => ({ ...p, end_date: v }))} placeholder="Select date" disabled={isOneDay} />
+        </div>
+      </FormSec>
+      {isEdit && (
+        <FormSec title="Status" className="pev-full">
+          <div className="form-group rf-full">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.is_active !== false}
+              onClick={() => setForm((p) => ({ ...p, is_active: p.is_active === false }))}
+              className="mng-switch pev-switch"
+            >
+              <span className={`mng-switch__track ${form.is_active !== false ? 'is-on' : ''}`}>
+                <span className="mng-switch__dot" />
+              </span>
+              <span className="mng-switch__label">{form.is_active !== false ? 'Active' : 'Inactive'}</span>
+            </button>
+            <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted.</p>
+          </div>
+        </FormSec>
       )}
     </div>
   );
@@ -358,7 +386,7 @@ const DashboardEvents = () => {
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => { resetForm(); setOpenAdd(false); setFormError(null); }}>Cancel</button>
-            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleSubmitNew}>Save</button>
+            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleSubmitNew}>Save event</button>
           </>
         )}
       >
@@ -377,7 +405,7 @@ const DashboardEvents = () => {
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => { setEditRow(null); resetForm(); setFormError(null); }}>Cancel</button>
-            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleUpdate}>Update</button>
+            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleUpdate}>Update event</button>
           </>
         )}
       >

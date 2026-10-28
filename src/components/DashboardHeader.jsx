@@ -3,6 +3,7 @@ import '../styles/components/DashboardHeader.css';
 import { FiBell, FiMenu, FiSidebar } from './icons/hugeicons';
 import Tooltip from './ui/Tooltip';
 import InstallAppButton from './InstallAppButton';
+import ThemeSwitch from './ThemeSwitch';
 import NotificationPermissionPrompt from './NotificationPermissionPrompt';
 import { announceNew } from '../utils/systemNotify';
 import { resolveProfileImageUrl } from '../utils/profileImage';
@@ -370,6 +371,10 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
                   >
                     Edit Profile
                   </button>
+                  <div className="px-2 pb-2 pt-1" role="none">
+                    <p className="m-0 pb-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Theme</p>
+                    <ThemeSwitch />
+                  </div>
                   <button
                     className="dropdown-item dropdown-item--danger block w-full text-left px-3 py-2 min-h-[40px] border-none bg-transparent text-error text-[length:var(--text-base)] cursor-pointer rounded-md transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-error-soft focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:bg-primary-soft"
                     role="menuitem"

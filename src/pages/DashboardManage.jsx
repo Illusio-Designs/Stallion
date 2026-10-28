@@ -34,6 +34,7 @@ import { invalidateCache } from '../services/cacheService';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/redesign-n-manage.css';
+import '../styles/redesign-p-forms.css';
 import '../styles/redesign-n-headings.css';
 
 // Master-data attribute tabs. Lists are read with every item (active and inactive) so they can be
@@ -1208,7 +1209,7 @@ const DashboardManage = () => {
           setOpenAdd(false);
           resetForm();
         }}
-        title={`Add ${activeTab}`}
+        title={`Add ${String(activeTab).toLowerCase()}`}
         footer={(
           <>
             <button 
@@ -1226,12 +1227,13 @@ const DashboardManage = () => {
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? 'Saving...' : `Save ${String(activeTab || '').toLowerCase()}`}
             </button>
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
+        <form className="ui-form rf-form" onSubmit={handleSubmit}>
+          <h3 className="rf-sec__h rf-full">{formData.type || activeTab} details</h3>
           {renderFormFields()}
         </form>
       </AsidePanel>
@@ -1241,7 +1243,7 @@ const DashboardManage = () => {
           setEditRow(null);
           resetForm();
         }}
-        title={`Edit ${editRow?.type || ''}`}
+        title={`Edit ${String(editRow?.type || '').toLowerCase()}`}
         footer={(
           <>
             <button 
@@ -1259,12 +1261,13 @@ const DashboardManage = () => {
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? 'Updating...' : 'Update'}
+              {loading ? 'Updating...' : `Update ${String(editRow?.type || '').toLowerCase()}`}
             </button>
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
+        <form className="ui-form rf-form" onSubmit={handleSubmit}>
+          <h3 className="rf-sec__h rf-full">{formData.type || activeTab} details</h3>
           {renderFormFields()}
           {GEO_TABS.includes(formData.type) && (
             <div className="form-group form-group--full">

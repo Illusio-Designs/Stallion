@@ -45,7 +45,7 @@ export default function OrdersPerDayChart({ data = [], height = 215, ariaLabel }
     <div className="rda-chart" ref={wrapRef}>
       <svg viewBox={`0 0 ${w} ${height}`} width="100%" height={height} role="img"
         aria-label={ariaLabel || 'Bar chart of orders'}>
-        <g stroke="#e1e1e1" strokeWidth="1">
+        <g style={{ stroke: 'var(--l-line)' }} strokeWidth="1">
           {cfg.ticks.map((t, i) => (
             <line key={i} x1={cfg.left} x2={cfg.left + cfg.innerW} y1={cfg.y(t)} y2={cfg.y(t)} />
           ))}
@@ -61,7 +61,7 @@ export default function OrdersPerDayChart({ data = [], height = 215, ariaLabel }
           const x = cfg.left + cfg.band * i + (cfg.band - cfg.barW) / 2;
           return h > 0 ? (
             <rect key={i} x={x} y={top} width={cfg.barW} height={h} rx={Math.min(5, cfg.barW / 2)}
-              fill={d.current ? '#0a0a0a' : '#c2c2c2'}>
+              style={{ fill: d.current ? 'var(--t-ink)' : 'var(--chart-bar, #c2c2c2)' }}>
               <title>{d.title || `${d.label}: ${d.value}`}</title>
             </rect>
           ) : null;

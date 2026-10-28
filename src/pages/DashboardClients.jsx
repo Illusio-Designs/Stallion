@@ -29,6 +29,8 @@ import { downloadCsv } from '../utils/exportCsv';
 import '../styles/redesign-n-party.css';
 import '../styles/redesign-n-headings.css';
 import '../styles/redesign-p-party.css';
+import '../styles/redesign-p-forms.css';
+import { FormProgress } from '../components/forms/FormBits';
 import AddressAutocomplete from '../components/ui/AddressAutocomplete';
 
 const splitNames = (v) => String(v || '').split(',').map((n) => n.trim()).filter((n) => n && n !== '—');
@@ -1330,7 +1332,12 @@ const DashboardClients = () => {
   const creditLocked = !!editRow && !isPartyManager;
 
   const renderPartyFormFields = () => (
-    <div className="pf">
+    <div className="pf rf-form">
+      <FormProgress
+        label="Name, address, terms"
+        done={['party_name', 'trade_name', 'contact_person', 'phone', 'address', 'country_id', 'state_id', 'city_id', 'pincode'].filter((k) => String(formData[k] ?? '').trim() !== '').length}
+        total={9}
+      />
       <section className="pf-sec" aria-labelledby="pf-h-party">
         <h3 id="pf-h-party" className="pf-sec__h">Party</h3>
         <p className="pf-sec__d">Who the shop is and how to reach it.</p>
@@ -1839,7 +1846,7 @@ const DashboardClients = () => {
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? (editRow ? 'Updating...' : 'Saving...') : (editRow ? 'Update' : 'Save')}
+              {loading ? (editRow ? 'Updating...' : 'Saving...') : (editRow ? 'Update party' : 'Save party')}
             </button>
           </>
         )}

@@ -1,7 +1,7 @@
 /* Breadcrumb Styles */
 .breadcrumb {
-  background: #ffffff;
-  border-bottom: 1px solid #e1e1e1;
+  background: var(--b-card);
+  border-bottom: 1px solid var(--l-line);
   /* Clear the fixed header (var(--header-height)) so the breadcrumb sits
      below the nav with a gap, instead of sliding underneath it. */
   padding: calc(var(--header-height) + var(--space-4)) 5% var(--space-4);
@@ -35,7 +35,7 @@
   list-style: none;
   font-size: var(--text-md);
   line-height: var(--leading-snug);
-  color: #595959;
+  color: var(--t-mute);
   min-width: 0;
   flex-wrap: wrap;
 }
@@ -57,7 +57,7 @@
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
-  color: #0a0a0a;
+  color: var(--t-ink);
   background: none;
   border: none;
   padding: var(--space-1) var(--space-2);
@@ -68,8 +68,8 @@
 }
 
 button.breadcrumb-item:hover {
-  color: #0a0a0a;
-  background: #f4f4f4;
+  color: var(--t-ink);
+  background: var(--b-soft);
 }
 
 button.breadcrumb-item:active {
@@ -85,7 +85,7 @@ button.breadcrumb-item:focus-visible {
 .breadcrumb-item.active {
   max-width: none;
   white-space: normal;
-  color: #595959;
+  color: var(--t-mute);
   font-weight: var(--font-weight-semibold);
   cursor: default;
 }
@@ -93,7 +93,7 @@ button.breadcrumb-item:focus-visible {
 .breadcrumb-separator {
   display: inline-flex;
   align-items: center;
-  color: #8c8c8c;
+  color: var(--t-faint);
   flex-shrink: 0;
 }
 
@@ -110,7 +110,7 @@ button.breadcrumb-item:focus-visible {
   justify-content: center;
   min-height: 40px;
   background: var(--color-primary);
-  color: #ffffff;
+  color: var(--t-on-ink);
   padding: var(--space-2) var(--space-6);
   border: none;
   border-radius: 11px;
@@ -124,7 +124,7 @@ button.breadcrumb-item:focus-visible {
 
 .continue-shopping-btn:hover {
   background: var(--color-primary-hover);
-  color: #ffffff;
+  color: var(--t-on-ink);
 }
 
 .continue-shopping-btn:active {

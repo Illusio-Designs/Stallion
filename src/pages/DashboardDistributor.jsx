@@ -20,6 +20,7 @@ import { showSuccess, showError } from '../services/notificationService';
 import { FiSearch } from '../components/icons/hugeicons';
 import { Avatar, FormSection, usePeopleQuery } from '../components/people/PeopleBits';
 import '../styles/redesign-p-people.css';
+import '../styles/redesign-p-forms.css';
 
 // Multi-select zones dropdown matching the existing DropdownSelector design
 const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled = false, onOpen }) => {
@@ -1078,7 +1079,7 @@ const DashboardDistributor = () => {
 
   // Same fields for Add and Edit; only the phone input differs (Edit uses the country-code picker).
   const renderFields = (isEdit) => (
-    <form className="ui-form pp-form" onSubmit={handleSubmit}>
+    <form className="ui-form pp-form rf-form" onSubmit={handleSubmit}>
       <FormSection title="Distributor" hint="Who they are and how to reach them.">
         <div className="form-group">
           <label className="ui-label">Distributor name *</label>

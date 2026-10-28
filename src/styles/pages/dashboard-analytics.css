@@ -42,7 +42,7 @@
   fill: var(--color-primary);
 }
 .srchart__bar--revenue {
-  fill: #9a9a9a;
+  fill: var(--t-faint);
 }
 .srchart__svg:hover .srchart__bar {
   opacity: 0.45;

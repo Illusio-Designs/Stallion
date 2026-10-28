@@ -68,7 +68,7 @@ const titleCase = (s) =>
 // Inline achievement progress bar
 const Progress = ({ pct }) => {
   const v = Math.max(0, Math.min(100, Math.round(pct)));
-  const color = v >= 50 ? '#0a0a0a' : '#8c8c8c';
+  const color = v >= 50 ? 'var(--t-ink)' : 'var(--t-faint)';
   return (
     <div className="flex items-center gap-2 min-w-[120px]">
       <div className="flex-1 h-[6px] rounded-[999px] bg-[var(--color-grey-200)] overflow-hidden">
