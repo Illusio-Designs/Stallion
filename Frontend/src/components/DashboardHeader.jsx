@@ -280,7 +280,7 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
               Always in reach on iPad, unlike the button at the bottom of the
               sidebar. Hidden on phones, which use the menu button above. */}
           {onToggleSidebar && (
-            <Tooltip label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="bottom">
+            <Tooltip label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} placement="right">
               <button
                 type="button"
                 className="dashboard-sidebar-toggle hidden md:inline-flex bg-transparent border-none w-10 h-10 -ml-1 rounded-pill items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]"
