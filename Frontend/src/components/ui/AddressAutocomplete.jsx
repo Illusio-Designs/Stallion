@@ -9,13 +9,14 @@ import '../../styles/redesign-n-address.css';
 // and city (missing ones are added on the server).
 const newSession = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
 
-export default function AddressAutocomplete({ value, onChange, onPick, placeholder = 'Start typing the shop address', id }) {
+export default function AddressAutocomplete({ value, onChange, onPick, placeholder = 'Start typing the shop address', id, showStatus = false }) {
   const reactId = useId();
   const listId = `${reactId}-list`;
   const [items, setItems] = useState([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState(''); // why suggestions are missing (shown to admins)
   const session = useRef(newSession());
   const enabled = useRef(true);
   const typed = useRef(false); // suggestions only after the person types, not after a pick or a fill
@@ -30,7 +31,8 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
     timer.current = setTimeout(async () => {
       try {
         const res = await suggestAddress(text, session.current);
-        if (res?.configured === false) { enabled.current = false; setItems([]); setOpen(false); return; }
+        if (res?.configured === false) { enabled.current = false; setItems([]); setOpen(false); setStatus('Google address search is not set up on the server yet (GOOGLE_MAPS_API_KEY is missing). Type the address by hand.'); return; }
+        if (res?.unavailable) { setStatus(`Google address search is not working: ${res.reason || 'no answer from Google'}. Type the address by hand.`); } else { setStatus(''); }
         const list = Array.isArray(res?.suggestions) ? res.suggestions : [];
         setItems(list);
         setActive(-1);
@@ -90,6 +92,7 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
         autoComplete="off"
       />
       {busy && <span className="addr-ac__busy" role="status">Filling in the address...</span>}
+      {showStatus && status && <span className="addr-ac__status" role="status">{status}</span>}
       {open && items.length > 0 && (
         <ul className="addr-ac__list" id={listId} role="listbox">
           {items.map((it, i) => (

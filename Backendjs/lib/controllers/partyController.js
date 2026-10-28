@@ -24,7 +24,7 @@ const { resolveStateId } = require('../utils/stateResolver');
 const { findOrCreateRoleUser } = require('../utils/userFactory');
 const { hasRole, canManageParties, canCreateParty, normalizeRole, partyActiveFilter, denyInactiveParty, isAdmin } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
-const { salesmanCoversState, distributorCoversState } = require('../utils/workingStates');
+const { salesmanCoversState, distributorCoversState, salesmanStateIds } = require('../utils/workingStates');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse, listWithOptionalPagination } = require('../utils/listSearchHelpers');
 
 // PAN and GSTIN are tax identifiers: only managers (and the party itself) see them. A salesman or
@@ -235,8 +235,14 @@ class PartyController {
                     return res.status(403).json({ error: 'Access denied' });
                 }
             }
+            let ownWhere = mergeWhere({ salesman_id: salesman_id }, partyActiveFilter(req.userRoleNames));
+            // A salesman only gets the parties in the states he works in.
+            if (!canManageParties(req.userRoleNames)) {
+                const ids = await salesmanStateIds(salesman_id);
+                ownWhere = mergeWhere(ownWhere, { state_id: { [Op.in]: ids } });
+            }
             const body = await listWithOptionalPagination(Party, req, {
-                where: mergeWhere({ salesman_id: salesman_id }, partyActiveFilter(req.userRoleNames)),
+                where: ownWhere,
                 order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
             res.status(200).json(hidePartySecrets(req, body));
@@ -352,9 +358,15 @@ class PartyController {
                 return res.status(400).json({ error: `No zone assigned for this ${roleName}` });
             }
 
-            // Find all parties in the zone
+            // Find all parties in the zone (a salesman: only those in his working states)
+            let zoneWhere = mergeWhere({ zone_id: zone_id }, partyActiveFilter(roleName));
+            if (roleName === 'salesman') {
+                const me = await Salesman.findOne({ where: { user_id: user.user_id }, attributes: ['salesman_id'] });
+                const ids = await salesmanStateIds(me && me.salesman_id);
+                zoneWhere = mergeWhere(zoneWhere, { state_id: { [Op.in]: ids } });
+            }
             const body = await listWithOptionalPagination(Party, req, {
-                where: mergeWhere({ zone_id: zone_id }, partyActiveFilter(roleName)),
+                where: zoneWhere,
                 order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
             res.status(200).json(hidePartySecrets(req, body));

@@ -7,6 +7,7 @@ const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, 
 const { SalesmanCheckInType } = require('../constants/enums');
 const { checkVisitLocation } = require('../utils/geo');
 const { learnShopSpot } = require('../utils/shopSpot');
+const { salesmanCoversState } = require('../utils/workingStates');
 const { isOfficeRole, hasRole } = require('../utils/roleHelpers');
 
 const IN_PROGRESS_MARK = '[In progress]';
@@ -190,6 +191,16 @@ class SalesmanCheckInsController {
 
             // Distance between the party's saved latitude/longitude and the phone's. A salesman
             // must send their GPS, so the check cannot be skipped by leaving it out.
+            // A salesman can only check in at parties in the states he works in.
+            if (actor.salesmanId) {
+                const scopedParty = await Party.findOne({ where: { party_id: fields.party_id }, attributes: ['party_id', 'state_id'] });
+                if (!scopedParty) {
+                    return res.status(404).json({ error: 'Party not found' });
+                }
+                if (!(await salesmanCoversState(actor.salesmanId, scopedParty.state_id))) {
+                    return res.status(403).json({ error: 'This party is outside the states you work in, so you cannot check in there.' });
+                }
+            }
             const hasDeviceLoc = fields.latitude != null && fields.latitude !== '' && fields.longitude != null && fields.longitude !== '';
             if (actor.salesmanId && !hasDeviceLoc) {
                 return res.status(400).json({ error: 'Your current location is required to check in. Please allow location access and try again.' });

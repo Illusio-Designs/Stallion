@@ -574,6 +574,10 @@ const DashboardClients = () => {
   // A Google address was picked: fill the address, pincode, country, state and city. Anything
   // the lists did not have was added by the server, so the dropdowns are reloaded first.
   const handleAddressPick = async (d) => {
+    if (d.blocked && d.blocked.what === 'state_not_allotted') {
+      showWarning(`${d.blocked.name || 'This state'} is not one of the states you work in, so a party cannot be added there. Ask an admin to add it to your working states.`);
+      return;
+    }
     if (d.blocked) {
       const names = d.names || {};
       showWarning(`${names[d.blocked.what] || d.blocked.name} is switched off in Manage. The address is filled in; ask an admin to switch it on, then pick the ${d.blocked.what} yourself.`);
@@ -1355,6 +1359,7 @@ const DashboardClients = () => {
           value={formData.address}
           onChange={(text) => setFormData(prev => ({ ...prev, address: text, address_lat: null, address_lng: null }))}
           onPick={handleAddressPick}
+          showStatus={isAdmin || userRole === 'party_manager' || userRole === 'sales_manager'}
         />
       </div>
       <div className="form-group form-group--full">
