@@ -15,3 +15,13 @@
 @media (max-width: 1100px) {
   :root .party-n-table .party-who { max-width: 190px; }
 }
+
+/* Table header: a real title, buttons on the right, and the row-count box small on the left
+   instead of a big lone box under the buttons. */
+:root .party-n-table h2.ui-table__title {
+  font-size: 18px; letter-spacing: 0; text-transform: none; color: #0a0a0a; margin: 0;
+}
+:root .party-n-table .ui-table__header { padding-bottom: 8px; align-items: center; }
+:root .party-n-table .ui-table__control-row { justify-content: flex-start; }
+:root .party-n-table .ui-table__controls { padding-bottom: 10px; }
+:root .party-n-table .ui-table__right .ui-dropdown-custom__trigger { min-height: 36px; height: 36px; min-width: 130px; font-size: 13px; }
