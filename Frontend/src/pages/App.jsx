@@ -96,7 +96,8 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   const getLayoutFromPage = (page) => {
     if (page === 'login') {
       return 'auth';
-    } else if (isDashboardPage(page)) {
+    } else if (isDashboardPage(page) || ['products', 'product-detail', 'cart'].includes(page)) {
+      // The shop and the cart sit inside the same frame as the dashboard: one header, one menu, one bottom bar.
       return 'dashboard';
     }
     return 'public';
