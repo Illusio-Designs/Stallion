@@ -140,6 +140,12 @@ const Party = sequelize.define('Party', {
         type: DataTypes.DECIMAL(7, 2),
         allowNull: true
     },
+    // Written address read from the GPS point at the on-site capture (reverse
+    // geocoding), kept next to the typed address so a wrong typed address can be fixed.
+    location_address: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
     is_active: {
         type: DataTypes.BOOLEAN,
         allowNull: false,
