@@ -8,6 +8,8 @@ const TrayReturnTask = require('../models/TrayReturnTask');
 const { trayPieceCount } = require('../utils/trayLifecycle');
 const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const { Op } = require('sequelize');
+const { hasRole } = require('../utils/roleHelpers');
+const { resolveUserScope } = require('../utils/scopeHelpers');
 const { parsePaginationParams, buildPaginatedResponse, getListSearchParams, buildNamePhoneFilter } = require('../utils/listSearchHelpers');
 
 // Adds what the tray cards show: the frames inside (model_no + status), a piece count and the
@@ -61,8 +63,17 @@ class TrayController {
             }
             const { name } = getListSearchParams(req);
             const searchFilter = buildNamePhoneFilter({ name, nameFields: ['tray_name'] });
+            // A salesman sees only the trays that are with him right now.
+            let ownOnly = null;
+            if (hasRole(req.userRoleNames, ['salesman']) && !hasRole(req.userRoleNames, ['admin', 'tray_manager', 'sales_manager'])) {
+                const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                const links = scope.salesmanId
+                    ? await SalesmanTray.findAll({ where: { salesman_id: scope.salesmanId, released_at: null }, attributes: ['tray_id'] })
+                    : [];
+                ownOnly = { tray_id: { [Op.in]: links.map((l) => l.tray_id) } };
+            }
             const { count, rows: trays } = await Tray.findAndCountAll({
-                where: { ...(searchFilter || {}), ...activeOnlyWhere(req) },
+                where: { ...(searchFilter || {}), ...activeOnlyWhere(req), ...(ownOnly || {}) },
                 order: [['tray_name', 'ASC']],
                 limit: pagination.limit,
                 offset: pagination.offset,

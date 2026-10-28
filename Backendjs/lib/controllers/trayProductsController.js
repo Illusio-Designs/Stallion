@@ -6,6 +6,9 @@ const Tray = require('../models/Tray');
 const { TrayProductStatus, TrayProductStatusTransitions, TrayStatus } = require('../constants/enums');
 const { syncTrayStatus } = require('../utils/trayLifecycle');
 const { recordStockMove } = require('../utils/stockLedger');
+const SalesmanTray = require('../models/SalesmanTray');
+const { hasRole } = require('../utils/roleHelpers');
+const { resolveUserScope } = require('../utils/scopeHelpers');
 
 function isValidTrayProductStatus(status) {
     return Object.values(TrayProductStatus).includes(status);
@@ -25,6 +28,14 @@ class TrayProductsController {
             const { id } = req.params;
             if (!id) {
                 return res.status(400).json({ error: 'Tray ID is required' });
+            }
+            // A salesman may open only a tray that is with him.
+            if (hasRole(req.userRoleNames, ['salesman']) && !hasRole(req.userRoleNames, ['admin', 'tray_manager', 'sales_manager'])) {
+                const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                const mine = scope.salesmanId
+                    ? await SalesmanTray.findOne({ where: { salesman_id: scope.salesmanId, tray_id: id, released_at: null } })
+                    : null;
+                if (!mine) return res.status(403).json({ error: 'This tray is not with you' });
             }
             const trayProducts = await TrayProducts.findAll({ where: { tray_id: id } });
             res.status(200).json(trayProducts);
