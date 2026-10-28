@@ -3434,11 +3434,11 @@ const DashboardProducts = () => {
           {uploadProgress && (
             <div style={{
               padding: '12px',
-              backgroundColor: uploadProgress.success ? '#d4edda' : '#f8d7da',
-              border: `1px solid ${uploadProgress.success ? '#c3e6cb' : '#f5c6cb'}`,
+              backgroundColor: uploadProgress.success ? 'var(--ops-ok-bg, #d4edda)' : 'var(--ops-bad-bg, #f8d7da)',
+              border: `1px solid ${uploadProgress.success ? 'var(--ops-ok-line, #c3e6cb)' : 'var(--ops-bad-line, #f5c6cb)'}`,
               borderRadius: '8px',
               marginTop: '16px',
-              color: uploadProgress.success ? '#155724' : '#721c24'
+              color: uploadProgress.success ? 'var(--ops-ok-ink, #155724)' : 'var(--ops-bad-ink, #721c24)'
             }}>
               <strong>{uploadProgress.success ? 'Success!' : 'Error:'}</strong> {uploadProgress.message}
               {uploadProgress.details && (
@@ -3512,23 +3512,23 @@ const DashboardProducts = () => {
                     <div
                       key={item.id}
                       style={{
-                        border: isSelected ? '3px solid #16171d' : '2px solid #e5e7eb',
+                        border: isSelected ? '3px solid var(--ops-sel, #16171d)' : '2px solid var(--ops-line, #e5e7eb)',
                         borderRadius: '8px',
                         overflow: 'hidden',
-                        background: isSelected ? '#f3f4f5' : '#fff',
+                        background: isSelected ? 'var(--ops-sel-bg, #f3f4f5)' : 'var(--ops-card, #fff)',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         position: 'relative'
                       }}
                       onMouseEnter={(e) => {
                         if (!isSelected) {
-                          e.currentTarget.style.borderColor = '#16171d';
+                          e.currentTarget.style.borderColor = 'var(--ops-sel, #16171d)';
                           e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!isSelected) {
-                          e.currentTarget.style.borderColor = '#e5e7eb';
+                          e.currentTarget.style.borderColor = 'var(--ops-line, #e5e7eb)';
                           e.currentTarget.style.boxShadow = 'none';
                         }
                       }}
@@ -3551,8 +3551,8 @@ const DashboardProducts = () => {
                         top: '8px',
                         left: '8px',
                         zIndex: 3,
-                        background: isSelected ? '#16171d' : 'rgba(255, 255, 255, 0.9)',
-                        border: '2px solid #16171d',
+                        background: isSelected ? 'var(--ops-sel, #16171d)' : 'var(--ops-chk-bg, rgba(255, 255, 255, 0.9))',
+                        border: '2px solid var(--ops-sel, #16171d)',
                         borderRadius: '4px',
                         width: '24px',
                         height: '24px',
@@ -3562,7 +3562,7 @@ const DashboardProducts = () => {
                         cursor: 'pointer'
                       }}>
                         {isSelected && (
-                          <span className="text-white text-sm font-bold">✓</span>
+                          <span className="text-white text-sm font-bold" style={{ color: "var(--ops-tick, #fff)" }}>✓</span>
                         )}
                       </div>
                       <div className="w-full aspect-[4/3] bg-surface-muted relative">
