@@ -1,1 +1,156 @@
-/* Dark-mode fixes: shell */
+/* Dark-mode fixes: shell (dashboard layout, header, sidebar, shared UI, home, analytics, settings, support).
+   Light mode is untouched; everything here is scoped to :root[data-theme="dark"]. */
+:root[data-theme="dark"] {
+  --chart-bar: #4a4a50;
+  --ring-track: #cfcfd2;
+  --spin-color: #f2f2f2;
+}
+
+/* ---- Header ---- */
+:root[data-theme="dark"] .dashboard-layout .dashboard-header,
+:root[data-theme="dark"] .dashboard-layout .dashboard-footer { border-color: var(--l-line); }
+:root[data-theme="dark"] .dashboard-header img[src$="logo.webp"] { filter: invert(1); mix-blend-mode: screen; }
+:root[data-theme="dark"] .dashboard-icon-btn:hover,
+:root[data-theme="dark"] .dashboard-menu-btn:hover,
+:root[data-theme="dark"] .dashboard-sidebar-toggle:hover { border-color: var(--color-border-strong); }
+:root[data-theme="dark"] .dashboard-avatar-btn:hover { border-color: var(--t-faint); }
+:root[data-theme="dark"] .dashboard-search-bar:focus-within { box-shadow: var(--focus-ring); }
+:root[data-theme="dark"] .dashboard-search-dropdown,
+:root[data-theme="dark"] .dashboard-user-dropdown,
+:root[data-theme="dark"] .dashboard-notification-panel { box-shadow: var(--shadow-lg); }
+
+/* ---- Sidebar (dark in both themes) ---- */
+:root[data-theme="dark"] .dashboard-sidebar { border-right-color: var(--l-line); }
+:root[data-theme="dark"] .dashboard-sidebar-nav a:hover,
+:root[data-theme="dark"] .dashboard-sidebar .sidebar-toggle:hover,
+:root[data-theme="dark"] .dashboard-sidebar .sidebar-mobile-close:hover { background: var(--b-side-on); }
+:root[data-theme="dark"] .dashboard-sidebar-nav a.active,
+:root[data-theme="dark"] .dashboard-sidebar.collapsed .dashboard-sidebar-nav a.active { background: var(--b-side-on); }
+:root[data-theme="dark"] .dashboard-sidebar-footer { border-top-color: var(--l-line); }
+:root[data-theme="dark"] .dashboard-sidebar-nav a:focus-visible { box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.5); }
+
+/* ---- Bottom nav ---- */
+:root[data-theme="dark"] .dashboard-bottom-nav { box-shadow: 0 10px 30px -8px rgba(0, 0, 0, 0.7); }
+
+/* ---- Ink "hero" cards turn light in dark: their muted text must be dark grey ---- */
+:root[data-theme="dark"] .dash-kpis > .dash-card.metric:first-child h4,
+:root[data-theme="dark"] .dash-kpis > .dash-card.metric:first-child .metric-sub,
+:root[data-theme="dark"] .rda-kpis > .rda-kpi:first-child .rda-kpi__delta,
+:root[data-theme="dark"] .rda-kpis > .rda-kpi:first-child .rda-kpi__lab,
+:root[data-theme="dark"] .rda-kpis > .rda-kpi:first-child .rda-kpi__num small,
+:root[data-theme="dark"] .target-ring__label,
+:root[data-theme="dark"] .target-ring__sub,
+:root[data-theme="dark"] .sh__st--dark small,
+:root[data-theme="dark"] .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-sub { color: #55555a; }
+:root[data-theme="dark"] .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child h4 { color: var(--t-mute); }
+
+/* ---- Home / analytics charts and bars ---- */
+:root[data-theme="dark"] .rdn-bar__track i { background: var(--chart-bar); }
+:root[data-theme="dark"] .rdn-bar:hover .rdn-bar__track i { background: var(--t-faint); }
+:root[data-theme="dark"] .rdn-shop__go:disabled { background: var(--b-soft2); color: var(--t-faint); }
+:root[data-theme="dark"] .rda-prog { background: var(--b-soft2); }
+:root[data-theme="dark"] .rda-prog i { background: var(--t-faint); }
+:root[data-theme="dark"] .rda-pic { background: var(--b-soft2); color: var(--t-ink); }
+:root[data-theme="dark"] .rda-pill.ok { background: var(--c-ok-soft); }
+:root[data-theme="dark"] .sbs__row--none .sbs__fill { background: var(--b-soft2); }
+:root[data-theme="dark"] .sbs__row[aria-pressed="true"] { box-shadow: inset 3px 0 0 var(--t-ink); }
+:root[data-theme="dark"] .sr-chart__line { background: var(--t-faint); }
+:root[data-theme="dark"] .gsr__input::placeholder { color: var(--t-faint); }
+
+/* ---- Status text that was a fixed dark red ---- */
+:root[data-theme="dark"] .ui-badge--danger,
+:root[data-theme="dark"] .stock-badge.danger,
+:root[data-theme="dark"] .offline-banner__row--bad,
+:root[data-theme="dark"] .sbs__chg.dn,
+:root[data-theme="dark"] .sh__chg.dn,
+:root[data-theme="dark"] .sh-warn { color: var(--c-bad); }
+:root[data-theme="dark"] .offline-banner { background: #3b2a14; color: #f0d29a; border-bottom-color: #5a421e; }
+
+/* ---- Focus rings (were near-black translucent) ---- */
+:root[data-theme="dark"] .rda-seg button:focus-visible,
+:root[data-theme="dark"] .rda-btn:focus-visible,
+:root[data-theme="dark"] .rda-shop__at:focus-visible,
+:root[data-theme="dark"] .rdn-action:focus-visible,
+:root[data-theme="dark"] .rdn-shop__field select:focus-visible,
+:root[data-theme="dark"] .rdn-shop__test-btn:focus-visible,
+:root[data-theme="dark"] .rdn-shop__go:focus-visible,
+:root[data-theme="dark"] .needs-attention__item:focus-visible,
+:root[data-theme="dark"] .ui-select:focus-visible,
+:root[data-theme="dark"] .dashboard-avatar-btn:focus-visible,
+:root[data-theme="dark"] button.breadcrumb-item:focus-visible { box-shadow: var(--focus-ring); }
+
+/* ---- Inputs, selects, dropdown triggers: stronger border than white-theme grey ---- */
+:root[data-theme="dark"] .ui-select,
+:root[data-theme="dark"] .ui-dropdown-custom__trigger,
+:root[data-theme="dark"] .ui-pill,
+:root[data-theme="dark"] .ui-manage-cols__summary,
+:root[data-theme="dark"] .ui-page-chip,
+:root[data-theme="dark"] .ui-tab:hover { border-color: var(--color-border-strong); }
+:root[data-theme="dark"] .ui-select:hover { border-color: var(--t-faint); }
+:root[data-theme="dark"] .ui-form .form-group .phone-input-container .selected-flag .arrow { border-top-color: var(--t-mute) !important; }
+:root[data-theme="dark"] .ui-form .form-group .phone-input-container .selected-flag .arrow.up { border-bottom-color: var(--t-mute) !important; }
+:root[data-theme="dark"] .ui-form .form-group .phone-input-container .phone-input-field::placeholder { color: var(--t-faint) !important; }
+:root[data-theme="dark"] .ui-form .form-group .phone-input-container .country-list { box-shadow: var(--shadow-md) !important; }
+
+/* ---- Overlays, panels, popovers ---- */
+:root[data-theme="dark"] .ui-modal__backdrop,
+:root[data-theme="dark"] .ui-aside-panel__backdrop { background: var(--scrim); }
+:root[data-theme="dark"] .ui-aside-panel { box-shadow: -12px 0 32px rgba(0, 0, 0, 0.5); }
+:root[data-theme="dark"] .cal-popover { box-shadow: var(--shadow-lg); }
+:root[data-theme="dark"] .ui-aside-panel,
+:root[data-theme="dark"] .cal-popover { border-color: var(--l-line); }
+
+/* ---- Toasts ---- */
+:root[data-theme="dark"] .Toastify__toast { box-shadow: var(--shadow-lg) !important; }
+:root[data-theme="dark"] .Toastify__toast--success { border-color: #1f5a45 !important; }
+:root[data-theme="dark"] .Toastify__toast--error { border-color: #6a2e2a !important; }
+:root[data-theme="dark"] .Toastify__close-button { color: var(--t-mute) !important; opacity: 0.8; }
+:root[data-theme="dark"] .Toastify__progress-bar { opacity: 0.7; }
+
+/* ---- Chips, breadcrumbs, skeletons ---- */
+:root[data-theme="dark"] .filter-chip:hover { border-color: var(--t-ink); }
+:root[data-theme="dark"] .filter-chip__x { color: var(--t-mute); }
+:root[data-theme="dark"] .filter-chip:hover .filter-chip__x { background: var(--b-soft2); }
+:root[data-theme="dark"] .filter-chip-clear:active { filter: none; }
+:root[data-theme="dark"] button.breadcrumb-item:active { background: var(--b-soft2); }
+:root[data-theme="dark"] .ui-skeleton,
+:root[data-theme="dark"] [class*="skeleton"] {
+  background-image: linear-gradient(90deg, #1e1e20 0, #2a2a2d 40px, #1e1e20 80px);
+}
+
+/* ---- Notification panel (bell) ---- */
+:root[data-theme="dark"] .rdb-panel { box-shadow: var(--shadow-lg); }
+:root[data-theme="dark"] .rdb-item { border-top-color: var(--l-line); }
+:root[data-theme="dark"] .rdb-item__msg { color: var(--t-mute); }
+:root[data-theme="dark"] .rdb-link:focus-visible,
+:root[data-theme="dark"] .rdb-item:focus-visible,
+:root[data-theme="dark"] .rdt-field select:focus-visible,
+:root[data-theme="dark"] .rdt-field input:focus-visible { box-shadow: var(--focus-ring); }
+:root[data-theme="dark"] .rdt-pill--done { border-color: var(--t-faint); color: var(--t-mute); }
+:root[data-theme="dark"] .rdt-field select,
+:root[data-theme="dark"] .rdt-field input { border-color: var(--color-border-strong); }
+:root[data-theme="dark"] .rdt-err { color: var(--c-bad); }
+
+/* ---- Reports / settings / progress / status pills ---- */
+:root[data-theme="dark"] .prog { background: var(--b-soft2); }
+:root[data-theme="dark"] .srchart__bar--revenue { fill: var(--t-faint); }
+:root[data-theme="dark"] .srchart__legend-item--revenue::before { background: var(--t-faint); }
+:root[data-theme="dark"] .dash-card.settings-danger { border-color: #6a2e2a; background: var(--c-bad-soft); }
+:root[data-theme="dark"] .pill.ok { background: var(--c-ok-soft); color: var(--c-ok); }
+:root[data-theme="dark"] .tgl { background: var(--color-grey-400); }
+:root[data-theme="dark"] .gbtn { border-color: var(--color-border-strong); }
+
+/* ---- Error boundary card (inline styles read these) ---- */
+:root[data-theme="dark"] {
+  --eb-page: #0b0b0c;
+  --eb-card: #151516;
+  --eb-line: #2b2b2e;
+  --eb-ink: #f2f2f2;
+  --eb-mute: #a3a3a8;
+  --eb-btn: #f2f2f2;
+  --eb-btn-text: #0a0a0a;
+}
+
+/* ---- goey-toast (blob is an SVG): hairline so it separates from panels ---- */
+:root[data-theme="dark"] .gooey-blobSvg path { stroke: #3a3a3e; stroke-width: 1px; }
+:root[data-theme="dark"] .gooey-blobSvg { filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.6)); }

@@ -38,7 +38,7 @@ class ErrorBoundary extends React.Component {
           alignItems: 'center',
           justifyContent: 'center',
           padding: '24px',
-          background: '#f4f5f7',
+          background: 'var(--eb-page, #f4f5f7)',
           fontFamily: "'Spoof Trial', system-ui, sans-serif",
         }}
       >
@@ -46,17 +46,17 @@ class ErrorBoundary extends React.Component {
           style={{
             maxWidth: '420px',
             textAlign: 'center',
-            background: '#ffffff',
-            border: '1px solid #ebecf0',
+            background: 'var(--eb-card, #ffffff)',
+            border: '1px solid var(--eb-line, #ebecf0)',
             borderRadius: '12px',
             padding: '32px',
             boxShadow: '0 8px 24px rgba(0, 0, 0, 0.10)',
           }}
         >
-          <h1 style={{ fontSize: '20px', margin: '0 0 8px', color: '#1a1b23' }}>
+          <h1 style={{ fontSize: '20px', margin: '0 0 8px', color: 'var(--eb-ink, #1a1b23)' }}>
             Something went wrong
           </h1>
-          <p style={{ fontSize: '14px', color: '#6b6f7d', margin: '0 0 20px', lineHeight: 1.5 }}>
+          <p style={{ fontSize: '14px', color: 'var(--eb-mute, #6b6f7d)', margin: '0 0 20px', lineHeight: 1.5 }}>
             An unexpected error occurred. Reloading the page usually fixes it.
           </p>
           <button
@@ -65,8 +65,8 @@ class ErrorBoundary extends React.Component {
             style={{
               minHeight: '40px',
               padding: '0 20px',
-              background: '#16171d',
-              color: '#ffffff',
+              background: 'var(--eb-btn, #16171d)',
+              color: 'var(--eb-btn-text, #ffffff)',
               border: 'none',
               borderRadius: '8px',
               fontSize: '14px',
