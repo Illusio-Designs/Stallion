@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import '../styles/components/DashboardHeader.css';
-import { FiMaximize, FiMinimize, FiBell, FiMenu, FiSidebar } from './icons/hugeicons';
+import { FiBell, FiMenu, FiSidebar } from './icons/hugeicons';
 import Tooltip from './ui/Tooltip';
 import InstallAppButton from './InstallAppButton';
 import { resolveProfileImageUrl } from '../utils/profileImage';
@@ -15,7 +15,6 @@ import '../styles/redesign-n-tasks.css';
 const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuToggle, onToggleSidebar }) => {
   const [userName, setUserName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const userMenuRef = useRef(null);
 
@@ -207,21 +206,6 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
     }
   }, []);
 
-  useEffect(() => {
-    const handleFsChange = () => {
-      const fsEl = document.fullscreenElement || document.webkitFullscreenElement || document.msFullscreenElement;
-      setIsFullscreen(!!fsEl);
-    };
-    document.addEventListener('fullscreenchange', handleFsChange);
-    document.addEventListener('webkitfullscreenchange', handleFsChange);
-    document.addEventListener('msfullscreenchange', handleFsChange);
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFsChange);
-      document.removeEventListener('webkitfullscreenchange', handleFsChange);
-      document.removeEventListener('msfullscreenchange', handleFsChange);
-    };
-  }, []);
-
   // Close user dropdown when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -251,18 +235,6 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
     return `${first}${second}`.toUpperCase();
   }, [userName]);
 
-  const toggleFullscreen = () => {
-    const doc = document;
-    const docEl = document.documentElement;
-    const fsEl = doc.fullscreenElement || doc.webkitFullscreenElement || doc.msFullscreenElement;
-    if (!fsEl) {
-      const req = docEl.requestFullscreen || docEl.webkitRequestFullscreen || docEl.msRequestFullscreen;
-      if (req) req.call(docEl);
-    } else {
-      const exit = doc.exitFullscreen || doc.webkitExitFullscreen || doc.msExitFullscreen;
-      if (exit) exit.call(doc);
-    }
-  };
 
   return (
     <header className={`dashboard-header sticky top-0 z-[5] bg-surface border-b border-border ml-0 ${isCollapsed ? 'collapsed' : 'expanded'}`}>
@@ -366,11 +338,6 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
                 </div>
               )}
             </div>
-            <Tooltip label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} placement="bottom">
-              <button className="dashboard-icon-btn bg-transparent border-none w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]" aria-label={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen'} onClick={toggleFullscreen}>
-                {isFullscreen ? <FiMinimize size={20} /> : <FiMaximize size={20} />}
-              </button>
-            </Tooltip>
             <div className="dashboard-user-menu relative" ref={userMenuRef}>
               <button
                 className="dashboard-avatar-btn has-tooltip group relative bg-primary-soft border border-border w-10 h-10 rounded-pill inline-flex items-center justify-center cursor-pointer overflow-visible transition duration-200 ease-[ease] motion-reduce:transition-none hover:border-border-strong focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
