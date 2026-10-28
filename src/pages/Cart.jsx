@@ -333,7 +333,7 @@ const Cart = ({ onPageChange = null }) => {
       }
       const res = await verifyPartyLocation(selectedParty, pos);
       const acc = Number(res?.accuracy);
-      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 50m geofence is now active for this party.`);
+      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 100m geofence is now active for this party.`);
       setParties(prev => prev.map(p => {
         const id = p.id || p.party_id;
         return id === selectedParty
@@ -349,7 +349,7 @@ const Cart = ({ onPageChange = null }) => {
 
   // Early read of the phone's GPS when the order type is chosen (it also asks for
   // permission up front). Only real GPS is used: an IP-based guess is accurate to
-  // a city at best and can never satisfy the shop's 50 m check. The position used
+  // a city at best and can never satisfy the shop's distance check. The position used
   // for the order is read again at checkout (see handleCheckout).
   const requestLocation = async () => {
     try {
@@ -1548,8 +1548,8 @@ const Cart = ({ onPageChange = null }) => {
                       <div className={`flex flex-col gap-1.5 cart-notice ${(!verified || farAway) ? 'cart-notice--bad' : ''}`}>
                         <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
                           {verified
-                            ? `Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 50m geofence active.`
-                            : 'Location not verified yet. Stand at the shop and tap below to enable the 50m geofence.'}
+                            ? `Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 100m geofence active.`
+                            : 'Location not verified yet. Stand at the shop and tap below to enable the 100m geofence.'}
                         </p>
                         {verified && (
                           <p className={`m-0 text-[length:var(--text-xs)] ${visitDistance && visitDistance.meters != null && visitDistance.meters > GEOFENCE_RADIUS_M ? 'text-error' : 'text-text-muted'}`} role="status">
