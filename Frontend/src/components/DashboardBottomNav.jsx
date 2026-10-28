@@ -84,7 +84,7 @@ const DashboardBottomNav = ({ onPageChange, currentPage }) => {
       aria-label="Dashboard"
     >
       {primary.map((it) => {
-        const active = currentPage === it.id;
+        const active = currentPage === it.id || (it.id === 'shop' && ['products', 'product-detail'].includes(currentPage));
         const Icon = ICONS[it.id] || FiGrid;
         return (
           <button
