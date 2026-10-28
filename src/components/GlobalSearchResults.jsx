@@ -13,7 +13,8 @@ const FIELD_ROLES = new Set(['salesman', 'distributor', 'party']);
 const matchedIn = (item, term, fields) => {
   const t = String(term || '').trim().toLowerCase();
   if (!t) return '';
-  const hit = fields.find(([key]) => String(item[key] ?? '').toLowerCase().includes(t));
+  const tight = t.replace(/\s+/g, '');
+  const hit = fields.find(([key]) => { const v = String(item[key] ?? '').toLowerCase(); return v.includes(t) || v.replace(/\s+/g, '').includes(tight); });
   return hit ? `${hit[1]}: ${item[hit[0]]}` : '';
 };
 const PARTY_MATCH = [['party_name', 'Name'], ['trade_name', 'Trade name'], ['contact_person', 'Contact'], ['phone', 'Phone'], ['city_name', 'City'], ['gstin', 'GST']];
