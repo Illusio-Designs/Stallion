@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light only">
+<title>Offline | Stallion Eyewear</title>
+<style>
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{display:flex;align-items:center;justify-content:center;padding:24px;background:#fff;color:#0a0a0a;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;text-align:center}
+  main{max-width:360px}
+  .ic{width:64px;height:64px;border-radius:18px;background:#0a0a0a;color:#fff;display:grid;place-items:center;margin:0 auto 18px;font-size:28px}
+  h1{font-size:22px;margin:0 0 8px}
+  p{margin:0 0 20px;color:#595959;line-height:1.5}
+  button{height:48px;padding:0 28px;border-radius:12px;border:0;background:#0a0a0a;color:#fff;font:inherit;font-weight:700;font-size:15px;cursor:pointer}
+  button:focus-visible{outline:2px solid #0a0a0a;outline-offset:3px}
+</style>
+</head>
+<body>
+<main>
+  <div class="ic" aria-hidden="true">&#9679;</div>
+  <h1>You are offline</h1>
+  <p>There is no internet signal right now. Visits you saved are kept on this phone and are sent when you are back online.</p>
+  <button type="button" onclick="location.reload()">Try again</button>
+</main>
+</body>
+</html>

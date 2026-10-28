@@ -15,6 +15,8 @@ import "../styles/redesign-l.css";
 import "../styles/redesign-m.css";
 import "../styles/redesign-n-touch.css";
 import "../styles/redesign-n-polish.css";
+import "../styles/redesign-n-app.css";
+import RegisterServiceWorker from "../components/RegisterServiceWorker";
 import LoaderProvider from "../components/LoaderProvider";
 import ToastContainerProvider from "../components/ToastContainerProvider";
 import ErrorBoundary from "../components/ErrorBoundary";
@@ -38,6 +40,9 @@ export const metadata = {
   },
   other: {
     'color-scheme': 'light only',
+    // Older iPhones only open the home-screen icon full screen with this tag.
+    'apple-mobile-web-app-capable': 'yes',
+    'format-detection': 'telephone=no',
   },
 };
 
@@ -64,6 +69,7 @@ export default function RootLayout({ children }) {
         <meta name="color-scheme" content="light only" />
       </head>
       <body className="antialiased" style={{colorScheme: 'light'}}>
+        <RegisterServiceWorker />
         <ErrorBoundary>
           <LoaderProvider>
             <ToastContainerProvider>
