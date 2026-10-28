@@ -27,6 +27,9 @@ app.use((req, res, next) => {
     next();
 });
 app.use(express.json());
+// Express 5 leaves req.body undefined when a request has no body (a DELETE, a bare POST). Handlers read
+// fields from it, so give them an empty object instead of a crash.
+app.use((req, _res, next) => { if (req.body === undefined) req.body = {}; next(); });
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads directory with absolute path
