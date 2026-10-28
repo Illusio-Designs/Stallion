@@ -581,7 +581,7 @@ const DashboardClients = () => {
     if (d.blocked) {
       const names = d.names || {};
       showWarning(`${names[d.blocked.what] || d.blocked.name} is switched off in Manage. The address is filled in; ask an admin to switch it on, then pick the ${d.blocked.what} yourself.`);
-      setFormData(prev => ({ ...prev, address: d.address_line || d.suggestion_main || d.address, pincode: d.pincode || prev.pincode, address_lat: d.latitude ?? null, address_lng: d.longitude ?? null }));
+      setFormData(prev => ({ ...prev, address: d.address || d.address_line || d.suggestion_main, pincode: d.pincode || prev.pincode, address_lat: d.latitude ?? null, address_lng: d.longitude ?? null }));
       return;
     }
     isInitializingEditRef.current = true;
@@ -597,7 +597,7 @@ const DashboardClients = () => {
       }
       setFormData(prev => ({
         ...prev,
-        address: d.address_line || d.suggestion_main || d.address,
+        address: d.address || d.address_line || d.suggestion_main,
         pincode: d.pincode || prev.pincode,
         // The shop's point comes from the picked address; it is saved with the party.
         address_lat: d.latitude ?? null,
@@ -1352,8 +1352,8 @@ const DashboardClients = () => {
           onChange={(e) => handleInputChange('prefered_courier', e.target.value)}
         />
       </div>
-      <div className="form-group form-group--full party-form__section"><h5>Address</h5></div>
-      <div className="form-group">
+      <div className="form-group form-group--full party-form__section"><h5>Shipping address</h5></div>
+      <div className="form-group form-group--full">
         <label className="ui-label">Address *</label>
         <AddressAutocomplete
           value={formData.address}
@@ -1362,30 +1362,6 @@ const DashboardClients = () => {
           showStatus={isAdmin || userRole === 'party_manager' || userRole === 'sales_manager'}
         />
       </div>
-      <div className="form-group form-group--full">
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            className="accent-primary"
-            checked={formData.billing_same_as_shipping !== false}
-            onChange={(e) => handleInputChange('billing_same_as_shipping', e.target.checked)}
-          />
-          <span className="ui-label m-0">Billing address same as shipping</span>
-        </label>
-      </div>
-      {formData.billing_same_as_shipping === false && (
-        <div className="form-group form-group--full">
-          <label className="ui-label">Billing Address</label>
-          <textarea
-            className="ui-input"
-            rows={2}
-            style={{ minHeight: 64, resize: 'vertical', lineHeight: 1.4 }}
-            placeholder="Billing address"
-            value={formData.billing_address}
-            onChange={(e) => handleInputChange('billing_address', e.target.value)}
-          />
-        </div>
-      )}
       <div className="form-group">
         <label className="ui-label">Country *</label>
         <DropdownSelector
@@ -1472,6 +1448,31 @@ const DashboardClients = () => {
           onChange={(e) => handleInputChange('pincode', e.target.value)}
         />
       </div>
+      <div className="form-group form-group--full party-form__section"><h5>Billing address</h5></div>
+      <div className="form-group form-group--full">
+        <label className="flex cursor-pointer items-center gap-2">
+          <input
+            type="checkbox"
+            className="accent-primary"
+            checked={formData.billing_same_as_shipping !== false}
+            onChange={(e) => handleInputChange('billing_same_as_shipping', e.target.checked)}
+          />
+          <span className="ui-label m-0">Billing address same as shipping</span>
+        </label>
+      </div>
+      {formData.billing_same_as_shipping === false && (
+        <div className="form-group form-group--full">
+          <label className="ui-label">Billing Address</label>
+          <textarea
+            className="ui-input"
+            rows={2}
+            style={{ minHeight: 64, resize: 'vertical', lineHeight: 1.4 }}
+            placeholder="Billing address"
+            value={formData.billing_address}
+            onChange={(e) => handleInputChange('billing_address', e.target.value)}
+          />
+        </div>
+      )}
       <div className="form-group form-group--full party-form__section"><h5>GST, PAN and credit</h5></div>
       <div className="form-group">
         <label className="ui-label">GSTIN</label>

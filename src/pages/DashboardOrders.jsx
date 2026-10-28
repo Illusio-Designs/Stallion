@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
+import { addressRows } from '../utils/addressParts';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
 import AsidePanel from '../components/ui/AsidePanel';
@@ -384,6 +385,8 @@ const DashboardOrders = () => {
         clientAddress: partyAddress,
         partyCity: (typeof order.party?.city === 'string' ? order.party.city : order.party?.city?.name) || order.party_city || '',
         clientBillingAddress: partyBillingAddress,
+        shipParts: order.party_address_parts || null,
+        billParts: order.party_billing_address_parts || null,
         salesman: salesmanLabel,
         date: orderDate,
         qty: totalQuantity,
@@ -1027,10 +1030,17 @@ const DashboardOrders = () => {
                 <p className="ord-view__lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Only admin and order managers can edit or cancel this order.</span></p>
               )}
 
-              {viewRow.clientAddress && (
+              {addressRows(viewRow.shipParts, viewRow.clientAddress).length > 0 && (
                 <div>
                   <h5 className="ord-view__section-title">Shipping Address</h5>
-                  <div className="ord-notes">{viewRow.clientAddress}</div>
+                  <div className="ord-view__summary">
+                    {addressRows(viewRow.shipParts, viewRow.clientAddress).map(([label, value]) => (
+                      <div className="ord-field" key={label}>
+                        <span className="ord-field__label">{label}</span>
+                        <span className="ord-field__value">{value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
