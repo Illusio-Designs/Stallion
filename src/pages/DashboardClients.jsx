@@ -435,35 +435,22 @@ const DashboardClients = () => {
     return rows;
   }, [rows, activeTab]);
 
-  // List tools (display only): client-side search + location chips over loaded rows.
+  // List tools (display only): client-side search over loaded rows.
   const [partySearch, setPartySearch] = useState('');
   const [partyQuery, setPartyQuery] = useState(''); // debounced copy of partySearch
   useEffect(() => {
     const t = setTimeout(() => setPartyQuery(partySearch), 250);
     return () => clearTimeout(t);
   }, [partySearch]);
-  const [locChip, setLocChip] = useState('');
-  const LOC_CHIPS = [
-    { key: '', label: 'Any location' },
-    { key: 'ok', label: 'Exact spot' },
-    { key: 'warn', label: 'From address' },
-    { key: 'idle', label: 'Not set' },
-  ];
-  const locCounts = useMemo(() => {
-    const c = { '': rowsByTab.length, ok: 0, warn: 0, idle: 0 };
-    rowsByTab.forEach(r => { c[r.locationState] = (c[r.locationState] || 0) + 1; });
-    return c;
-  }, [rowsByTab]);
   // The list endpoints return every page of the user's parties, so search runs over the loaded rows.
   const filteredRowsByTab = useMemo(() => {
     const q = partyQuery.trim().toLowerCase();
     return rowsByTab.filter(r => {
-      if (locChip && r.locationState !== locChip) return false;
       if (!q) return true;
       return [r.party_name, r.trade_name, r.contact_person, r.phone, r.cityLabel, r.gstin]
         .some(v => String(v || '').toLowerCase().includes(q));
     });
-  }, [rowsByTab, partyQuery, locChip]);
+  }, [rowsByTab, partyQuery]);
   const handleExportParties = () => {
     downloadCsv('parties', [
       { label: 'Party name', value: r => r.party_name },
@@ -1610,14 +1597,6 @@ const DashboardClients = () => {
               rowOnPhone
             />
             <button type="button" className="gbtn" onClick={handleExportParties} disabled={loading || filteredRowsByTab.length === 0}>Export CSV</button>
-          </div>
-          <div className="gchips" role="group" aria-label="Location">
-            <span className="party-tools__label" aria-hidden="true">Shop location</span>
-            {LOC_CHIPS.map(c => (
-              <button key={c.key} type="button" aria-pressed={locChip === c.key} className={`gchip ${locChip === c.key ? 'on' : ''}`} onClick={() => setLocChip(c.key)}>
-                {c.label} <b>{locCounts[c.key] || 0}</b>
-              </button>
-            ))}
           </div>
         </div>
         <div className="dash-row">
