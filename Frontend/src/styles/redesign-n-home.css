@@ -60,6 +60,16 @@
 :root .rdn-shop__dist.ok { color: #1e7a3c; font-weight: 600; }
 :root .rdn-shop__dist.far { color: #b3261e; font-weight: 600; }
 :root .rdn-linkbtn { border: 0; background: transparent; padding: 0; font: inherit; font-size: 13px; font-weight: 600; color: #0a0a0a; text-decoration: underline; cursor: pointer; }
+:root .rdn-shop__test { display: flex; flex-direction: column; gap: 10px; }
+:root .rdn-shop__test-btn { height: 48px; border-radius: 12px; border: 1px solid #0a0a0a; background: #ffffff; color: #0a0a0a; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+:root .rdn-shop__test-btn:hover:not(:disabled) { background: #f4f4f4; }
+:root .rdn-shop__test-btn:disabled { opacity: .5; cursor: not-allowed; }
+:root .rdn-shop__test-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(10, 10, 10, 0.25); }
+:root .rdn-shop__visit { font-size: 13px; color: #595959; }
+:root .rdn-shop__visit summary { cursor: pointer; font-weight: 600; color: #0a0a0a; min-height: 32px; display: flex; align-items: center; }
+:root .rdn-shop__visit ul { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+:root .rdn-shop__visit li { display: flex; flex-direction: column; gap: 2px; }
+:root .rdn-shop__visit small { color: #b3261e; }
 :root .rdn-shop__go { height: 48px; border-radius: 12px; border: 0; background: #0a0a0a; color: #ffffff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
 :root .rdn-shop__go:hover:not(:disabled) { background: #1c1c1c; }
 :root .rdn-shop__go:disabled { background: #c2c2c2; cursor: not-allowed; }
@@ -68,6 +78,7 @@
 @media (min-width: 768px) {
   :root .rdn-shop__field select { max-width: 480px; }
   :root .rdn-shop__go { align-self: flex-start; padding: 0 28px; }
+  :root .rdn-shop__test-btn { align-self: flex-start; padding: 0 28px; }
 }
 @media (max-width: 560px) {
   :root .rdn-actions { grid-template-columns: minmax(0, 1fr); }
