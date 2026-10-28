@@ -1,1 +1,112 @@
-/* Dark-mode fixes: public */
+/* Dark-mode fixes: public / storefront (Home, Shop, Product detail, Cart, Login, About, Footer, Header) */
+:root[data-theme="dark"] {
+  --pub-img-panel: #f1f1f2; /* product photos have light backgrounds: keep a light neutral panel so black frames stay visible */
+}
+
+/* ---- Logo: the artwork is ink on white. Invert and screen-blend so the white box disappears ---- */
+:root[data-theme="dark"] .logo-image,
+:root[data-theme="dark"] .footer-logo-image,
+:root[data-theme="dark"] .auth-brand-logo {
+  filter: invert(1);
+  mix-blend-mode: screen;
+}
+
+/* ---- Skeletons ---- */
+:root[data-theme="dark"] .ui-skeleton {
+  background-color: var(--b-soft2);
+  background-image: linear-gradient(90deg, var(--b-soft2) 0, #343438 40px, var(--b-soft2) 80px);
+}
+
+/* ---- Product image panels stay light ---- */
+:root:root[data-theme="dark"] .product-card .product-image,
+:root:root[data-theme="dark"] .products-grid-container .product-card .product-image,
+:root:root[data-theme="dark"] .products-grid .product-image,
+:root:root[data-theme="dark"] .pdp-big,
+:root:root[data-theme="dark"] .pdp-thumb,
+:root:root[data-theme="dark"] .pdp-other-img,
+:root:root[data-theme="dark"] .cart-page .item-image,
+:root:root[data-theme="dark"] .item-image {
+  background: var(--pub-img-panel);
+}
+:root:root[data-theme="dark"] .product-card .pc-image-placeholder {
+  background-color: #dcdcde;
+}
+:root:root[data-theme="dark"] .product-card .pc-image-unavailable {
+  background: var(--pub-img-panel);
+  color: #6b6b70;
+}
+:root:root[data-theme="dark"] .pdp-thumb.on { box-shadow: 0 0 0 1px var(--t-ink); }
+:root:root[data-theme="dark"] .pdp-thumb { border-color: var(--l-line); }
+:root:root[data-theme="dark"] .pdp-thumb:not(.on) img { opacity: 0.8; }
+
+/* ---- Light surfaces that used the ink token as a dark panel ---- */
+:root[data-theme="dark"] .auth-panel,
+:root[data-theme="dark"] .hero-section .hero-content,
+:root[data-theme="dark"] .about-hero {
+  background: var(--b-soft);
+  color: var(--t-ink);
+}
+:root[data-theme="dark"] .auth-panel { border-right: 1px solid var(--l-line); }
+:root[data-theme="dark"] .auth-headline,
+:root[data-theme="dark"] .hero-section .hero-content h1,
+:root[data-theme="dark"] .about-hero h1 { color: var(--t-ink) !important; }
+:root[data-theme="dark"] .auth-panel-text,
+:root[data-theme="dark"] .hero-section .hero-content p,
+:root[data-theme="dark"] .about-hero-lede,
+:root[data-theme="dark"] .about-eyebrow { color: var(--t-mute) !important; }
+:root[data-theme="dark"] .about-eyebrow--dark { color: var(--t-faint) !important; }
+:root[data-theme="dark"] .auth-brand:focus-visible { box-shadow: var(--focus-ring); }
+:root[data-theme="dark"] .hero-section .hero-secondary-cta { border-color: var(--l-line); color: var(--t-ink); }
+:root[data-theme="dark"] .hero-section .hero-secondary-cta:hover { background: var(--b-soft2); }
+:root[data-theme="dark"] .about-hero-overlay { background: linear-gradient(180deg, rgba(0,0,0,.35) 0%, rgba(0,0,0,.6) 100%); }
+:root[data-theme="dark"] .about-image-overlay {
+  background: linear-gradient(304.14deg, var(--color-surface) 21.59%, rgba(21,21,22,.35) 72.31%, var(--color-surface) 89.86%);
+}
+:root[data-theme="dark"] .about-goggles-icon { opacity: 0.08; }
+
+/* ---- Login ---- */
+:root[data-theme="dark"] .auth-split .login-phone-row { background: var(--b-soft); }
+:root[data-theme="dark"] .auth-split .ui-btn--primary:hover:not(:disabled) { border-color: var(--t-ink); }
+:root[data-theme="dark"] .auth-split .otp-input:focus,
+:root[data-theme="dark"] .auth-split .login-container input:focus { box-shadow: var(--focus-ring); }
+
+/* ---- Header / search / buttons ---- */
+:root[data-theme="dark"] .search-bar input::placeholder { color: var(--t-faint); }
+:root[data-theme="dark"] .search-bar:focus-within { box-shadow: var(--focus-ring); }
+:root[data-theme="dark"] .hd-btn--ghost:hover { border-color: var(--color-border-strong); }
+
+/* ---- Footer: decorative gradient/bg image ---- */
+:root[data-theme="dark"] .footer-bg-image { opacity: 0.25; }
+
+/* ---- Product card ---- */
+:root[data-theme="dark"] .product-card .pc-qty-btn:hover:not(:disabled) { background: var(--b-soft2); }
+:root[data-theme="dark"] .products-page .product-card .pc-sub { color: var(--t-mute); }
+:root[data-theme="dark"] .product-card .pc-badge.pc-pill--ok::before { background: var(--c-ok); }
+:root[data-theme="dark"] .product-card .pc-badge.pc-pill--bad { border-color: var(--c-bad-soft); }
+:root[data-theme="dark"] .product-card .pc-badge.pc-pill--bad::before { background: var(--c-bad); }
+
+/* ---- Product detail ---- */
+:root:root[data-theme="dark"] .pdp-stock.ok { border-color: var(--c-ok-soft); }
+:root:root[data-theme="dark"] .pdp-stock.warn { border-color: var(--b-soft2); }
+:root:root[data-theme="dark"] .pdp-chip,
+:root:root[data-theme="dark"] .pdn-chip,
+:root:root[data-theme="dark"] .pdp-qty,
+:root:root[data-theme="dark"] .shop-swatch > span { border-color: var(--color-border-strong); }
+:root:root[data-theme="dark"] .pdp-add.is-added { background: var(--c-ok-soft); color: var(--c-ok); border-color: var(--c-ok); }
+:root:root[data-theme="dark"] .pdp-sticky { box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.5); }
+:root:root[data-theme="dark"] .shop-chip--x { border-color: var(--l-line); }
+:root:root[data-theme="dark"] .shop-opt input { accent-color: var(--t-ink); }
+:root:root[data-theme="dark"] .shop-sheet-scrim { background: var(--scrim); }
+
+/* ---- Toasts ---- */
+:root[data-theme="dark"] .Toastify__toast { box-shadow: var(--shadow-lg); }
+:root[data-theme="dark"] .Toastify__toast--success { border-color: #1f5c47 !important; }
+:root[data-theme="dark"] .Toastify__toast--error { border-color: #6b2f2b !important; }
+:root[data-theme="dark"] .Toastify__toast--info,
+:root[data-theme="dark"] .Toastify__toast--warning,
+:root[data-theme="dark"] .Toastify__toast--default { background: var(--b-card); color: var(--t-ink); border-color: var(--l-line); }
+
+/* ---- Breadcrumb / filter chips ---- */
+:root[data-theme="dark"] button.breadcrumb-item:active { background: var(--b-soft2); }
+:root[data-theme="dark"] .filter-chip__x { color: var(--t-mute); }
+:root[data-theme="dark"] .filter-chip:hover .filter-chip__x { background: var(--b-soft2); color: var(--t-ink); }
