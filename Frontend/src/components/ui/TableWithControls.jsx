@@ -218,6 +218,7 @@ export default function TableWithControls({
   return (
     <div className="ui-table-container">
     <div className="ui-table">
+      <div className="ui-table__top">
       <div className="ui-table__header">
         <TitleTag className="ui-table__title">{title}</TitleTag>
         <div className="ui-table__actions">
@@ -300,6 +301,7 @@ export default function TableWithControls({
             )}
           </div>
         </div>
+      </div>
       </div>
 
       <div className="ui-table__scroll">

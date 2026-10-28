@@ -18,3 +18,13 @@
 @media (max-width: 899px) {
   :root .party-tools__label { display: none; }
 }
+
+/* Every table: title on the left, then the date / row-count controls, then the action buttons,
+   all on one line (they wrap onto a second line only when there is no room). */
+@media (min-width: 721px) {
+  :root .ui-table__top { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-bottom: 12px; }
+  :root .ui-table__top > .ui-table__header { display: contents; }
+  :root .ui-table__top .ui-table__title { flex: 1 1 auto; order: 0; margin: 0; }
+  :root .ui-table__top > .ui-table__controls { order: 1; padding: 0; }
+  :root .ui-table__top .ui-table__actions { order: 2; }
+}
