@@ -445,3 +445,12 @@ footer.footer, footer.footer > *, .footer .footer-background { background: #ffff
 @media (max-width: 860px) {
   .hero-section .hero-content { width: calc(100% - 32px) !important; padding: 36px 24px !important; }
 }
+
+/* The shop sits inside the dashboard frame now (which already pads the page), so the shop page
+   adds no side padding of its own and phones keep two product columns. */
+.dashboard-content .products-page { padding-left: 0; padding-right: 0; background: transparent; }
+@media (max-width: 640px) {
+  div.products-grid-container.grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .products-grid-container .product-card { padding: 8px; }
+  .products-grid-container .product-card .product-image { height: 112px; }
+}
