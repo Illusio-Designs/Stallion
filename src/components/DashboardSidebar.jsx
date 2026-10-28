@@ -65,6 +65,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     analytics: FiBarChart2,
     support: FiHelpCircle,
     settings: FiSettings,
+    shop: FiShoppingBag,
   };
   
   // Role comes from localStorage, which doesn't exist during SSR. Reading it
@@ -78,29 +79,33 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
   const userRoles = mounted ? getUserRoles() : [];
 
   // All available menu items
+  // In the order people work: home, the shop, then orders and parties, then the rest.
   const allMenuItems = [
     { id: 'dashboard', text: 'Dashboard' },
-    { id: 'dashboard-products', text: 'Products' },
     { id: 'orders', text: 'Orders' },
+    { id: 'party', text: 'Parties' },
     { id: 'expenses', text: 'Expenses' },
-    { id: 'tray', text: 'Sample' },
+    { id: 'dashboard-products', text: 'Products' },
+    { id: 'tray', text: 'Sample trays' },
     { id: 'events', text: 'Events' },
     { id: 'offers', text: 'Offers' },
-    { id: 'party', text: 'Party' },
     { id: 'salesmen', text: 'Salesmen' },
-    { id: 'distributor', text: 'Distributor' },
-    { id: 'office-team', text: 'Office Team' },
+    { id: 'distributor', text: 'Distributors' },
+    { id: 'office-team', text: 'Office team' },
     { id: 'manage', text: 'Manage' },
-    { id: 'analytics', text: 'Analytics & Reports' },
+    { id: 'analytics', text: 'Reports' },
     { id: 'support', text: 'Support' },
     { id: 'settings', text: 'Settings' },
   ];
+
   
   // Filter menu items based on the union of the user's roles
   const rolesKey = userRoles.join(',');
   const menuItems = useMemo(() => {
-    if (!userRoles.length) return allMenuItems; // If no role, show all (fallback)
-    return filterMenuItemsByRoles(allMenuItems, userRoles);
+    const list = userRoles.length ? filterMenuItemsByRoles(allMenuItems, userRoles) : allMenuItems; // no role: show all (fallback)
+    // The shop is a row of this menu too, right after the Dashboard (there is no separate shop navigation).
+    const at = list.findIndex((it) => it.id === 'dashboard');
+    return [...list.slice(0, at + 1), { id: 'shop', text: 'Shop' }, ...list.slice(at + 1)];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolesKey]);
 
@@ -158,7 +163,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
                     ? 'mx-auto h-11 w-11 justify-center p-0'
                     : 'min-h-10 gap-3 px-3 py-2'
                 } ${
-                  currentPage === item.id
+                  (currentPage === item.id || (item.id === 'shop' && ['products', 'product-detail', 'cart'].includes(currentPage)))
                     ? isCollapsed
                       ? 'active bg-accent text-text-on-primary font-semibold'
                       : "active bg-primary text-text-on-primary font-semibold before:absolute before:left-[-12px] before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-pill before:bg-accent before:content-['']"
@@ -169,7 +174,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
                   // A long-press only shows the label; it must not navigate.
                   if (longPressed.current) { longPressed.current = false; return; }
                   hideTip();
-                  onPageChange(item.id);
+                  onPageChange(item.id === 'shop' ? 'products' : item.id);
                   onMobileClose?.();
                 }}
                 {...tipHandlers(item.text)}
@@ -187,24 +192,6 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
               </a>
             </li>
           ))}
-          {/* The shop is one more row of this menu (there is no separate shop navigation
-              or "Back to Shop" button any more). */}
-          <li className="relative mb-1 overflow-visible">
-            <a
-              href="/products"
-              className={`group relative flex items-center overflow-visible rounded-md text-text-muted no-underline transition-[background-color,color] duration-200 ease-[ease] outline-none hover:bg-grey-100 hover:text-text focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] active:scale-[0.98] motion-reduce:transition-none ${
-                isCollapsed ? 'mx-auto h-11 w-11 justify-center p-0' : 'min-h-10 gap-3 px-3 py-2'
-              }`}
-              onClick={() => onMobileClose?.()}
-              aria-label="Shop"
-              {...tipHandlers('Shop')}
-            >
-              <span className="sidebar-icon inline-flex h-5 w-5 flex-shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5 [&>svg]:flex-shrink-0">
-                <FiShoppingBag size={20} aria-hidden="true" />
-              </span>
-              {!isCollapsed && <span className="sidebar-text whitespace-nowrap text-[length:var(--text-base)]">Shop</span>}
-            </a>
-          </li>
         </ul>
       </nav>
       <div
