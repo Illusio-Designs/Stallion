@@ -128,7 +128,7 @@ class ProductController {
             if (pageNum < 1 || limitNum < 1) {
                 return res.status(400).json({ error: 'Page and limit must be positive numbers' });
             }
-            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody, product_ids, image_status, status } = req.body;
+            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody, product_ids, image_status, status, in_stock } = req.body;
             const { name: nameQuery } = getListSearchParams(req);
             const search = (searchQuery || searchBody || nameQuery || '').trim();
             const conditions = [];
@@ -181,6 +181,10 @@ class ProductController {
                 || String(status || '').trim().toLowerCase() === 'active';
             if (wantsActive) {
                 conditions.push({ is_active: true });
+            }
+            // The shop lists only frames that can be ordered: warehouse plus tray stock above zero.
+            if (in_stock === true || String(in_stock).toLowerCase() === 'true') {
+                conditions.push(Sequelize.literal(`(COALESCE(\`${Product.name}\`.warehouse_qty, 0) + COALESCE(\`${Product.name}\`.tray_qty, 0)) > 0`));
             }
             if (price) {
                 conditions.push({
