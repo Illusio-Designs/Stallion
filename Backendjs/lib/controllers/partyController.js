@@ -42,11 +42,23 @@ const withSalesmanNames = async (rows) => {
         stateIds.length ? State.findAll({ where: { id: { [Op.in]: stateIds } }, attributes: ['id', 'name'] }) : [],
     ]);
     const names = new Map(sms.map((m) => [m.salesman_id, m.full_name]));
+    // A party with no salesman of its own is served by the salesmen who work in its state.
+    const noOwnerStates = [...new Set(plain.filter((p) => !p.salesman_id && p.state_id).map((p) => p.state_id))];
+    const byState = new Map();
+    if (noOwnerStates.length) {
+        const links = await SalesmanStates.findAll({ where: { state_id: { [Op.in]: noOwnerStates } }, attributes: ['salesman_id', 'state_id'] });
+        const people = await Salesman.findAll({ where: { salesman_id: { [Op.in]: [...new Set(links.map((l) => l.salesman_id))] } }, attributes: ['salesman_id', 'full_name'] });
+        const nameOf = new Map(people.map((m) => [m.salesman_id, m.full_name]));
+        links.forEach((l) => {
+            const n = nameOf.get(l.salesman_id);
+            if (n) byState.set(l.state_id, [...(byState.get(l.state_id) || []), n]);
+        });
+    }
     const cityNames = new Map(cities.map((c) => [c.id, c.name]));
     const stateNames = new Map(states.map((x) => [x.id, x.name]));
     return plain.map((p) => ({
         ...p,
-        salesman_name: names.get(p.salesman_id) || null,
+        salesman_name: names.get(p.salesman_id) || (byState.get(p.state_id) || []).join(', ') || null,
         city_name: cityNames.get(p.city_id) || null,
         state_name: stateNames.get(p.state_id) || null,
     }));
