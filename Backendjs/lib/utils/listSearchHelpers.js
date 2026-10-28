@@ -1,4 +1,4 @@
-const { Op } = require('sequelize');
+const { Op, fn, col, where: sqlWhere } = require('sequelize');
 
 /** Optional `name`, `search` (alias for name), and `phone` from query string. */
 function getListSearchParams(req) {
@@ -14,14 +14,18 @@ function getListSearchParams(req) {
  * Build a Sequelize where fragment for partial name / phone matches.
  * `name` matches any of `nameFields`; `phone` matches any of `phoneFields`.
  */
-function buildNamePhoneFilter({ name, phone, nameFields = [], phoneFields = [] }) {
+function buildNamePhoneFilter({ name, phone, nameFields = [], phoneFields = [], ignoreSpaces = false }) {
     const conditions = [];
 
     if (name && nameFields.length > 0) {
         const term = likeContains(name);
-        conditions.push({
-            [Op.or]: nameFields.map((field) => ({ [field]: { [Op.like]: term } })),
-        });
+        const ors = nameFields.map((field) => ({ [field]: { [Op.like]: term } }));
+        // "rajopti" should find "Raj Optical": compare again with the spaces left out of both sides.
+        const tight = name.replace(/\s+/g, '');
+        if (ignoreSpaces && tight) {
+            ors.push(...nameFields.map((field) => sqlWhere(fn('REPLACE', col(field), ' ', ''), { [Op.like]: likeContains(tight) })));
+        }
+        conditions.push({ [Op.or]: ors });
     }
 
     if (phone && phoneFields.length > 0) {
