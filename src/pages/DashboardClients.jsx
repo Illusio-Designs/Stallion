@@ -366,7 +366,14 @@ const DashboardClients = () => {
       )
     },
     { key: 'cityLabel', label: 'CITY' },
-    { key: 'salesmanLabel', label: 'SALESMAN' },
+    {
+      key: 'salesmanLabel', label: 'SALESMAN', render: (v) => {
+        const names = String(v || '').split(',').map((n) => n.trim()).filter((n) => n && n !== '—');
+        return names.length === 0 ? '—' : (
+          <span className="sm-pills">{names.map((n) => <span key={n} className="sm-pill">{n}</span>)}</span>
+        );
+      }
+    },
     {
       key: 'locationLabel', label: 'LOCATION', render: (v, row) => (
         <span className={`loc-pill loc-pill--${row.locationState}`}>{v}</span>
