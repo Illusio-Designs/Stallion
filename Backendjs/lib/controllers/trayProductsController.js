@@ -180,7 +180,8 @@ class TrayProductsController {
 
     async deleteProductFromTray(req, res) {
         try {
-            const { tray_id, product_id } = req.body;
+            // A DELETE has no body in browsers, so the ids may come in the query string.
+            const { tray_id, product_id } = { ...(req.query || {}), ...(req.body || {}) };
             if (!tray_id || !product_id) {
                 return res.status(400).json({ error: 'Tray product ID is required' });
             }

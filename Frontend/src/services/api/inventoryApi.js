@@ -185,9 +185,9 @@ export const updateProductInTray = async (trayProductData) => {
  */
 export const deleteProductFromTray = async (trayProductData) => {
   const { tray_id, product_id } = trayProductData;
-  return apiRequest('/tray_products', {
+  // A DELETE carries no body, so the ids go in the query string.
+  return apiRequest(`/tray_products?tray_id=${encodeURIComponent(tray_id)}&product_id=${encodeURIComponent(product_id)}`, {
     method: 'DELETE',
-    body: { tray_id, product_id },
     includeAuth: true,
   });
 };
