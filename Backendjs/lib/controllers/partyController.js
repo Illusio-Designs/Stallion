@@ -116,6 +116,7 @@ class PartyController {
                 name,
                 phone,
                 nameFields: ['party_name', 'trade_name', 'contact_person'],
+                ignoreSpaces: true,
                 phoneFields: ['phone'],
             });
             const where = mergeWhere(partyActiveFilter(req.userRoleNames), searchFilter);
@@ -217,6 +218,7 @@ class PartyController {
                 name,
                 phone,
                 nameFields: ['party_name', 'trade_name', 'contact_person'],
+                ignoreSpaces: true,
                 phoneFields: ['phone'],
             });
             where = mergeWhere(where, searchFilter);

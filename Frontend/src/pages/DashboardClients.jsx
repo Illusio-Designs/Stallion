@@ -445,10 +445,11 @@ const DashboardClients = () => {
   // The list endpoints return every page of the user's parties, so search runs over the loaded rows.
   const filteredRowsByTab = useMemo(() => {
     const q = partyQuery.trim().toLowerCase();
+    const tight = q.replace(/\s+/g, ''); // "rajopti" also finds "Raj Optical"
     return rowsByTab.filter(r => {
       if (!q) return true;
       return [r.party_name, r.trade_name, r.contact_person, r.phone, r.cityLabel, r.gstin]
-        .some(v => String(v || '').toLowerCase().includes(q));
+        .some(v => { const t = String(v || '').toLowerCase(); return t.includes(q) || t.replace(/\s+/g, '').includes(tight); });
     });
   }, [rowsByTab, partyQuery]);
   const handleExportParties = () => {
