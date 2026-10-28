@@ -29,14 +29,27 @@ const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationPa
 
 // PAN and GSTIN are tax identifiers: only managers (and the party itself) see them. A salesman or
 // distributor still gets the name, phone and address they need for visits and orders.
-/** Adds `salesman_name` (from Salesman.full_name via salesman_id) to party rows. One extra query per page. */
+/** Adds `salesman_name` (via salesman_id) and `city_name` / `state_name` to party rows. Three small extra queries per page. */
 const withSalesmanNames = async (rows) => {
     const plain = (rows || []).map((r) => (typeof r.toJSON === 'function' ? r.toJSON() : { ...r }));
-    const ids = [...new Set(plain.map((p) => p.salesman_id).filter(Boolean))];
-    if (ids.length === 0) return plain;
-    const sms = await Salesman.findAll({ where: { salesman_id: { [Op.in]: ids } }, attributes: ['salesman_id', 'full_name'] });
+    const uniq = (key) => [...new Set(plain.map((p) => p[key]).filter(Boolean))];
+    const salesmanIds = uniq('salesman_id');
+    const cityIds = uniq('city_id');
+    const stateIds = uniq('state_id');
+    const [sms, cities, states] = await Promise.all([
+        salesmanIds.length ? Salesman.findAll({ where: { salesman_id: { [Op.in]: salesmanIds } }, attributes: ['salesman_id', 'full_name'] }) : [],
+        cityIds.length ? Cities.findAll({ where: { id: { [Op.in]: cityIds } }, attributes: ['id', 'name'] }) : [],
+        stateIds.length ? State.findAll({ where: { id: { [Op.in]: stateIds } }, attributes: ['id', 'name'] }) : [],
+    ]);
     const names = new Map(sms.map((m) => [m.salesman_id, m.full_name]));
-    return plain.map((p) => ({ ...p, salesman_name: names.get(p.salesman_id) || null }));
+    const cityNames = new Map(cities.map((c) => [c.id, c.name]));
+    const stateNames = new Map(states.map((x) => [x.id, x.name]));
+    return plain.map((p) => ({
+        ...p,
+        salesman_name: names.get(p.salesman_id) || null,
+        city_name: cityNames.get(p.city_id) || null,
+        state_name: stateNames.get(p.state_id) || null,
+    }));
 };
 
 const PARTY_SECRET_FIELDS = ['pan', 'gstin'];
