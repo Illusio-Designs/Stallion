@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import "../styles/pages/ProductDetail.css";
 import "../styles/redesign-n-product.css";
+import "../styles/redesign-p-detail.css";
 import Skeleton from "../components/ui/Skeleton";
 import { addToCart } from "../services/cartService";
 import { showAddToCartSuccess } from "../services/notificationService";
-import { parseProductPath } from "../utils/dashboardRoutes";
+import { parseProductPath, productPath } from "../utils/dashboardRoutes";
 import { encodeUploadName } from "../utils/imageUrl";
 import {
   getProductModels,
@@ -18,6 +19,7 @@ import {
   getLensMaterials,
   getFrameTypes
 } from "../services/apiService";
+import { getProducts } from "../services/api/productApi";
 
 // Shared state for viewMode to communicate with Breadcrumb
 let sharedViewMode = "list";
@@ -38,6 +40,26 @@ const display = (value) => {
   const str = String(value).trim();
   if (str === "" || str === "N/A") return "—";
   return str;
+};
+
+// Whole rupees when there are no paise, otherwise two decimals.
+const inr = (value) => {
+  const n = Number(value) || 0;
+  return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
+};
+
+// First image of a raw product row as a full upload URL (for the "other frames" cards).
+const firstImageUrl = (product) => {
+  const base = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || "https://api.stallioneyewear.in").replace(/\/$/, "");
+  let urls = product?.image_urls;
+  if (typeof urls === "string") {
+    try { urls = JSON.parse(urls); } catch (e) { urls = [urls]; }
+    if (typeof urls === "string") urls = [urls];
+  }
+  const first = (Array.isArray(urls) && urls[0]) || product?.image_url;
+  if (typeof first !== "string") return "/images/products/spac1.webp";
+  const file = first.split("?")[0].split("#")[0].replace(/([\]"\\])+$/, "").split("/").pop();
+  return file && file.includes(".") ? `${base}/uploads/products/${encodeUploadName(file)}` : "/images/products/spac1.webp";
 };
 
 const ProductDetail = ({ productId: propProductId = null }) => {
@@ -106,6 +128,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   // fallback, so we can show a graceful "image unavailable" affordance. Keyed by
   // src so selecting a different variation gives its image a fresh attempt.
   const [brokenMainImageSrc, setBrokenMainImageSrc] = useState(null);
+  const [otherFrames, setOtherFrames] = useState([]); // "Other frames you may like"
   
   // Lookup data for resolving IDs to names
   const [brands, setBrands] = useState([]);
@@ -411,6 +434,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
         images: getAllImageUrls(model.image_urls),
         mrp: formatPrice(model.mrp),
         whp: formatPrice(model.whp),
+        whpNum: Number(model.whp) || 0,
+        mrpNum: Number(model.mrp) || 0,
       };
     });
 
@@ -513,6 +538,23 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   }, [rawModels]);
 
   const currentProduct = productVariations[selectedVariation] || null;
+  const currentModelNo = currentProduct ? currentProduct.model : null;
+
+  // Other frames you may like: a few other active products (display only, best effort).
+  useEffect(() => {
+    if (!currentModelNo) return undefined;
+    let cancelled = false;
+    getProducts(1, 12, { status: "active" })
+      .then((res) => {
+        if (cancelled) return;
+        const rows = (res?.data || [])
+          .filter((p) => (p.status || "").toLowerCase().trim() === "active" && p.model_no && p.model_no !== currentModelNo)
+          .slice(0, 4);
+        setOtherFrames(rows);
+      })
+      .catch(() => { if (!cancelled) setOtherFrames([]); });
+    return () => { cancelled = true; };
+  }, [currentModelNo]);
   const totalVariations = productVariations.length;
 
   // Update display variation based on selected variation
@@ -697,19 +739,25 @@ const ProductDetail = ({ productId: propProductId = null }) => {
 
   const cur = currentProduct;
   const curStock = Number(cur.stock ?? 0);
-  const curQty = getQuantity(cur.id);
+  const curQty = curStock > 0 ? Math.min(getQuantity(cur.id), curStock) : getQuantity(cur.id);
   const brandName = display(cur.brand);
   const mainImageSrc = galleryImages[Math.min(imageIndex, galleryImages.length - 1)] || cur.image || '/images/products/spac1.webp';
   const stockState = curStock <= 0 ? { cls: "bad", text: "Sold out" } : curStock <= 10 ? { cls: "warn", text: `Low stock, ${curStock} left` } : { cls: "ok", text: `In stock, ${curStock} left` };
+  const lensText = [cur.lenseColour, cur.lenseMaterial].map(display).filter((v) => v !== "—").join(", ") || "—";
   const specRows = [
-    ["Gender", cur.gender],
     ["Shape", cur.shape],
     ["Frame type", cur.type],
     ["Frame material", cur.frameMaterial],
-    ["Lens colour", cur.lenseColour],
-    ["Lens material", cur.lenseMaterial],
+    ["Lens", lensText],
     ["Size", cur.size],
+    ["Gender", cur.gender],
   ];
+  const offPct = cur.mrpNum > cur.whpNum && cur.whpNum > 0 ? Math.round(100 - (cur.whpNum * 100) / cur.mrpNum) : 0;
+  const lineTotal = inr(cur.whpNum * curQty);
+  const colourName = (v) => {
+    const c = display(v.lenseColour);
+    return c !== "—" ? c : display(v.frameColour);
+  };
   const onImgError = (e) => {
     if (e.target.dataset.fallbackApplied !== "true" && !e.target.src.endsWith('/images/products/spac1.webp')) {
       e.target.dataset.fallbackApplied = "true";
@@ -719,32 +767,62 @@ const ProductDetail = ({ productId: propProductId = null }) => {
     }
   };
 
+  const qtyBox = (key) => (
+    <div className="pdp-qty" role="group" aria-label="Quantity" key={key}>
+      <button
+        type="button"
+        className="pdp-qty-btn"
+        aria-label="Decrease quantity"
+        disabled={curQty <= 1}
+        onClick={(e) => handleQuantityDecrease(cur.id, e)}
+      >
+        <span aria-hidden="true">&minus;</span>
+      </button>
+      <input
+        className="pdp-qty-input"
+        type="number"
+        inputMode="numeric"
+        min="1"
+        max={curStock > 0 ? curStock : undefined}
+        step="1"
+        aria-label="Quantity"
+        value={editingQuantities[cur.id] !== undefined ? editingQuantities[cur.id] : curQty}
+        onChange={(e) => {
+          let val = e.target.value;
+          const num = parseInt(val, 10);
+          if (curStock > 0 && !Number.isNaN(num) && num > curStock) val = String(curStock); // never above the stock
+          setEditingQuantities((q) => ({ ...q, [cur.id]: val }));
+        }}
+        onBlur={(e) => {
+          const val = editingQuantities[cur.id];
+          const num = parseInt(val, 10);
+          handleQuantityInputChange(cur.id, (!val || isNaN(num) || num < 1) ? '1' : val, e);
+          setEditingQuantities((q) => {
+            const { [cur.id]: _, ...rest } = q;
+            return rest;
+          });
+        }}
+      />
+      <button
+        type="button"
+        className="pdp-qty-btn"
+        aria-label="Increase quantity"
+        onClick={(e) => handleQuantityIncrease(cur.id, e)}
+        disabled={curStock <= 0 || curQty >= curStock}
+      >
+        <span aria-hidden="true">+</span>
+      </button>
+    </div>
+  );
+
   return (
-    <div className="product-detail-page pdx bg-bg">
-      <div className="pdx-grid pdn-grid">
-        <div className="pdx-gallery pdn-gallery">
-          {galleryThumbs.length > 1 && (
-            <div className="pdx-thumbs pdn-thumbs" role="listbox" aria-orientation="vertical" aria-label="Product images">
-              {galleryThumbs.map((t, i) => (
-                <div
-                  key={`${t.src}-${i}`}
-                  ref={(node) => { thumbnailRefs.current[i] = node; }}
-                  className={`pdx-thumb pdn-thumb ${t.active ? "on" : ""}`}
-                  role="option"
-                  tabIndex={t.active ? 0 : -1}
-                  aria-selected={t.active}
-                  aria-label={t.label}
-                  onClick={t.onSelect}
-                  onKeyDown={(e) => handleThumbnailKeyDown(e, i, galleryThumbs.length)}
-                >
-                  <img src={t.src} alt={t.label} onError={(e) => { if (!e.target.src.endsWith('/images/products/spac1.webp')) e.target.src = '/images/products/spac1.webp'; }} />
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="pdx-big pdn-big">
+    <div className="product-detail-page pdp bg-bg">
+      <div className="pdp-grid">
+        <div className="pdp-gallery">
+          <div className="pdp-big">
+            <span className={`pdp-stock ${stockState.cls}`}>{stockState.text}</span>
             {brokenMainImageSrc === mainImageSrc ? (
-              <div className="main-product-image-unavailable pdx-unavail" role="img" aria-label="Image unavailable">
+              <div className="main-product-image-unavailable pdp-unavail" role="img" aria-label="Image unavailable">
                 <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <rect x="3" y="3" width="18" height="18" rx="2" />
                   <circle cx="9" cy="9" r="1.5" />
@@ -757,78 +835,109 @@ const ProductDetail = ({ productId: propProductId = null }) => {
               <img src={mainImageSrc} alt={cur.name} onError={onImgError} />
             )}
           </div>
+          {galleryThumbs.length > 1 && (
+            <div className="pdp-thumbs" role="listbox" aria-orientation="horizontal" aria-label="Product images">
+              {galleryThumbs.map((t, i) => (
+                <div
+                  key={`${t.src}-${i}`}
+                  ref={(node) => { thumbnailRefs.current[i] = node; }}
+                  className={`pdp-thumb ${t.active ? "on" : ""}`}
+                  role="option"
+                  tabIndex={t.active ? 0 : -1}
+                  aria-selected={t.active}
+                  aria-label={t.label}
+                  onClick={t.onSelect}
+                  onKeyDown={(e) => handleThumbnailKeyDown(e, i, galleryThumbs.length)}
+                >
+                  <img src={t.src} alt={t.label} onError={(e) => { if (!e.target.src.endsWith('/images/products/spac1.webp')) e.target.src = '/images/products/spac1.webp'; }} />
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
-        <div className="pdx-info pdn-info">
-          <div>
-            <span className={`pdx-pill ${stockState.cls}`}>{stockState.text}</span>
-            <h1 className="product-title pdx-title">{display(cur.name)}</h1>
-            {brandName !== "—" && <p className="pdx-brand">{brandName}</p>}
+        <div className="pdp-info">
+          <div className="pdp-head">
+            {brandName !== "—" && <p className="pdp-brand">{brandName}</p>}
+            <h1 className="product-title pdp-title">{display(cur.name)}</h1>
           </div>
-          <div className="pdx-price">
-            <span className="pdx-whp">{display(cur.whp)}</span>
-            <span className="pdx-per">per piece (WHP)</span>
-            {cur.mrp && cur.mrp !== "₹0" && <s className="pdx-mrp" aria-label="MRP">MRP {cur.mrp}</s>}
+          <div className="pdp-price">
+            <span className="pdp-whp">{inr(cur.whpNum)}</span>
+            <span className="pdp-per">per piece (WHP)</span>
+            {cur.mrpNum > 0 && <s className="pdp-mrp" aria-label="MRP">{inr(cur.mrpNum)}</s>}
+            {offPct > 0 && <span className="pdp-off">{offPct}% off MRP</span>}
           </div>
-          <div className="pdx-card">
-            <dl className="pdx-kv">
-              {specRows.map(([label, value]) => (
-                <div key={label}><dt>{label}</dt><dd>{display(value)}</dd></div>
-              ))}
-            </dl>
-          </div>
-          <div className="pdx-buy">
-            <div className="pdx-qty quantity-selector-small" role="group" aria-label="Quantity">
-              <button
-                type="button"
-                className="qty-btn-small minus"
-                aria-label="Decrease quantity"
-                disabled={curQty <= 1}
-                onClick={(e) => handleQuantityDecrease(cur.id, e)}
-              >
-                <span aria-hidden="true">&minus;</span>
-              </button>
-              <input
-                className="qty-number-small"
-                type="number"
-                inputMode="numeric"
-                min="1"
-                step="1"
-                aria-label="Quantity"
-                value={editingQuantities[cur.id] !== undefined ? editingQuantities[cur.id] : curQty}
-                onChange={(e) => {
-                  setEditingQuantities((q) => ({ ...q, [cur.id]: e.target.value }));
-                }}
-                onBlur={(e) => {
-                  const val = editingQuantities[cur.id];
-                  const num = parseInt(val, 10);
-                  handleQuantityInputChange(cur.id, (!val || isNaN(num) || num < 1) ? '1' : val, e);
-                  setEditingQuantities((q) => {
-                    const { [cur.id]: _, ...rest } = q;
-                    return rest;
-                  });
-                }}
-              />
-              <button
-                type="button"
-                className="qty-btn-small plus"
-                aria-label="Increase quantity"
-                onClick={(e) => handleQuantityIncrease(cur.id, e)}
-                disabled={curStock <= 0 || curQty >= curStock}
-              >
-                <span aria-hidden="true">+</span>
-              </button>
+
+          {totalVariations > 1 && (
+            <div className="pdp-colours" role="group" aria-label="Colour">
+              <span className="pdp-label">Colour: {colourName(cur)}</span>
+              <div className="pdp-chips">
+                {productVariations.map((v, i) => (
+                  <button
+                    type="button"
+                    key={`${v.id}-${i}`}
+                    className={`pdp-chip ${i === selectedVariation ? "on" : ""}`}
+                    aria-pressed={i === selectedVariation}
+                    onClick={() => handleVariationClick(i)}
+                  >
+                    {colourName(v)} <b>{Number(v.stock ?? 0)}</b>
+                  </button>
+                ))}
+              </div>
             </div>
+          )}
+
+          <div className="pdp-buy">
+            {qtyBox("buy")}
             <button
               type="button"
               disabled={curStock <= 0}
-              className={`add-to-cart-btn-small pdx-add ${addedIds[cur.id] ? "is-added" : ""}`}
+              className={`pdp-add ${addedIds[cur.id] ? "is-added" : ""}`}
               onClick={(e) => handleAddToCart(cur, e)}
             >
-              {curStock <= 0 ? "Out of stock" : addedIds[cur.id] ? "Added to cart" : "Add to cart"}
+              {curStock <= 0 ? "Out of stock" : addedIds[cur.id] ? "Added to cart" : `Add to cart · ${lineTotal}`}
             </button>
           </div>
+
+          <dl className="pdp-specs">
+            {specRows.map(([label, value]) => (
+              <div key={label}><dt>{label}</dt><dd>{display(value)}</dd></div>
+            ))}
+          </dl>
         </div>
+      </div>
+
+      {otherFrames.length > 0 && (
+        <section className="pdp-others" aria-labelledby="pdp-others-h">
+          <h2 id="pdp-others-h">Other frames you may like</h2>
+          <div className="pdp-others-grid">
+            {otherFrames.map((p) => {
+              const w = Number(p.whp) || 0;
+              const m = Number(p.mrp) || 0;
+              const off = m > w && w > 0 ? Math.round(100 - (w * 100) / m) : 0;
+              return (
+                <a key={p.product_id || p.id || p.model_no} className="pdp-other" href={productPath(p.model_no)}>
+                  <span className="pdp-other-img"><img src={firstImageUrl(p)} alt="" loading="lazy" onError={(e) => { if (!e.target.src.endsWith('/images/products/spac1.webp')) e.target.src = '/images/products/spac1.webp'; }} /></span>
+                  <b className="pdp-other-name">{p.model_no}</b>
+                  <span className="pdp-other-price">{w > 0 && <b>{inr(w)}</b>}{off > 0 && <span className="pdp-off">{off}% off MRP</span>}</span>
+                </a>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      <div className="pdp-sticky">
+        <div className="pdp-sticky-total"><span>Total</span><b>{lineTotal}</b></div>
+        {qtyBox("sticky")}
+        <button
+          type="button"
+          disabled={curStock <= 0}
+          className={`pdp-add ${addedIds[cur.id] ? "is-added" : ""}`}
+          onClick={(e) => handleAddToCart(cur, e)}
+        >
+          {curStock <= 0 ? "Out of stock" : addedIds[cur.id] ? "Added" : "Add to cart"}
+        </button>
       </div>
     </div>
   );
