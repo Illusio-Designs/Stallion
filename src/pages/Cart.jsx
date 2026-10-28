@@ -17,7 +17,6 @@ import { getUserRole, getUser } from "../services/authService";
 import { encodeUploadName } from "../utils/imageUrl";
 import DropdownSelector from "../components/ui/DropdownSelector";
 import AsidePanel from "../components/ui/AsidePanel";
-import { useConfirm } from "../components/ui/ConfirmProvider";
 import {
   getMyParties,
   getPartyById,
@@ -30,11 +29,9 @@ import {
   getAvailableOffers,
   quoteOrder,
   getProductsByIds,
-  verifyPartyLocationAsking,
-  ADDRESS_FAR_CONFIRM,
-  rememberAddressFix,
+  rememberEditParty,
 } from "../services/apiService";
-import { captureCurrentPosition, distanceMeters, GEOFENCE_RADIUS_M } from "../utils/geolocation";
+import { captureCurrentPosition, distanceMeters, hasPartyPoint, visitRadius } from "../utils/geolocation";
 
 // Re-point any product image URL (legacy host, absolute server path, or
 // relative) to the configured image host — the same base the Media gallery and
@@ -51,7 +48,6 @@ const resolveCartImage = (img) => {
 };
 
 const Cart = ({ onPageChange = null }) => {
-  const confirm = useConfirm();
   const handlePageChange = (page) => {
     if (onPageChange) {
       onPageChange(page);
@@ -80,7 +76,6 @@ const Cart = ({ onPageChange = null }) => {
   // Role-based state
   const [orderType, setOrderType] = useState(isDistributor ? "distributor_order" : "");
   const [selectedParty, setSelectedParty] = useState("");
-  const [verifyingLoc, setVerifyingLoc] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("");
   const [orderNote, setOrderNote] = useState("");
@@ -321,41 +316,12 @@ const Cart = ({ onPageChange = null }) => {
     });
   };
 
-  // On-site capture ("I'm at shop") for the selected party — sets its TRUSTED
-  // verified location so the 50m visit geofence turns on. Lets a salesman verify
-  // right from the cart without opening the party editor.
-  const handleVerifyPartyLocation = async () => {
+  // A party with no location: Edit party opens for it (pick the address from Google) and the app
+  // comes back to this cart, with the visit order and the party chosen again.
+  const handleEditPartyLocation = () => {
     if (!selectedParty) return;
-    try {
-      setVerifyingLoc(true);
-      let pos;
-      try {
-        pos = await captureCurrentPosition();
-      } catch (geoErr) {
-        showError(geoErr?.message || 'Could not get your location. Please try again.');
-        return;
-      }
-      const res = await verifyPartyLocationAsking(selectedParty, pos, (m) => confirm(ADDRESS_FAR_CONFIRM(m)));
-      const acc = Number(res?.accuracy);
-      if (res?.address_mismatch && res?.location_address) {
-        // Written address does not match the shop: open Edit party with the GPS address.
-        rememberAddressFix(selectedParty, res);
-        showSuccess('Shop spot saved. Update the party address from your location.');
-        if (onPageChange) onPageChange('party'); else window.location.href = '/dashboard/party';
-        return;
-      }
-      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 100m geofence is now active for this party.`);
-      setParties(prev => prev.map(p => {
-        const id = p.id || p.party_id;
-        return id === selectedParty
-          ? { ...p, latitude: Number(res?.latitude), longitude: Number(res?.longitude), location_source: 'verified', location_accuracy_m: acc }
-          : p;
-      }));
-    } catch (err) {
-      showError(err?.message || 'Could not verify location. Please try again from the shop.');
-    } finally {
-      setVerifyingLoc(false);
-    }
+    rememberEditParty(selectedParty, '/cart', { orderType: 'visit_order' });
+    if (onPageChange) onPageChange('party'); else window.location.href = '/dashboard/party';
   };
 
   // Early read of the phone's GPS when the order type is chosen (it also asks for
@@ -372,9 +338,7 @@ const Cart = ({ onPageChange = null }) => {
 
   // The selected party's saved (verified) shop point, if it has one.
   const selectedPartyRecord = parties.find((p) => (p.id || p.party_id) === selectedParty) || null;
-  const selectedPartyVerified = !!selectedPartyRecord
-    && selectedPartyRecord.location_source === 'verified'
-    && selectedPartyRecord.latitude != null && selectedPartyRecord.longitude != null;
+  const selectedPartyHasPoint = hasPartyPoint(selectedPartyRecord);
 
   // Read the GPS now and measure the distance to the shop. Used when a party is
   // picked, from the "Check again" link, and right before the order is sent, so
@@ -382,15 +346,15 @@ const Cart = ({ onPageChange = null }) => {
   const [visitDistance, setVisitDistance] = useState(null); // { meters } | { error }
   const [checkingDistance, setCheckingDistance] = useState(false);
   const refreshVisitDistance = async () => {
-    if (!selectedPartyVerified) { setVisitDistance(null); return null; }
+    if (!selectedPartyHasPoint) { setVisitDistance(null); return null; }
     setCheckingDistance(true);
     try {
       const pos = await captureCurrentPosition();
-      locationRef.current = { latitude: pos.latitude, longitude: pos.longitude };
+      locationRef.current = { latitude: pos.latitude, longitude: pos.longitude, accuracy: pos.accuracy };
       setLatitude(pos.latitude);
       setLongitude(pos.longitude);
       const meters = distanceMeters(pos.latitude, pos.longitude, Number(selectedPartyRecord.latitude), Number(selectedPartyRecord.longitude));
-      const result = { meters };
+      const result = { meters, allowed: visitRadius(selectedPartyRecord, pos.accuracy) };
       setVisitDistance(result);
       return result;
     } catch (e) {
@@ -402,13 +366,13 @@ const Cart = ({ onPageChange = null }) => {
     }
   };
   useEffect(() => {
-    if (isSalesman && orderType === 'visit_order' && selectedParty && selectedPartyVerified) {
+    if (isSalesman && orderType === 'visit_order' && selectedParty && selectedPartyHasPoint) {
       refreshVisitDistance();
     } else {
       setVisitDistance(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderType, selectedParty, selectedPartyVerified, isSalesman]);
+  }, [orderType, selectedParty, selectedPartyHasPoint, isSalesman]);
 
   // Fetch parties based on order type for salesman
   useEffect(() => {
@@ -470,6 +434,21 @@ const Cart = ({ onPageChange = null }) => {
     fetchPartiesForOrderType();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderType, isSalesman]); // Only depend on orderType and isSalesman, not user object
+
+  // Back from Edit party (a party that had no location): choose the visit order and that party again.
+  useEffect(() => {
+    if (!isSalesman || typeof window === 'undefined') return;
+    try {
+      const raw = sessionStorage.getItem('stallion.cartReturn');
+      if (!raw) return;
+      sessionStorage.removeItem('stallion.cartReturn');
+      const back = JSON.parse(raw);
+      if (!back || !back.party_id || !(Date.now() - Number(back.at) < 30 * 60 * 1000)) return;
+      sessionStorage.setItem('stallion.checkinParty', JSON.stringify({ party_id: back.party_id, at: Date.now() }));
+      setOrderType(back.orderType || 'visit_order');
+    } catch { /* storage unavailable: the order type and party are chosen again by hand */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSalesman]);
 
   // After "I'm at the shop" on Home, preselect that party for a visit order. Selecting goes
   // through setSelectedParty, so the verified-location / distance effects still run.
@@ -710,8 +689,9 @@ const Cart = ({ onPageChange = null }) => {
           showError('Please select a party');
           return;
         }
-        if (!selectedPartyVerified) {
-          showError('This party\'s shop location is not set yet. Tap "I\'m at shop" under the party, then place the order.');
+        if (!selectedPartyHasPoint) {
+          showError('This party has no location yet. Edit the party and pick its address. You come back to this cart after saving.');
+          handleEditPartyLocation();
           return;
         }
         // Read the GPS again right now: the order must carry where the salesman
@@ -723,8 +703,8 @@ const Cart = ({ onPageChange = null }) => {
           showError((fresh && fresh.error) || 'Could not get your location. Please turn on location and try again.');
           return;
         }
-        if (fresh.meters > GEOFENCE_RADIUS_M) {
-          showError(`You are about ${Math.round(fresh.meters)} m from this shop. Move within ${GEOFENCE_RADIUS_M} m of it to place a visit order.`);
+        if (fresh.meters > fresh.allowed) {
+          showError(`You are about ${Math.round(fresh.meters)} m from this shop. Move within ${Math.round(fresh.allowed)} m of it to place a visit order.`);
           return;
         }
       }
@@ -1198,6 +1178,12 @@ const Cart = ({ onPageChange = null }) => {
         });
       }
 
+      // The phone's GPS accuracy at this moment: the server allows a little extra distance for a weak signal.
+      if (orderData.order_type === 'visit_order') {
+        const acc = Number(locationRef.current?.accuracy);
+        if (Number.isFinite(acc) && acc > 0) orderData.accuracy = acc;
+      }
+
       // Final check: Log salesman_id status (but don't block API call - let backend validate)
       if (isSalesman) {
         if (!orderData.salesman_id) {
@@ -1553,25 +1539,29 @@ const Cart = ({ onPageChange = null }) => {
                   />
                   {isSalesman && orderType === 'visit_order' && selectedParty && (() => {
                     const sp = parties.find(p => (p.id || p.party_id) === selectedParty);
-                    const verified = sp && sp.location_source === 'verified';
-                    const farAway = verified && ((visitDistance && visitDistance.error) || (visitDistance && visitDistance.meters != null && visitDistance.meters > GEOFENCE_RADIUS_M));
+                    const hasPoint = hasPartyPoint(sp);
+                    const precise = hasPoint && sp.location_source === 'verified';
+                    const allowed = visitDistance && visitDistance.allowed != null ? visitDistance.allowed : visitRadius(sp, 0);
+                    const farAway = hasPoint && ((visitDistance && visitDistance.error) || (visitDistance && visitDistance.meters != null && visitDistance.meters > allowed));
                     return (
-                      <div className={`flex flex-col gap-1.5 cart-notice ${(!verified || farAway) ? 'cart-notice--bad' : ''}`}>
+                      <div className={`flex flex-col gap-1.5 cart-notice ${(!hasPoint || farAway) ? 'cart-notice--bad' : ''}`}>
                         <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
-                          {verified
-                            ? `Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 100m geofence active.`
-                            : 'Location not verified yet. Stand at the shop and tap below to enable the 100m geofence.'}
+                          {!hasPoint
+                            ? 'This party has no location yet. Edit the party and pick its address. You come back to this cart after saving.'
+                            : precise
+                              ? 'Shop spot saved. You must be within 50 m of it.'
+                              : 'Location from the address. You can be within 150 m, and this order saves the exact shop spot.'}
                         </p>
-                        {verified && (
-                          <p className={`m-0 text-[length:var(--text-xs)] ${visitDistance && visitDistance.meters != null && visitDistance.meters > GEOFENCE_RADIUS_M ? 'text-error' : 'text-text-muted'}`} role="status">
+                        {hasPoint && (
+                          <p className={`m-0 text-[length:var(--text-xs)] ${visitDistance && visitDistance.meters != null && visitDistance.meters > allowed ? 'text-error' : 'text-text-muted'}`} role="status">
                             {checkingDistance
                               ? 'Checking where you are…'
                               : visitDistance && visitDistance.error
                                 ? visitDistance.error
                                 : visitDistance && visitDistance.meters != null
-                                  ? (visitDistance.meters <= GEOFENCE_RADIUS_M
+                                  ? (visitDistance.meters <= allowed
                                     ? `You are at the shop (${Math.round(visitDistance.meters)} m away).`
-                                    : `You are ${Math.round(visitDistance.meters)} m from this shop. Move within ${GEOFENCE_RADIUS_M} m to place the order.`)
+                                    : `You are ${Math.round(visitDistance.meters)} m from this shop. Move within ${Math.round(allowed)} m to place the order.`)
                                   : ''}
                             {' '}
                             <button type="button" className="border-none bg-transparent p-0 font-semibold text-primary underline cursor-pointer" onClick={refreshVisitDistance} disabled={checkingDistance}>
@@ -1579,14 +1569,9 @@ const Cart = ({ onPageChange = null }) => {
                             </button>
                           </p>
                         )}
-                        {!verified && (
-                          <button
-                            type="button"
-                            className="ui-btn ui-btn--secondary self-start"
-                            onClick={handleVerifyPartyLocation}
-                            disabled={verifyingLoc}
-                          >
-                            {verifyingLoc ? 'Capturing…' : 'I’m at shop'}
+                        {!hasPoint && (
+                          <button type="button" className="ui-btn ui-btn--secondary self-start" onClick={handleEditPartyLocation}>
+                            Edit party
                           </button>
                         )}
                       </div>

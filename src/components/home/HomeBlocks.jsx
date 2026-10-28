@@ -4,10 +4,9 @@ import { useRouter } from 'next/navigation';
 import Skeleton from '../ui/Skeleton';
 import StatusBadge from '../ui/StatusBadge';
 import { FiMapPin, FiShoppingCart, FiUsers, FiPackage, FiCreditCard, FiNavigation2, FiUser, FiChevronRight } from '../icons/hugeicons';
-import { captureCurrentPosition, distanceMeters, GEOFENCE_RADIUS_M } from '../../utils/geolocation';
+import { captureCurrentPosition, distanceMeters, hasPartyPoint, visitRadius } from '../../utils/geolocation';
 import { createSalesmanCheckin } from '../../services/api/salesmanApi';
-import { verifyPartyLocationAsking, ADDRESS_FAR_CONFIRM, rememberAddressFix } from '../../services/api/partnersApi';
-import { useConfirm } from '../ui/ConfirmProvider';
+import { rememberEditParty } from '../../services/api/partnersApi';
 import { getMySalesman } from '../../services/api/dashboardApi';
 import { getTrayTasks, markTrayTaskInTransit } from '../../services/api/inventoryApi';
 import { queueCheckin, isNetworkError } from '../../services/offlineQueue';
@@ -193,27 +192,21 @@ export function FieldCard({ summary, loading, error, onRetry }) {
 }
 
 // ---------- Salesman: "I'm at the shop" ----------
+// Check in at a party's shop. The shop's point comes from its address (picked from Google in
+// Edit party); the first visit saves the salesman's own position as the precise spot.
 export function ShopCheckInCard({ parties, salesmanId, loading }) {
   const router = useRouter();
-  const confirm = useConfirm();
   const [partyId, setPartyId] = useState('');
-  const [dist, setDist] = useState(null); // { meters } | { error }
+  const [dist, setDist] = useState(null); // { meters, allowed } | { error }
   const [measuring, setMeasuring] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [saved, setSaved] = useState({}); // partyId -> spot saved by the shop test
-  const [failed, setFailed] = useState({}); // partyId -> why the last shop test failed
 
   const idOf = (p) => String(p.party_id || p.id);
-  const list = useMemo(
-    () => (parties || []).filter((p) => p.is_active !== false).map((p) => (saved[idOf(p)] ? { ...p, ...saved[idOf(p)] } : p)),
-    [parties, saved],
-  );
-  const isReady = (p) => p.location_source === 'verified' && p.latitude != null && p.longitude != null;
-  const readyList = list.filter(isReady);
-  const toVisit = list.filter((p) => !isReady(p));
+  const list = useMemo(() => (parties || []).filter((p) => p.is_active !== false), [parties]);
+  const readyList = list.filter(hasPartyPoint);
+  const noLocation = list.filter((p) => !hasPartyPoint(p));
   const party = list.find((p) => idOf(p) === partyId) || null;
-  const hasLocation = !!party && isReady(party);
+  const hasLocation = !!party && hasPartyPoint(party);
   const cityOf = (p) => p.city?.name || p.city_name || (typeof p.city === 'string' ? p.city : '');
 
   const measure = useCallback(async (p) => {
@@ -222,7 +215,7 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
     try {
       const pos = await captureCurrentPosition();
       const meters = distanceMeters(pos.latitude, pos.longitude, Number(p.latitude), Number(p.longitude));
-      const result = { meters, pos };
+      const result = { meters, allowed: visitRadius(p, pos.accuracy), pos };
       setDist(result);
       return result;
     } catch (e) {
@@ -240,38 +233,15 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partyId]);
 
-  // Shop test: read the GPS at the shop and save the spot. When it works the party is
-  // good to go; when it fails the party stays on the "To visit" list with the reason.
-  const testShop = async () => {
-    if (!party || testing) return;
-    const id = idOf(party);
-    setTesting(true);
-    try {
-      const pos = await captureCurrentPosition();
-      const res = await verifyPartyLocationAsking(id, pos, (m) => confirm(ADDRESS_FAR_CONFIRM(m)));
-      setSaved((m) => ({ ...m, [id]: { latitude: Number(res?.latitude), longitude: Number(res?.longitude), location_source: 'verified', location_accuracy_m: Number(res?.accuracy) } }));
-      setFailed((m) => { const n = { ...m }; delete n[id]; return n; });
-      if (res?.address_mismatch && res?.location_address) {
-        // The written address does not match the shop: Edit party opens with the address
-        // updated from the GPS spot.
-        rememberAddressFix(id, res);
-        showSuccess('Shop spot saved. Update the party address from your location.');
-        router.push('/dashboard/party');
-        return;
-      }
-      showSuccess('Shop test passed. This party is good to go.');
-      measure({ ...party, latitude: Number(res?.latitude), longitude: Number(res?.longitude) });
-    } catch (e) {
-      const why = e?.message || 'The shop test did not work. Try again at the shop.';
-      setFailed((m) => ({ ...m, [id]: why }));
-      showError(why);
-    } finally {
-      setTesting(false);
-    }
-  };
-
   const distText = (m) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`);
-  const within = dist && dist.meters != null && dist.meters <= GEOFENCE_RADIUS_M;
+  const within = dist && dist.meters != null && dist.meters <= dist.allowed;
+  const precise = !!party && party.location_source === 'verified';
+
+  // A party with no location: Edit party opens for it, and the app comes back here after saving.
+  const editParty = (p) => {
+    rememberEditParty(idOf(p), '/dashboard');
+    router.push('/dashboard/party');
+  };
 
   const checkIn = async () => {
     if (!party || !hasLocation || busy) return;
@@ -279,8 +249,8 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
     try {
       const result = await measure(party);
       if (result.error) { showError(result.error); return; }
-      if (result.meters > GEOFENCE_RADIUS_M) {
-        showError(`You are ${distText(result.meters)} from the shop. Get within ${GEOFENCE_RADIUS_M} m to check in.`);
+      if (result.meters > result.allowed) {
+        showError(`You are ${distText(result.meters)} from the shop. Get within ${Math.round(result.allowed)} m to check in.`);
         return;
       }
       const now = new Date();
@@ -296,6 +266,7 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
         in_time: now.toISOString(),
         latitude: String(result.pos.latitude),
         longitude: String(result.pos.longitude),
+        accuracy: Number.isFinite(Number(result.pos.accuracy)) ? Number(result.pos.accuracy) : undefined,
       };
       try {
         if (typeof navigator !== 'undefined' && navigator.onLine === false) throw new Error('offline');
@@ -315,7 +286,12 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
       } catch { /* storage unavailable: the cart simply asks for the party */ }
       router.push('/products');
     } catch (err) {
-      showError(err?.message || 'Could not check in. Please try again.');
+      if (err?.errorData?.code === 'no_location') {
+        showError(err.message);
+        editParty(party);
+      } else {
+        showError(err?.message || 'Could not check in. Please try again.');
+      }
     } finally {
       setBusy(false);
     }
@@ -341,30 +317,24 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
             <select value={partyId} onChange={(e) => setPartyId(e.target.value)} disabled={busy}>
               <option value="">Choose a party</option>
               {readyList.length > 0 && (
-                <optgroup label="Good to go">
+                <optgroup label="Ready to check in">
                   {readyList.map((p) => <option key={idOf(p)} value={idOf(p)}>{p.party_name || p.name}{cityOf(p) ? `, ${cityOf(p)}` : ''}</option>)}
                 </optgroup>
               )}
-              {toVisit.length > 0 && (
-                <optgroup label="To visit (test the shop first)">
-                  {toVisit.map((p) => <option key={idOf(p)} value={idOf(p)}>{p.party_name || p.name}{cityOf(p) ? `, ${cityOf(p)}` : ''}</option>)}
+              {noLocation.length > 0 && (
+                <optgroup label="No location yet (edit the party)">
+                  {noLocation.map((p) => <option key={idOf(p)} value={idOf(p)}>{p.party_name || p.name}{cityOf(p) ? `, ${cityOf(p)}` : ''}</option>)}
                 </optgroup>
               )}
             </select>
           </label>
           {party && !hasLocation && (
             <div className="rdn-shop__test">
-              <p className="rdn-shop__note rdn-shop__note--warn" role="status" aria-live="polite">
+              <p className="rdn-shop__note rdn-shop__note--warn" role="status">
                 <FiMapPin size={16} aria-hidden="true" />
-                <span>
-                  {failed[idOf(party)]
-                    ? `Shop test did not pass: ${failed[idOf(party)]} This party stays on your visit list.`
-                    : 'This party has no shop spot yet. Stand at the shop and run the shop test. If it works, you are good to go.'}
-                </span>
+                <span>This party has no location yet. Edit the party and pick its address. You come back here after saving.</span>
               </p>
-              <button type="button" className="rdn-shop__test-btn" onClick={testShop} disabled={testing || busy}>
-                {testing ? 'Testing...' : failed[idOf(party)] ? 'Test again at the shop' : 'Test shop location'}
-              </button>
+              <button type="button" className="rdn-shop__test-btn" onClick={() => editParty(party)}>Edit party</button>
             </div>
           )}
           {party && hasLocation && (
@@ -372,7 +342,7 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
               <FiMapPin size={16} aria-hidden="true" />
               {measuring ? 'Checking your distance...'
                 : dist?.error ? dist.error
-                : dist ? `${distText(dist.meters)} from the shop. ${within ? `Within ${GEOFENCE_RADIUS_M} m, you can check in.` : `You need to be within ${GEOFENCE_RADIUS_M} m.`}`
+                : dist ? `${distText(dist.meters)} from the shop. ${within ? 'You can check in.' : `You need to be within ${Math.round(dist.allowed)} m.`}${!precise && within ? ' This visit saves the exact shop spot.' : ''}`
                 : 'Shop location saved.'}
               {!measuring && <button type="button" className="rdn-linkbtn" onClick={() => measure(party)}>Check again</button>}
             </p>
@@ -380,16 +350,15 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
           <button type="button" className="rdn-shop__go" onClick={checkIn} disabled={!party || !hasLocation || busy || !salesmanId}>
             {busy ? 'Checking in...' : 'Check in and start order'}
           </button>
-          {toVisit.length > 0 && (
+          {noLocation.length > 0 && (
             <details className="rdn-shop__visit">
-              <summary>To visit ({toVisit.length}): no shop spot yet</summary>
+              <summary>No location yet ({noLocation.length})</summary>
               <ul>
-                {toVisit.map((p) => (
+                {noLocation.map((p) => (
                   <li key={idOf(p)}>
                     <button type="button" className="rdn-linkbtn" onClick={() => setPartyId(idOf(p))}>
                       {p.party_name || p.name}{cityOf(p) ? `, ${cityOf(p)}` : ''}
                     </button>
-                    {failed[idOf(p)] && <small>{failed[idOf(p)]}</small>}
                   </li>
                 ))}
               </ul>
