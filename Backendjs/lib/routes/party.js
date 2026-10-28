@@ -23,8 +23,6 @@ router.put('/:id/location', authenticateToken, partyController.setPartyLocation)
 // On-site capture ("I'm at the shop"): salesman/admin/party managers send device
 // GPS + accuracy to set the TRUSTED verified location. Before '/:id'.
 router.put('/:id/verify-location', authenticateToken, isPartyCreator, partyController.verifyPartyLocation);
-// A manager approves a location captured while the address was not on the map.
-router.put('/:id/approve-location', authenticateToken, isPartyManager, partyController.approvePartyLocation);
 // Remove a wrong saved location so "I'm at shop" can capture it again.
 // Managers only; before '/:id'.
 router.delete('/:id/location', authenticateToken, isPartyManager, partyController.removePartyLocation);

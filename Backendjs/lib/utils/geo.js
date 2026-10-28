@@ -93,8 +93,8 @@ const CAPTURE_MAX_PINCODE_DISTANCE_M = Number(process.env.CAPTURE_MAX_PINCODE_DI
  * precisely the address resolved (refPrecision): 'address' uses the tight limit,
  * 'pincode' the wider one. A city/state centroid, or no result at all, cannot
  * prove the person is at the shop, so the capture is accepted but flagged
- * `unchecked: true` for a manager to approve.
- * @returns {{ ok: boolean, distance: number|null, reason?: string, noReference?: boolean, unchecked?: boolean }}
+ * accepted as it is (noReference: true) when the GPS fix itself is good.
+ * @returns {{ ok: boolean, distance: number|null, reason?: string, noReference?: boolean }}
  */
 function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng, refPrecision }) {
   const lat = Number(deviceLat), lng = Number(deviceLng);
@@ -117,9 +117,8 @@ function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng,
   const precision = refPrecision || 'address';
   if (!hasRef || precision === 'city' || precision === 'state') {
     // The map cannot place this address, so the phone cannot be compared with it.
-    // The capture still works (good GPS fix) but is flagged `unchecked` so a manager
-    // can approve it; the geofence is enforced against it in the meantime.
-    return { ok: true, distance: null, noReference: true, unchecked: true };
+    // A good GPS fix is enough: the capture is accepted as it is.
+    return { ok: true, distance: null, noReference: true };
   }
   const limit = precision === 'pincode' ? CAPTURE_MAX_PINCODE_DISTANCE_M : CAPTURE_MAX_ADDRESS_DISTANCE_M;
   const distance = distanceMeters(lat, lng, refLat, refLng);

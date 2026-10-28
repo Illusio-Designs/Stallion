@@ -434,7 +434,6 @@ class PartyController {
             // Geocode once; it is both the validation reference and the fallback.
             const geo = await geocodeAddress(address, { pincode });
             let captured = false;
-            let locationUnchecked = false;
             if (hasDeviceLoc) {
                 const acc = accuracy != null && accuracy !== '' ? accuracy : location_accuracy_m;
                 const check = validateOnsiteCapture({
@@ -449,8 +448,6 @@ class PartyController {
                     const accNum = Number(acc);
                     locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
                     captured = true;
-                    // Address not found on the map: kept, but a manager approves it.
-                    locationUnchecked = !!check.unchecked;
                 } else {
                     return res.status(422).json({ error: check.reason });
                 }
@@ -484,7 +481,6 @@ class PartyController {
                 longitude: finalLng,
                 location_source: locationSource,
                 location_accuracy_m: locationAccuracyM,
-                location_unchecked: locationUnchecked,
                 created_by: user.user_id,
                 created_at: new Date(),
                 updated_at: new Date(),
@@ -504,7 +500,7 @@ class PartyController {
             // Tell the app what happened to the location so it never claims more than was saved.
             const out = party.toJSON();
             out.location_status = locationSource === 'verified'
-                ? (locationUnchecked ? 'unchecked' : 'verified')
+                ? 'verified'
                 : (locationSource === 'geocoded' ? 'address_only' : 'none');
             out.location_capture_sent = hasDeviceLoc;
             res.status(200).json(out);
@@ -568,7 +564,6 @@ class PartyController {
             party.latitude = finalLat;
             party.longitude = finalLng;
             party.location_source = source;
-            party.location_unchecked = false;
             party.updated_at = new Date();
             await party.save();
             await logAudit({
@@ -651,7 +646,6 @@ class PartyController {
             party.longitude = Number(longitude);
             party.location_source = 'verified';
             party.location_accuracy_m = Number.isFinite(acc) ? acc : null;
-            party.location_unchecked = !!check.unchecked;
             party.updated_at = new Date();
             await party.save();
 
@@ -660,7 +654,7 @@ class PartyController {
                 action: 'update',
                 description: adminOverride
                     ? `Party location set by admin (±${Number.isFinite(acc) ? Math.round(acc) : '?'}m)`
-                    : `Party location verified on-site (±${Math.round(acc)}m)${check.unchecked ? ', address not found on the map, to be approved' : ''}`,
+                    : `Party location verified on-site (±${Math.round(acc)}m)`,
                 tableName: 'parties',
                 recordId: party.party_id,
                 oldValues: oldSnapshot,
@@ -670,46 +664,13 @@ class PartyController {
             return res.status(200).json({
                 message: adminOverride
                     ? 'Party location set from your current position.'
-                    : (check.unchecked
-                        ? 'Location saved. The map could not find this address, so a manager will check it.'
-                        : 'On-site location verified and saved.'),
-                location_unchecked: !!check.unchecked,
+                    : 'On-site location verified and saved.',
                 latitude: party.latitude,
                 longitude: party.longitude,
                 location_source: 'verified',
                 accuracy: party.location_accuracy_m,
                 distance_from_address_m: check.distance,
             });
-        } catch (error) {
-            return res.status(500).json({ error: error.message });
-        }
-    }
-
-    // A manager confirms a location that was captured on-site while the address could
-    // not be found on the map. Clears the "to be checked" flag; the point stays as it is.
-    async approvePartyLocation(req, res) {
-        try {
-            const party = await Party.findOne({ where: { party_id: req.params.id } });
-            if (!party) {
-                return res.status(404).json({ error: 'Party not found' });
-            }
-            if (!party.location_unchecked) {
-                return res.status(409).json({ error: 'This location does not need approval.' });
-            }
-            const oldSnapshot = party.toJSON();
-            party.location_unchecked = false;
-            party.updated_at = new Date();
-            await party.save();
-            await logAudit({
-                req,
-                action: 'update',
-                description: 'Party location approved',
-                tableName: 'parties',
-                recordId: party.party_id,
-                oldValues: oldSnapshot,
-                newValues: party,
-            });
-            return res.status(200).json({ message: 'Location approved.', location_unchecked: false });
         } catch (error) {
             return res.status(500).json({ error: error.message });
         }
@@ -738,7 +699,6 @@ class PartyController {
             party.longitude = null;
             party.location_source = null;
             party.location_accuracy_m = null;
-            party.location_unchecked = false;
             party.updated_at = new Date();
             await party.save();
 
@@ -877,14 +837,12 @@ class PartyController {
                         payload.longitude = geo.longitude;
                         payload.location_source = 'geocoded';
                         payload.location_accuracy_m = null;
-                        payload.location_unchecked = false;
                     } else if (wasVerified) {
                         // Never keep a verified point that belonged to the old address.
                         payload.latitude = null;
                         payload.longitude = null;
                         payload.location_source = null;
                         payload.location_accuracy_m = null;
-                        payload.location_unchecked = false;
                     }
                     locationReset = wasVerified;
                 }
