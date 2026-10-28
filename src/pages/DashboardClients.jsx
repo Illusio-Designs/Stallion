@@ -577,7 +577,7 @@ const DashboardClients = () => {
     if (d.blocked) {
       const names = d.names || {};
       showWarning(`${names[d.blocked.what] || d.blocked.name} is switched off in Manage. The address is filled in; ask an admin to switch it on, then pick the ${d.blocked.what} yourself.`);
-      setFormData(prev => ({ ...prev, address: d.address, pincode: d.pincode || prev.pincode, address_lat: d.latitude ?? null, address_lng: d.longitude ?? null }));
+      setFormData(prev => ({ ...prev, address: d.address_line || d.suggestion_main || d.address, pincode: d.pincode || prev.pincode, address_lat: d.latitude ?? null, address_lng: d.longitude ?? null }));
       return;
     }
     isInitializingEditRef.current = true;
@@ -593,7 +593,7 @@ const DashboardClients = () => {
       }
       setFormData(prev => ({
         ...prev,
-        address: d.address,
+        address: d.address_line || d.suggestion_main || d.address,
         pincode: d.pincode || prev.pincode,
         // The shop's point comes from the picked address; it is saved with the party.
         address_lat: d.latitude ?? null,
