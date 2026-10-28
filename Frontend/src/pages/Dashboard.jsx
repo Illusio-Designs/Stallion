@@ -696,10 +696,10 @@ const Dashboard = () => {
           <div className="dash-row">
             <section className="target-ring col-span-full" aria-label="Target progress">
               <svg className="target-ring__svg" width="88" height="88" viewBox="0 0 84 84" role="img" aria-label={`${targetPct} percent of target reached`}>
-                <circle cx="42" cy="42" r="34" fill="none" stroke="#3b3b3b" strokeWidth="9" />
-                <circle cx="42" cy="42" r="34" fill="none" stroke="#ffffff" strokeWidth="9" strokeLinecap="round"
+                <circle cx="42" cy="42" r="34" fill="none" strokeWidth="9" style={{ stroke: 'var(--ring-track, #3b3b3b)' }} />
+                <circle cx="42" cy="42" r="34" fill="none" strokeWidth="9" strokeLinecap="round" style={{ stroke: 'var(--t-on-ink)' }}
                   strokeDasharray={`${Math.min(1, targetDone / (targetTotal || 1)) * RING_C} ${RING_C}`} transform="rotate(-90 42 42)" />
-                <text x="42" y="47" textAnchor="middle" fill="#ffffff" fontSize="16" fontWeight="700" style={{ fontFamily: 'var(--font-display)' }}>{targetPct}%</text>
+                <text x="42" y="47" textAnchor="middle" fontSize="16" fontWeight="700" style={{ fontFamily: 'var(--font-display)', fill: 'var(--t-on-ink)' }}>{targetPct}%</text>
               </svg>
               <div className="target-ring__text">
                 <span className="target-ring__label">Target</span>
@@ -761,8 +761,8 @@ const Dashboard = () => {
               <div className="rda-card__head">
                 <div><h2>Orders per day</h2><p>{ordersChart.sub}. Cancelled orders are not counted.</p></div>
                 <div className="rda-legend" aria-hidden="true">
-                  <span><i style={{ background: '#c2c2c2' }} />Earlier</span>
-                  <span><i style={{ background: '#0a0a0a' }} />{range === 'today' ? 'Now' : range === 'year' ? 'This month' : 'Today'}</span>
+                  <span><i style={{ background: 'var(--chart-bar, #c2c2c2)' }} />Earlier</span>
+                  <span><i style={{ background: 'var(--t-ink)' }} />{range === 'today' ? 'Now' : range === 'year' ? 'This month' : 'Today'}</span>
                 </div>
               </div>
               <OrdersPerDayChart data={ordersChart.buckets} height={215} ariaLabel={`Bar chart of orders. ${ordersChart.total} orders. ${ordersChart.sub}.`} />
