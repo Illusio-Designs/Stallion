@@ -30,7 +30,7 @@ const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationPa
 // PAN and GSTIN are tax identifiers: only managers (and the party itself) see them. A salesman or
 // distributor still gets the name, phone and address they need for visits and orders.
 /** Adds `salesman_name` (via salesman_id) and `city_name` / `state_name` to party rows. Three small extra queries per page. */
-const withSalesmanNames = async (rows) => {
+const withSalesmanNames = async (rows, ownSalesman = null) => {
     const plain = (rows || []).map((r) => (typeof r.toJSON === 'function' ? r.toJSON() : { ...r }));
     const uniq = (key) => [...new Set(plain.map((p) => p[key]).filter(Boolean))];
     const salesmanIds = uniq('salesman_id');
@@ -56,6 +56,15 @@ const withSalesmanNames = async (rows) => {
     }
     const cityNames = new Map(cities.map((c) => [c.id, c.name]));
     const stateNames = new Map(states.map((x) => [x.id, x.name]));
+    // A salesman is only ever shown his own name, never the other salesmen of the same state.
+    if (ownSalesman) {
+        return plain.map((p) => ({
+            ...p,
+            salesman_name: ownSalesman.full_name || null,
+            city_name: cityNames.get(p.city_id) || null,
+            state_name: stateNames.get(p.state_id) || null,
+        }));
+    }
     return plain.map((p) => ({
         ...p,
         salesman_name: names.get(p.salesman_id) || (byState.get(p.state_id) || []).join(', ') || null,
@@ -204,6 +213,7 @@ class PartyController {
             }
             const roleName = role.role_name.toLowerCase();
             let where;
+            let ownSalesman = null;
 
             if (roleName === 'party') {
                 where = { user_id: user.user_id };
@@ -212,6 +222,7 @@ class PartyController {
                 if (!salesman) {
                     return res.status(404).json({ error: 'Salesman not found' });
                 }
+                ownSalesman = salesman;
                 const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
                 const stateIds = salesmanStates.map((s) => s.state_id);
                 if (salesman.state_id && !stateIds.includes(salesman.state_id)) {
@@ -254,7 +265,7 @@ class PartyController {
                 limit: pagination.limit,
                 offset: pagination.offset,
             });
-            res.status(200).json(hidePartySecrets(req, buildPaginatedResponse(await withSalesmanNames(parties), pagination, count)));
+            res.status(200).json(hidePartySecrets(req, buildPaginatedResponse(await withSalesmanNames(parties, ownSalesman), pagination, count)));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
