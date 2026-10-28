@@ -4,6 +4,7 @@ import 'react-international-phone/style.css';
 import AsidePanel from '../components/ui/AsidePanel';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import DatePicker from '../components/ui/DatePicker';
+import DateTimePicker from '../components/ui/DateTimePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import FileUpload from '../components/ui/FileUpload';
@@ -2146,7 +2147,7 @@ const DashboardSuppliers = () => {
               <>
                 <div className="form-group form-group--full">
                   <label className="ui-label" htmlFor="visit-date-fixed">Visit date</label>
-                  <input id="visit-date-fixed" type="date" className="ui-input" value={String(editCheckin.check_in_date || '').slice(0, 10)} disabled readOnly />
+                  <DatePicker value={String(editCheckin.check_in_date || '').slice(0, 10)} disabled />
                 </div>
                 <p className="form-group--full visit-fixed-note">Date and party cannot be changed after a visit is saved.</p>
               </>
@@ -2185,15 +2186,15 @@ const DashboardSuppliers = () => {
             </div>
             <div className="form-group">
               <label className="ui-label">In Time <span className="text-error">*</span></label>
-              <input type="datetime-local" className="ui-input" value={checkinForm.in_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, in_time: e.target.value }))} />
+              <DateTimePicker value={checkinForm.in_time} onChange={(v) => setCheckinForm(prev => ({ ...prev, in_time: v }))} />
             </div>
             <div className="form-group">
               <label className="ui-label">Out Time <span className="text-error">*</span></label>
-              <input type="datetime-local" className="ui-input" min={checkinForm.in_time || undefined} value={checkinForm.out_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, out_time: e.target.value }))} />
+              <DateTimePicker min={checkinForm.in_time || undefined} value={checkinForm.out_time} onChange={(v) => setCheckinForm(prev => ({ ...prev, out_time: v }))} />
             </div>
             <div className="form-group form-group--full">
               <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
-              <input type="date" className="ui-input" min={new Date().toISOString().slice(0, 10)} value={checkinForm.next_visit_date} onChange={(e) => setCheckinForm(prev => ({ ...prev, next_visit_date: e.target.value }))} />
+              <DatePicker min={new Date().toISOString().slice(0, 10)} value={checkinForm.next_visit_date} onChange={(v) => setCheckinForm(prev => ({ ...prev, next_visit_date: v }))} placeholder="Next visit date" />
             </div>
             <div className="form-group form-group--full">
               <label className="ui-label">Remarks</label>

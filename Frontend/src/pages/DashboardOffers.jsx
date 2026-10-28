@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import DatePicker from '../components/ui/DatePicker';
 import AsidePanel from '../components/ui/AsidePanel';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import PagedMultiSelect from '../components/ui/PagedMultiSelect';
@@ -457,11 +458,11 @@ const DashboardOffers = () => {
 
           <div className="form-group">
             <label className="ui-label">Start Date</label>
-            <input type="date" className="ui-input" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} />
+            <DatePicker value={form.start_date} onChange={(v) => set('start_date', v)} placeholder="Select date" />
           </div>
           <div className="form-group">
             <label className="ui-label">End Date</label>
-            <input type="date" className="ui-input" value={form.end_date} onChange={(e) => set('end_date', e.target.value)} />
+            <DatePicker value={form.end_date} onChange={(v) => set('end_date', v)} placeholder="Select date" />
           </div>
 
           <div className="form-group">

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import DatePicker from '../components/ui/DatePicker';
 import AsidePanel from '../components/ui/AsidePanel';
 import {
   getEvents,
@@ -311,21 +312,11 @@ const DashboardEvents = () => {
           </div>
           <div className="form-group flex flex-col gap-2">
             <label className="ui-label text-sm font-medium text-text">Start Date <span className="text-[#b00020]">*</span></label>
-            <input
-              type="date"
-              className="ui-input w-full"
-              value={form.start_date}
-              onChange={(e) => setForm((p) => ({ ...p, start_date: e.target.value }))}
-            />
+            <DatePicker value={form.start_date} onChange={(v) => setForm((p) => ({ ...p, start_date: v }))} placeholder="Select date" />
           </div>
           <div className="form-group flex flex-col gap-2">
             <label className="ui-label text-sm font-medium text-text">End Date <span className="text-[#b00020]">*</span></label>
-            <input
-              type="date"
-              className="ui-input w-full"
-              value={form.end_date}
-              onChange={(e) => setForm((p) => ({ ...p, end_date: e.target.value }))}
-            />
+            <DatePicker value={form.end_date} onChange={(v) => setForm((p) => ({ ...p, end_date: v }))} placeholder="Select date" />
           </div>
           <div className="form-group flex flex-col gap-2">
             <label className="ui-label text-sm font-medium text-text">Event Location <span className="text-[#b00020]">*</span></label>
@@ -367,21 +358,11 @@ const DashboardEvents = () => {
           </div>
           <div className="form-group flex flex-col gap-2">
             <label className="ui-label text-sm font-medium text-text">Start Date <span className="text-[#b00020]">*</span></label>
-            <input
-              type="date"
-              className="ui-input w-full"
-              value={form.start_date}
-              onChange={(e) => setForm((p) => ({ ...p, start_date: e.target.value }))}
-            />
+            <DatePicker value={form.start_date} onChange={(v) => setForm((p) => ({ ...p, start_date: v }))} placeholder="Select date" />
           </div>
           <div className="form-group flex flex-col gap-2">
             <label className="ui-label text-sm font-medium text-text">End Date <span className="text-[#b00020]">*</span></label>
-            <input
-              type="date"
-              className="ui-input w-full"
-              value={form.end_date}
-              onChange={(e) => setForm((p) => ({ ...p, end_date: e.target.value }))}
-            />
+            <DatePicker value={form.end_date} onChange={(v) => setForm((p) => ({ ...p, end_date: v }))} placeholder="Select date" />
           </div>
           <div className="form-group flex flex-col gap-2">
             <label className="ui-label text-sm font-medium text-text">Event Location <span className="text-[#b00020]">*</span></label>
