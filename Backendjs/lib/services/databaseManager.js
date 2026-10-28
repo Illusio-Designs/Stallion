@@ -587,6 +587,9 @@ class DatabaseManager {
                 });
                 console.log('✅ Added column parties.billing_same_as_shipping');
             }
+            // Columns the Party model selects on every query. Added here, before any Party query,
+            // so a failed alter-sync can never make the whole party list fail with "Unknown column".
+            await this.ensureColumn('parties', 'location_address', 'TEXT NULL');
             await sequelize.query(
                 'UPDATE parties SET billing_same_as_shipping = 1 WHERE billing_same_as_shipping IS NULL'
             );
