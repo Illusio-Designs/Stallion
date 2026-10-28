@@ -637,8 +637,8 @@ const Dashboard = () => {
             <p>{subline}</p>
             {isOfficeView && summary && (
               <div className="rda-subnums">
-                <span><b>{summary.salesmen_in_field}</b> / {summary.salesmen_total} salesmen in the field</span>
-                <span><b>{summary.visits_today}</b> visit{summary.visits_today === 1 ? '' : 's'} today</span>
+                <span><b>{Number(summary.salesmen_in_field) || 0}</b> / {Number(summary.salesmen_total) || 0} salesmen in the field</span>
+                <span><b>{Number(summary.visits_today) || 0}</b> visit{Number(summary.visits_today) === 1 ? '' : 's'} today</span>
               </div>
             )}
           </div>

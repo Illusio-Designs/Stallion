@@ -14,6 +14,7 @@ import "../styles/redesign-k.css";
 import "../styles/redesign-l.css";
 import "../styles/redesign-m.css";
 import "../styles/redesign-n-touch.css";
+import "../styles/redesign-n-polish.css";
 import LoaderProvider from "../components/LoaderProvider";
 import ToastContainerProvider from "../components/ToastContainerProvider";
 import ErrorBoundary from "../components/ErrorBoundary";
