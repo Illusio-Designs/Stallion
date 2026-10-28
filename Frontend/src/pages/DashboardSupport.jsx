@@ -68,7 +68,7 @@ const DashboardSupport = () => {
               </div>
               <div className="support-faq__item">
                 <dt>I cannot place a visit order</dt>
-                <dd>You must be within 50 m of the shop, and the shop location must be saved first.</dd>
+                <dd>You must be within 100 m of the shop, and the shop location must be saved first.</dd>
               </div>
               <div className="support-faq__item">
                 <dt>A page says Access denied</dt>

@@ -16,6 +16,7 @@ import {
   getPartiesForRole,
   getStates,
   getZones,
+  approvePartyLocation,
   removePartyLocation,
   updateParty,
   verifyPartyLocation,
@@ -417,9 +418,9 @@ const DashboardClients = () => {
         isActive: party.is_active !== false,
         cityLabel: (typeof party.city === 'string' ? party.city : party.city?.name) || party.city_name || '—',
         salesmanLabel: party.salesman?.full_name || party.salesman?.salesman_name || party.salesman_name || '—',
-        locationState: party.location_source === 'verified' ? 'ok'
+        locationState: party.location_source === 'verified' ? (party.location_unchecked ? 'warn' : 'ok')
           : (Number.isFinite(Number(party.latitude)) && party.latitude !== null && Number.isFinite(Number(party.longitude)) && party.longitude !== null ? 'warn' : 'idle'),
-        locationLabel: party.location_source === 'verified' ? 'Verified at shop'
+        locationLabel: party.location_source === 'verified' ? (party.location_unchecked ? 'To be checked' : 'Verified at shop')
           : (Number.isFinite(Number(party.latitude)) && party.latitude !== null && Number.isFinite(Number(party.longitude)) && party.longitude !== null ? 'Address only' : 'Not set'),
         creditLabel: `${Number(party.credit_days) || 0} days`,
       };
@@ -602,13 +603,19 @@ const DashboardClients = () => {
         const savedLat = Number(res?.latitude);
         const savedLng = Number(res?.longitude);
         const savedAcc = Number(res?.accuracy);
-        showSuccess(`Location verified & saved${Number.isFinite(savedAcc) ? ` (±${Math.round(savedAcc)}m)` : ''}. The 50m geofence is now active for this party.`);
+        const unchecked = res?.location_unchecked === true;
+        if (unchecked) {
+          showWarning('Location saved. The map could not find this address, so a manager will check it. Visit orders and check-ins work meanwhile.');
+        } else {
+          showSuccess(`Location verified & saved${Number.isFinite(savedAcc) ? ` (±${Math.round(savedAcc)}m)` : ''}. The 100m geofence is now active for this party.`);
+        }
+        const saved = { latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc, location_unchecked: unchecked };
         setParties(prev => prev.map(p => {
           const id = p.id || p.party_id;
-          return id === partyId ? { ...p, latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc } : p;
+          return id === partyId ? { ...p, ...saved } : p;
         }));
-        setEditRow(prev => (prev ? { ...prev, latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc } : prev));
-        setFormData(prev => ({ ...prev, latitude: savedLat, longitude: savedLng, location_source: 'verified', location_accuracy_m: savedAcc }));
+        setEditRow(prev => (prev ? { ...prev, ...saved } : prev));
+        setFormData(prev => ({ ...prev, ...saved }));
       } else {
         setFormData(prev => ({
           ...prev,
@@ -636,13 +643,30 @@ const DashboardClients = () => {
     try {
       setSavingLoc(true);
       await removePartyLocation(partyId);
-      const cleared = { latitude: null, longitude: null, location_source: null, location_accuracy_m: null };
+      const cleared = { latitude: null, longitude: null, location_source: null, location_accuracy_m: null, location_unchecked: false };
       setParties(prev => prev.map(p => ((p.id || p.party_id) === partyId ? { ...p, ...cleared } : p)));
       setEditRow(prev => (prev ? { ...prev, ...cleared } : prev));
       setFormData(prev => ({ ...prev, ...cleared }));
       showSuccess('Location removed. Use "I\'m at shop" to set it again.');
     } catch (err) {
       showError(err?.message || 'Could not remove the location. Please try again.');
+    } finally {
+      setSavingLoc(false);
+    }
+  };
+
+  // A manager confirms a location that was saved while the address was not on the map.
+  const handleApproveLocation = async () => {
+    const partyId = editRow?.id || editRow?.party_id;
+    if (!partyId) return;
+    try {
+      setSavingLoc(true);
+      await approvePartyLocation(partyId);
+      setParties(prev => prev.map(p => ((p.id || p.party_id) === partyId ? { ...p, location_unchecked: false } : p)));
+      setEditRow(prev => (prev ? { ...prev, location_unchecked: false } : prev));
+      showSuccess('Location approved.');
+    } catch (err) {
+      showError(err?.message || 'Could not approve the location. Please try again.');
     } finally {
       setSavingLoc(false);
     }
@@ -1099,7 +1123,18 @@ const DashboardClients = () => {
         // insufficient permissions" for salesmen / field roles creating a party.
         try {
           const newParty = await createParty(dataToSend);
-          showSuccess('Party created successfully!');
+          // Say what happened to the shop location, never more than was saved.
+          const locStatus = newParty?.location_status;
+          const needsCapture = locStatus === 'none' || locStatus === 'address_only';
+          if (locStatus === 'unchecked') {
+            showWarning('Party created. The map could not find the address, so the shop location is saved but a manager will check it.');
+          } else if (needsCapture) {
+            showWarning(newParty?.location_capture_sent
+              ? 'Party created, but the shop location was not saved. Stand at the shop and tap "I\'m at shop" below.'
+              : 'Party created. Stand at the shop and tap "I\'m at shop" below to set its location.');
+          } else {
+            showSuccess('Party created successfully!');
+          }
 
           // Optimistically add to table if it matches the current filter
           if (newParty && (!selectedCountryFilter || !newParty.country_id || String(newParty.country_id) === String(selectedCountryFilter))) {
@@ -1117,6 +1152,10 @@ const DashboardClients = () => {
           setOpenAdd(false);
           setEditRow(null);
           resetForm();
+          // Reopen the new party so the salesman can capture the location right now.
+          if (needsCapture && (newParty?.party_id || newParty?.id)) {
+            await handleEdit({ ...newParty, id: newParty.party_id || newParty.id });
+          }
         } catch (error) {
           // Handle foreign key constraint errors by retrying with null values
           // Check both error.message and error.error (in case error is wrapped)
@@ -1507,6 +1546,8 @@ const DashboardClients = () => {
         const locAcc = editRow?.location_accuracy_m ?? formData.location_accuracy_m;
         const hasLocationSet = Number.isFinite(Number(locLat)) && Number.isFinite(Number(locLng));
         const isVerified = locSource === 'verified';
+        const locUnchecked = isVerified && (editRow?.location_unchecked ?? formData.location_unchecked) === true;
+        const canApprove = !!editRow && locUnchecked && (isAdmin || userRole === 'party_manager' || userRole === 'sales_manager');
         // Capture works once for everyone. A wrong location is fixed by a manager
         // removing it first, which brings the button back.
         const canCapture = !isVerified;
@@ -1516,17 +1557,22 @@ const DashboardClients = () => {
           <div className="form-group form-group--full party-loc">
             <label className="ui-label">Shop location (visit geofence)</label>
             <div className="party-loc__chip">
-              <span className={`loc-pill loc-pill--${isVerified ? 'ok' : hasLocationSet ? 'warn' : 'idle'}`}>{isVerified ? 'Verified at shop' : hasLocationSet ? 'Address only' : 'Not set'}</span>
+              <span className={`loc-pill loc-pill--${isVerified && !locUnchecked ? 'ok' : hasLocationSet ? 'warn' : 'idle'}`}>{isVerified ? (locUnchecked ? 'To be checked' : 'Verified at shop') : hasLocationSet ? 'Address only' : 'Not set'}</span>
             </div>
             <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
               {isVerified
-                ? `Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. The strict 50m geofence is active for visit orders and check-ins.${canRemoveLocation ? ' If it is wrong, press “Remove location” and capture it again.' : ' If it is wrong, ask a manager to remove it.'}`
-                : 'Stand at the shop and tap below to lock the exact spot — the 50m geofence turns on once it is verified.'}
+                ? `Verified on-site${Number.isFinite(Number(locAcc)) ? ` (±${Math.round(Number(locAcc))}m)` : ''}. ${locUnchecked ? 'The map could not find this address, so a manager needs to check it. ' : ''}The 100m geofence is active for visit orders and check-ins.${canRemoveLocation ? ' If it is wrong, press “Remove location” and capture it again.' : ' If it is wrong, ask a manager to remove it.'}`
+                : 'Stand at the shop and tap below to lock the exact spot — the 100m geofence turns on once it is verified.'}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {canCapture && (
                 <button type="button" className="ui-btn ui-btn--primary" onClick={handleCaptureAtShop} disabled={savingLoc}>
                   {savingLoc ? 'Capturing…' : 'I’m at shop'}
+                </button>
+              )}
+              {canApprove && (
+                <button type="button" className="ui-btn ui-btn--primary" onClick={handleApproveLocation} disabled={savingLoc}>
+                  {savingLoc ? 'Approving…' : 'Approve location'}
                 </button>
               )}
               {canRemoveLocation && (

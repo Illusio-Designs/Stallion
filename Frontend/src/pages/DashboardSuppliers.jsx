@@ -2167,7 +2167,7 @@ const DashboardSuppliers = () => {
                 return (
                   <p className="mt-2 mb-0 text-[length:var(--text-xs)] text-text-muted">
                     {verified
-                      ? `Party location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — you must be within 50m to check in.`
+                      ? `Party location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — you must be within 100m to check in.`
                       : 'This party’s location is not set yet. Set it from Party → Edit (“I’m at shop”) before checking in.'}
                   </p>
                 );

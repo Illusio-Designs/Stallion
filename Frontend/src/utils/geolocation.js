@@ -3,11 +3,11 @@
 // Wraps navigator.geolocation.getCurrentPosition in a promise that resolves to
 // { latitude, longitude, accuracy } (accuracy in metres) or REJECTS with a
 // friendly, user-facing Error message. High-accuracy is requested because the
-// captured point becomes the party's trusted 50m geofence anchor.
+// captured point becomes the party's trusted geofence anchor.
 
 // The distance a salesman must be within to place a visit order or check in.
-// Mirrors the server's GEOFENCE_RADIUS_M (50 m).
-export const GEOFENCE_RADIUS_M = 50;
+// Mirrors the server's GEOFENCE_RADIUS_M (100 m).
+export const GEOFENCE_RADIUS_M = 100;
 
 // Great-circle distance in metres between two lat/lng points (Haversine).
 export function distanceMeters(lat1, lng1, lat2, lng2) {

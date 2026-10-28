@@ -140,6 +140,13 @@ const Party = sequelize.define('Party', {
         type: DataTypes.DECIMAL(7, 2),
         allowNull: true
     },
+    // True when the location was captured on-site but the address could not be found
+    // on the map to cross-check it. Works for the geofence; a manager approves it.
+    location_unchecked: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+    },
     is_active: {
         type: DataTypes.BOOLEAN,
         allowNull: false,

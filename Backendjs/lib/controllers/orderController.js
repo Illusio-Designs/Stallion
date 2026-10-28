@@ -7,7 +7,7 @@ const Distributor = require('../models/distributor');
 const Salesman = require('../models/Salesman');
 const Product = require('../models/Product');
 const TrayProducts = require('../models/TrayProducts');
-const { TrayProductStatus, OrderStatus, OrderStatusTransitions, OrderType } = require('../constants/enums');
+const { TrayProductStatus, OrderStatus, OrderStatusTransitions, OrderType, SalesmanCheckInType } = require('../constants/enums');
 const { generateUniqueOrderNumber } = require('../services/order_number_generator');
 const Event = require('../models/event');
 const OrderOperation = require('../models/OrderOperation');
@@ -1152,6 +1152,31 @@ class OrderController {
                     }
                 }
 
+                // A visit order closes the salesman's open "I'm at the shop" visit for this
+                // party: the visit now points at the order, so the Visit Report shows one row.
+                // Never blocks the order itself.
+                if (order_type === OrderType.VISIT_ORDER && order.salesman_id && order.party_id) {
+                    try {
+                        const openVisit = await SalesmanCheckIns.findOne({
+                            where: {
+                                salesman_id: order.salesman_id,
+                                party_id: order.party_id,
+                                order_id: null,
+                                type: SalesmanCheckInType.VISIT,
+                                check_in_remarks: { [Op.like]: '[In progress]%' },
+                                in_time: { [Op.gte]: new Date(Date.now() - 12 * 60 * 60 * 1000) },
+                            },
+                            order: [['in_time', 'DESC']],
+                            transaction,
+                        });
+                        if (openVisit) {
+                            await openVisit.update({ order_id: order.order_id, type: SalesmanCheckInType.ORDERED }, { transaction });
+                        }
+                    } catch (linkErr) {
+                        console.error('[order] could not link the open visit:', linkErr.message);
+                    }
+                }
+
                 // Stock history: one line per product on this order.
                 for (const line of stockLines) {
                     await recordStockMove({ transaction, ...line, kind: 'order', user, reference: order.order_number });
@@ -1709,7 +1734,7 @@ class OrderController {
             //    keep the visit record but drop the order link (order_id is nullable).
             //  - order_operation: usually removed by the reversal above, but a
             //    cancelled/completed order skips that, so clear any leftovers.
-            await SalesmanCheckIns.update({ order_id: null }, { where: { order_id: order.order_id } });
+            await SalesmanCheckIns.update({ order_id: null, type: SalesmanCheckInType.VISIT }, { where: { order_id: order.order_id } });
             await OrderOperation.destroy({ where: { order_id: order.order_id } });
             await order.destroy();
             await logAudit({
