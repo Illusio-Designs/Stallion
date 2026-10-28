@@ -1,0 +1,65 @@
+/* Salesmen page refinements: small filters, state pills, phone cards, sectioned form.
+   Compact black and white. Mobile first. Touch targets 44px or more. */
+
+/* ---- Filters ---- */
+:root .sx-filters{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+:root .sx-search{grid-column:1/-1;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:1px solid #cfcfcf;border-radius:10px;background:#fff;color:#595959}
+:root .sx-search:focus-within{border-color:#0a0a0a}
+:root .sx-search__input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:14px;color:#0a0a0a;min-height:40px}
+:root .sx-select{min-width:0;min-height:44px}
+:root .sx-select:focus-visible{outline:2px solid #0a0a0a;outline-offset:1px}
+:root .sx-add{grid-column:1/-1;min-height:44px}
+@media (min-width:768px){
+  :root .sx-filters{grid-template-columns:minmax(220px,1.6fr) repeat(3,minmax(120px,1fr));}
+  :root .sx-add{display:none}
+}
+
+/* ---- State pills ---- */
+:root .sx-pills{display:inline-flex;flex-wrap:wrap;gap:4px}
+:root .sx-pill{display:inline-block;border-radius:99px;padding:3px 10px;font-size:12px;font-weight:600;background:#ececec;color:#0a0a0a;white-space:nowrap}
+:root .sx-pill--more{background:#0a0a0a;color:#fff}
+:root .sx-status{min-height:44px;display:inline-flex;align-items:center}
+
+/* ---- Phone cards (table on tablet and desktop) ---- */
+:root .sx-cards{display:grid;gap:10px}
+:root .sx-cards__note{margin:0;padding:24px 8px;text-align:center;color:#595959;font-size:14px}
+:root .sx-card{border:1px solid #e1e1e1;border-radius:12px;background:#fff;padding:12px;display:grid;gap:10px}
+:root .sx-card__top{display:flex;align-items:center;gap:10px}
+:root .sx-card__who{flex:1;min-width:0;display:flex;flex-direction:column}
+:root .sx-card__who strong{font-size:15px;color:#0a0a0a;overflow-wrap:anywhere}
+:root .sx-card__who small{font-size:12px;color:#595959;overflow-wrap:anywhere}
+:root .sx-card__meta{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:13px;color:#595959;flex-wrap:wrap}
+:root .sx-card__meta b{color:#0a0a0a;font-size:15px}
+:root .sx-card__note{margin:0;font-size:13px;color:#595959;overflow-wrap:anywhere}
+:root .sx-card__act{display:flex;gap:8px}
+:root .sx-card__act .ui-btn{flex:1;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}
+:root .sx-tablewrap{display:none}
+@media (min-width:768px){
+  :root .sx-cards{display:none}
+  :root .sx-tablewrap{display:block}
+}
+
+/* ---- Tabs: touch height ---- */
+:root .order-tabs-container .order-tab{min-height:44px}
+
+/* ---- Add / edit form ---- */
+:root .sx-form{display:block}
+:root .sx-sec{padding:0 0 16px;margin:0 0 16px;border-bottom:1px solid #e1e1e1}
+:root .sx-sec:last-child{border-bottom:0;margin-bottom:0}
+:root .sx-sec__h{margin:0 0 4px;font-size:15px;font-weight:700;color:#0a0a0a}
+:root .sx-sec__opt{font-weight:400;color:#595959;font-size:12px}
+:root .sx-sec__d{margin:0 0 10px;font-size:12.5px;color:#595959}
+:root .sx-sec .sx-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:8px}
+:root .sx-sec .sx-grid .form-group--full{grid-column:1/-1}
+:root .sx-sec .form-group{min-width:0}
+:root .sx-lock{margin:0 0 10px}
+:root .sx-form .ui-input{min-height:44px}
+@media (min-width:640px){
+  :root .sx-sec .sx-grid{grid-template-columns:1fr 1fr}
+}
+
+/* ---- Sticky footer buttons (footer sits outside the scrolling body) ---- */
+:root .sx-foot-btn{min-height:44px}
+@media (max-width:639.98px){
+  :root .sx-foot-btn{flex:1}
+}

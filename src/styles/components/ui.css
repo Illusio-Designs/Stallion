@@ -1196,7 +1196,7 @@ textarea.ui-input {
 
 .ui-aside-panel {
   position: relative;
-  height: 100dvh;
+  height: 100%; /* the backdrop is the visible area, so the panel follows it when a keyboard opens */
   width: 100%;
   max-width: 520px;
   background: var(--color-surface);

@@ -1,22 +1,51 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
+import { FiSearch } from '../components/icons/hugeicons';
 import { showSuccess, showError } from '../services/notificationService';
+import { getUser } from '../services/authService';
 import '../styles/pages/dashboard-support.css';
+import '../styles/redesign-p-account.css';
+
+const ANSWERS = [
+  { q: 'I did not get my code', a: 'Wait 30 seconds, then tap Resend. You can resend 3 times in 15 minutes.' },
+  { q: 'I cannot place a visit order', a: 'You must be within 50 m of the shop. The first visit to a shop allows 150 m and saves the exact spot. A party with no location needs its address picked in Party \u2192 Edit first.' },
+  { q: 'A page says Access denied', a: 'Your role cannot change that data. Ask an admin.' },
+];
+
+// Name and email come from the signed-in user, so the person only writes the question.
+const readSender = () => {
+  let u = null;
+  try { u = getUser(); } catch { u = null; }
+  let stored = {};
+  try { stored = JSON.parse(window.localStorage.getItem('user') || '{}') || {}; } catch { stored = {}; }
+  let storedName = '';
+  try { storedName = window.localStorage.getItem('userName') || ''; } catch { storedName = ''; }
+  return {
+    name: (u && (u.full_name || u.name)) || stored.name || storedName || '',
+    email: (u && u.email) || stored.email || '',
+  };
+};
 
 const DashboardSupport = () => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
   const [query, setQuery] = useState('');
+  const [search, setSearch] = useState('');
+
+  const shown = useMemo(() => {
+    const s = search.trim().toLowerCase();
+    return s ? ANSWERS.filter((x) => `${x.q} ${x.a}`.toLowerCase().includes(s)) : ANSWERS;
+  }, [search]);
 
   const handleSend = (e) => {
     e.preventDefault();
-    if (!name || !email || !query) {
-      showError('Please fill out all fields.');
+    const { name, email } = readSender();
+    if (!query.trim()) {
+      showError('Please write your question.');
       return;
     }
     try {
-      const subject = encodeURIComponent(`Support Query from ${name}`);
-      const body = encodeURIComponent(`Name: ${name}\nEmail: ${email}\n\nMessage:\n${query}`);
+      const who = name || email || 'a Stallion user';
+      const subject = encodeURIComponent(`Support Query from ${who}`);
+      const body = encodeURIComponent(`Name: ${name || '-'}\nEmail: ${email || '-'}\n\nMessage:\n${query}`);
       const mailto = `mailto:illusiodesigns@gmail.com?subject=${subject}&body=${body}`;
       window.location.href = mailto;
       showSuccess('Opening your email client to send the message...');
@@ -28,54 +57,41 @@ const DashboardSupport = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
-        <div className="pg-head"><div><h1>Support</h1><p>Send a question to the Stallion team.</p></div></div>
-        <div className="dash-row">
-          <div className="dash-card full support p-5 min-[481px]:p-6">
-            <div className="support-header flex items-end justify-between gap-4 mb-5 min-[481px]:mb-6">
-              <div>
-                <h4 className="support-title m-0 text-[var(--text-lg)] leading-tight tracking-[-0.01em] font-semibold text-text">Contact support</h4>
-                <p className="support-subtitle mt-2 mb-0 text-text-muted text-[var(--text-sm)] leading-snug">Send us your query and we will get back to you.</p>
-              </div>
-            </div>
+        <div className="pg-head"><div><h1>Support</h1><p>Find an answer or send a question to the Stallion team.</p></div></div>
+        <div className="acc-support">
+          <section className="dash-card acc-card" aria-labelledby="sup-answers">
+            <h2 id="sup-answers" className="acc-h">Quick answers</h2>
+            <label className="acc-search">
+              <FiSearch size={18} aria-hidden="true" />
+              <input type="search" className="ui-input" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search the answers" aria-label="Search the answers" />
+            </label>
+            {shown.length ? (
+              <dl className="acc-faq">
+                {shown.map((x) => (
+                  <div className="acc-faq__item" key={x.q}>
+                    <dt>{x.q}</dt>
+                    <dd>{x.a}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <p className="acc-empty">No answer matches "{search}". Write to us on this page and we will help.</p>
+            )}
+          </section>
 
-            <form onSubmit={handleSend} className="ui-form support-form grid grid-cols-1 gap-4 min-[560px]:grid-cols-2 min-[560px]:gap-5">
-              <div className="form-group flex flex-col gap-2">
-                <label className="ui-label block mb-2" htmlFor="support-name">Your Name</label>
-                <input id="support-name" className="ui-input w-full" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" required />
+          <section className="dash-card acc-card" aria-labelledby="sup-contact">
+            <h2 id="sup-contact" className="acc-h">Still stuck? Write to us</h2>
+            <form onSubmit={handleSend} className="ui-form acc-form">
+              <div className="acc-field">
+                <label className="ui-label" htmlFor="support-query">Your question</label>
+                <textarea id="support-query" className="ui-input acc-textarea" rows={5} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Write your question here..." required />
               </div>
-              <div className="form-group flex flex-col gap-2">
-                <label className="ui-label block mb-2" htmlFor="support-email">Email</label>
-                <input id="support-email" className="ui-input w-full" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" required />
-              </div>
-              <div className="form-group flex flex-col gap-2 col-[1/-1]">
-                <label className="ui-label block mb-2" htmlFor="support-query">Query</label>
-                <textarea id="support-query" className="ui-input w-full min-h-[140px] resize-y" rows={6} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Write your question here..." required />
-              </div>
-
-              <div className="support-form-actions flex flex-wrap justify-end gap-3 col-[1/-1]">
+              <div className="acc-row-end">
+                <span className="acc-hint">Your name and email are added for you.</span>
                 <Button type="submit">Send</Button>
               </div>
             </form>
-          </div>
-        </div>
-        <div className="dash-row">
-          <div className="dash-card full support support-faq p-5 min-[481px]:p-6">
-            <h4 className="support-title m-0">Quick answers</h4>
-            <dl className="support-faq__list">
-              <div className="support-faq__item">
-                <dt>I did not get my code</dt>
-                <dd>Wait 30 seconds, then tap Resend. You can resend 3 times in 15 minutes.</dd>
-              </div>
-              <div className="support-faq__item">
-                <dt>I cannot place a visit order</dt>
-                <dd>You must be within 50 m of the shop. The first visit to a shop allows 150 m and saves the exact spot. A party with no location needs its address picked in Party → Edit first.</dd>
-              </div>
-              <div className="support-faq__item">
-                <dt>A page says Access denied</dt>
-                <dd>Your role cannot change that data. Ask an admin.</dd>
-              </div>
-            </dl>
-          </div>
+          </section>
         </div>
       </div>
     </div>
@@ -83,4 +99,3 @@ const DashboardSupport = () => {
 };
 
 export default DashboardSupport;
-

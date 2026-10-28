@@ -9,6 +9,11 @@ import PagedMultiSelect from '../components/ui/PagedMultiSelect';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import { createUser, updateUserById, getRoles, getUsers, deleteUser, getIndianCountries, getStates, getCities } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
+import { FiSearch } from '../components/icons/hugeicons';
+import { Avatar, FormSection, usePeopleQuery } from '../components/people/PeopleBits';
+import '../styles/redesign-p-people.css';
+
+const PAGE_STEP = 20;
 
 const DashboardOfficeTeam = () => {
   const confirm = useConfirm();
@@ -302,23 +307,50 @@ const DashboardOfficeTeam = () => {
     return filtered;
   }, [rows, activeTab]);
 
+  const roleListOf = (row) => String(row.role || '').split(', ').filter(Boolean);
+
+  const [query, setQuery] = usePeopleQuery();
+  const [shown, setShown] = useState(PAGE_STEP);
+
+  const listRows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return filteredRowsByTab;
+    return filteredRowsByTab.filter(r => [r.fullName, r.phoneNumber, r.email, r.role]
+      .filter(Boolean).join(' ').toLowerCase().includes(q));
+  }, [filteredRowsByTab, query]);
+
+  useEffect(() => { setShown(PAGE_STEP); }, [query, activeTab]);
+
+  const tabCounts = useMemo(() => ({
+    All: rows.length,
+    Activate: rows.filter(r => r.isActive).length,
+    Deactivate: rows.filter(r => !r.isActive).length,
+  }), [rows]);
+
   const columns = useMemo(() => ([
-    { key: 'fullName', label: 'FULL NAME' },
-    { key: 'phoneNumber', label: 'PHONE NUMBER' },
-    { key: 'email', label: 'EMAIL' },
-    { key: 'address', label: 'ADDRESS' },
+    { key: 'fullName', label: 'NAME', render: (_v, row) => (
+      <div className="pp-who">
+        <Avatar name={row.fullName} />
+        <div className="pp-who__t">
+          <span className="pp-who__n">{row.fullName}</span>
+          {row.email ? <span className="pp-sub">{row.email}</span> : null}
+        </div>
+      </div>
+    ) },
     { key: 'role', label: 'ROLES', render: (v) => (
-      <span className="ot-roles">
-        {String(v || '').split(', ').filter(Boolean).map((r) => <span key={r} className="ot-chip">{r}</span>)}
+      <span className="pp-pills">
+        {String(v || '').split(', ').filter(Boolean).map((r) => <span key={r} className="pp-pill">{r}</span>)}
       </span>
     ) },
+    { key: 'phoneNumber', label: 'PHONE', render: (v) => <span className="pp-num">{v ? (String(v).startsWith('+') ? v : `+${v}`) : '-'}</span> },
     { key: 'status', label: 'STATUS', render: (v, row) => (
-      <span className={`ui-badge ${row.isActive ? 'ui-badge--success' : 'ui-badge--danger'}`}>{v}</span>
+      <span className={`pp-pill ${row.isActive ? 'pp-pill--ok' : 'pp-pill--off'}`}>{v}</span>
     ) },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions onEdit={() => setEditRow(row)}/>
     ) },
   ]), []);
+
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({
@@ -579,188 +611,122 @@ const DashboardOfficeTeam = () => {
     }
   };
 
-  return (
-    <div className="dash-page w-full">
-      <div className="dash-container flex flex-col gap-4">
-        <div className="pg-head"><div><h1>Office team</h1><p>Admin only. A member can hold several roles and sees the pages of all of them.</p></div></div>
-        <div className="dash-row grid grid-cols-12 gap-4">
-          <div className="order-tabs-container col-span-full flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm">
-            {['All', 'Activate', 'Deactivate'].map(tab => (
-              <button
-                key={tab}
-                className={`order-tab inline-flex min-h-10 flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-4 py-2 text-[var(--text-base)] font-semibold leading-[var(--leading-snug)] transition-colors focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] ${activeTab === tab ? 'active bg-primary text-text-on-primary' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="dash-row grid grid-cols-12 gap-4">
-          <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
-            {error && !loading ? (
-              <div className="ui-state ui-state--error">
-                <div className="ui-state__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="32" height="32">
-                    <circle cx="12" cy="12" r="9" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                </div>
-                <p className="ui-state__title">Couldn&apos;t load the team</p>
-                <p className="ui-state__desc">{error}</p>
-                <div className="ui-state__actions">
-                  <button className="ui-btn ui-btn--secondary" onClick={() => fetchUsers()}>
-                    Try again
-                  </button>
-                </div>
-              </div>
-            ) : !loading && rows.length === 0 ? (
-              <div className="ui-state ui-state--empty">
-                <div className="ui-state__icon" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="32" height="32">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <line x1="19" y1="8" x2="19" y2="14" />
-                    <line x1="22" y1="11" x2="16" y2="11" />
-                  </svg>
-                </div>
-                <p className="ui-state__title">No team members yet</p>
-                <p className="ui-state__desc">Add your office team members to manage their roles and access.</p>
-                <div className="ui-state__actions">
-                  <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>
-                    Add New User
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <TableWithControls
-                title="Office Team"
-                columns={columns}
-                rows={filteredRowsByTab}
-                onAddNew={() => setOpenAdd(true)}
-                addNewText="Add New User"
-                searchPlaceholder="Search users"
-                loading={loading}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-      <AsidePanel
-        open={openAdd}
-        onClose={() => {
-          setOpenAdd(false);
-          setFormData({
-            fullName: '',
-            phoneNumber: '',
-            roleIds: [],
-            email: '',
-            address: '',
-            country_id: '',
-            state_id: '',
-            city_id: '',
-          });
-        }}
-        title="Add New User"
-        footer={(
-          <>
-            <button
-              className="ui-btn ui-btn--secondary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border-strong bg-surface px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text transition-colors hover:bg-grey-100 hover:border-grey-400 active:bg-grey-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
-              onClick={() => {
-                setOpenAdd(false);
-                setFormData({
-                  fullName: '',
-                  phoneNumber: '',
-                  roleIds: [],
-                  email: '',
-                  address: '',
-                  country_id: '',
-                  state_id: '',
-                  city_id: '',
-                });
-              }}
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              className="ui-btn ui-btn--primary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text-on-primary shadow-xs transition-colors hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
-              onClick={handleSubmit}
-              disabled={loading || !formData.fullName || !formData.phoneNumber || !formData.roleIds.length || !formData.address}
-            >
-              {loading ? 'Saving...' : 'Save'}
-            </button>
-          </>
-        )}
-      >
-        <form className="ui-form grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Full Name *</label>
+  const emptyAdd = {
+    fullName: '',
+    phoneNumber: '',
+    roleIds: [],
+    email: '',
+    address: '',
+    country_id: '',
+    state_id: '',
+    city_id: '',
+  };
+  const emptyEdit = { ...emptyAdd, isActive: true };
+
+  const closeAdd = () => {
+    setOpenAdd(false);
+    setFormData(emptyAdd);
+  };
+  const closeEdit = () => {
+    setEditRow(null);
+    setEditFormData(emptyEdit);
+  };
+
+  const footerFor = (isEdit) => {
+    const d = isEdit ? editFormData : formData;
+    return (
+      <>
+        <span className="pp-foot-note">Nothing is saved until you press {isEdit ? 'Update' : 'Save'}.</span>
+        <button className="ui-btn ui-btn--secondary pp-btn" onClick={isEdit ? closeEdit : closeAdd} disabled={loading}>
+          Cancel
+        </button>
+        <button
+          className="ui-btn ui-btn--primary pp-btn pp-btn--pri"
+          onClick={isEdit ? handleEditSubmit : handleSubmit}
+          disabled={loading || !d.fullName || !d.phoneNumber || !d.roleIds.length || !d.address}
+        >
+          {loading ? (isEdit ? 'Updating...' : 'Saving...') : (isEdit ? 'Update' : 'Save')}
+        </button>
+      </>
+    );
+  };
+
+  // Same fields for Add and Edit; Edit also has the Active switch.
+  const renderFields = (isEdit) => {
+    const d = isEdit ? editFormData : formData;
+    const patch = (obj) => (isEdit
+      ? setEditFormData(prev => ({ ...prev, ...obj }))
+      : setFormData(prev => ({ ...prev, ...obj })));
+    return (
+      <form className="ui-form pp-form" onSubmit={isEdit ? handleEditSubmit : handleSubmit}>
+        <FormSection title="Person" hint="Who they are and how to reach them.">
+          <div className="form-group pp-full">
+            <label className="ui-label">Full name *</label>
             <input
-              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
+              className="ui-input"
               placeholder="Enter full name"
-              value={formData.fullName}
-              onChange={(e) => handleInputChange('fullName', e.target.value)}
+              value={d.fullName}
+              onChange={(e) => patch({ fullName: e.target.value })}
               required
             />
           </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Phone Number *</label>
+          <div className="form-group">
+            <label className="ui-label">Phone number *</label>
             <PhoneInput
               defaultCountry="in"
-              value={formData.phoneNumber ? (String(formData.phoneNumber).startsWith('+') ? String(formData.phoneNumber) : '+' + formData.phoneNumber) : ''}
-              onChange={(phone) => handleInputChange('phoneNumber', phone.replace(/^\+/, ''))}
+              value={d.phoneNumber ? (String(d.phoneNumber).startsWith('+') ? String(d.phoneNumber) : '+' + d.phoneNumber) : ''}
+              onChange={(phone) => patch({ phoneNumber: phone.replace(/^\+/, '') })}
               className="phone-intl"
-              inputProps={{
-                required: true,
-                placeholder: 'Enter your phone number',
-              }}
+              inputProps={{ required: true, placeholder: isEdit ? 'Enter phone number' : 'Enter your phone number' }}
             />
           </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Email</label>
+          <div className="form-group">
+            <label className="ui-label">Email</label>
             <input
-              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
+              className="ui-input"
               type="email"
               placeholder="Enter email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
+              value={d.email}
+              onChange={(e) => patch({ email: e.target.value })}
             />
           </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Address *</label>
-            <input
-              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
-              placeholder="Enter address"
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
-            />
-          </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Roles * <span className="text-text-muted font-normal">(select one or more)</span></label>
+        </FormSection>
+
+        <FormSection title="Roles" hint="A member can hold several roles and sees the pages of all of them.">
+          <div className="form-group pp-full">
+            <label className="ui-label">Roles * <span className="text-text-muted font-normal">(select one or more)</span></label>
             <PagedMultiSelect
               fetchPage={roleFetchPage}
               mapItem={roleMapItem}
-              selected={selectedRoleChips(formData.roleIds)}
-              onToggle={(opt) => toggleRoleId(formData.roleIds, opt, (next) => handleInputChange('roleIds', next))}
-              onRemove={(id) => handleInputChange('roleIds', formData.roleIds.filter((rid) => String(rid) !== String(id)))}
+              selected={selectedRoleChips(d.roleIds)}
+              onToggle={(opt) => toggleRoleId(d.roleIds, opt, (next) => patch({ roleIds: next }))}
+              onRemove={(id) => patch({ roleIds: d.roleIds.filter((rid) => String(rid) !== String(id)) })}
               placeholder="Select roles"
               searchPlaceholder="Search roles…"
             />
           </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Country</label>
+        </FormSection>
+
+        <FormSection title="Address">
+          <div className="form-group pp-full">
+            <label className="ui-label">Address *</label>
+            <input
+              className="ui-input"
+              placeholder="Enter address"
+              value={d.address}
+              onChange={(e) => patch({ address: e.target.value })}
+            />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">Country</label>
             <DropdownSelector
               options={[
                 { value: '', label: 'Select Country' },
                 ...countries.map((c) => ({ value: c.id, label: c.name })),
               ]}
-              value={formData.country_id}
+              value={d.country_id}
               onChange={(value) => {
-                handleInputChange('country_id', value);
-                handleInputChange('state_id', '');
-                handleInputChange('city_id', '');
+                patch({ country_id: value, state_id: '', city_id: '' });
                 fetchStates(value);
               }}
               onOpen={() => { if (!countries.length) getIndianCountries().then(r => setCountries(Array.isArray(r) ? r : (r?.data || []))).catch(() => {}); }}
@@ -768,210 +734,197 @@ const DashboardOfficeTeam = () => {
               className="ui-dropdown-custom--full-width"
             />
           </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">State</label>
+          <div className="form-group">
+            <label className="ui-label">State</label>
             <DropdownSelector
               options={[
                 { value: '', label: 'Select State' },
                 ...states.map((s) => ({ value: s.id, label: s.name })),
               ]}
-              value={formData.state_id}
+              value={d.state_id}
               onChange={(value) => {
-                handleInputChange('state_id', value);
-                handleInputChange('city_id', '');
+                patch({ state_id: value, city_id: '' });
                 fetchCities(value);
               }}
               placeholder="Select State"
-              disabled={!formData.country_id}
+              disabled={!d.country_id}
               className="ui-dropdown-custom--full-width"
             />
           </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">City</label>
+          <div className="form-group">
+            <label className="ui-label">City</label>
             <DropdownSelector
               options={[
                 { value: '', label: 'Select City' },
                 ...cities.map((c) => ({ value: c.id, label: c.name })),
               ]}
-              value={formData.city_id}
-              onChange={(value) => handleInputChange('city_id', value)}
+              value={d.city_id}
+              onChange={(value) => patch({ city_id: value })}
               placeholder="Select City"
-              disabled={!formData.state_id}
+              disabled={!d.state_id}
               className="ui-dropdown-custom--full-width"
             />
           </div>
-        </form>
-      </AsidePanel>
-      <AsidePanel
-        open={!!editRow}
-        onClose={() => {
-          setEditRow(null);
-          setEditFormData({
-            fullName: '',
-            phoneNumber: '',
-            roleIds: [],
-            isActive: true,
-            email: '',
-            address: '',
-            country_id: '',
-            state_id: '',
-            city_id: '',
-          });
-        }}
-        title="Edit User"
-        footer={(
-          <>
-            <button
-              className="ui-btn ui-btn--secondary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-border-strong bg-surface px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text transition-colors hover:bg-grey-100 hover:border-grey-400 active:bg-grey-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
-              onClick={() => {
-                setEditRow(null);
-                setEditFormData({
-                  fullName: '',
-                  phoneNumber: '',
-                  roleIds: [],
-                  isActive: true,
-                  email: '',
-                  address: '',
-                  country_id: '',
-                  state_id: '',
-                  city_id: '',
-                });
-              }}
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              className="ui-btn ui-btn--primary inline-flex min-h-10 cursor-pointer items-center justify-center gap-2 rounded-md border border-primary bg-primary px-4 text-[var(--text-base)] font-semibold leading-[1.2] text-text-on-primary shadow-xs transition-colors hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:opacity-55"
-              onClick={handleEditSubmit}
-              disabled={loading || !editFormData.fullName || !editFormData.phoneNumber || !editFormData.roleIds.length || !editFormData.address}
-            >
-              {loading ? 'Updating...' : 'Update'}
-            </button>
-          </>
-        )}
-      >
-        <form className="ui-form grid grid-cols-1 gap-4 sm:grid-cols-2" onSubmit={handleEditSubmit}>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Full Name *</label>
-            <input
-              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
-              placeholder="Enter full name"
-              value={editFormData.fullName}
-              onChange={(e) => setEditFormData(prev => ({ ...prev, fullName: e.target.value }))}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Phone Number *</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={editFormData.phoneNumber ? (String(editFormData.phoneNumber).startsWith('+') ? String(editFormData.phoneNumber) : '+' + editFormData.phoneNumber) : ''}
-              onChange={(phone) => setEditFormData(prev => ({ ...prev, phoneNumber: phone.replace(/^\+/, '') }))}
-              className="phone-intl"
-              inputProps={{
-                required: true,
-                placeholder: 'Enter phone number',
-              }}
-            />
-          </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Email</label>
-            <input
-              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
-              type="email"
-              placeholder="Enter email"
-              value={editFormData.email}
-              onChange={(e) => setEditFormData(prev => ({ ...prev, email: e.target.value }))}
-            />
-          </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Address *</label>
-            <input
-              className="ui-input min-h-10 w-full rounded-md border border-border-strong bg-surface px-3 text-[var(--text-base)] text-text transition-colors placeholder:text-text-subtle hover:border-grey-400 focus:border-primary focus:outline-none focus:shadow-[var(--focus-ring)]"
-              placeholder="Enter address"
-              value={editFormData.address}
-              onChange={(e) => setEditFormData(prev => ({ ...prev, address: e.target.value }))}
-            />
-          </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Roles * <span className="text-text-muted font-normal">(select one or more)</span></label>
-            <PagedMultiSelect
-              fetchPage={roleFetchPage}
-              mapItem={roleMapItem}
-              selected={selectedRoleChips(editFormData.roleIds)}
-              onToggle={(opt) => toggleRoleId(editFormData.roleIds, opt, (next) => setEditFormData((prev) => ({ ...prev, roleIds: next })))}
-              onRemove={(id) => setEditFormData((prev) => ({ ...prev, roleIds: prev.roleIds.filter((rid) => String(rid) !== String(id)) }))}
-              placeholder="Select roles"
-              searchPlaceholder="Search roles…"
-            />
-          </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Country</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Country' },
-                ...countries.map((c) => ({ value: c.id, label: c.name })),
-              ]}
-              value={editFormData.country_id}
-              onChange={(value) => {
-                setEditFormData(prev => ({ ...prev, country_id: value, state_id: '', city_id: '' }));
-                fetchStates(value);
-              }}
-              onOpen={() => { if (!countries.length) getIndianCountries().then(r => setCountries(Array.isArray(r) ? r : (r?.data || []))).catch(() => {}); }}
-              placeholder="Select Country"
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">State</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select State' },
-                ...states.map((s) => ({ value: s.id, label: s.name })),
-              ]}
-              value={editFormData.state_id}
-              onChange={(value) => {
-                setEditFormData(prev => ({ ...prev, state_id: value, city_id: '' }));
-                fetchCities(value);
-              }}
-              placeholder="Select State"
-              disabled={!editFormData.country_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">City</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select City' },
-                ...cities.map((c) => ({ value: c.id, label: c.name })),
-              ]}
-              value={editFormData.city_id}
-              onChange={(value) => setEditFormData(prev => ({ ...prev, city_id: value }))}
-              placeholder="Select City"
-              disabled={!editFormData.state_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group form-group--full flex flex-col gap-2 sm:col-span-full">
-            <label className="ui-label text-[var(--text-sm)] font-medium text-text">Status</label>
-            <div className="flex items-center gap-4">
-              <label className="flex cursor-pointer items-center gap-2">
+        </FormSection>
+
+        {isEdit && (
+          <FormSection title="Status" hint="Inactive people stay in the list. Nothing is deleted.">
+            <div className="form-group pp-full">
+              <label className="pp-check">
                 <input
                   type="checkbox"
-                  checked={editFormData.isActive}
-                  onChange={(e) => setEditFormData(prev => ({ ...prev, isActive: e.target.checked }))}
+                  checked={d.isActive}
+                  onChange={(e) => patch({ isActive: e.target.checked })}
                 />
                 <span>Active</span>
               </label>
             </div>
+          </FormSection>
+        )}
+      </form>
+    );
+  };
+
+  const tabLabel = { All: 'All', Activate: 'Active', Deactivate: 'Inactive' };
+
+  return (
+    <div className="dash-page w-full">
+      <div className="dash-container flex flex-col gap-4 pp-team">
+        <div className="pg-head">
+          <div><h1>Office team</h1><p>Admin only. A member can hold several roles and sees the pages of all of them.</p></div>
+          <button type="button" className="pp-btn pp-btn--pri" onClick={() => setOpenAdd(true)}>Add team member</button>
+        </div>
+
+        <div className="pp-bar">
+          <label className="pp-search">
+            <FiSearch size={18} />
+            <input
+              type="search"
+              placeholder="Search name, phone or role"
+              aria-label="Search the office team"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="pp-chips" role="group" aria-label="Filter by status">
+          {['All', 'Activate', 'Deactivate'].map(tab => (
+            <button key={tab} type="button" className="pp-chip" aria-pressed={activeTab === tab} onClick={() => setActiveTab(tab)}>
+              {tabLabel[tab]} <b>{tabCounts[tab]}</b>
+            </button>
+          ))}
+        </div>
+
+        {error && !loading ? (
+          <div className="ui-state ui-state--error">
+            <div className="ui-state__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="32" height="32">
+                <circle cx="12" cy="12" r="9" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <p className="ui-state__title">Couldn&apos;t load the team</p>
+            <p className="ui-state__desc">{error}</p>
+            <div className="ui-state__actions">
+              <button className="ui-btn ui-btn--secondary pp-btn" onClick={() => fetchUsers()}>
+                Try again
+              </button>
+            </div>
           </div>
-        </form>
+        ) : !loading && rows.length === 0 ? (
+          <div className="ui-state ui-state--empty">
+            <div className="ui-state__icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="32" height="32">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <line x1="19" y1="8" x2="19" y2="14" />
+                <line x1="22" y1="11" x2="16" y2="11" />
+              </svg>
+            </div>
+            <p className="ui-state__title">No team members yet</p>
+            <p className="ui-state__desc">Add your office team members to manage their roles and access.</p>
+            <div className="ui-state__actions">
+              <button className="ui-btn ui-btn--primary pp-btn pp-btn--pri" onClick={() => setOpenAdd(true)}>
+                Add team member
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="pp-list pp-desk">
+              <TableWithControls
+                title="Office team"
+                columns={columns}
+                rows={listRows}
+                showSerialNumber={false}
+                selectable={false}
+                loading={loading}
+              />
+            </div>
+            <div className="pp-mob" aria-busy={loading}>
+              {loading ? (
+                <div className="pp-empty">Loading the team...</div>
+              ) : listRows.length === 0 ? (
+                <div className="pp-empty">No team members match.</div>
+              ) : (
+                <>
+                  {listRows.slice(0, shown).map((row) => (
+                    <article className="pp-card" key={row.id}>
+                      <div className="pp-card__top">
+                        <div className="pp-who">
+                          <Avatar name={row.fullName} />
+                          <div className="pp-who__t">
+                            <span className="pp-who__n">{row.fullName}</span>
+                            {row.email ? <span className="pp-sub">{row.email}</span> : null}
+                          </div>
+                        </div>
+                        <span className={`pp-pill ${row.isActive ? 'pp-pill--ok' : 'pp-pill--off'}`}>{row.status}</span>
+                      </div>
+                      <span className="pp-pills">
+                        {roleListOf(row).map(r => <span key={r} className="pp-pill">{r}</span>)}
+                      </span>
+                      <div className="pp-card__foot">
+                        {row.phoneNumber
+                          ? <a href={`tel:${String(row.phoneNumber).startsWith('+') ? row.phoneNumber : '+' + row.phoneNumber}`}>{String(row.phoneNumber).startsWith('+') ? row.phoneNumber : `+${row.phoneNumber}`}</a>
+                          : <span className="pp-sub">No phone</span>}
+                        <button type="button" className="pp-btn" onClick={() => setEditRow(row)} aria-label={`Edit ${row.fullName}`}>Edit</button>
+                      </div>
+                    </article>
+                  ))}
+                  {listRows.length > shown && (
+                    <button type="button" className="pp-btn pp-more" onClick={() => setShown(n => n + PAGE_STEP)}>
+                      Show more ({listRows.length - shown} left)
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      <AsidePanel
+        open={openAdd}
+        onClose={closeAdd}
+        title="Add new user"
+        width="lg"
+        footer={footerFor(false)}
+      >
+        {renderFields(false)}
+      </AsidePanel>
+      <AsidePanel
+        open={!!editRow}
+        onClose={closeEdit}
+        title="Edit user"
+        width="lg"
+        footer={footerFor(true)}
+      >
+        {renderFields(true)}
       </AsidePanel>
     </div>
   );
 };
 
 export default DashboardOfficeTeam;
-

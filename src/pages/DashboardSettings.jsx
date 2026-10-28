@@ -5,8 +5,9 @@ import 'react-international-phone/style.css';
 import { showSuccess, showError } from '../services/notificationService';
 import { updateUser, uploadProfileImage, getMe } from '../services/apiService';
 import { resolveProfileImageUrl, toStoredProfileImage } from '../utils/profileImage';
-import { getUser } from '../services/authService';
+import { getUser, getUserRole } from '../services/authService';
 import '../styles/pages/dashboard-settings.css';
+import '../styles/redesign-p-account.css';
 
 const DashboardSettings = () => {
   const [userName, setUserName] = useState('');
@@ -494,130 +495,106 @@ const DashboardSettings = () => {
     setLoading(false);
   };
 
+  const roleLabel = (() => {
+    let r = '';
+    try { r = getUserRole() || ''; } catch { r = ''; }
+    return r ? r.charAt(0).toUpperCase() + r.slice(1).replace(/_/g, ' ') : '';
+  })();
+  const initials = (userName || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
+  const dirty = avatarFile !== null || userName !== initialData.name || email !== initialData.email || phone !== initialData.phone || avatar !== initialData.avatar;
+
   return (
     <div className="dash-page">
       <div className="dash-container">
-        <div className="pg-head"><div><h1>Settings</h1><p>Your profile. Everyone can change their own.</p></div></div>
-        <div className="dash-row">
-          <div className="dash-card full settings p-4 min-[561px]:p-6">
-            <div className="settings-header flex flex-wrap items-end justify-between gap-4 mb-5 min-[561px]:mb-6">
-              <div>
-                <h4 className="settings-title m-0 text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.01em] font-semibold text-text">Profile Settings</h4>
-                <p className="settings-subtitle mt-1 mb-0 text-text-muted text-[length:var(--text-base)] leading-[var(--leading-normal)]">Update your personal information and profile photo.</p>
+        <div className="pg-head"><div><h1>Settings</h1><p>Your profile and sign-in. Everyone can change their own.</p></div></div>
+        <form onSubmit={handleSubmit} className="ui-form acc-settings">
+          <section className="dash-card acc-card acc-profile" aria-label="Profile">
+            <div className="acc-avatar">
+              {avatar && !avatarError ? (
+                <img
+                  key={avatar.substring(0, 100)}
+                  src={avatar}
+                  alt="Profile photo"
+                  onError={() => setAvatarError(true)}
+                  onLoad={() => setAvatarError(false)}
+                />
+              ) : (
+                <span aria-hidden="true">{initials}</span>
+              )}
+            </div>
+            <div className="acc-profile__who">
+              <b className="acc-profile__name">{userName || 'Your name'}</b>
+              <span className="acc-profile__meta">{[roleLabel, phone && `+${String(phone).replace(/^\+/, '')}`].filter(Boolean).join(' \u00b7 ') || 'Signed in'}</span>
+              {avatarError && <span className="acc-err">Failed to load image</span>}
+              <span className="acc-hint">JPG or PNG, up to about 2 MB.</span>
+            </div>
+            <div className="acc-profile__actions">
+              <input
+                id="avatar-input"
+                type="file"
+                accept="image/*"
+                className="hidden-input hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  handleAvatarChange(file);
+                  if (e.target) e.target.value = '';
+                }}
+              />
+              <Button type="button" onClick={() => document.getElementById('avatar-input').click()} size="sm">Change photo</Button>
+              {avatar && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => {
+                  setAvatar('');
+                  setAvatarFile(null);
+                  setAvatarError(false);
+                }}>Remove</Button>
+              )}
+            </div>
+          </section>
+
+          <section className="dash-card acc-card" aria-labelledby="set-contact">
+            <div className="acc-sec-head">
+              <h2 id="set-contact" className="acc-h">Contact</h2>
+              <p className="acc-sub">Used for orders and visit reports.</p>
+            </div>
+            <div className="acc-grid">
+              <div className="acc-field">
+                <label className="ui-label" htmlFor="set-name">Full name</label>
+                <input id="set-name" className="ui-input" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Enter your name" required />
+              </div>
+              <div className="acc-field">
+                <label className="ui-label" htmlFor="set-email">Email</label>
+                <input id="set-email" className="ui-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
               </div>
             </div>
+          </section>
 
-            <div className="settings-grid grid grid-cols-1 items-start gap-6 mt-6 min-[769px]:grid-cols-[280px_1fr] min-[769px]:gap-8 min-[769px]:mt-8">
-              <aside className="settings-sidebar flex flex-col gap-3">
-                <div className="settings-avatar__preview settings-avatar__preview--lg flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted text-center text-[length:var(--text-xs)] text-text-subtle">
-                  {avatar && !avatarError ? (
-                    <img 
-                      key={avatar.substring(0, 100)} // Force re-render if avatar changes
-                      src={avatar} 
-                      alt="Avatar" 
-                      onError={(e) => {
-                        console.error('Failed to load avatar image:', {
-                          src: avatar ? avatar.substring(0, 100) : 'empty',
-                          hasAvatar: !!avatar,
-                          avatarLength: avatar ? avatar.length : 0,
-                          isBase64: avatar ? avatar.startsWith('data:') : false,
-                          error: e.target?.error,
-                          naturalWidth: e.target?.naturalWidth,
-                          naturalHeight: e.target?.naturalHeight
-                        });
-                        setAvatarError(true);
-                      }}
-                      onLoad={(e) => {
-                        console.log('Avatar image loaded successfully:', {
-                          naturalWidth: e.target.naturalWidth,
-                          naturalHeight: e.target.naturalHeight,
-                          complete: e.target.complete,
-                          avatarLength: avatar.length
-                        });
-                        setAvatarError(false);
-                      }}
-                      className="block w-full h-full object-cover visible opacity-100"
-                    />
-                  ) : avatarError ? (
-                    <span className="text-[#ef4444] text-[12px]">Failed to load image</span>
-                  ) : (
-                    <span>No Image</span>
-                  )}
-                </div>
-                <div className="settings-avatar__actions flex flex-wrap items-center gap-2">
-                  <input
-                    id="avatar-input"
-                    type="file"
-                    accept="image/*"
-                    className="hidden-input hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      handleAvatarChange(file);
-                      // Reset input to allow selecting the same file again
-                      if (e.target) {
-                        e.target.value = '';
-                      }
-                    }} 
-                  />
-                  <Button type="button" onClick={() => document.getElementById('avatar-input').click()} size="sm">Change Photo</Button>
-                  {avatar && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => {
-                      setAvatar('');
-                      setAvatarFile(null);
-                      setAvatarError(false);
-                    }}>Remove</Button>
-                  )}
-                  <div className="settings-hint mt-1 text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-text-subtle">JPG, PNG up to ~2MB recommended.</div>
-                </div>
-              </aside>
-
-              <form onSubmit={handleSubmit} className="settings-form ui-form grid max-w-[720px] grid-cols-1 gap-5 min-[561px]:gap-6">
-                <div className="form-group flex flex-col gap-2">
-                  <label className="ui-label">User Name</label>
-                  <input className="ui-input" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Enter your name" required />
-                </div>
-                <div className="form-group flex flex-col gap-2">
-                  <label className="ui-label">Email</label>
-                  <input className="ui-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-                </div>
-                <div className="form-group flex flex-col gap-2">
-                  <label className="ui-label">Phone Number</label>
-                  <PhoneInput
-                    defaultCountry="in"
-                    value={phone ? (String(phone).startsWith('+') ? String(phone) : '+' + phone) : ''}
-                    onChange={(phone) => setPhone(phone.replace(/^\+/, ''))}
-                    className="phone-intl"
-                    inputProps={{
-                      placeholder: 'Enter your phone number',
-                    }}
-                  />
-                </div>
-
-                <div className="settings-actions flex flex-col-reverse items-stretch gap-3 mt-2 pt-6 border-t border-border [&_.ui-btn]:w-full min-[561px]:flex-row min-[561px]:items-center min-[561px]:justify-end min-[561px]:[&_.ui-btn]:w-auto">
-                  <Button 
-                    type="button" 
-                    variant="secondary" 
-                    onClick={handleReset}
-                    disabled={loading}
-                  >
-                    Reset
-                  </Button>
-                  <Button 
-                    type="submit"
-                    disabled={loading || !userName.trim()}
-                  >
-                    {loading ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
-              </form>
+          <section className="dash-card acc-card" aria-labelledby="set-signin">
+            <div className="acc-sec-head">
+              <h2 id="set-signin" className="acc-h">Sign in</h2>
+              <p className="acc-sub">This phone number is how you sign in. We send a code to it.</p>
             </div>
-          </div>
+            <div className="acc-grid">
+              <div className="acc-field">
+                <label className="ui-label" htmlFor="set-phone">Phone number</label>
+                <PhoneInput
+                  defaultCountry="in"
+                  value={phone ? (String(phone).startsWith('+') ? String(phone) : '+' + phone) : ''}
+                  onChange={(phone) => setPhone(phone.replace(/^\+/, ''))}
+                  className="phone-intl"
+                  inputProps={{ id: 'set-phone', placeholder: 'Enter your phone number' }}
+                />
+              </div>
+            </div>
+          </section>
 
-        </div>
+          <div className="acc-savebar">
+            <Button type="button" variant="secondary" onClick={handleReset} disabled={loading || !dirty}>Reset</Button>
+            <Button type="submit" disabled={loading || !userName.trim()}>{loading ? 'Saving...' : 'Save changes'}</Button>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
 
 export default DashboardSettings;
-

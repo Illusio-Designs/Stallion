@@ -1,0 +1,38 @@
+/* Dashboard (office view): needs attention first, compact numbers, chart + latest orders. */
+:root .rda-head { align-items: flex-start; }
+:root .rda-head .rda-seg { margin-left: auto; max-width: 100%; overflow-x: auto; }
+:root .rda-head .rda-seg button { min-height: 44px; padding: 6px 14px; }
+
+/* Field strip: salesmen in the field, visits today */
+:root .rdp-field { gap: 6px 10px; margin-top: 10px; }
+:root .rdp-field > span { display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border: 1px solid #e1e1e1; border-radius: 999px; background: #ffffff; font-size: 13px; color: #595959; }
+
+/* Needs attention card, first on the page; items in two columns when there is room */
+:root .rdp-attn { padding: 16px; }
+:root .rdp-attn .needs-attention__list { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 24px; }
+:root .rdp-attn .needs-attention__item { min-height: 44px; }
+:root .rdp-attn .needs-attention__item:nth-child(2) { border-top: 1px solid #e1e1e1; padding-top: 12px; }
+@media (min-width: 900px) {
+  :root .rdp-attn .needs-attention__list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root .rdp-attn .needs-attention__item:nth-child(2) { border-top: 0; padding-top: 0; }
+}
+
+/* Compact row of four numbers */
+:root .dash-row.rdp-kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+:root .rdp-kpis > .rda-kpi { padding: 12px 14px; gap: 4px; border-radius: 12px; }
+:root .rdp-kpis .rda-kpi__num, :root .rdp-kpis .metric-value { font-size: 22px; line-height: 1.15; }
+:root .rdp-kpis .rda-kpi__delta { font-size: 12px; }
+@media (max-width: 900px) {
+  :root .dash-row.rdp-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* Chart and latest orders side by side on desktop, stacked on tablet and phone */
+:root .rdp-chart-row { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); align-items: start; }
+@media (max-width: 900px) {
+  :root .rdp-chart-row { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 560px) {
+  :root .rdp-attn { padding: 14px; }
+  :root .dash-row.rdp-kpis { gap: 8px; }
+  :root .rdp-kpis > .rda-kpi { padding: 10px 12px; }
+}

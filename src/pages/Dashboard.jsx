@@ -5,6 +5,7 @@ import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
 import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
+import '../styles/redesign-p-dashboard.css';
 import OrdersPerDayChart from '../components/charts/OrdersPerDayChart';
 import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets, getTrays } from '../services/apiService';
 import { getDashboardSummary } from '../services/api/dashboardApi';
@@ -667,7 +668,7 @@ const Dashboard = () => {
             <h1>{heading}</h1>
             <p>{subline}</p>
             {isOfficeView && summary && (
-              <div className="rda-subnums">
+              <div className="rda-subnums rdp-field">
                 <span><b>{Number(summary.salesmen_in_field) || 0}</b> / {Number(summary.salesmen_total) || 0} salesmen in the field</span>
                 <span><b>{Number(summary.visits_today) || 0}</b> visit{Number(summary.visits_today) === 1 ? '' : 's'} today</span>
               </div>
@@ -713,7 +714,30 @@ const Dashboard = () => {
 
         {isSalesman && <ShopCheckInCard parties={ownParties} salesmanId={mySalesmanId || user?.salesman_id || null} loading={loading && ownParties.length === 0} />}
 
-        <div className="dash-row dash-kpis rda-kpis" aria-label="Key figures">
+        {isOfficeView && (
+          <section className="needs-attention rda-card rdp-attn" aria-label="Needs attention">
+            <div className="rda-card__head">
+              <div><h2>Needs attention</h2><p>Things only a person can decide</p></div>
+            </div>
+            <div className="needs-attention__list">
+              {attention.length === 0 && (loading
+                ? <div className="rda-skel-list" aria-busy="true">{[0, 1, 2].map((i) => <Skeleton key={i} width="100%" height={44} radius={10} />)}</div>
+                : <p className="rda-empty">Nothing needs your attention right now.</p>)}
+              {attention.map((a) => (
+                <button key={a.title} type="button" onClick={a.onClick} className={`needs-attention__item needs-attention__item--${a.tone}`}>
+                  <span className="needs-attention__icon" aria-hidden="true"><a.icon size={18} /></span>
+                  <span className="needs-attention__text">
+                    <span className="needs-attention__title">{a.title}</span>
+                    <span className="needs-attention__desc">{a.desc}</span>
+                  </span>
+                  <FiChevronRight size={16} aria-hidden="true" className="needs-attention__go" />
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="dash-row dash-kpis rda-kpis rdp-kpis" aria-label="Key figures">
           {kpis.map((k) => {
             const sm = k.money != null ? shortMoney(k.money) : null;
             return (
@@ -732,7 +756,7 @@ const Dashboard = () => {
         </div>
 
         {isOfficeView && (
-          <div className="rda-cols">
+          <div className="rda-cols rdp-chart-row">
             <section className="rda-card" aria-label="Orders per day">
               <div className="rda-card__head">
                 <div><h2>Orders per day</h2><p>{ordersChart.sub}. Cancelled orders are not counted.</p></div>
@@ -743,27 +767,7 @@ const Dashboard = () => {
               </div>
               <OrdersPerDayChart data={ordersChart.buckets} height={215} ariaLabel={`Bar chart of orders. ${ordersChart.total} orders. ${ordersChart.sub}.`} />
             </section>
-
-            <section className="needs-attention rda-card" aria-label="Needs attention">
-              <div className="rda-card__head">
-                <div><h2>Needs attention</h2><p>Things only a person can decide</p></div>
-              </div>
-              <div className="needs-attention__list">
-                {attention.length === 0 && (loading
-                  ? <div className="rda-skel-list" aria-busy="true">{[0, 1, 2].map((i) => <Skeleton key={i} width="100%" height={44} radius={10} />)}</div>
-                  : <p className="rda-empty">Nothing needs your attention right now.</p>)}
-                {attention.map((a) => (
-                  <button key={a.title} type="button" onClick={a.onClick} className={`needs-attention__item needs-attention__item--${a.tone}`}>
-                    <span className="needs-attention__icon" aria-hidden="true"><a.icon size={18} /></span>
-                    <span className="needs-attention__text">
-                      <span className="needs-attention__title">{a.title}</span>
-                      <span className="needs-attention__desc">{a.desc}</span>
-                    </span>
-                    <FiChevronRight size={16} aria-hidden="true" className="needs-attention__go" />
-                  </button>
-                ))}
-              </div>
-            </section>
+            <OrderOverviewCard orders={orders} loading={loading} loadError={loadError} partyOf={partyOf} onAll={go('/dashboard/orders')} />
           </div>
         )}
 
@@ -775,8 +779,7 @@ const Dashboard = () => {
         )}
 
         {isOfficeView && (
-          <div className="rda-cols rda-cols--even">
-            <OrderOverviewCard orders={orders} loading={loading} loadError={loadError} partyOf={partyOf} onAll={go('/dashboard/orders')} />
+          <div className="rda-cols rda-cols--one">
             <FieldCard summary={summary} loading={summaryLoading} error={summaryError} onRetry={loadSummary} />
           </div>
         )}

@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import '../styles/pages/Login.css';
+import '../styles/redesign-p-login.css';
 import { showLoginSuccess, showError, showSuccess } from '../services/notificationService';
 import { setAuth, isLoggedIn, getUserRoles, getUser } from '../services/authService';
 import { checkUser, login, getMe, getMyRole, requestOtpResend } from '../services/apiService';
@@ -187,9 +188,12 @@ const Login = ({ onPageChange }) => {
       if (errorMessage.includes('user not found') || 
           errorDataMessage.includes('user not found') ||
           errorText.includes('user not found')) {
+        setPhoneError('This number is not registered. Check it, or ask your administrator to add you.');
         showError('User not found. Please ensure your phone number is registered. If you were just created by an administrator, please wait a few moments and try again, or contact your administrator.');
       } else {
-        showError(errorDataMessage ? (error.errorData?.error || error.errorData?.message || error.errorData?.msg) : (error.message || 'Something went wrong. Please try again.'));
+        const reason = errorDataMessage ? (error.errorData?.error || error.errorData?.message || error.errorData?.msg) : (error.message || 'Something went wrong. Please try again.');
+        setPhoneError(reason);
+        showError(reason);
       }
     } finally {
       setLoading(false);
@@ -626,7 +630,11 @@ const Login = ({ onPageChange }) => {
     } catch (error) {
       console.error('OTP verification error:', error);
       const errorMessage = error.message || error.error?.message || 'Incorrect code. Please try again.';
-      setOtpError(errorMessage);
+      const lower = String(errorMessage).toLowerCase();
+      let reason = errorMessage;
+      if (lower.includes('expire')) reason = 'This code has expired. Tap Resend code to get a new one.';
+      else if (lower.includes('incorrect') || lower.includes('invalid') || lower.includes('wrong') || lower.includes('mismatch')) reason = 'That code is wrong. Check the SMS and try again.';
+      setOtpError(reason);
       showError(errorMessage);
 
       // Clear OTP on error
@@ -683,17 +691,17 @@ const Login = ({ onPageChange }) => {
           <img src="/images/logo/logo.webp" alt="Stallion Eyewear" className="auth-brand-logo" />
         </button>
         <div className="auth-panel-main">
-          <p className="auth-headline">Frames, delivered to every counter.</p>
-          <p className="auth-panel-text">Sign in with your phone number. We send a 6 digit code by SMS.</p>
+          <p className="auth-headline">Wholesale frames, one tap away.</p>
+          <p className="auth-panel-text">Orders, parties and visits in one app.</p>
         </div>
         <p className="auth-panel-foot">Salesmen, parties, distributors and the office team all sign in here.</p>
       </section>
       <div className="login-content auth-form-side">
-        <div className="login-container">
+        <div className="login-container login-card">
           {!showOTP ? (
             <>
-              <h1 className="login-title m-0 mb-2 text-center text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Sign in</h1>
-              <p className="login-subtitle m-0 mb-8 text-center text-[length:var(--text-base)] font-normal leading-[var(--leading-normal)] text-text-muted">Enter your mobile number to receive a one-time code.</p>
+              <h1 className="login-title m-0 mb-1 text-left text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Sign in</h1>
+              <p className="login-subtitle m-0 mb-5 text-left text-[length:var(--text-base)] font-normal leading-[var(--leading-normal)] text-text-muted">Enter your mobile number to receive a one-time code.</p>
               <form className="login-form flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
                 <div className="login-input-group flex flex-col gap-2">
                   <label className="ui-label" htmlFor="phone">Mobile number</label>
@@ -725,12 +733,30 @@ const Login = ({ onPageChange }) => {
             </>
           ) : (
             <>
-              <h1 className="login-title m-0 mb-2 text-center text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Verify your number</h1>
-              <p className="login-subtitle m-0 mb-8 text-center text-[length:var(--text-base)] font-normal leading-[var(--leading-normal)] text-text-muted">
-                We sent a 6-digit code to
-                {phoneNumber ? <strong className="login-phone-hint whitespace-nowrap font-semibold text-text"> +{String(phoneNumber).replace(/^\+/, '')}</strong> : ' your phone'}.
+              <h1 className="login-title m-0 mb-1 text-left text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Verify your number</h1>
+              <p className="login-subtitle m-0 mb-5 text-left text-[length:var(--text-base)] font-normal leading-[var(--leading-normal)] text-text-muted">
+                Enter the 6-digit code we sent by SMS.
               </p>
               <form className="login-form flex flex-col gap-6" onSubmit={handleOTPVerify} noValidate>
+                <div className="login-phone-row">
+                  <div>
+                    <span className="login-phone-label">Sent to</span>
+                    <strong className="login-phone-hint">{phoneNumber ? `+${String(phoneNumber).replace(/^\+/, '')}` : 'your phone'}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="login-link-btn"
+                    onClick={() => {
+                      destroyOTPWidget();
+                      setShowOTP(false);
+                      setOtp(['', '', '', '', '', '']);
+                      setOtpError('');
+                    }}
+                    disabled={loading}
+                  >
+                    Change number
+                  </button>
+                </div>
                 <div className="login-input-group flex flex-col gap-2">
                   <span className="ui-label" id="otp-label">One-time code</span>
                   <div
@@ -769,20 +795,7 @@ const Login = ({ onPageChange }) => {
                 >
                   <span className="ui-btn__label">{loading ? 'Verifying…' : 'Verify code'}</span>
                 </button>
-                <div className="resend-otp-container -mt-2 text-center">
-                  <button
-                    type="button"
-                    className="resend-otp-btn cursor-pointer rounded-sm border-none bg-transparent px-3 py-2 text-[length:var(--text-sm)] font-medium text-text-muted underline"
-                    onClick={() => {
-                      destroyOTPWidget();
-                      setShowOTP(false);
-                      setOtp(['', '', '', '', '', '']);
-                      setOtpError('');
-                    }}
-                    disabled={loading}
-                  >
-                    Change number
-                  </button>
+                <div className="resend-otp-container login-resend">
                   <button
                     type="button"
                     className="resend-otp-btn cursor-pointer rounded-sm border-none bg-transparent px-3 py-2 text-[length:var(--text-sm)] font-medium text-primary transition-[color,background] duration-200 ease-[ease] hover:enabled:bg-primary-soft hover:enabled:text-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:text-text-subtle motion-reduce:transition-none"
@@ -790,7 +803,7 @@ const Login = ({ onPageChange }) => {
                     disabled={resendDisabled || loading}
                   >
                     {resendTimer > 0
-                      ? `Resend code in ${resendTimer}s`
+                      ? `Resend in 0:${String(resendTimer).padStart(2, '0')}`
                       : 'Resend code'}
                   </button>
                 </div>

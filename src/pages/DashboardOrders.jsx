@@ -2,6 +2,8 @@ import DropdownSelector from '../components/ui/DropdownSelector';
 import React, { useMemo, useState, useEffect } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
+import DateRangePicker from '../components/ui/DateRangePicker';
+import { FiSearch } from '../components/icons/hugeicons';
 import { addressRows } from '../utils/addressParts';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
@@ -42,6 +44,7 @@ import { showSuccess, showError } from '../services/notificationService';
 import { getUserRole, getUser, getUserRoles } from '../services/authService';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/redesign-n-orders.css';
+import '../styles/redesign-p-orders.css';
 
 // Status wording, tones and piece counts live in utils/orderStatus.js
 const mapApiStatusToUI = (apiStatus) => (apiStatus ? orderStatusLabel(apiStatus) : 'PENDING');
@@ -69,6 +72,10 @@ const DashboardOrders = () => {
   const [activeTab, setActiveTab] = useState('All');
   const [dateFrom, setDateFrom] = useState(null); // 'YYYY-MM-DD' or null
   const [dateTo, setDateTo] = useState(null);     // 'YYYY-MM-DD' or null
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [salesmanFilter, setSalesmanFilter] = useState('');
+  const [cardLimit, setCardLimit] = useState(20);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -422,8 +429,20 @@ const DashboardOrders = () => {
       });
     }
 
+    if (typeFilter) result = result.filter(row => row.orderType === typeFilter);
+    if (salesmanFilter) result = result.filter(row => row.salesman === salesmanFilter);
+    const q = search.trim().toLowerCase();
+    if (q) {
+      result = result.filter(row => [row.orderId, row.client, row.salesman, row.partyCity, row.orderType]
+        .some(v => String(v ?? '').toLowerCase().includes(q)));
+    }
+
     return result;
-  }, [rows, activeTab, dateFrom, dateTo]);
+  }, [rows, activeTab, dateFrom, dateTo, typeFilter, salesmanFilter, search]);
+
+  const typeOptions = useMemo(() => [{ value: '', label: 'All types' }, ...[...new Set(rows.map(r => r.orderType).filter(t => t && t !== 'N/A'))].sort().map(t => ({ value: t, label: t }))], [rows]);
+  const salesmanOptions = useMemo(() => [{ value: '', label: 'All salesmen' }, ...[...new Set(rows.map(r => r.salesman).filter(t => t && t !== '—'))].sort().map(t => ({ value: t, label: t }))], [rows]);
+  useEffect(() => { setCardLimit(20); }, [activeTab, dateFrom, dateTo, typeFilter, salesmanFilter, search]);
 
   // Counts shown on the status chips
   const tabCounts = useMemo(() => {
@@ -663,25 +682,12 @@ const DashboardOrders = () => {
             <button type="button" className="gbtn" onClick={handleExportOrders} disabled={loading || filteredRowsByTab.length === 0}>Export CSV</button>
           </div>
         </div>
-        {/* Summary Cards */}
-        <div className="dash-row orders-summary mb-5">
-          <div className="dash-card metric orders-card p-5">
-            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Orders</h4>
-            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
-            <div className="metric-sub flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-text-muted">Retail {summaryStats.retailOrders} | Bulk {summaryStats.bulkOrders}</div>
-          </div>
-          <div className="dash-card metric orders-card p-5">
-            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Pending Orders</h4>
-            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
-          </div>
-          <div className="dash-card metric orders-card p-5">
-            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Completed Orders</h4>
-            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
-          </div>
-          <div className="dash-card metric orders-card p-5">
-            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Revenue</h4>
-            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
-          </div>
+        {/* Summary numbers: one slim row */}
+        <div className="orp-kpis" role="list" aria-label="Order totals">
+          <div className="orp-kpi" role="listitem"><small>Orders</small><b>{loading ? <Skeleton width={50} height={18} /> : summaryStats.totalOrders}</b><span>Retail {summaryStats.retailOrders} | Bulk {summaryStats.bulkOrders}</span></div>
+          <div className="orp-kpi" role="listitem"><small>Pending</small><b>{loading ? <Skeleton width={50} height={18} /> : summaryStats.pendingOrders}</b></div>
+          <div className="orp-kpi" role="listitem"><small>Completed</small><b>{loading ? <Skeleton width={70} height={18} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</b></div>
+          <div className="orp-kpi" role="listitem"><small>Revenue</small><b>{loading ? <Skeleton width={70} height={18} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</b></div>
         </div>
 
         {/* Order Status Tabs */}
@@ -697,6 +703,19 @@ const DashboardOrders = () => {
                 <b className="order-tab__count">{tabCounts[tab] ?? 0}</b>
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Search and filters: one line */}
+        <div className="orp-toolbar">
+          <label className="orp-search">
+            <FiSearch aria-hidden="true" />
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order, party or salesman" aria-label="Search orders" />
+          </label>
+          <div className="orp-filters">
+            <DateRangePicker from={dateFrom} to={dateTo} onChange={({ from, to }) => { setDateFrom(from); setDateTo(to); }} />
+            <DropdownSelector options={typeOptions} value={typeFilter} onChange={setTypeFilter} placeholder="Order type" />
+            <DropdownSelector options={salesmanOptions} value={salesmanFilter} onChange={setSalesmanFilter} placeholder="Salesman" />
           </div>
         </div>
 
@@ -725,16 +744,52 @@ const DashboardOrders = () => {
                 <p className="ui-state__desc">Orders placed from the shop will show up here.</p>
               </div>
             ) : (
-              <TableWithControls
-                title="Order Overview"
-                columns={columns}
-                rows={filteredRowsByTab}
-                dateFrom={dateFrom}
-                dateTo={dateTo}
-                onDateRangeChange={({ from, to }) => { setDateFrom(from); setDateTo(to); }}
-                itemName="Order"
-                loading={loading}
-              />
+              <>
+                <div className="orp-table">
+                  <TableWithControls
+                    title="Order Overview"
+                    titleAs="h2"
+                    columns={columns}
+                    rows={filteredRowsByTab}
+                    itemName="Order"
+                    loading={loading}
+                  />
+                </div>
+                <div className="orp-cards">
+                  {loading ? <p className="orp-empty">Loading orders…</p> : filteredRowsByTab.length === 0 ? <p className="orp-empty">No orders match these filters.</p> : (
+                    <>
+                      <ul className="orp-list">
+                        {filteredRowsByTab.slice(0, cardLimit).map((row) => {
+                          const held = heldNote(row?.originalOrder);
+                          return (
+                            <li key={row.id} className="orp-card">
+                              <button type="button" className="orp-card__main" onClick={() => setViewRow(row)} aria-label={`View order ${row.orderId}`}>
+                                <span className="orp-card__top"><b className="orp-card__party">{row.client}</b><b className="orp-card__amt">{row.value}</b></span>
+                                <span className="orp-card__mid">
+                                  <StatusBadge status={orderStatusBadgeKey(UI_TO_API_STATUS[row.status])}>{orderPillLabel(row?.originalOrder, row.status)}</StatusBadge>
+                                  {held && <small>{held}</small>}
+                                </span>
+                                <span className="orp-card__foot">{[row.orderId, row.orderType !== 'N/A' ? row.orderType : '', row.date].filter(Boolean).join(' · ')}</span>
+                              </button>
+                              <div className="orp-card__act">
+                                <RowActions
+                                  onView={() => setViewRow(row)}
+                                  onEdit={(canEditOrder || canReturnTrays) ? () => setViewRow(row) : undefined}
+                                  onDownload={() => handleDownload(row)}
+                                />
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <p className="orp-count">Showing {Math.min(cardLimit, filteredRowsByTab.length)} of {filteredRowsByTab.length} orders</p>
+                      {filteredRowsByTab.length > cardLimit && (
+                        <button type="button" className="orp-more" onClick={() => setCardLimit(n => n + 20)}>Show more</button>
+                      )}
+                    </>
+                  )}
+                </div>
+              </>
             )}
           </div>
         </div>

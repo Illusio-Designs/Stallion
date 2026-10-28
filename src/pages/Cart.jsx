@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import "../styles/pages/Cart.css";
+import "../styles/redesign-p-cart.css";
 import {
   getCartItems,
   removeFromCart,
@@ -1286,7 +1287,7 @@ const Cart = ({ onPageChange = null }) => {
   };
 
   return (
-    <div className="cart-page bg-surface-muted px-[5%] py-10 min-h-[70vh] max-md:px-4 max-md:py-6">
+    <div className={`cart-page bg-surface-muted px-[5%] py-10 min-h-[70vh] max-md:px-4 max-md:py-6${cartItems.length > 0 ? ' has-cart-bar' : ''}`}>
       <div className="cart-container max-w-[1200px] mx-auto">
         <div className="cart-content grid grid-cols-1 min-[1400px]:grid-cols-[2fr_1fr] gap-6 items-start">
           {/* Shopping Cart Section */}
@@ -1431,7 +1432,7 @@ const Cart = ({ onPageChange = null }) => {
               {/* Order Type Dropdown - Only for Salesman */}
               {isSalesman && (
                 <div className="form-group flex flex-col gap-2">
-                  <label className="form-label text-[length:var(--text-sm)] font-medium text-text">Order Type</label>
+                  <label className="form-label text-[length:var(--text-sm)] font-medium text-text">Order type</label>
                   <DropdownSelector
                     options={[
                       { value: 'visit_order', label: 'Visit' },
@@ -1628,7 +1629,7 @@ const Cart = ({ onPageChange = null }) => {
               )}
             </div>
 
-            <div className={`summary-breakdown flex flex-col gap-5 mb-8 ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'pt-6 mt-6 border-t border-border' : 'pt-3 mt-0'}`}>
+            <div className={`summary-breakdown cart-summary-total flex flex-col gap-5 mb-8 ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'pt-6 mt-6 border-t border-border' : 'pt-3 mt-0'}`}>
               <div className="breakdown-item flex justify-between items-baseline gap-4">
                 <span className="breakdown-label text-[length:var(--text-base)] text-text-muted font-normal">Subtotal:</span>
                 <span className="breakdown-value text-[length:var(--text-base)] text-text font-semibold [font-variant-numeric:tabular-nums]">
@@ -1664,7 +1665,7 @@ const Cart = ({ onPageChange = null }) => {
             )}
             <button
               type="button"
-              className="checkout-btn mt-6 w-full min-h-[52px] bg-primary text-text-on-primary border border-primary px-6 py-3.5 rounded-xl text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_-8px_var(--color-primary)] hover:enabled:bg-primary-hover hover:enabled:border-primary-hover hover:enabled:-translate-y-px focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:translate-y-0 active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
+              className="checkout-btn cart-place-desktop mt-6 w-full min-h-[52px] bg-primary text-text-on-primary border border-primary px-6 py-3.5 rounded-xl text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_-8px_var(--color-primary)] hover:enabled:bg-primary-hover hover:enabled:border-primary-hover hover:enabled:-translate-y-px focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:translate-y-0 active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
               onClick={handleCheckout}
               disabled={loading || isOfficeOnly || outOfStockItems.length > 0}
               aria-busy={loading}
@@ -1675,6 +1676,24 @@ const Cart = ({ onPageChange = null }) => {
           </div>
         </div>
       </div>
+
+      {cartItems.length > 0 && (
+        <div className="cart-bar" role="region" aria-label="Order total">
+          <div className="cart-bar__total">
+            <span className="cart-bar__label">Total</span>
+            <span className="cart-bar__amount">{formatPrice(quote && quote.order_total != null ? quote.order_total : calculateTotal())}</span>
+          </div>
+          <button
+            type="button"
+            className="checkout-btn cart-bar__btn"
+            onClick={handleCheckout}
+            disabled={loading || isOfficeOnly || outOfStockItems.length > 0}
+            aria-busy={loading}
+          >
+            {loading ? 'Placing order...' : 'Place order'}
+          </button>
+        </div>
+      )}
 
       <AsidePanel
         open={addPartyOpen}

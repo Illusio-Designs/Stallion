@@ -1,0 +1,150 @@
+/* Parties list and Add/Edit party form (page pass P). Mobile first. */
+
+/* ---------- Head: title left, actions in one row ---------- */
+:root .pp-head { align-items: flex-start; gap: 12px; }
+:root .pp-actions { display: flex; flex-wrap: nowrap; gap: 8px; width: 100%; }
+:root .pp-actions .gbtn { flex: 1 1 0; min-width: 0; padding: 0 10px; gap: 6px; }
+:root .pp-actions .gbtn span { overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 420px) {
+  :root .pp-actions .gbtn svg { display: none; }
+}
+@media (min-width: 768px) {
+  :root .pp-actions { width: auto; }
+  :root .pp-actions .gbtn { flex: none; padding: 0 16px; }
+}
+
+/* ---------- Tabs ---------- */
+:root .pp-tabs { margin-top: 12px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+:root .pp-tabs::-webkit-scrollbar { display: none; }
+:root .pp-tabs .order-tab { min-height: 44px; }
+
+/* ---------- Search + small filters ---------- */
+:root .pp-tools { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+:root .pp-search {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 14px;
+  background: #fff; border: 1px solid #e1e1e1; border-radius: 11px; color: #595959; min-width: 0;
+}
+:root .pp-search:focus-within { border-color: #0a0a0a; box-shadow: 0 0 0 3px #00000022; }
+:root .pp-search svg { flex: none; }
+:root .pp-search input {
+  flex: 1; min-width: 0; height: 42px; border: 0; outline: 0; background: transparent; font: inherit; color: #0a0a0a;
+}
+:root .pp-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+:root .pp-filters .pp-dd { width: 100%; min-width: 0; }
+:root .pp-filters .pp-dd .ui-dropdown-custom__trigger { min-height: 44px; height: 44px; font-size: 13px; padding-left: 12px; padding-right: 10px; }
+@media (min-width: 640px) {
+  :root .pp-filters { grid-template-columns: repeat(3, minmax(0, 1fr)) auto; }
+}
+@media (min-width: 1024px) {
+  :root .pp-tools { flex-direction: row; align-items: center; }
+  :root .pp-search { flex: 1 1 280px; }
+  :root .pp-filters { flex: 0 1 auto; grid-template-columns: repeat(3, 150px) auto; }
+}
+
+/* ---------- List card ---------- */
+:root .pp-list { padding: 0; overflow: hidden; }
+:root .pp-sk { display: block; height: 18px; border-radius: 6px; background: #f0f0f0; }
+:root .pp-dash { color: #8a8a8a; }
+:root .pp-icon {
+  display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 10px;
+  border: 1px solid transparent; background: transparent; color: #0a0a0a; cursor: pointer;
+}
+:root .pp-icon:hover { background: #f4f4f4; border-color: #e1e1e1; }
+:root .pp-icon:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 1px; }
+:root .pp-acts { display: inline-flex; align-items: center; gap: 2px; }
+:root .pp-who__text { display: flex; flex-direction: column; min-width: 0; }
+:root .pp-who__sub { font-size: 12px; font-weight: 400; color: #595959; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root .pp-list .party-who { max-width: none; min-width: 0; }
+:root .pp-list .party-who__name { display: block; -webkit-line-clamp: 2; display: -webkit-box; }
+
+/* Phone: cards */
+:root .pp-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+:root .pp-card { padding: 12px 14px; border-top: 1px solid #ececec; display: flex; flex-direction: column; gap: 8px; }
+:root .pp-card:first-child { border-top: 0; }
+:root .pp-card--sk { height: 108px; background: #f7f7f7; }
+:root .pp-card__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+:root .pp-card__top .party-who { flex: 1; min-width: 0; }
+:root .pp-card__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+:root .pp-table { display: none; }
+
+/* Tablet and desktop: table that always fits */
+@media (min-width: 640px) {
+  :root .pp-cards { display: none; }
+  :root .pp-table { display: block; }
+  :root .pp-table table { width: 100%; table-layout: auto; border-collapse: collapse; }
+  :root .pp-table th, :root .pp-table td { padding: 8px 10px; text-align: left; vertical-align: middle; font-size: 14px; }
+  :root .pp-table thead th { border-bottom: 1px solid #e1e1e1; background: #fafafa; }
+  :root .pp-table tbody td { border-top: 1px solid #ececec; }
+  :root .pp-table tbody tr:first-child td { border-top: 0; }
+  :root .pp-th {
+    min-height: 44px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 700;
+    letter-spacing: .04em; text-transform: uppercase; color: #595959; cursor: pointer; white-space: nowrap;
+  }
+  :root .pp-th:hover { color: #0a0a0a; }
+  :root .pp-table .pp-c-credit { text-align: right; white-space: nowrap; }
+  :root .pp-table .pp-c-act { width: 1%; white-space: nowrap; text-align: right; }
+  :root .pp-table .pp-c-party { min-width: 0; }
+  :root .pp-table .pp-c-city { color: #595959; }
+  :root .pp-table td.pp-c-city, :root .pp-table td.pp-c-sm { white-space: normal; max-width: none; overflow: visible; }
+  :root .pp-table td { max-width: none; overflow: visible; text-overflow: clip; white-space: normal; color: #0a0a0a; }
+  :root .pp-table td.pp-c-credit, :root .pp-table td.pp-c-loc, :root .pp-table td.pp-c-act { white-space: nowrap; }
+}
+/* Tablet: the city moves under the party name, so Credit days and the actions stay in view. */
+@media (min-width: 640px) and (max-width: 1099px) {
+  :root .pp-table .pp-c-city { display: none; }
+  :root .pp-table th, :root .pp-table td { padding-left: 8px; padding-right: 8px; }
+}
+@media (min-width: 1100px) {
+  :root .pp-who__sub { display: none; }
+}
+
+/* Footer */
+:root .pp-foot {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-top: 1px solid #ececec; font-size: 13px; color: #595959;
+}
+:root .pp-foot .pp-dd--size .ui-dropdown-custom__trigger { min-height: 44px; min-width: 130px; font-size: 13px; }
+
+/* ---------- Row menu ---------- */
+:root .pp-more__shade { position: fixed; inset: 0; z-index: 10090; }
+:root .pp-more {
+  position: fixed; z-index: 10100; width: 200px; padding: 4px; background: #fff; border: 1px solid #e1e1e1;
+  border-radius: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, .12);
+}
+:root .pp-more__item {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 12px; border-radius: 8px;
+  color: #0a0a0a; font-size: 14px; font-weight: 600; text-decoration: none;
+}
+:root .pp-more__item:hover { background: #f4f4f4; }
+
+/* ---------- Add / Edit party form ---------- */
+:root .pf { display: flex; flex-direction: column; gap: 18px; }
+:root .pf-sec { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+:root .pf-sec + .pf-sec { border-top: 1px solid #e1e1e1; padding-top: 16px; }
+:root .pf-sec__h { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: #0a0a0a; }
+:root .pf-sec__d { margin: -6px 0 0; font-size: 13px; color: #595959; }
+:root .pf-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+:root .pf-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+:root .pf-hint { font-size: 12px; color: #595959; }
+:root .pf-field .ui-input, :root .pf-field .ui-dropdown-custom__trigger { min-height: 44px; }
+@media (min-width: 640px) {
+  :root .pf-grid { grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+  :root .pf-field--full { grid-column: 1 / -1; }
+}
+
+/* Switch (own control) */
+:root .pf-switch {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 6px 0;
+  border: 0; background: none; font: inherit; text-align: left; cursor: pointer; color: #0a0a0a;
+}
+:root .pf-switch:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; border-radius: 8px; }
+:root .pf-switch__track { position: relative; flex: none; width: 44px; height: 26px; border-radius: 99px; background: #c9c9c9; transition: background .15s; }
+:root .pf-switch__dot { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform .15s; }
+:root .pf-switch.is-on .pf-switch__track { background: #0a0a0a; }
+:root .pf-switch.is-on .pf-switch__dot { transform: translateX(18px); }
+:root .pf-switch__text { display: flex; flex-direction: column; gap: 1px; }
+:root .pf-switch__text b { font-size: 14px; font-weight: 600; }
+:root .pf-switch__text small { font-size: 12px; color: #595959; }
+@media (prefers-reduced-motion: reduce) {
+  :root .pf-switch__track, :root .pf-switch__dot { transition: none; }
+}
