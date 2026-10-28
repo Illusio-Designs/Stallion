@@ -464,6 +464,11 @@ const DashboardTray = () => {
 
   // Return tasks: frames booked from trays for orders that must come back to the office.
   // Shown to admin and tray manager only (the salesman sees their own on the home page).
+  // A salesman sees the trays that are with him and cannot add, edit or move anything.
+  const readOnly = useMemo(() => {
+    const roles = getUserRoles();
+    return roles.includes('salesman') && !roles.some((r) => ['admin', 'tray_manager', 'sales_manager'].includes(r));
+  }, []);
   const canSeeReturnTasks = useMemo(() => getUserRoles().some((r) => ['admin', 'tray_manager'].includes(r)), []);
   const [returnTasks, setReturnTasks] = useState([]);
   useEffect(() => {
@@ -573,18 +578,18 @@ const DashboardTray = () => {
         <div className="page-head tray-head">
           <div>
             <h1>Sample trays</h1>
-            <p>Admin and tray managers manage trays. Sales managers can assign them to salesmen.</p>
+            <p>{readOnly ? 'The trays that are with you. The office gives and takes them back.' : 'Admin and tray managers manage trays. Sales managers can assign them to salesmen.'}</p>
           </div>
           {activeTab === 'all-trays' && (
             <div className="page-head__actions">
               <button className="ui-btn ui-btn--secondary" onClick={fetchTrays} disabled={loading}>Refresh</button>
-              <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Tray</button>
+              {!readOnly && <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Tray</button>}
             </div>
           )}
         </div>
 
         {/* Tab Navigation */}
-        <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
+        {!readOnly && (<div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
           <div className="order-tabs-container col-span-full flex w-full gap-[var(--space-2)] overflow-x-auto rounded-lg border border-border bg-surface px-[var(--space-3)] py-[var(--space-2)] shadow-sm">
             <button
               className={`order-tab inline-flex min-h-[40px] flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-[var(--space-4)] py-[var(--space-2)] text-[length:var(--text-base)] font-semibold leading-snug transition-colors active:scale-[0.98] ${activeTab === 'all-trays' ? 'active bg-primary text-white' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
@@ -599,7 +604,7 @@ const DashboardTray = () => {
               Assign Products
             </button>
           </div>
-        </div>
+        </div>)}
 
         {/* Tab Content */}
         {activeTab === 'all-trays' && (
@@ -632,14 +637,14 @@ const DashboardTray = () => {
                     {c.label} <b>{c.count}</b>
                   </button>
                 ))}
-                <button
+                {!readOnly && <button
                   type="button"
                   aria-pressed={showInactive}
                   className={`chip${showInactive ? ' on' : ''}`}
                   onClick={() => { const next = !showInactive; setShowInactive(next); fetchTraysPage(1, traySearch, next); }}
                 >
                   Show inactive
-                </button>
+                </button>}
               </div>
               <GooeySearch
                 value={traySearch}
@@ -671,8 +676,8 @@ const DashboardTray = () => {
             ) : visibleTrays.length === 0 ? (
               <div className="ui-state ui-state--empty">
                 <p className="ui-state__title">{trays.length === 0 ? 'No trays yet' : 'No trays in this view'}</p>
-                <p className="ui-state__desc">{trays.length === 0 ? 'Add a tray to start grouping sample frames.' : 'Try another filter.'}</p>
-                {trays.length === 0 && <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Tray</button>}
+                <p className="ui-state__desc">{trays.length === 0 ? (readOnly ? 'The office has not given you a tray yet.' : 'Add a tray to start grouping sample frames.') : 'Try another filter.'}</p>
+                {trays.length === 0 && !readOnly && <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Tray</button>}
               </div>
             ) : (
               <div className="tray-grid">
@@ -705,7 +710,7 @@ const DashboardTray = () => {
                       {(bookedByTray[trayId] || 0) > 0 && <span className="tray-meta">{bookedByTray[trayId]} booked for orders</span>}
                       <div className="trn-fill">
                         <span className="trn-fill__pill">{frames.length} of {TRAY_SLOTS}</span>
-                        {frames.length > TRAY_SLOTS && <span className="trn-fill__more">+{frames.length - TRAY_SLOTS} more in Assign Products</span>}
+                        {frames.length > TRAY_SLOTS && <span className="trn-fill__more">+{frames.length - TRAY_SLOTS} more{readOnly ? "" : " in Assign Products"}</span>}
                       </div>
                       <div className="trn-slots" role="group" aria-label={`Frames in ${t.tray_name}`}>
                         {Array.from({ length: TRAY_SLOTS }).map((_, i) => {
@@ -719,6 +724,7 @@ const DashboardTray = () => {
                               className={`trn-slot trn-slot--full${on ? ' on' : ''}`}
                               aria-pressed={on}
                               title={`${f.model_no || 'Frame'}${f.qty > 1 ? ` x${f.qty}` : ''} (${getStatusLabel(f.status)})`}
+                              disabled={readOnly}
                               onClick={() => toggleCardPick(trayId, f.product_id)}
                             >
                               {String(f.model_no || '?').slice(0, 5)}
@@ -727,13 +733,13 @@ const DashboardTray = () => {
                         })}
                       </div>
                       {frames.length === 0 && <span className="tray-meta">No frames yet.</span>}
-                      <div className="tray-card__actions trn-actions">
+                      {!readOnly && <div className="tray-card__actions trn-actions">
                         <button type="button" className="ui-btn ui-btn--primary" onClick={() => handleAssignFrame(t)} disabled={!canAssign || saving || busy}>Assign frame</button>
                         <button type="button" className="ui-btn ui-btn--secondary" onClick={() => handleTakeBack(t)} disabled={frames.length === 0 || saving || busy}>
                           {busy ? 'Taking back…' : picked.length ? `Take back (${picked.length})` : 'Take back'}
                         </button>
                         <button type="button" className="ui-btn ui-btn--secondary" onClick={() => openEdit(t)}>Edit</button>
-                      </div>
+                      </div>}
                     </div>
                   );
                 })}
