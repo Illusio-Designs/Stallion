@@ -1,0 +1,113 @@
+'use client';
+import React, { useEffect, useId, useRef, useState } from 'react';
+import { suggestAddress, addressDetails } from '../../services/api/partnersApi';
+import '../../styles/redesign-n-address.css';
+
+// Address box with Google suggestions while typing. Typing by hand always works: when the
+// server has no Google key (or Google is slow) the box is a plain multi-line field.
+// onPick receives the picked address with its pincode and the ids of its country, state
+// and city (missing ones are added on the server).
+const newSession = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+
+export default function AddressAutocomplete({ value, onChange, onPick, placeholder = 'Start typing the shop address', id }) {
+  const reactId = useId();
+  const listId = `${reactId}-list`;
+  const [items, setItems] = useState([]);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const [busy, setBusy] = useState(false);
+  const session = useRef(newSession());
+  const enabled = useRef(true);
+  const typed = useRef(false); // suggestions only after the person types, not after a pick or a fill
+  const timer = useRef(null);
+  const wrap = useRef(null);
+
+  useEffect(() => {
+    if (!typed.current || !enabled.current) return undefined;
+    const text = String(value || '').trim();
+    if (text.length < 3) { setItems([]); setOpen(false); return undefined; }
+    clearTimeout(timer.current);
+    timer.current = setTimeout(async () => {
+      try {
+        const res = await suggestAddress(text, session.current);
+        if (res?.configured === false) { enabled.current = false; setItems([]); setOpen(false); return; }
+        const list = Array.isArray(res?.suggestions) ? res.suggestions : [];
+        setItems(list);
+        setActive(-1);
+        setOpen(list.length > 0);
+      } catch {
+        setItems([]); setOpen(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer.current);
+  }, [value]);
+
+  useEffect(() => {
+    const away = (e) => { if (wrap.current && !wrap.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', away);
+    return () => document.removeEventListener('mousedown', away);
+  }, []);
+
+  const choose = async (item) => {
+    setOpen(false);
+    typed.current = false;
+    setBusy(true);
+    try {
+      const d = await addressDetails(item.place_id, session.current);
+      session.current = newSession();
+      if (d?.address) onPick?.(d);
+      else onChange?.(item.text || '');
+    } catch {
+      onChange?.(item.text || '');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const onKey = (e) => {
+    if (!open || !items.length) return;
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActive((a) => (a + 1) % items.length); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); setActive((a) => (a <= 0 ? items.length - 1 : a - 1)); }
+    else if (e.key === 'Enter' && active >= 0) { e.preventDefault(); choose(items[active]); }
+    else if (e.key === 'Escape') { setOpen(false); }
+  };
+
+  return (
+    <div className="addr-ac" ref={wrap}>
+      <textarea
+        id={id}
+        className="ui-input addr-ac__input"
+        rows={2}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => { typed.current = true; onChange?.(e.target.value); }}
+        onKeyDown={onKey}
+        role="combobox"
+        aria-expanded={open}
+        aria-controls={listId}
+        aria-autocomplete="list"
+        aria-activedescendant={active >= 0 ? `${listId}-${active}` : undefined}
+        autoComplete="off"
+      />
+      {busy && <span className="addr-ac__busy" role="status">Filling in the address...</span>}
+      {open && items.length > 0 && (
+        <ul className="addr-ac__list" id={listId} role="listbox">
+          {items.map((it, i) => (
+            <li
+              key={it.place_id}
+              id={`${listId}-${i}`}
+              role="option"
+              aria-selected={i === active}
+              className={`addr-ac__item${i === active ? ' is-active' : ''}`}
+              onMouseDown={(e) => { e.preventDefault(); choose(it); }}
+            >
+              <b>{it.main || it.text}</b>
+              {it.secondary && <span>{it.secondary}</span>}
+            </li>
+          ))}
+          <li className="addr-ac__credit" aria-hidden="true">Powered by Google</li>
+        </ul>
+      )}
+    </div>
+  );
+}

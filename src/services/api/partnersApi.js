@@ -1000,6 +1000,22 @@ export const verifyPartyLocation = async (partyId, pos) => {
 };
 
 /**
+ * Address suggestions while typing (Google Places through the server).
+ * @returns {Promise<{configured:boolean, suggestions:Array<{place_id:string,text:string,main:string,secondary:string}>}>}
+ */
+export const suggestAddress = async (input, session) => {
+  return apiRequest('/parties/address-suggest', { method: 'POST', body: { input, session }, includeAuth: true });
+};
+
+/**
+ * The picked address with its pincode and the ids of its country, state and city.
+ * Missing countries, states and cities are added to the lists by the server.
+ */
+export const addressDetails = async (placeId, session) => {
+  return apiRequest('/parties/address-details', { method: 'POST', body: { place_id: placeId, session }, includeAuth: true });
+};
+
+/**
  * Read the written address at a GPS point (like delivery apps). Nothing is saved.
  * @returns {Promise<{found:boolean, address?:string, street?:string, city?:string, state?:string, pincode?:string}>}
  */
