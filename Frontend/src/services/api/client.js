@@ -147,6 +147,14 @@ const handleResponse = async (response) => {
                     (errorData.data && (errorData.data.error || errorData.data.message || errorData.data.msg)) ||
                     errorMessage;
       
+      // Validation answers often come as a list of problems: show every one of them.
+      if (errorMessage === 'An error occurred' || !errorMessage) {
+        const list = Array.isArray(errorData.errors) ? errorData.errors : (Array.isArray(errorData.details) ? errorData.details : null);
+        if (list && list.length) {
+          errorMessage = list.map((e) => (typeof e === 'string' ? e : (e && (e.msg || e.message)) || '')).filter(Boolean).join('. ') || errorMessage;
+        }
+      }
+
       // The server firewall (Imunify360) blocks the request before it reaches the
       // API and answers with its own JSON message. Show something users can act
       // on instead of the firewall's wording, and keep the original in the console.
@@ -167,16 +175,18 @@ const handleResponse = async (response) => {
         
         // Try to construct a more informative message
         if (response.status === 404) {
-          errorMessage = 'Resource not found';
+          errorMessage = 'Not found';
         } else if (response.status === 500) {
-          errorMessage = 'Internal server error. Please try again later.';
+          errorMessage = 'The server hit an error and gave no reason';
         } else if (response.status === 400) {
-          errorMessage = 'Bad request. Please check your input.';
+          errorMessage = 'The server did not accept the details sent';
         } else if (response.status === 403) {
-          errorMessage = 'Access forbidden';
+          errorMessage = 'You do not have permission for this';
         } else {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          errorMessage = `The server answered ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
         }
+        // Say which request failed so the problem can be found quickly.
+        try { errorMessage += ` (${response.status} on ${new URL(response.url).pathname})`; } catch { /* no url */ }
       }
     } catch (parseError) {
       // If we can't parse the error response, use status text
@@ -414,6 +424,14 @@ const apiRequest = async (endpoint, options = {}) => {
     return await handleResponse(response);
   } catch (error) {
     if (!silent) console.error(`API Error [${method} ${fullUrl}]:`, error);
+    // The request never got an answer: say what that usually means instead of the browser's bare "Failed to fetch".
+    if (error && error.statusCode === undefined && /failed to fetch|load failed|networkerror|network request failed/i.test(String(error.message))) {
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      error.message = offline
+        ? 'No internet connection. Check your signal and try again.'
+        : `Could not reach the server. The connection dropped, or the server is down (${error.message}).`;
+      error.isNetworkFailure = true;
+    }
     throw error;
   }
 };
