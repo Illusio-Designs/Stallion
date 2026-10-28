@@ -946,8 +946,9 @@ class OrderController {
                 }
                 // A salesman's orders always go under the logged-in salesman.
                 if (isSalesmanRequired) salesman_id = userScope.salesmanId;
-                // ...and only for parties that belong to them.
-                if (party_id) {
+                // ...and only for parties in the states they work in. Event orders are the exception:
+                // at an event a salesman may take an order for any party.
+                if (party_id && order_type !== OrderType.EVENT_ORDER) {
                     const ownParty = await Party.findOne({ where: { party_id }, attributes: ['party_id', 'state_id'] });
                     if (!ownParty) {
                         return res.status(404).json({ error: 'Party not found' });

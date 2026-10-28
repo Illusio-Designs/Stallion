@@ -428,7 +428,8 @@ export const getSalesmanParties = async () => scopedList('/parties/my');
 // GET /distributors/parties — parties under the authenticated distributor.
 export const getDistributorParties = async () => scopedList('/distributors/parties');
 // GET /parties/my — parties for the current user's role.
-export const getMyParties = async () => scopedList('/parties/my');
+// opts.scope 'event': a salesman gets every party (event orders); otherwise only his working states.
+export const getMyParties = async (opts = {}) => scopedList(opts && opts.scope ? `/parties/my?scope=${encodeURIComponent(opts.scope)}` : '/parties/my');
 
 /**
  * Role-aware party fetch. End-user roles get their own token-scoped parties;
