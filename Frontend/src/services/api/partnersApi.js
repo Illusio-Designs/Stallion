@@ -619,6 +619,13 @@ export const getParties = async (countryId) => {
  * @param {string} partyId - Party ID (UUID)
  * @returns {Promise<Object>} Party object
  */
+// One party by id for the signed-in user (a salesman may open the parties of his own states).
+export const getPartyDetails = async (partyId) => {
+  const id = String(partyId || '').trim();
+  if (!id) throw new Error('Invalid party ID provided');
+  return apiRequest(`/parties/${encodeURIComponent(id)}`, { method: 'GET', includeAuth: true });
+};
+
 export const getPartyById = async (partyId) => {
   if (!partyId || typeof partyId !== 'string' || partyId.trim() === '') {
     throw new Error('Invalid party ID provided');

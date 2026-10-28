@@ -20,6 +20,7 @@ import {
   removePartyLocation,
   updateParty,
   takeEditParty,
+  getPartyDetails,
 } from '../services/apiService';
 import { getUser, getUserRole, getUserRoles } from '../services/authService';
 import { showError, showSuccess, showWarning } from '../services/notificationService';
@@ -701,19 +702,23 @@ const DashboardClients = () => {
   // After saving, the app goes back to where the salesman came from.
   const editOpenDone = useRef(false);
   useEffect(() => {
-    if (editOpenDone.current || !parties.length) return;
+    if (editOpenDone.current) return;
     const want = takeEditParty();
     editOpenDone.current = true;
     if (!want) return;
-    const raw = parties.find((p) => String(p.party_id || p.id) === want.party_id);
-    if (!raw) return;
-    editReturnRef.current = { to: want.returnTo || null, orderType: want.orderType || null, party_id: want.party_id };
+    // The party is fetched by itself, so the form opens at once without waiting for the whole list.
     (async () => {
-      await handleEdit({ ...raw, id: raw.party_id || raw.id });
-      showWarning('This party has no location yet. Pick its address from the suggestions, then press Update.');
+      try {
+        const raw = await getPartyDetails(want.party_id);
+        editReturnRef.current = { to: want.returnTo || null, orderType: want.orderType || null, party_id: want.party_id };
+        await handleEdit({ ...raw, id: raw.party_id || raw.id });
+        showWarning('Check this party and pick its address from the suggestions, then press Update.');
+      } catch (e) {
+        showError(`Could not open this party: ${e.message || 'unknown error'}`);
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [parties]);
+  }, []);
 
   const handleDelete = async (row) => {
     if (!(await confirm(`Are you sure you want to delete this party? This will also delete the associated user account.`))) {
@@ -1051,8 +1056,6 @@ const DashboardClients = () => {
             : 'Party updated successfully!');
           setError(null);
 
-          await fetchPartiesForCountry(selectedCountryFilter);
-
           // Opened from the cart or from the check-in on Home: after a successful save go back to
           // where the salesman was (the cart with the same order type and party, or the check-in
           // with the same party chosen). Opened from the Parties page: stay here.
@@ -1069,6 +1072,7 @@ const DashboardClients = () => {
             window.location.href = back.to;
             return;
           }
+          await fetchPartiesForCountry(selectedCountryFilter);
         } catch (apiError) {
           const errorMsg = String(apiError.message || apiError.error || 'Failed to update party');
           const isInitError = apiError.isInitializationError ||
