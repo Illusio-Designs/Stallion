@@ -24,6 +24,9 @@ const Zone = require('../models/Zone');
 const User = require('../models/User');
 const sequelize = require('../constants/database');
 const { Op } = require('sequelize');
+const Country = require('../models/Country');
+const State = require('../models/State');
+const Cities = require('../models/Cities');
 const salesmanTargetsController = require('./salesmanTargetsController');
 const DistributorZones = require('../models/DistributorZones');
 const { resolveDistributorIdForParty } = require('../utils/distributorMatch');
@@ -37,7 +40,8 @@ const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationPa
 const orderPartyInclude = {
     model: Party,
     as: 'party',
-    attributes: ['party_name', 'address', 'billing_address', 'billing_same_as_shipping', 'latitude', 'longitude'],
+    attributes: ['party_name', 'address', 'billing_address', 'billing_same_as_shipping', 'latitude', 'longitude',
+        'country_id', 'state_id', 'city_id', 'pincode'],
     required: false,
 };
 
@@ -168,6 +172,40 @@ async function decorateOrder(order, opts) {
     return (await decorateOrders([plain], opts))[0];
 }
 
+// Shipping and billing addresses of the orders' parties as separate parts (line, city, state,
+// country, pincode), so screens and the PDF can show each on its own line.
+async function loadAddressNames(plainOrders) {
+    const ids = { country: new Set(), state: new Set(), city: new Set() };
+    plainOrders.forEach((o) => {
+        const p = o.party;
+        if (!p) return;
+        if (p.country_id) ids.country.add(p.country_id);
+        if (p.state_id) ids.state.add(p.state_id);
+        if (p.city_id) ids.city.add(p.city_id);
+    });
+    const map = (rows) => Object.fromEntries(rows.map((r) => [r.id, r.name]));
+    const [countries, states, cities] = await Promise.all([
+        ids.country.size ? Country.findAll({ where: { id: [...ids.country] }, attributes: ['id', 'name'] }) : [],
+        ids.state.size ? State.findAll({ where: { id: [...ids.state] }, attributes: ['id', 'name'] }) : [],
+        ids.city.size ? Cities.findAll({ where: { id: [...ids.city] }, attributes: ['id', 'name'] }) : [],
+    ]);
+    return { country: map(countries), state: map(states), city: map(cities) };
+}
+
+// The party's address as separate parts. The billing address has only its own line; when it
+// is the same as shipping, all parts are the shipping parts.
+function addressPartsOf(party, names, billing) {
+    if (!party) return null;
+    const ownLine = billing && !party.billing_same_as_shipping;
+    return {
+        line: (ownLine ? party.billing_address : party.address) || '',
+        city: ownLine ? '' : (names.city[party.city_id] || ''),
+        state: ownLine ? '' : (names.state[party.state_id] || ''),
+        country: ownLine ? '' : (names.country[party.country_id] || ''),
+        pincode: ownLine ? '' : (party.pincode || ''),
+    };
+}
+
 async function mapOrdersWithPartyName(orders) {
     // Batched salesman-name lookup so order lists (and the Visit Report that
     // merges visit orders) carry salesman_name without the client fetching each
@@ -179,6 +217,7 @@ async function mapOrdersWithPartyName(orders) {
         salesmen.forEach((s) => { salesmanMap[s.salesman_id] = s.full_name; });
     }
     const decorated = await decorateOrders(orders.map((o) => o.get({ plain: true })));
+    const addressNames = await loadAddressNames(decorated);
     return decorated.map((plain) => {
         const { party, ...rest } = plain;
         return {
@@ -191,6 +230,8 @@ async function mapOrdersWithPartyName(orders) {
             party_billing_address: party
                 ? (party.billing_same_as_shipping ? party.address : party.billing_address)
                 : null,
+            party_address_parts: addressPartsOf(party, addressNames, false),
+            party_billing_address_parts: addressPartsOf(party, addressNames, true),
         };
     });
 }

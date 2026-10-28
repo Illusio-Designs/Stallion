@@ -9,6 +9,7 @@
 import { getProductsByIds } from '../services/apiService';
 import { RUPEE_FONT_BASE64 } from './rupeeFont';
 import { orderStatusLabel, getShipments, heldNote, fmtDate } from './orderStatus';
+import { addressRows } from './addressParts';
 
 const parseOrderItems = (orderItems) => {
   if (!orderItems) return [];
@@ -180,11 +181,13 @@ export async function downloadOrderPdf(row, products = []) {
   y += metaH + 6;
 
   // ================= Address box =================
-  const addr = row?.clientAddress ? String(row.clientAddress) : '';
+  // Shipping address as separate lines: Address, City, State, Pincode, Country
+  const shipRows = addressRows(row?.shipParts, row?.clientAddress);
+  const addr = shipRows.map(([label, value]) => `${label}: ${value}`).join('\n');
   const billing = (row?.clientBillingAddress && row.clientBillingAddress !== row.clientAddress) ? String(row.clientBillingAddress) : '';
   if (addr || billing) {
     doc.setFontSize(9.5);
-    const shipLines = addr ? doc.splitTextToSize(addr, CW - 8) : [];
+    const shipLines = addr ? addr.split('\n').flatMap((l) => doc.splitTextToSize(l, CW - 8)) : [];
     const billLines = billing ? doc.splitTextToSize(billing, CW - 8) : [];
     const lh = 4.6;
     const aH = 6 + (addr ? 5 + shipLines.length * lh : 0) + (billing ? 5 + billLines.length * lh + 2 : 0);
