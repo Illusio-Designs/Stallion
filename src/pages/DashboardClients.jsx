@@ -21,6 +21,7 @@ import {
   verifyPartyLocationAsking,
   reverseGeocodeLocation,
   ADDRESS_FAR_CONFIRM,
+  takeAddressFix,
 } from '../services/apiService';
 import { getUser, getUserRole, getUserRoles } from '../services/authService';
 import { showError, showSuccess, showWarning } from '../services/notificationService';
@@ -612,8 +613,11 @@ const DashboardClients = () => {
         if (res?.location_address) {
           setAddrSuggest({ address: res.location_address, pincode: res?.location_address_parts?.pincode || '' });
         }
-        if (res?.address_mismatch) {
-          showWarning('Location saved. It is far from the written address. Use the address read from the shop spot below if it is right.');
+        if (res?.address_mismatch && res?.location_address) {
+          // Final address follows the GPS spot: the form is updated, the salesman checks and saves.
+          setFormData(prev => ({ ...prev, address: res.location_address, pincode: res?.location_address_parts?.pincode || prev.pincode }));
+          setAddrSuggest(null);
+          showWarning('Address updated from your location. Check it, then press Save.');
         }
         setParties(prev => prev.map(p => {
           const id = p.id || p.party_id;
@@ -755,6 +759,24 @@ const DashboardClients = () => {
       }, 200);
     }
   };
+
+  // Coming from "I'm at shop" on Home or in the cart when the written address did not match:
+  // open that party with the address already updated from the GPS spot.
+  const addressFixDone = useRef(false);
+  useEffect(() => {
+    if (addressFixDone.current || !parties.length) return;
+    const fix = takeAddressFix();
+    addressFixDone.current = true;
+    if (!fix) return;
+    const raw = parties.find((p) => String(p.party_id || p.id) === fix.party_id);
+    if (!raw) return;
+    (async () => {
+      await handleEdit({ ...raw, id: raw.party_id || raw.id });
+      setFormData(prev => ({ ...prev, address: fix.address, pincode: fix.pincode || prev.pincode }));
+      showWarning('Address updated from your location. Check it, then press Save.');
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [parties]);
 
   const handleDelete = async (row) => {
     if (!(await confirm(`Are you sure you want to delete this party? This will also delete the associated user account.`))) {
@@ -1173,6 +1195,13 @@ const DashboardClients = () => {
           // Reopen the new party so the salesman can capture the location right now.
           if (needsCapture && (newParty?.party_id || newParty?.id)) {
             await handleEdit({ ...newParty, id: newParty.party_id || newParty.id });
+          }
+          // The written address did not match the shop: reopen the party with the address
+          // updated from the GPS spot so the final address follows the location.
+          if (newParty?.address_mismatch && newParty?.location_address && (newParty?.party_id || newParty?.id)) {
+            await handleEdit({ ...newParty, id: newParty.party_id || newParty.id });
+            setFormData(prev => ({ ...prev, address: newParty.location_address }));
+            showWarning('Address updated from your location. Check it, then press Save.');
           }
         } catch (error) {
           // Handle foreign key constraint errors by retrying with null values

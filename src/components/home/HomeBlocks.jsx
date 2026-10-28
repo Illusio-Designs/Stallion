@@ -6,7 +6,7 @@ import StatusBadge from '../ui/StatusBadge';
 import { FiMapPin, FiShoppingCart, FiUsers, FiPackage, FiCreditCard, FiNavigation2, FiUser, FiChevronRight } from '../icons/hugeicons';
 import { captureCurrentPosition, distanceMeters, GEOFENCE_RADIUS_M } from '../../utils/geolocation';
 import { createSalesmanCheckin } from '../../services/api/salesmanApi';
-import { verifyPartyLocationAsking, ADDRESS_FAR_CONFIRM } from '../../services/api/partnersApi';
+import { verifyPartyLocationAsking, ADDRESS_FAR_CONFIRM, rememberAddressFix } from '../../services/api/partnersApi';
 import { useConfirm } from '../ui/ConfirmProvider';
 import { getMySalesman } from '../../services/api/dashboardApi';
 import { getTrayTasks, markTrayTaskInTransit } from '../../services/api/inventoryApi';
@@ -251,6 +251,14 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
       const res = await verifyPartyLocationAsking(id, pos, (m) => confirm(ADDRESS_FAR_CONFIRM(m)));
       setSaved((m) => ({ ...m, [id]: { latitude: Number(res?.latitude), longitude: Number(res?.longitude), location_source: 'verified', location_accuracy_m: Number(res?.accuracy) } }));
       setFailed((m) => { const n = { ...m }; delete n[id]; return n; });
+      if (res?.address_mismatch && res?.location_address) {
+        // The written address does not match the shop: Edit party opens with the address
+        // updated from the GPS spot.
+        rememberAddressFix(id, res);
+        showSuccess('Shop spot saved. Update the party address from your location.');
+        router.push('/dashboard/party');
+        return;
+      }
       showSuccess('Shop test passed. This party is good to go.');
       measure({ ...party, latitude: Number(res?.latitude), longitude: Number(res?.longitude) });
     } catch (e) {
