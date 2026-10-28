@@ -828,8 +828,6 @@ const ProductDetail = ({ productId: propProductId = null }) => {
               {curStock <= 0 ? "Out of stock" : addedIds[cur.id] ? "Added to cart" : "Add to cart"}
             </button>
           </div>
-          <p className="pdx-hint">Quantity cannot be more than the stock, and sold out frames cannot be ordered.</p>
-
         </div>
       </div>
     </div>
