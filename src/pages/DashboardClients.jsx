@@ -1061,20 +1061,21 @@ const DashboardClients = () => {
 
           await fetchPartiesForCountry(selectedCountryFilter);
 
-          // Opened from the cart or Home for a party with no location: go back there once it has one.
+          // Opened from the cart or from the check-in on Home: after a successful save go back to
+          // where the salesman was (the cart with the same order type and party, or the check-in
+          // with the same party chosen). Opened from the Parties page: stay here.
           const back = editReturnRef.current;
           if (back && back.to) {
-            if (dataToSend.address_lat !== undefined || updatedParty?.latitude != null) {
-              editReturnRef.current = null;
-              try {
-                if (back.to === '/cart') {
-                  sessionStorage.setItem('stallion.cartReturn', JSON.stringify({ party_id: back.party_id, orderType: back.orderType || 'visit_order', at: Date.now() }));
-                }
-              } catch { /* storage unavailable: the cart asks for the order type and party again */ }
-              window.location.href = back.to;
-              return;
-            }
-            showWarning('Pick the address from the suggestions so the party gets a location, then press Update.');
+            editReturnRef.current = null;
+            try {
+              if (back.to === '/cart') {
+                sessionStorage.setItem('stallion.cartReturn', JSON.stringify({ party_id: back.party_id, orderType: back.orderType || 'visit_order', at: Date.now() }));
+              } else {
+                sessionStorage.setItem('stallion.homeReturn', JSON.stringify({ party_id: back.party_id, at: Date.now() }));
+              }
+            } catch { /* storage unavailable: the party is chosen again by hand */ }
+            window.location.href = back.to;
+            return;
           }
         } catch (apiError) {
           const errorMsg = String(apiError.message || apiError.error || 'Failed to update party');
@@ -1280,6 +1281,7 @@ const DashboardClients = () => {
   };
 
   const closePartyForm = () => {
+    editReturnRef.current = null; // closed without saving: stay on the Parties page
     setOpenAdd(false);
     setEditRow(null);
     resetForm();
