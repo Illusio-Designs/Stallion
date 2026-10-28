@@ -1,0 +1,12 @@
+/* App feel when opened from the home screen, plus touch basics everywhere (unlayered). */
+:root button, :root a, :root input, :root select, :root textarea, :root label, :root [role="button"] { touch-action: manipulation; }
+:root { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+@media (display-mode: standalone), (display-mode: minimal-ui) {
+  /* No browser pull-to-refresh bounce, so the screen does not jump like a web page */
+  :root html, :root body { overscroll-behavior-y: contain; }
+  /* Buttons and navigation are not selectable text, as in a native app; inputs and content are */
+  :root button, :root nav, :root [role="button"], :root [role="tab"], :root summary { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+  :root input, :root textarea, :root select, :root [contenteditable="true"] { -webkit-user-select: text; user-select: text; }
+  :root img { -webkit-touch-callout: none; }
+}
