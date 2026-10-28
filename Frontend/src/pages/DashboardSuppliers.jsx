@@ -1654,32 +1654,42 @@ const DashboardSuppliers = () => {
                     onChange={(e) => setListQuery(e.target.value)}
                   />
                 </label>
-                <select
-                  className="sx-select"
-                  aria-label="Country"
-                  value={selectedCountryFilter || ''}
-                  onChange={(e) => {
-                    // Salesmen are always loaded per country, so there is no "All" option
-                    const value = e.target.value;
-                    if (!value) return;
-                    setSalesmen([]);
-                    setHasSearched(false);
-                    setStateFilter('');
-                    setSelectedCountryFilter(value);
-                  }}
-                >
-                  {!selectedCountryFilter ? <option value="">Country</option> : null}
-                  {countries.map(country => <option key={country.id} value={country.id}>{country.name}</option>)}
-                </select>
-                <select className="sx-select" aria-label="State" value={stateFilter} onChange={(e) => setStateFilter(e.target.value)}>
-                  <option value="">All states</option>
-                  {stateFilterOptions.map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
-                <select className="sx-select" aria-label="Status" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-                  <option value="">All status</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                </select>
+                <div className="sx-select">
+                  <DropdownSelector
+                    options={countries.map((country) => ({ value: country.id, label: country.name }))}
+                    value={selectedCountryFilter || ''}
+                    onChange={(value) => {
+                      // Salesmen are always loaded per country, so there is no "All" option
+                      if (!value) return;
+                      setSalesmen([]);
+                      setHasSearched(false);
+                      setStateFilter('');
+                      setSelectedCountryFilter(value);
+                    }}
+                    placeholder="Country"
+                    searchable={false}
+                    className="ui-dropdown-custom--full-width"
+                  />
+                </div>
+                <div className="sx-select">
+                  <DropdownSelector
+                    options={[{ value: '', label: 'All states' }, ...stateFilterOptions.map((n) => ({ value: n, label: n }))]}
+                    value={stateFilter}
+                    onChange={(v) => setStateFilter(v)}
+                    placeholder="All states"
+                    className="ui-dropdown-custom--full-width"
+                  />
+                </div>
+                <div className="sx-select">
+                  <DropdownSelector
+                    options={[{ value: '', label: 'All status' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+                    value={statusFilter}
+                    onChange={(v) => setStatusFilter(v)}
+                    placeholder="All status"
+                    searchable={false}
+                    className="ui-dropdown-custom--full-width"
+                  />
+                </div>
                 <button type="button" className="ui-btn ui-btn--primary sx-add" onClick={handleAdd}>Add salesman</button>
               </div>
               {error ? (

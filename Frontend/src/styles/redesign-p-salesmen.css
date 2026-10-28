@@ -6,7 +6,7 @@
 :root .sx-search{grid-column:1/-1;display:flex;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:1px solid #cfcfcf;border-radius:10px;background:#fff;color:#595959}
 :root .sx-search:focus-within{border-color:#0a0a0a}
 :root .sx-search__input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:14px;color:#0a0a0a;min-height:40px}
-:root .sx-select{min-height:44px;min-width:0;padding:0 10px;border:1px solid #cfcfcf;border-radius:10px;background:#fff;font-size:14px;color:#0a0a0a}
+:root .sx-select{min-width:0;min-height:44px}
 :root .sx-select:focus-visible{outline:2px solid #0a0a0a;outline-offset:1px}
 :root .sx-add{grid-column:1/-1;min-height:44px}
 @media (min-width:768px){
