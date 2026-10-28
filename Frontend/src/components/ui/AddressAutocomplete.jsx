@@ -55,7 +55,7 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
     try {
       const d = await addressDetails(item.place_id, session.current);
       session.current = newSession();
-      if (d?.address) onPick?.(d);
+      if (d?.address) onPick?.({ ...d, suggestion_main: item.main || '' });
       else onChange?.(item.text || '');
     } catch {
       onChange?.(item.text || '');
