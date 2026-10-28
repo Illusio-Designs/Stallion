@@ -191,10 +191,17 @@ class PartyController {
                 if (salesman.state_id && !stateIds.includes(salesman.state_id)) {
                     stateIds.push(salesman.state_id);
                 }
-                if (stateIds.length === 0) {
-                    return res.status(200).json(buildPaginatedResponse([], pagination, 0));
+                // Event orders: a salesman may take an order for ANY party (?scope=event). Every
+                // other use (visit, WhatsApp, check-in) is limited to his working states.
+                const forEvent = String((req.query && req.query.scope) || '').toLowerCase() === 'event';
+                if (forEvent) {
+                    where = {};
+                } else {
+                    if (stateIds.length === 0) {
+                        return res.status(200).json(buildPaginatedResponse([], pagination, 0));
+                    }
+                    where = { state_id: { [Op.in]: stateIds } };
                 }
-                where = { state_id: { [Op.in]: stateIds } };
             } else if (roleName === 'distributor') {
                 const distributor = await Distributor.findOne({ where: { user_id: user.user_id } });
                 if (!distributor) {
