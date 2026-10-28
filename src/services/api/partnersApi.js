@@ -999,19 +999,6 @@ export const verifyPartyLocation = async (partyId, pos) => {
 };
 
 /**
- * A manager approves a location that was captured while the party's address could
- * not be found on the map (clears the "to be checked" flag).
- * @param {string} partyId
- * @returns {Promise<{message:string, location_unchecked:boolean}>}
- */
-export const approvePartyLocation = async (partyId) => {
-  return apiRequest(`/parties/${partyId}/approve-location`, {
-    method: 'PUT',
-    includeAuth: true,
-  });
-};
-
-/**
  * Remove a party's saved location (managers only) so "I'm at shop" can capture it
  * again. Used when the first capture was wrong.
  * @param {string} partyId
