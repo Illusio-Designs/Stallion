@@ -292,6 +292,15 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
               </button>
             </Tooltip>
           )}
+          {/* Phones: menu button, then the logo (the sidebar carries the logo on larger screens). */}
+          <button
+            type="button"
+            className="dashboard-header-logo md:hidden bg-transparent border-none p-0 cursor-pointer flex items-center"
+            onClick={() => onPageChange?.('dashboard')}
+            aria-label="Stallion Eyewear, go to the dashboard"
+          >
+            <img src="/images/logo/logo.webp" alt="" className="block h-9 w-auto max-w-[120px] object-contain" />
+          </button>
           <div className="dashboard-title text-[length:var(--text-md)] text-text font-semibold whitespace-nowrap overflow-hidden text-ellipsis">Welcome {userName}</div>
         </div>
 

@@ -1288,7 +1288,7 @@ const Cart = ({ onPageChange = null }) => {
   return (
     <div className="cart-page bg-surface-muted px-[5%] py-10 min-h-[70vh] max-md:px-4 max-md:py-6">
       <div className="cart-container max-w-[1200px] mx-auto">
-        <div className="cart-content grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 items-start">
+        <div className="cart-content grid grid-cols-1 min-[1400px]:grid-cols-[2fr_1fr] gap-6 items-start">
           {/* Shopping Cart Section */}
           <div className="shopping-cart-section bg-surface border border-grey-100 rounded-[20px] p-8 shadow-[0_1px_2px_rgba(16,18,38,0.04),0_18px_44px_-20px_rgba(16,18,38,0.18)] max-md:p-5 max-md:rounded-2xl">
             <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Your cart{cartItems.length > 0 && (<span className="cart-sub">{cartItems.length} {cartItems.length === 1 ? 'model' : 'models'}, {cartItems.reduce((n, it) => n + (Number(it.quantity) || 0), 0)} frames</span>)}</h2>
