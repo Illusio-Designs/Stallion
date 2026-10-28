@@ -1,0 +1,104 @@
+/* Reports, Support and Settings: compact black-and-white layout (mobile first) */
+
+/* ---------- shared ---------- */
+:root .acc-card { padding: 16px; border-radius: 14px; }
+:root .acc-h { margin: 0; font-size: 17px; font-weight: 700; color: #0a0a0a; letter-spacing: -.01em; }
+:root .acc-sub { margin: 3px 0 0; font-size: 13.5px; color: #595959; }
+:root .acc-hint { font-size: 12.5px; color: #595959; }
+:root .acc-err { font-size: 12.5px; color: #b3261e; }
+:root .acc-empty { margin: 12px 0 0; font-size: 14px; color: #595959; }
+:root .acc-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+:root .acc-field .ui-label { margin: 0; }
+:root .acc-field .ui-input { width: 100%; min-height: 44px; }
+:root .acc-card .ui-btn, :root .acc-card .gbtn { min-height: 44px; }
+
+/* ---------- Support ---------- */
+:root .acc-support { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; align-items: start; }
+:root .acc-search { position: relative; display: block; margin-top: 12px; }
+:root .acc-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #595959; pointer-events: none; }
+:root .acc-search .ui-input { width: 100%; min-height: 44px; padding-left: 38px; }
+:root .acc-faq { margin: 6px 0 0; }
+:root .acc-faq__item { padding: 12px 0; border-bottom: 1px solid #e1e1e1; }
+:root .acc-faq__item:last-child { border-bottom: 0; }
+:root .acc-faq dt, :root .acc-faq__item dt { font-weight: 700; font-size: 14.5px; color: #0a0a0a; }
+:root .acc-faq__item dd { margin: 4px 0 0; font-size: 13.5px; line-height: 1.45; color: #595959; }
+:root .acc-form { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+:root .acc-textarea { min-height: 120px; resize: vertical; }
+:root .acc-row-end { display: flex; flex-direction: column-reverse; gap: 10px; align-items: stretch; }
+:root .acc-row-end .ui-btn { width: 100%; }
+@media (min-width: 560px) {
+  :root .acc-row-end { flex-direction: row; justify-content: space-between; align-items: center; }
+  :root .acc-row-end .ui-btn { width: auto; }
+}
+@media (min-width: 900px) {
+  :root .acc-support { grid-template-columns: 1.2fr 1fr; gap: 16px; }
+  :root .acc-card { padding: 20px; }
+  :root .acc-support > .acc-card:last-child { position: sticky; top: 16px; }
+}
+
+/* ---------- Settings ---------- */
+:root .acc-settings { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; max-width: 880px; }
+:root .acc-profile { display: grid; grid-template-columns: 64px 1fr; gap: 12px 14px; align-items: center; }
+:root .acc-avatar { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: #0a0a0a; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; }
+:root .acc-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+:root .acc-profile__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+:root .acc-profile__name { font-size: 18px; font-weight: 700; color: #0a0a0a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .acc-profile__meta { font-size: 13.5px; color: #595959; }
+:root .acc-profile__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+:root .acc-profile__actions .ui-btn { min-height: 44px; }
+:root .acc-sec-head { margin-bottom: 12px; }
+:root .acc-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+:root .acc-settings .phone-intl { width: 100%; }
+:root .acc-settings .react-international-phone-input { flex: 1; min-width: 0; height: 44px; }
+:root .acc-settings .react-international-phone-country-selector-button { height: 44px; }
+:root .acc-savebar { display: flex; justify-content: flex-end; gap: 10px; padding: 10px 0; position: sticky; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 20; background: linear-gradient(to top, #fff 70%, rgba(255,255,255,0)); }
+:root .acc-savebar .ui-btn { min-height: 44px; }
+:root .acc-savebar .ui-btn[type="submit"] { flex: 1; }
+@media (min-width: 560px) {
+  :root .acc-grid { grid-template-columns: 1fr 1fr; }
+  :root .acc-profile { grid-template-columns: 72px 1fr auto; }
+  :root .acc-profile__actions { grid-column: auto; }
+  :root .acc-avatar { width: 72px; height: 72px; }
+}
+@media (min-width: 768px) {
+  :root .acc-savebar { position: static; background: none; padding: 4px 0 0; }
+  :root .acc-savebar .ui-btn[type="submit"] { flex: none; }
+  :root .acc-card { padding: 20px; }
+}
+
+/* ---------- Reports ---------- */
+:root .rep-periods { max-width: 100%; overflow-x: auto; }
+:root .rep-periods button { min-height: 44px; white-space: nowrap; }
+:root .rep-dl { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
+:root .rep-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+:root .rep-kpi { background: #fff; border: 1px solid #e1e1e1; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+:root .rep-kpi small { font-size: 12px; color: #595959; font-weight: 600; }
+:root .rep-kpi b { font-size: 20px; line-height: 1.15; font-weight: 700; color: #0a0a0a; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+:root .rep-kpi--dk { background: #0a0a0a; border-color: #0a0a0a; }
+:root .rep-kpi--dk small { color: #c8c8c8; }
+:root .rep-kpi--dk b { color: #fff; }
+:root .rep-tabs { display: flex; gap: 4px; padding: 3px; background: #fff; border: 1px solid #e1e1e1; border-radius: 12px; overflow-x: auto; }
+:root .rep-tab { flex: 1 0 auto; min-height: 44px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-weight: 600; font-size: 14px; color: #595959; cursor: pointer; white-space: nowrap; }
+:root .rep-tab.on { background: #0a0a0a; color: #fff; }
+:root .rep-tab:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
+:root .rep-empty__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
+:root .rep-empty__actions .gbtn { min-height: 44px; }
+
+/* phone card list replaces the wide table */
+:root .rep-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+:root .rep-cardrow { padding: 12px 0; border-bottom: 1px solid #e1e1e1; display: flex; flex-direction: column; gap: 5px; }
+:root .rep-cardrow:last-child { border-bottom: 0; }
+:root .rep-cardrow__top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+:root .rep-cardrow__top b { font-size: 15px; color: #0a0a0a; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+:root .rep-cardrow__date, :root .rep-cardrow__sub { font-size: 13px; color: #595959; }
+:root .rep-cardrow__nums { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: #0a0a0a; font-variant-numeric: tabular-nums; }
+:root .rep-cardrow__note { font-size: 13px; color: #595959; }
+:root .rep-table { display: none; }
+
+@media (min-width: 640px) {
+  :root .rep-kpis { grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  :root .rep-kpi b { font-size: 22px; }
+  :root .rep-cards { display: none; }
+  :root .rep-table { display: block; }
+  :root .rep-tab { flex: none; }
+}

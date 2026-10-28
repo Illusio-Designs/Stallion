@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import '../styles/pages/dashboard-analytics.css';
+import '../styles/redesign-p-account.css';
+import { FiDownload } from '../components/icons/hugeicons';
 import TableWithControls from '../components/ui/TableWithControls';
 import StatusBadge from '../components/ui/StatusBadge';
 import Skeleton from '../components/ui/Skeleton';
@@ -22,14 +24,15 @@ import { showError } from '../services/notificationService';
 import { downloadCsv } from '../utils/exportCsv';
 
 const TABS = [
-  { key: 'targets', label: 'Target Achievement' },
-  { key: 'checkins', label: 'Visit Report' },
-  { key: 'states', label: 'Sales by State' },
+  { key: 'targets', label: 'Targets' },
+  { key: 'states', label: 'Sales by state' },
+  { key: 'checkins', label: 'Visits' },
 ];
 
 const PERIODS = [
   { key: '7d', label: '7 days' },
   { key: 'month', label: 'This month' },
+  { key: 'quarter', label: 'Quarter' },
   { key: 'year', label: 'Year' },
 ];
 // Start of the chosen period (end is always now).
@@ -38,6 +41,7 @@ const periodStart = (key) => {
   d.setHours(0, 0, 0, 0);
   if (key === '7d') d.setDate(d.getDate() - 6);
   else if (key === 'month') d.setDate(1);
+  else if (key === 'quarter') { d.setMonth(Math.floor(d.getMonth() / 3) * 3); d.setDate(1); }
   else { d.setMonth(0); d.setDate(1); }
   return d;
 };
@@ -416,6 +420,7 @@ const AnalyticsReports = () => {
     }
   };
   const visibleCount = activeTab === 'targets' ? targetRows.length : checkinRows.length;
+  const visitCount = periodCheckins.length;
   const periodLabel = PERIODS.find((p) => p.key === period)?.label || '';
 
   const backendDown = (
@@ -436,30 +441,41 @@ const AnalyticsReports = () => {
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
         <div className="pg-head">
-          <div><h1>Reports</h1><p>{fmtDate(periodRange.from)} to {fmtDate(periodRange.to)}. Cancelled orders count toward salesman targets.</p></div>
+          <div><h1>Reports</h1><p>{fmtDate(periodRange.from)} to {fmtDate(periodRange.to)}. Cancelled orders count toward targets.</p></div>
           <div className="pg-head__tools">
-            <div className="seg rep-seg" role="group" aria-label="Period">
+            <div className="seg rep-seg rep-periods" role="group" aria-label="Period">
               {PERIODS.map((p) => (
                 <button key={p.key} type="button" aria-pressed={period === p.key} className={period === p.key ? 'on' : ''} onClick={() => setPeriod(p.key)}>{p.label}</button>
               ))}
             </div>
-            <button type="button" className="gbtn rep-export" onClick={exportVisible} disabled={loading || visibleCount === 0}>Export CSV</button>
+            <button type="button" className="gbtn rep-export rep-dl" onClick={exportVisible} disabled={loading || visibleCount === 0} title={activeTab === 'targets' ? 'Download the targets as a CSV file' : 'Download the visits as a CSV file'}>
+              <FiDownload size={16} aria-hidden="true" /> Download
+            </button>
           </div>
         </div>
 
-        {/* Tab navigation */}
-        <div className="dash-row">
-          <div className="order-tabs-container col-[1/-1] flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                className={`order-tab inline-flex min-h-10 flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-4 py-2 text-[length:var(--text-base)] font-semibold leading-snug transition-colors active:scale-[0.98] ${activeTab === tab.key ? 'active bg-primary text-white' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
-                onClick={() => setActiveTab(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+        {/* Four numbers for the chosen period */}
+        <div className="rep-kpis" aria-label="Summary">
+          {[
+            { label: 'Target done', value: `${summary.pct}%`, dark: true },
+            { label: 'Achieved', value: money(summary.achieved) },
+            { label: 'Due', value: money(summary.due) },
+            { label: 'Visits', value: String(visitCount) },
+          ].map((card) => (
+            <div key={card.label} className={`rep-kpi${card.dark ? ' rep-kpi--dk' : ''}`}>
+              <small>{card.label}</small>
+              <b>{loading ? <Skeleton width={70} height={22} /> : card.value}</b>
+            </div>
+          ))}
+        </div>
+
+        {/* Views */}
+        <div className="rep-tabs" role="tablist" aria-label="Report">
+          {TABS.map((tab) => (
+            <button key={tab.key} type="button" role="tab" aria-selected={activeTab === tab.key} className={`rep-tab${activeTab === tab.key ? ' on' : ''}`} onClick={() => setActiveTab(tab.key)}>
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {activeTab === 'states' && <SalesByState from={periodRange.from} to={periodRange.to} />}
@@ -467,22 +483,6 @@ const AnalyticsReports = () => {
         {/* ===== Target Achievement ===== */}
         {activeTab === 'targets' && (
           <>
-            <div className="dash-row analytics-summary grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
-              {[
-                { label: 'Total Target', value: money(summary.total) },
-                { label: 'Achieved', value: money(summary.achieved) },
-                { label: 'Due', value: money(summary.due) },
-                { label: 'Completed %', value: `${summary.pct}%` },
-              ].map((card) => (
-                <div key={card.label} className="dash-card metric analytics-card flex flex-col gap-1 bg-surface border border-border rounded-lg shadow-sm p-5 col-span-1 sm:col-span-6 lg:col-span-3">
-                  <h4 className="m-0 text-xs font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle">{card.label}</h4>
-                  <div className="metric-value text-xl font-bold leading-tight tracking-[-0.01em] text-text tabular-nums">
-                    {loading ? <Skeleton width={90} height={24} /> : card.value}
-                  </div>
-                </div>
-              ))}
-            </div>
-
             {!loading && bySalesman.length > 0 && (
               <div className="dash-row">
                 <div className="dash-card full an-bars">
@@ -503,12 +503,30 @@ const AnalyticsReports = () => {
             <div className="dash-row">
               <div className="dash-card full">
                 {loadError && !loading ? backendDown : (!loading && targetRows.length === 0) ? (
-                  <div className="ui-state ui-state--empty">
-                    <p className="ui-state__title">{targets.length ? `No targets in ${periodLabel.toLowerCase()}` : 'No targets yet'}</p>
-                    <p className="ui-state__desc">{targets.length ? 'Pick a longer period to see more.' : 'Salesman targets and their achievement will show here once created.'}</p>
+                  <div className="ui-state ui-state--empty rep-empty">
+                    <p className="ui-state__title">{targets.length ? `No targets in ${periodLabel.toLowerCase()}` : 'No targets set yet'}</p>
+                    <p className="ui-state__desc">{targets.length ? 'Pick a longer period to see more.' : (isSalesman ? 'Your manager sets your target. It will show here with how much you have done. Your visits and sales are still shown.' : 'Set a target for a salesman and the progress will show here. Sales by state and Visits already work.')}</p>
+                    <div className="rep-empty__actions">
+                      <button type="button" className="gbtn" onClick={() => setActiveTab('states')}>See sales by state</button>
+                      <button type="button" className="gbtn" onClick={() => setActiveTab('checkins')}>See visits</button>
+                    </div>
                   </div>
                 ) : (
-                  <TableWithControls title="Target Achievement" columns={targetColumns} rows={targetRows} itemName="Target" loading={loading} selectable={false} />
+                  <>
+                    <ul className="rep-cards">
+                      {targetRows.map((r) => (
+                        <li key={r.id} className="rep-cardrow">
+                          <div className="rep-cardrow__top"><b>{r.salesman}</b><StatusBadge status={String(r.status).toLowerCase()}>{String(r.status).toUpperCase()}</StatusBadge></div>
+                          <div className="rep-cardrow__sub">{r.type} · {r.period}</div>
+                          <Progress pct={r.progress} />
+                          <div className="rep-cardrow__nums"><span>Target {r.target}</span><span>Achieved {r.achieved}</span></div>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="rep-table">
+                      <TableWithControls title="Target achievement" columns={targetColumns} rows={targetRows} itemName="Target" loading={loading} selectable={false} />
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -521,12 +539,24 @@ const AnalyticsReports = () => {
             <div className="dash-card full">
               {loadError && !loading ? backendDown : (!loading && checkinRows.length === 0) ? (
                 <div className="ui-state ui-state--empty">
-                  <p className="ui-state__title">{checkins.length ? `No visits in ${periodLabel.toLowerCase()}` : 'No visit reports yet'}</p>
+                  <p className="ui-state__title">{checkins.length ? `No visits in ${periodLabel.toLowerCase()}` : 'No visits yet'}</p>
                   <p className="ui-state__desc">{checkins.length ? 'Pick a longer period to see more.' : 'Salesman visit reports (with party and location) will show here.'}</p>
                 </div>
               ) : (
                 <>
-                  <TableWithControls title="Visit Report" columns={checkinColumns} rows={checkinRows} itemName="Visit Report" loading={loading} selectable={false} />
+                  <ul className="rep-cards">
+                    {checkinRows.map((r) => (
+                      <li key={r.id} className="rep-cardrow">
+                        <div className="rep-cardrow__top"><b>{r.party}</b><span className="rep-cardrow__date">{r.date}</span></div>
+                        <div className="rep-cardrow__sub">{r.salesman} · {r.type === 'ordered' ? 'Order' : 'Visit'}</div>
+                        {r.type === 'ordered' && <div className="rep-cardrow__nums"><span>{r.qty} frames</span><span>{r.amount}</span></div>}
+                        {r.reason !== '—' && <div className="rep-cardrow__note">{r.reason}</div>}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="rep-table">
+                    <TableWithControls title="Visits" columns={checkinColumns} rows={checkinRows} itemName="Visit" loading={loading} selectable={false} />
+                  </div>
                   {!loading && (
                     <div className="ui-state__desc" style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', padding: '12px 0' }}>
                       <span>
