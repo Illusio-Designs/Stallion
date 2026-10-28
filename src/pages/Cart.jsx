@@ -415,7 +415,8 @@ const Cart = ({ onPageChange = null }) => {
         // /parties/my. (getPartiesByZoneId / getParties are not used here — the
         // backend scopes /parties/my from the JWT for party/distributor/salesman.)
         console.log('[Cart] Fetching my parties for', orderType);
-        const partiesData = await getMyParties();
+        // Event orders: any party. Visit and WhatsApp orders: only the salesman's working states.
+        const partiesData = await getMyParties(isSalesman && orderType === 'event_order' ? { scope: 'event' } : undefined);
         setParties(Array.isArray(partiesData) ? partiesData : []);
         console.log('[Cart] Fetched my parties:', partiesData.length, 'parties');
 
@@ -823,7 +824,7 @@ const Cart = ({ onPageChange = null }) => {
             // /parties/my (getParties / POST /parties/get is manager-only).
             let allParties = [];
             try {
-              const partiesResp = await getMyParties();
+              const partiesResp = await getMyParties(isSalesman && orderType === 'event_order' ? { scope: 'event' } : undefined);
               allParties = Array.isArray(partiesResp) ? partiesResp : [];
             } catch (err) {
               console.warn('[Cart] Failed to fetch parties:', err);
