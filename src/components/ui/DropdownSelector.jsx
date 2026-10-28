@@ -46,9 +46,11 @@ export default function DropdownSelector({
   const filteredOptions = serverSearch
     ? options
     : (searchQuery
-        ? options.filter(opt =>
-            opt.label.toLowerCase().includes(searchQuery.toLowerCase())
-          )
+        ? options.filter(opt => {
+            const label = String(opt.label).toLowerCase();
+            const q = searchQuery.toLowerCase();
+            return label.includes(q) || label.replace(/\s+/g, '').includes(q.replace(/\s+/g, ''));
+          })
         : options);
 
   // Close dropdown when clicking outside

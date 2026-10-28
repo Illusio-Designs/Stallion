@@ -53,8 +53,8 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
       const inside = (wrap.current && wrap.current.contains(e.target)) || (listRef.current && listRef.current.contains(e.target));
       if (!inside) setOpen(false);
     };
-    document.addEventListener('mousedown', away);
-    return () => document.removeEventListener('mousedown', away);
+    document.addEventListener('pointerdown', away);
+    return () => document.removeEventListener('pointerdown', away);
   }, []);
 
   // The list is drawn on the page itself (not inside the side panel), so the panel's footer or its
@@ -65,7 +65,9 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
       const el = areaRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
-      const below = window.innerHeight - r.bottom - 8;
+      const vv = window.visualViewport;
+      const viewH = vv ? vv.height + vv.offsetTop : window.innerHeight; // the phone keyboard shrinks the visible area
+      const below = viewH - r.bottom - 8;
       const above = r.top - 8;
       const up = below < 200 && above > below;
       setPos({
@@ -79,7 +81,8 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
     place();
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
-    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
+    window.visualViewport?.addEventListener('resize', place);
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); window.visualViewport?.removeEventListener('resize', place); };
   }, [open, items.length]);
 
   const choose = async (item) => {
@@ -135,7 +138,8 @@ export default function AddressAutocomplete({ value, onChange, onPick, placehold
               role="option"
               aria-selected={i === active}
               className={`addr-ac__item${i === active ? ' is-active' : ''}`}
-              onMouseDown={(e) => { e.preventDefault(); choose(it); }}
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => choose(it)}
             >
               <b>{it.main || it.text}</b>
               {it.secondary && <span>{it.secondary}</span>}

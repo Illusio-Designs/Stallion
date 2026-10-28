@@ -1038,21 +1038,18 @@ const DashboardTray = () => {
                                   </td>
                                   <td className="p-3">
                                     <div className="flex items-center gap-2">
-                                      <select
-                                        className="ui-input"
-                                        aria-label="Move this piece to"
+                                      <DropdownSelector
+                                        options={[
+                                          { value: '__warehouse', label: 'Warehouse' },
+                                          ...trays
+                                            .filter((t) => (t.tray_id || t.id) !== selectedTray && t.tray_status !== 'inactive' && t.is_active !== false)
+                                            .map((t) => ({ value: t.tray_id || t.id, label: t.tray_name || t.name })),
+                                        ]}
                                         value=""
+                                        placeholder="Move to…"
                                         disabled={saving}
-                                        onChange={(e) => handleMoveProduct(tp, e.target.value === '__warehouse' ? '' : e.target.value)}
-                                      >
-                                        <option value="" disabled>Move to…</option>
-                                        <option value="__warehouse">Warehouse</option>
-                                        {trays
-                                          .filter((t) => (t.tray_id || t.id) !== selectedTray && t.tray_status !== 'inactive' && t.is_active !== false)
-                                          .map((t) => (
-                                            <option key={t.tray_id || t.id} value={t.tray_id || t.id}>{t.tray_name || t.name}</option>
-                                          ))}
-                                      </select>
+                                        onChange={(v) => handleMoveProduct(tp, v === '__warehouse' ? '' : v)}
+                                      />
                                       <RowActions
                                         onEdit={() => startEditProduct(tp)}
                                         onDelete={() => handleRemoveProduct(tp)}

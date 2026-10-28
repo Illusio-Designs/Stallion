@@ -1,3 +1,4 @@
+import DropdownSelector from '../components/ui/DropdownSelector';
 import React, { useMemo, useState, useEffect } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
@@ -1002,19 +1003,18 @@ const DashboardOrders = () => {
                   {partlyCancel && (
                     <p className="ordn-note">{unsentQty} of {counts.total} pieces have not been sent. Cancelling returns them to stock. The {counts.shipped} pieces already sent are not affected.</p>
                   )}
-                  <label className="ordn-dispatch__field">
+                  <div className="ordn-dispatch__field">
                     <span className="ui-label">Reason (required)</span>
-                    <select
-                      className="ui-input"
+                    <DropdownSelector
+                      options={CANCEL_REASONS.map((r) => ({ value: r, label: r }))}
                       value={cancelChoice}
+                      onChange={(v) => { setCancelChoice(v); setCancelError(''); }}
+                      placeholder="Choose a reason"
                       disabled={busy}
-                      aria-invalid={!!cancelError}
-                      onChange={(e) => { setCancelChoice(e.target.value); setCancelError(''); }}
-                    >
-                      <option value="">Choose a reason</option>
-                      {CANCEL_REASONS.map((r) => <option key={r} value={r}>{r}</option>)}
-                    </select>
-                  </label>
+                      searchable={false}
+                      className="ui-dropdown-custom--full-width"
+                    />
+                  </div>
                   {cancelChoice === 'Other' && (
                     <label className="ordn-dispatch__field">
                       <span className="ui-label">Write the reason</span>
