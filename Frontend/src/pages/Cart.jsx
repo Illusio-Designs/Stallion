@@ -1431,38 +1431,30 @@ const Cart = ({ onPageChange = null }) => {
               {/* Order Type Dropdown - Only for Salesman */}
               {isSalesman && (
                 <div className="form-group flex flex-col gap-2">
-                  <label htmlFor="order-type" className="form-label text-[length:var(--text-sm)] font-medium text-text">Order Type</label>
-                  <div className="cart-radio-group" role="radiogroup" aria-label="Order type">
-                    {[
-                      { value: 'visit_order', label: 'Visit order, at the shop' },
+                  <label className="form-label text-[length:var(--text-sm)] font-medium text-text">Order Type</label>
+                  <DropdownSelector
+                    options={[
+                      { value: 'visit_order', label: 'Visit' },
                       { value: 'whatsapp_order', label: 'WhatsApp order' },
                       { value: 'event_order', label: 'Event order' },
-                    ].map((opt) => (
-                      <label key={opt.value} className={`cart-radio${orderType === opt.value ? ' is-on' : ''}`}>
-                        <input
-                          type="radio"
-                          name="order-type"
-                          value={opt.value}
-                          checked={orderType === opt.value}
-                          onChange={() => {
-                            const newOrderType = opt.value;
-                            setOrderType(newOrderType);
-                            // Reset party and event when order type changes
-                            setSelectedParty("");
-                            setSelectedEvent("");
-                            // Reset country (not needed for salesman, but clean up state)
-                            setSelectedCountry("");
-                            // Clear events if switching away from event_order
-                            if (newOrderType !== 'event_order') {
-                              setEvents([]);
-                            }
-                          }}
-                        />
-                        <span className="cart-radio-dot" aria-hidden="true"></span>
-                        {opt.label}
-                      </label>
-                    ))}
-                  </div>
+                    ]}
+                    value={orderType}
+                    onChange={(newOrderType) => {
+                      setOrderType(newOrderType);
+                      // Reset party and event when order type changes
+                      setSelectedParty("");
+                      setSelectedEvent("");
+                      // Reset country (not needed for salesman, but clean up state)
+                      setSelectedCountry("");
+                      // Clear events if switching away from event_order
+                      if (newOrderType !== 'event_order') {
+                        setEvents([]);
+                      }
+                    }}
+                    placeholder="Select order type"
+                    searchable={false}
+                    className="ui-dropdown-custom--full-width"
+                  />
                 </div>
               )}
 
