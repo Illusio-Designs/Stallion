@@ -5,9 +5,9 @@ import 'react-international-phone/style.css';
 import AsidePanel from '../components/ui/AsidePanel';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import RowActions from '../components/ui/RowActions';
-import StatusBadge from '../components/ui/StatusBadge';
-import TableWithControls from '../components/ui/TableWithControls';
+import Pagination from '../components/ui/Pagination';
+import { HugeiconsIcon } from '@hugeicons/react';
+import { Add01Icon, Call02Icon, Download01Icon, Location01Icon, MoreHorizontalIcon, PencilEdit02Icon, RefreshIcon, Search01Icon, Upload01Icon } from '@hugeicons/core-free-icons';
 import {
   bulkUploadParties,
   createParty,
@@ -28,8 +28,10 @@ import { captureCurrentPosition } from '../utils/geolocation';
 import { downloadCsv } from '../utils/exportCsv';
 import '../styles/redesign-n-party.css';
 import '../styles/redesign-n-headings.css';
-import GooeySearch from '../components/ui/GooeySearch';
+import '../styles/redesign-p-party.css';
 import AddressAutocomplete from '../components/ui/AddressAutocomplete';
+
+const splitNames = (v) => String(v || '').split(',').map((n) => n.trim()).filter((n) => n && n !== '—');
 
 const DashboardClients = () => {
   const confirm = useConfirm();
@@ -357,40 +359,6 @@ const DashboardClients = () => {
     fetchPartiesForCountry(selectedCountryFilter);
   }, [selectedCountryFilter, defaultCountryResolved, fetchPartiesForCountry]);
 
-  const columns = useMemo(() => ([
-    {
-      key: 'party_name', label: 'PARTY', render: (v, row) => (
-        <span className="party-who">
-          <span className="party-who__pic" aria-hidden="true">{String(v || '?').trim().charAt(0).toUpperCase()}</span>
-          <span className="party-who__name">{v}</span>
-          {!row.isActive && <span className="party-who__off">Inactive</span>}
-        </span>
-      )
-    },
-    { key: 'cityLabel', label: 'CITY' },
-    {
-      key: 'salesmanLabel', label: 'SALESMAN', render: (v) => {
-        const names = String(v || '').split(',').map((n) => n.trim()).filter((n) => n && n !== '—');
-        return names.length === 0 ? '—' : (
-          <span className="sm-pills">{names.map((n) => <span key={n} className="sm-pill">{n}</span>)}</span>
-        );
-      }
-    },
-    {
-      key: 'locationLabel', label: 'LOCATION', render: (v, row) => (
-        <span className={`loc-pill loc-pill--${row.locationState}`}>{v}</span>
-      )
-    },
-    { key: 'creditLabel', label: 'CREDIT DAYS', render: (v) => <span className="party-credit">{v}</span> },
-    {
-      key: 'action', label: 'ACTION', render: (_v, row) => (
-        <RowActions
-          onEdit={canEditParty ? () => handleEdit(row) : undefined}
-        />
-      )
-    },
-  ]), [canEditParty, isPartyManager]);
-
   const rows = useMemo(() => {
     // CRITICAL: Backend returns wrong data, so we MUST filter strictly by country_id
     let filteredParties = [];
@@ -427,6 +395,7 @@ const DashboardClients = () => {
         ...party,
         id: partyId, // Ensure ID is preserved with consistent field name
         isActive: party.is_active !== false,
+        stateLabel: (typeof party.state === 'string' ? party.state : party.state?.name) || party.state_name || '',
         cityLabel: (typeof party.city === 'string' ? party.city : party.city?.name) || party.city_name || '—',
         salesmanLabel: party.salesman?.full_name || party.salesman?.salesman_name || party.salesman_name || '—',
         locationState: party.location_source === 'verified' ? 'ok'
@@ -438,25 +407,91 @@ const DashboardClients = () => {
     });
   }, [parties, selectedCountryFilter, isSalesman, isDistributor]);
 
-  const rowsByTab = useMemo(() => {
-    if (activeTab === 'Activate') return rows.filter(r => r.isActive);
-    if (activeTab === 'Deactivate') return rows.filter(r => !r.isActive);
-    return rows;
-  }, [rows, activeTab]);
-
-  // List tools (display only): client-side search over loaded rows.
+  // List tools (display only): tabs, search, filters, sort and paging over the loaded rows.
   const [partySearch, setPartySearch] = useState('');
   const [partyQuery, setPartyQuery] = useState(''); // debounced copy of partySearch
+  const [stateFilter, setStateFilter] = useState('');
+  const [salesmanFilter, setSalesmanFilter] = useState('');
+  const [sortBy, setSortBy] = useState(null);
+  const [sortDir, setSortDir] = useState('asc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [moreFor, setMoreFor] = useState(null); // { row, top, left }
   useEffect(() => {
     const t = setTimeout(() => setPartyQuery(partySearch), 250);
     return () => clearTimeout(t);
   }, [partySearch]);
+  // The search box in the top bar (global search) also searches this list.
+  useEffect(() => {
+    const handler = (e) => setPartySearch((e.detail?.query || '').trim());
+    window.addEventListener('globalSearchChanged', handler);
+    return () => window.removeEventListener('globalSearchChanged', handler);
+  }, []);
+
+  const rowsByTab = useMemo(() => {
+    if (activeTab === 'Active') return rows.filter(r => r.isActive);
+    if (activeTab === 'No location') return rows.filter(r => r.locationState === 'idle');
+    if (activeTab === 'Inactive') return rows.filter(r => !r.isActive);
+    return rows;
+  }, [rows, activeTab]);
+  const tabCounts = useMemo(() => ({
+    All: rows.length,
+    Active: rows.filter(r => r.isActive).length,
+    'No location': rows.filter(r => r.locationState === 'idle').length,
+    Inactive: rows.filter(r => !r.isActive).length,
+  }), [rows]);
+  const stateOptions = useMemo(() => [...new Set(rows.map(r => r.stateLabel).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [rows]);
+  const salesmanOptions = useMemo(() => [...new Set(rows.flatMap(r => splitNames(r.salesmanLabel)))].sort((a, b) => a.localeCompare(b)), [rows]);
+
   // The list endpoints return every page of the user's parties, so search runs over the loaded rows.
-  const filteredRowsByTab = useMemo(() => searchRows(
+  const searchedRows = useMemo(() => searchRows(
     rowsByTab,
     partyQuery,
     (r) => [r.party_name, r.trade_name, r.contact_person, r.phone, r.cityLabel, r.state_name, r.salesmanLabel, r.gstin, r.pincode],
   ), [rowsByTab, partyQuery]);
+  const filteredRowsByTab = useMemo(() => {
+    let out = searchedRows;
+    if (stateFilter) out = out.filter(r => r.stateLabel === stateFilter);
+    if (salesmanFilter) out = out.filter(r => splitNames(r.salesmanLabel).includes(salesmanFilter));
+    if (sortBy) {
+      const val = (r) => (sortBy === 'credit_days' ? Number(r.credit_days) || 0 : String(r[sortBy] ?? '').toLowerCase());
+      out = [...out].sort((x, y) => {
+        const a = val(x); const b = val(y);
+        const c = typeof a === 'number' ? a - b : String(a).localeCompare(String(b));
+        return sortDir === 'asc' ? c : -c;
+      });
+    }
+    return out;
+  }, [searchedRows, stateFilter, salesmanFilter, sortBy, sortDir]);
+  const pageCount = Math.max(1, Math.ceil(filteredRowsByTab.length / pageSize));
+  const safePage = Math.min(page, pageCount);
+  const pageRows = useMemo(
+    () => filteredRowsByTab.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [filteredRowsByTab, safePage, pageSize],
+  );
+  const toggleSort = (key) => {
+    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else { setSortBy(key); setSortDir('asc'); }
+    setPage(1);
+  };
+  const openMore = (e, row) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const w = 200;
+    setMoreFor({ row, top: Math.min(r.bottom + 4, window.innerHeight - 140), left: Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8)) });
+  };
+  useEffect(() => {
+    if (!moreFor) return undefined;
+    const close = () => setMoreFor(null);
+    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [moreFor]);
   const handleExportParties = () => {
     downloadCsv('parties', [
       { label: 'Party name', value: r => r.party_name },
@@ -1285,243 +1320,134 @@ const DashboardClients = () => {
 
   const isPartyFormOpen = openAdd || !!editRow;
 
+  const partyField = (label, req, node, hint) => (
+    <div className="pf-field">
+      <label className="ui-label">{label}{req ? ' *' : ''}</label>
+      {node}
+      {hint}
+    </div>
+  );
+  const creditLocked = !!editRow && !isPartyManager;
+
   const renderPartyFormFields = () => (
-    <>
-      <div className="form-group form-group--full party-form__section"><h5>Party details</h5></div>
-      <div className="form-group">
-        <label className="ui-label">Party Name *</label>
-        <input
-          className="ui-input"
-          placeholder="Party name"
-          value={formData.party_name}
-          onChange={(e) => handleInputChange('party_name', e.target.value)}
-          required
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Trade Name *</label>
-        <input
-          className="ui-input"
-          placeholder="Trade name"
-          value={formData.trade_name}
-          onChange={(e) => handleInputChange('trade_name', e.target.value)}
-          required
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Contact Person *</label>
-        <input
-          className="ui-input"
-          placeholder="Contact person"
-          value={formData.contact_person}
-          onChange={(e) => handleInputChange('contact_person', e.target.value)}
-          required
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Email</label>
-        <input
-          className="ui-input"
-          type="email"
-          placeholder="Email (optional)"
-          value={formData.email}
-          onChange={(e) => handleInputChange('email', e.target.value)}
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Phone *</label>
-        <PhoneInput
-          defaultCountry="in"
-          value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
-          onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
-          className="phone-intl"
-          inputProps={{
-            required: true,
-            placeholder: 'Enter your phone number',
-          }}
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Preferred Courier *</label>
-        <input
-          className="ui-input"
-          placeholder="Preferred Courier"
-          value={formData.prefered_courier}
-          onChange={(e) => handleInputChange('prefered_courier', e.target.value)}
-        />
-      </div>
-      <div className="form-group form-group--full party-form__section"><h5>Shipping address</h5></div>
-      <div className="form-group form-group--full">
-        <label className="ui-label">Address *</label>
-        <AddressAutocomplete
-          value={formData.address}
-          onChange={(text) => setFormData(prev => ({ ...prev, address: text, address_lat: null, address_lng: null }))}
-          onPick={handleAddressPick}
-          showStatus={isAdmin || userRole === 'party_manager' || userRole === 'sales_manager'}
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Country *</label>
-        <DropdownSelector
-          options={[
-            { value: '', label: 'Select Country' },
-            ...countries.map((country) => ({
-              value: country.id,
-              label: country.name,
-            })),
-          ]}
-          value={formData.country_id || ''}
-          onChange={(value) => handleInputChange('country_id', value || '')}
-          onOpen={fetchCountries}
-          placeholder="Select Country"
-          className="ui-dropdown-custom--full-width"
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">State *</label>
-        <DropdownSelector
-          options={[
-            { value: '', label: 'Select State' },
-            ...states.map((state) => ({
-              value: state.id,
-              label: state.name,
-            })),
-          ]}
-          value={formData.state_id || ''}
-          onChange={(value) => handleInputChange('state_id', value || '')}
-          placeholder="Select State"
-          disabled={!formData.country_id}
-          className="ui-dropdown-custom--full-width"
-        />
-        {!formData.country_id && (
-          <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a country first</small>
-        )}
-      </div>
-      <div className="form-group">
-        <label className="ui-label">City *</label>
-        <DropdownSelector
-          options={[
-            { value: '', label: 'Select City' },
-            ...cities.map((city) => ({
-              value: city.id,
-              label: city.name,
-            })),
-          ]}
-          value={formData.city_id || ''}
-          onChange={(value) => handleInputChange('city_id', value || '')}
-          placeholder="Select City"
-          disabled={!formData.state_id}
-          className="ui-dropdown-custom--full-width"
-        />
-        {!formData.state_id && (
-          <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a state first</small>
-        )}
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Zone</label>
-        <DropdownSelector
-          options={[
-            { value: '', label: 'Select Zone' },
-            ...zones.map((zone) => ({
-              value: zone.id,
-              label: zone.name,
-            })),
-          ]}
-          value={formData.zone_id || ''}
-          onChange={(value) => handleInputChange('zone_id', value || '')}
-          placeholder="Select Zone"
-          disabled={!formData.city_id}
-          className="ui-dropdown-custom--full-width"
-        />
-        {!formData.city_id && (
-          <small className="block mt-2 text-xs leading-snug text-text-subtle">Please select a city first</small>
-        )}
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Pincode *</label>
-        <input
-          className="ui-input"
-          placeholder="Pincode"
-          value={formData.pincode}
-          onChange={(e) => handleInputChange('pincode', e.target.value)}
-        />
-      </div>
-      <div className="form-group form-group--full party-form__section"><h5>Billing address</h5></div>
-      <div className="form-group form-group--full">
-        <label className="flex cursor-pointer items-center gap-2">
-          <input
-            type="checkbox"
-            className="accent-primary"
-            checked={formData.billing_same_as_shipping !== false}
-            onChange={(e) => handleInputChange('billing_same_as_shipping', e.target.checked)}
-          />
-          <span className="ui-label m-0">Billing address same as shipping</span>
-        </label>
-      </div>
-      {formData.billing_same_as_shipping === false && (
-        <div className="form-group form-group--full">
-          <label className="ui-label">Billing Address</label>
-          <textarea
-            className="ui-input"
-            rows={2}
-            style={{ minHeight: 64, resize: 'vertical', lineHeight: 1.4 }}
-            placeholder="Billing address"
-            value={formData.billing_address}
-            onChange={(e) => handleInputChange('billing_address', e.target.value)}
-          />
-        </div>
-      )}
-      <div className="form-group form-group--full party-form__section"><h5>GST, PAN and credit</h5></div>
-      <div className="form-group">
-        <label className="ui-label">GSTIN</label>
-        <input
-          disabled={!!editRow && !isPartyManager}
-          className="ui-input"
-          placeholder="GSTIN"
-          value={formData.gstin}
-          onChange={(e) => handleInputChange('gstin', e.target.value)}
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">PAN</label>
-        <input
-          disabled={!!editRow && !isPartyManager}
-          className="ui-input"
-          placeholder="PAN"
-          value={formData.pan}
-          onChange={(e) => handleInputChange('pan', e.target.value)}
-        />
-      </div>
-      <div className="form-group">
-        <label className="ui-label">Credit Days</label>
-        <input
-          disabled={!!editRow && !isPartyManager}
-          className="ui-input"
-          type="number"
-          placeholder="Credit Days"
-          value={formData.credit_days}
-          onChange={(e) => handleInputChange('credit_days', e.target.value)}
-          min="0"
-        />
-      </div>
-      {!isPartyManager && (
-        <div className="form-group form-group--full">
-          <p className="ord-view__lock party-form__lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Login status, credit days, GSTIN and PAN can be changed by admin, party and sales managers only.</span></p>
-        </div>
-      )}
-      {editRow && isAdmin && (
-        <div className="form-group form-group--full">
-          <label className="flex cursor-pointer items-center gap-2">
-            <input
-              type="checkbox"
-              className="accent-primary"
-              checked={formData.is_active !== false}
-              onChange={(e) => handleInputChange('is_active', e.target.checked)}
+    <div className="pf">
+      <section className="pf-sec" aria-labelledby="pf-h-party">
+        <h3 id="pf-h-party" className="pf-sec__h">Party</h3>
+        <p className="pf-sec__d">Who the shop is and how to reach it.</p>
+        <div className="pf-grid">
+          {partyField('Party name', true, (
+            <input className="ui-input" placeholder="Party name" value={formData.party_name}
+              onChange={(e) => handleInputChange('party_name', e.target.value)} required />
+          ))}
+          {partyField('Trade name', true, (
+            <input className="ui-input" placeholder="Trade name" value={formData.trade_name}
+              onChange={(e) => handleInputChange('trade_name', e.target.value)} required />
+          ))}
+          {partyField('Contact person', true, (
+            <input className="ui-input" placeholder="Contact person" value={formData.contact_person}
+              onChange={(e) => handleInputChange('contact_person', e.target.value)} required />
+          ))}
+          {partyField('Phone', true, (
+            <PhoneInput
+              defaultCountry="in"
+              value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
+              onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
+              className="phone-intl"
+              inputProps={{ required: true, placeholder: 'Enter your phone number' }}
             />
-            <span className="ui-label m-0">Active (uncheck to deactivate)</span>
-          </label>
+          ))}
+          {partyField('Email', false, (
+            <input className="ui-input" type="email" placeholder="Optional" value={formData.email}
+              onChange={(e) => handleInputChange('email', e.target.value)} />
+          ))}
         </div>
-      )}
+      </section>
+
+      <section className="pf-sec" aria-labelledby="pf-h-ship">
+        <h3 id="pf-h-ship" className="pf-sec__h">Shipping address</h3>
+        <p className="pf-sec__d">Search once and the rest fills in.</p>
+        <div className="pf-grid">
+          <div className="pf-field pf-field--full">
+            <label className="ui-label">Address *</label>
+            <AddressAutocomplete
+              value={formData.address}
+              onChange={(text) => setFormData(prev => ({ ...prev, address: text, address_lat: null, address_lng: null }))}
+              onPick={handleAddressPick}
+              showStatus={isAdmin || userRole === 'party_manager' || userRole === 'sales_manager'}
+            />
+          </div>
+          {partyField('Country', true, (
+            <DropdownSelector
+              options={[{ value: '', label: 'Select Country' }, ...countries.map((country) => ({ value: country.id, label: country.name }))]}
+              value={formData.country_id || ''}
+              onChange={(value) => handleInputChange('country_id', value || '')}
+              onOpen={fetchCountries}
+              placeholder="Select Country"
+              className="ui-dropdown-custom--full-width"
+            />
+          ))}
+          {partyField('State', true, (
+            <DropdownSelector
+              options={[{ value: '', label: 'Select State' }, ...states.map((state) => ({ value: state.id, label: state.name }))]}
+              value={formData.state_id || ''}
+              onChange={(value) => handleInputChange('state_id', value || '')}
+              placeholder="Select State"
+              disabled={!formData.country_id}
+              className="ui-dropdown-custom--full-width"
+            />
+          ), !formData.country_id && <small className="pf-hint">Please select a country first</small>)}
+          {partyField('City', true, (
+            <DropdownSelector
+              options={[{ value: '', label: 'Select City' }, ...cities.map((city) => ({ value: city.id, label: city.name }))]}
+              value={formData.city_id || ''}
+              onChange={(value) => handleInputChange('city_id', value || '')}
+              placeholder="Select City"
+              disabled={!formData.state_id}
+              className="ui-dropdown-custom--full-width"
+            />
+          ), !formData.state_id && <small className="pf-hint">Please select a state first</small>)}
+          {partyField('Pincode', true, (
+            <input className="ui-input" inputMode="numeric" placeholder="Pincode" value={formData.pincode}
+              onChange={(e) => handleInputChange('pincode', e.target.value)} />
+          ))}
+          {partyField('Zone', false, (
+            <DropdownSelector
+              options={[{ value: '', label: 'Select Zone' }, ...zones.map((zone) => ({ value: zone.id, label: zone.name }))]}
+              value={formData.zone_id || ''}
+              onChange={(value) => handleInputChange('zone_id', value || '')}
+              placeholder="Select Zone"
+              disabled={!formData.city_id}
+              className="ui-dropdown-custom--full-width"
+            />
+          ), !formData.city_id && <small className="pf-hint">Please select a city first</small>)}
+          <div className="pf-field pf-field--full">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={formData.billing_same_as_shipping !== false}
+              className={`pf-switch ${formData.billing_same_as_shipping !== false ? 'is-on' : ''}`}
+              onClick={() => handleInputChange('billing_same_as_shipping', formData.billing_same_as_shipping === false)}
+            >
+              <span className="pf-switch__track" aria-hidden="true"><span className="pf-switch__dot" /></span>
+              <span className="pf-switch__text">
+                <b>Billing address is the same</b>
+                <small>Turn off to enter a different billing address</small>
+              </span>
+            </button>
+          </div>
+          {formData.billing_same_as_shipping === false && (
+            <div className="pf-field pf-field--full">
+              <label className="ui-label">Billing address</label>
+              <textarea
+                className="ui-input"
+                rows={2}
+                style={{ minHeight: 64, resize: 'vertical', lineHeight: 1.4 }}
+                placeholder="Billing address"
+                value={formData.billing_address}
+                onChange={(e) => handleInputChange('billing_address', e.target.value)}
+              />
+            </div>
+          )}
       {(isAdmin || isSalesman || isDistributor || userRole === 'party_manager' || userRole === 'sales_manager') && (() => {
         const locLat = editRow?.latitude ?? formData.latitude;
         const locLng = editRow?.longitude ?? formData.longitude;
@@ -1533,7 +1459,7 @@ const DashboardClients = () => {
         const canRemoveLocation = !!editRow && hasLocationSet
           && (isAdmin || userRole === 'party_manager' || userRole === 'sales_manager');
         return (
-          <div className="form-group form-group--full party-loc">
+          <div className="pf-field pf-field--full party-loc">
             <label className="ui-label">Shop location</label>
             <div className="party-loc__chip">
               <span className={`loc-pill loc-pill--${isVerified || pickedNow ? 'ok' : hasLocationSet ? 'warn' : 'idle'}`}>
@@ -1574,65 +1500,191 @@ const DashboardClients = () => {
           </div>
         );
       })()}
-    </>
+        </div>
+      </section>
+
+      <section className="pf-sec" aria-labelledby="pf-h-terms">
+        <h3 id="pf-h-terms" className="pf-sec__h">Terms</h3>
+        <div className="pf-grid">
+          {partyField('Preferred courier', !editRow, (
+            <input className="ui-input" placeholder="Choose a courier" value={formData.prefered_courier}
+              onChange={(e) => handleInputChange('prefered_courier', e.target.value)} />
+          ))}
+          {partyField('Credit days', false, (
+            <input disabled={creditLocked} className="ui-input" type="number" inputMode="numeric" min="0"
+              placeholder={creditLocked ? 'Set by your manager' : 'Credit days'}
+              value={formData.credit_days} onChange={(e) => handleInputChange('credit_days', e.target.value)} />
+          ), creditLocked && <small className="pf-hint">Only managers can change this.</small>)}
+          {partyField('GSTIN', false, (
+            <input disabled={creditLocked} className="ui-input" placeholder="GSTIN" value={formData.gstin}
+              onChange={(e) => handleInputChange('gstin', e.target.value)} />
+          ))}
+          {partyField('PAN', false, (
+            <input disabled={creditLocked} className="ui-input" placeholder="PAN" value={formData.pan}
+              onChange={(e) => handleInputChange('pan', e.target.value)} />
+          ))}
+          {!isPartyManager && (
+            <div className="pf-field pf-field--full">
+              <p className="ord-view__lock party-form__lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Login status, credit days, GSTIN and PAN can be changed by admin, party and sales managers only.</span></p>
+            </div>
+          )}
+          {editRow && isAdmin && (
+            <div className="pf-field pf-field--full">
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formData.is_active !== false}
+                className={`pf-switch ${formData.is_active !== false ? 'is-on' : ''}`}
+                onClick={() => handleInputChange('is_active', formData.is_active === false)}
+              >
+                <span className="pf-switch__track" aria-hidden="true"><span className="pf-switch__dot" /></span>
+                <span className="pf-switch__text">
+                  <b>Active</b>
+                  <small>Switch off to make the party inactive. Nothing is deleted.</small>
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
+      </section>
+    </div>
   );
+
+  const partyMapHref = (row) => (
+    Number.isFinite(Number(row.latitude)) && row.latitude !== null && row.latitude !== ''
+      && Number.isFinite(Number(row.longitude)) && row.longitude !== null && row.longitude !== ''
+      ? `https://www.google.com/maps/search/?api=1&query=${Number(row.latitude)},${Number(row.longitude)}`
+      : null
+  );
+  const partyTel = (row) => {
+    const d = String(row.phone || '').replace(/[^\d+]/g, '');
+    return d ? `tel:${d.startsWith('+') ? d : `+${d}`}` : null;
+  };
+  const hasMore = (row) => !!(partyMapHref(row) || partyTel(row));
+
+  const pills = (v) => {
+    const names = splitNames(v);
+    return names.length === 0 ? <span className="pp-dash">—</span> : (
+      <span className="sm-pills">{names.map((n) => <span key={n} className="sm-pill">{n}</span>)}</span>
+    );
+  };
+  const whoCell = (row) => (
+    <span className="party-who">
+      <span className="party-who__pic" aria-hidden="true">{String(row.party_name || '?').trim().charAt(0).toUpperCase()}</span>
+      <span className="pp-who__text">
+        <span className="party-who__name">{row.party_name}</span>
+        <span className="pp-who__sub">{[row.cityLabel !== '—' ? row.cityLabel : '', row.stateLabel].filter(Boolean).join(', ')}</span>
+      </span>
+      {!row.isActive && <span className="party-who__off">Inactive</span>}
+    </span>
+  );
+  const rowButtons = (row) => (
+    <span className="pp-acts">
+      {canEditParty && (
+        <button type="button" className="pp-icon" aria-label={`Edit ${row.party_name || 'party'}`} onClick={() => handleEdit(row)}>
+          <HugeiconsIcon icon={PencilEdit02Icon} size={18} strokeWidth={1.8} />
+        </button>
+      )}
+      {hasMore(row) && (
+        <button type="button" className="pp-icon" aria-label={`More for ${row.party_name || 'party'}`} aria-haspopup="menu" onClick={(e) => openMore(e, row)}>
+          <HugeiconsIcon icon={MoreHorizontalIcon} size={18} strokeWidth={1.8} />
+        </button>
+      )}
+    </span>
+  );
+  const sortTh = (key, label, cls) => (
+    <th className={cls} aria-sort={sortBy === key ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" className="pp-th" onClick={() => toggleSort(key)}>
+        {label}<span aria-hidden="true">{sortBy === key ? (sortDir === 'asc' ? ' ↑' : ' ↓') : ''}</span>
+      </button>
+    </th>
+  );
+  const refresh = () => { setError(null); fetchPartiesForCountry(selectedCountryFilter); };
+  const listVisible = loading || (!error && filteredRowsByTab.length > 0);
 
   return (
     <div className="dash-page">
-      <div className="dash-container">
-        <div className="pg-head"><div><h1>Parties</h1><p>A shop's location comes from the address you pick. The first visit saves the exact spot.</p></div></div>
-        <div className="dash-row">
-          <div className="order-tabs-container">
-            {['All', 'Activate', 'Deactivate'].map(tab => (
-              <button
-                key={tab}
-                className={`order-tab flex-shrink-0 ${activeTab === tab ? 'active' : ''}`}
-                onClick={() => setActiveTab(tab)}
-              >
-                {tab}
-                <b className="order-tab__count">{tab === 'All' ? rows.length : tab === 'Activate' ? rows.filter(r => r.isActive).length : rows.filter(r => !r.isActive).length}</b>
+      <div className="dash-container pp">
+        <div className="pg-head pp-head">
+          <div><h1>Parties</h1><p>A shop&apos;s location comes from the address you pick. The first visit saves the exact spot.</p></div>
+          <div className="pp-actions">
+            <button type="button" className="gbtn" onClick={refresh} disabled={loading}>
+              <HugeiconsIcon icon={RefreshIcon} size={17} strokeWidth={1.8} /><span>Refresh</span>
+            </button>
+            {isPartyManager && (
+              <button type="button" className="gbtn" onClick={() => setOpenBulkUpload(true)}>
+                <HugeiconsIcon icon={Upload01Icon} size={17} strokeWidth={1.8} /><span>Bulk upload</span>
               </button>
-            ))}
+            )}
+            <button type="button" className="gbtn dark" onClick={handleAdd}>
+              <HugeiconsIcon icon={Add01Icon} size={17} strokeWidth={1.8} /><span>Add party</span>
+            </button>
           </div>
         </div>
-        <div className="dash-row party-tools">
-          <div className="gtools">
-            <GooeySearch
+
+        <div className="order-tabs-container pp-tabs" role="tablist" aria-label="Party status">
+          {['All', 'Active', 'No location', 'Inactive'].map(tab => (
+            <button
+              key={tab}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === tab}
+              className={`order-tab flex-shrink-0 ${activeTab === tab ? 'active' : ''}`}
+              onClick={() => { setActiveTab(tab); setPage(1); }}
+            >
+              {tab}
+              <b className="order-tab__count">{tabCounts[tab]}</b>
+            </button>
+          ))}
+        </div>
+
+        <div className="pp-tools">
+          <label className="pp-search">
+            <HugeiconsIcon icon={Search01Icon} size={18} strokeWidth={1.8} />
+            <input
+              type="search"
               value={partySearch}
-              onChange={setPartySearch}
-              placeholder="Search name, city, phone, salesman or GST"
-              label="Search parties"
-              openWidth={260}
-              rowOnPhone
+              onChange={(e) => { setPartySearch(e.target.value); setPage(1); }}
+              placeholder="Search name, city, phone or salesman"
+              aria-label="Search parties"
             />
-            <button type="button" className="gbtn" onClick={handleExportParties} disabled={loading || filteredRowsByTab.length === 0}>Export CSV</button>
-          </div>
-        </div>
-        <div className="dash-row">
-          <div className="dash-card full" style={{ maxWidth: 360 }}>
-            <label className="block mb-2 text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
-              Filter by Country
-            </label>
+          </label>
+          <div className="pp-filters">
             <DropdownSelector
-              options={[
-                { value: '', label: 'All Countries' },
-                ...countries.map(country => ({
-                  value: country.id,
-                  label: country.name
-                }))
-              ]}
+              options={[{ value: '', label: 'All countries' }, ...countries.map(country => ({ value: country.id, label: country.name }))]}
               value={selectedCountryFilter || ''}
               onChange={(newCountryId) => {
                 // Single source of truth; the effect above refetches (empty = All Countries)
                 setParties([]);
+                setStateFilter('');
+                setSalesmanFilter('');
+                setPage(1);
                 setSelectedCountryFilter(newCountryId || null);
               }}
               onOpen={fetchCountries}
-              placeholder="All Countries"
-              className="ui-dropdown-custom--full-width"
+              placeholder="All countries"
+              className="pp-dd"
             />
+            <DropdownSelector
+              options={[{ value: '', label: 'All states' }, ...stateOptions.map(n => ({ value: n, label: n }))]}
+              value={stateFilter}
+              onChange={(v) => { setStateFilter(v || ''); setPage(1); }}
+              placeholder="State"
+              className="pp-dd"
+            />
+            <DropdownSelector
+              options={[{ value: '', label: 'All salesmen' }, ...salesmanOptions.map(n => ({ value: n, label: n }))]}
+              value={salesmanFilter}
+              onChange={(v) => { setSalesmanFilter(v || ''); setPage(1); }}
+              placeholder="Salesman"
+              className="pp-dd"
+            />
+            <button type="button" className="gbtn pp-export" onClick={handleExportParties} disabled={loading || filteredRowsByTab.length === 0}>
+              <HugeiconsIcon icon={Download01Icon} size={17} strokeWidth={1.8} /><span>Export CSV</span>
+            </button>
           </div>
         </div>
+
         {!loading && error ? (
           <div className="dash-row">
             <div className="dash-card full">
@@ -1646,15 +1698,7 @@ const DashboardClients = () => {
                 </div>
                 <p className="ui-state__title">Couldn&apos;t load parties</p>
                 <p className="ui-state__desc">{error}</p>
-                <button
-                  className="ui-btn ui-btn--secondary"
-                  onClick={() => {
-                    setError(null);
-                    fetchPartiesForCountry(selectedCountryFilter);
-                  }}
-                >
-                  Try again
-                </button>
+                <button className="ui-btn ui-btn--secondary" onClick={refresh}>Try again</button>
               </div>
             </div>
           </div>
@@ -1673,52 +1717,112 @@ const DashboardClients = () => {
                 <p className="ui-state__title">{rows.length > 0 ? 'No matching parties' : 'No parties yet'}</p>
                 <p className="ui-state__desc">
                   {rows.length > 0
-                    ? 'Nothing matches the search or location filter. Clear it to see all parties.'
+                    ? 'Nothing matches the search or filters. Clear them to see all parties.'
                     : selectedCountryFilter
                     ? `No parties found for ${countries.find(c => String(c.id) === String(selectedCountryFilter))?.name || 'the selected country'}. Pick another country above, or add a new party.`
                     : 'No parties found. Pick a country above, or add a new party to get started.'}
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
-                  <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
-                    Add New Party
-                  </button>
+                  <button className="ui-btn ui-btn--primary" onClick={handleAdd}>Add party</button>
                   {isPartyManager && (
-                    <button className="ui-btn ui-btn--secondary" onClick={() => setOpenBulkUpload(true)}>
-                      Bulk Upload
-                    </button>
+                    <button className="ui-btn ui-btn--secondary" onClick={() => setOpenBulkUpload(true)}>Bulk upload</button>
                   )}
                 </div>
               </div>
             </div>
           </div>
         ) : null}
-        <div className="dash-row" style={(!loading && (error || filteredRowsByTab.length === 0)) ? { display: 'none' } : undefined}>
-          <div className="dash-card full party-n-table">
-            <TableWithControls
-              title="Party"
-              titleAs="h2"
-              columns={columns}
-              rows={filteredRowsByTab}
-              onAddNew={handleAdd}
-              addNewText="Add New Party"
-              onImport={isPartyManager ? () => setOpenBulkUpload(true) : undefined}
-              importText="Bulk Upload"
-              secondaryActions={[
-                {
-                  label: 'Refresh',
-                  onClick: () => { setError(null); fetchPartiesForCountry(selectedCountryFilter); }
-                }
-              ]}
-              showFilter={false}
-              loading={loading}
-            />
+
+        {listVisible && (
+          <div className="dash-card full party-n-table pp-list">
+            {/* Phone: one card per party */}
+            <ul className="pp-cards" aria-busy={loading}>
+              {loading
+                ? Array.from({ length: 5 }, (_, i) => <li key={i} className="pp-card pp-card--sk" aria-hidden="true" />)
+                : pageRows.map((row, i) => (
+                  <li key={row.id || i} className="pp-card">
+                    <div className="pp-card__top">
+                      {whoCell(row)}
+                      {rowButtons(row)}
+                    </div>
+                    <div className="pp-card__mid">{pills(row.salesmanLabel)}</div>
+                    <div className="pp-card__foot">
+                      <span className={`loc-pill loc-pill--${row.locationState}`}>{row.locationLabel}</span>
+                      <span className="party-credit">Credit {row.creditLabel}</span>
+                    </div>
+                  </li>
+                ))}
+            </ul>
+
+            {/* Tablet and desktop: table */}
+            <div className="pp-table">
+              <table>
+                <thead>
+                  <tr>
+                    {sortTh('party_name', 'Party', 'pp-c-party')}
+                    {sortTh('cityLabel', 'City', 'pp-c-city')}
+                    {sortTh('salesmanLabel', 'Salesman', 'pp-c-sm')}
+                    {sortTh('locationLabel', 'Location', 'pp-c-loc')}
+                    {sortTh('credit_days', 'Credit days', 'pp-c-credit')}
+                    <th className="pp-c-act"><span className="sr-only">Actions</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loading
+                    ? Array.from({ length: 6 }, (_, i) => (
+                      <tr key={i} aria-hidden="true"><td colSpan={6}><span className="pp-sk" /></td></tr>
+                    ))
+                    : pageRows.map((row, i) => (
+                      <tr key={row.id || i}>
+                        <td className="pp-c-party">{whoCell(row)}</td>
+                        <td className="pp-c-city">{row.cityLabel}</td>
+                        <td className="pp-c-sm">{pills(row.salesmanLabel)}</td>
+                        <td className="pp-c-loc"><span className={`loc-pill loc-pill--${row.locationState}`}>{row.locationLabel}</span></td>
+                        <td className="pp-c-credit"><span className="party-credit">{row.creditLabel}</span></td>
+                        <td className="pp-c-act">{rowButtons(row)}</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="pp-foot">
+              <span className="pp-count">Showing {pageRows.length} of {filteredRowsByTab.length} parties</span>
+              <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} />
+              <DropdownSelector
+                options={[20, 40, 60].map(n => ({ value: n, label: `${n} per page` }))}
+                value={pageSize}
+                onChange={(v) => { setPageSize(Number(v)); setPage(1); }}
+                searchable={false}
+                className="pp-dd pp-dd--size"
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
+
+      {moreFor && (
+        <>
+          <div className="pp-more__shade" onClick={() => setMoreFor(null)} aria-hidden="true" />
+          <div className="pp-more" role="menu" style={{ top: moreFor.top, left: moreFor.left }}>
+            {partyTel(moreFor.row) && (
+              <a role="menuitem" className="pp-more__item" href={partyTel(moreFor.row)} onClick={() => setMoreFor(null)}>
+                <HugeiconsIcon icon={Call02Icon} size={18} strokeWidth={1.8} />Call
+              </a>
+            )}
+            {partyMapHref(moreFor.row) && (
+              <a role="menuitem" className="pp-more__item" href={partyMapHref(moreFor.row)} target="_blank" rel="noopener noreferrer" onClick={() => setMoreFor(null)}>
+                <HugeiconsIcon icon={Location01Icon} size={18} strokeWidth={1.8} />View on map
+              </a>
+            )}
+          </div>
+        </>
+      )}
+
       <AsidePanel
         open={isPartyFormOpen}
         onClose={closePartyForm}
-        title={editRow ? 'Edit Party' : 'Add New Party'}
+        title={editRow ? 'Edit party' : 'Add party'}
         footer={(
           <>
             <button
