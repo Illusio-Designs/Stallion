@@ -5,7 +5,8 @@ const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 const { SalesmanCheckInType } = require('../constants/enums');
-const { checkGeofence } = require('../utils/geo');
+const { checkVisitLocation } = require('../utils/geo');
+const { learnShopSpot } = require('../utils/shopSpot');
 const { isOfficeRole, hasRole } = require('../utils/roleHelpers');
 
 const IN_PROGRESS_MARK = '[In progress]';
@@ -187,10 +188,8 @@ class SalesmanCheckInsController {
                 return res.status(400).json({ error: validationError });
             }
 
-            // Enforce the geofence against the party's TRUSTED verified location.
-            // Party location must be set via Add/Edit Party ("I'm at shop") —
-            // check-in never captures or changes it. A salesman must send their
-            // GPS, so the fence cannot be skipped by leaving it out.
+            // Distance between the party's saved latitude/longitude and the phone's. A salesman
+            // must send their GPS, so the check cannot be skipped by leaving it out.
             const hasDeviceLoc = fields.latitude != null && fields.latitude !== '' && fields.longitude != null && fields.longitude !== '';
             if (actor.salesmanId && !hasDeviceLoc) {
                 return res.status(400).json({ error: 'Your current location is required to check in. Please allow location access and try again.' });
@@ -200,15 +199,17 @@ class SalesmanCheckInsController {
                 if (!checkinParty) {
                     return res.status(404).json({ error: 'Party not found' });
                 }
-                if (checkinParty.location_source === 'verified' && checkinParty.latitude != null && checkinParty.longitude != null) {
-                    const geo = checkGeofence({ deviceLat: fields.latitude, deviceLng: fields.longitude, party: checkinParty, action: 'check in' });
-                    if (!geo.ok) {
-                        return res.status(403).json({ error: geo.reason });
-                    }
-                } else {
-                    return res.status(403).json({
-                        error: 'This party\'s exact location is not set yet. Open Add/Edit Party and use "I\'m at shop" to set it, then check in.',
-                    });
+                // 50m from the saved shop spot; 150m the first time (point from the address), then
+                // the phone's position is saved as the shop's precise spot.
+                const visitCheck = checkVisitLocation({
+                    deviceLat: fields.latitude, deviceLng: fields.longitude, accuracy: body.accuracy,
+                    party: checkinParty, action: 'check in',
+                });
+                if (!visitCheck.ok) {
+                    return res.status(visitCheck.code === 'no_location' ? 409 : 403).json({ error: visitCheck.reason, code: visitCheck.code });
+                }
+                if (visitCheck.learn) {
+                    await learnShopSpot(req, checkinParty, { latitude: fields.latitude, longitude: fields.longitude, accuracy: body.accuracy });
                 }
             }
 

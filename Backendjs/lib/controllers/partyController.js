@@ -64,6 +64,14 @@ function addressSimilarity(a, b) {
     return common / (x.size + y.size - common);
 }
 
+// A latitude/longitude pair from the client, or null when it is missing or out of range.
+function validPoint(lat, lng) {
+    if (lat == null || lat === '' || lng == null || lng === '') return null;
+    const la = Number(lat), lo = Number(lng);
+    if (!Number.isFinite(la) || !Number.isFinite(lo) || la < -90 || la > 90 || lo < -180 || lo > 180) return null;
+    return { latitude: la, longitude: lo };
+}
+
 class PartyController {
     async getPartie(req, res) {
         try {
@@ -361,7 +369,8 @@ class PartyController {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const user = req.user;
-            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, latitude, longitude, accuracy, location_accuracy_m, confirm_address_mismatch } = req.body;
+            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, latitude, longitude, accuracy, location_accuracy_m, confirm_address_mismatch, address_lat, address_lng } = req.body;
+            const addressPoint = validPoint(address_lat, address_lng);
             const confirmMismatch = confirm_address_mismatch === true || confirm_address_mismatch === 'true';
             // address, city, state and pincode are required so the party can be
             // geocoded accurately for the visit/check-in geofence.
@@ -433,7 +442,8 @@ class PartyController {
             let finalLat = null, finalLng = null, locationSource = null, locationAccuracyM = null;
             const hasDeviceLoc = latitude != null && latitude !== '' && longitude != null && longitude !== '';
             // Geocode once; it is both the validation reference and the fallback.
-            const geo = await geocodeAddress(address, { pincode });
+            // The point of the picked Google address when there is one; otherwise geocode the text.
+            const geo = addressPoint ? { ...addressPoint, precision: 'address' } : await geocodeAddress(address, { pincode });
             let captured = false;
             let createFarFromAddress = false;
             if (hasDeviceLoc) {
@@ -854,6 +864,7 @@ class PartyController {
             // available again to capture the new spot.
             const normText = (v) => String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
             const normPin = (v) => String(v || '').replace(/\D/g, '');
+            const updatePoint = validPoint(req.body.address_lat, req.body.address_lng);
             const addressChanged = address !== undefined && !!address && normText(address) !== normText(party.address);
             const pincodeChanged = pincode !== undefined && normPin(pincode) !== normPin(party.pincode);
             const stateChanged = state_id !== undefined && String(state_id || '') !== String(party.state_id || '');
@@ -868,13 +879,14 @@ class PartyController {
             const fixedFromGps = party.location_source === 'verified' && !!party.location_address
                 && address !== undefined && addressSimilarity(address, party.location_address) >= 0.6;
             let locationReset = false;
-            if (addressChanged || pincodeChanged || stateChanged || cityChanged) {
+            const hasNoPoint = party.latitude == null || party.longitude == null;
+            if (addressChanged || pincodeChanged || stateChanged || cityChanged || (hasNoPoint && updatePoint)) {
                 const wasVerified = party.location_source === 'verified';
                 if (wasVerified && (!movedShop || fixedFromGps)) {
                     // Wording-only edit, or the address was corrected from the GPS spot:
                     // keep the verified shop point as it is.
                 } else {
-                    const geo = await geocodeAddress(
+                    const geo = updatePoint ? { ...updatePoint, precision: 'address' } : await geocodeAddress(
                         address !== undefined ? address : party.address,
                         { pincode: pincode !== undefined ? pincode : party.pincode }
                     );

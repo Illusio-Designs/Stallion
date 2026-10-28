@@ -8,7 +8,14 @@
 // 20-60m and the saved point can be off by up to 50m, so a tighter fence would
 // wrongly reject real visits.
 // Overridable via env (GEOFENCE_RADIUS_M) without a redeploy.
-const GEOFENCE_RADIUS_M = Number(process.env.GEOFENCE_RADIUS_M) || 100;
+const GEOFENCE_RADIUS_M = Number(process.env.GEOFENCE_RADIUS_M) || 50;
+// Until a shop has a precise spot (learned from the first visit), its point comes from the
+// address and can be off by up to ~100m, so a wider radius is used for that first visit.
+const ROUGH_RADIUS_M = Number(process.env.GEOFENCE_ROUGH_RADIUS_M) || 150;
+// A visit is refused when the phone itself reports a worse GPS accuracy than this.
+const MAX_VISIT_ACCURACY_M = Number(process.env.VISIT_MAX_ACCURACY_M) || 50;
+// A weak signal gets up to this much extra distance on top of the radius.
+const ACCURACY_ALLOWANCE_CAP_M = Number(process.env.VISIT_ACCURACY_ALLOWANCE_M) || 25;
 
 const toRad = (deg) => (Number(deg) * Math.PI) / 180;
 
@@ -162,8 +169,59 @@ function checkGeofence({ deviceLat, deviceLng, party, action = 'perform this act
   return { ok: true, distance };
 }
 
+/**
+ * Visit order / check-in distance rule: the straight-line distance (Haversine) between
+ * the party's saved latitude/longitude and the phone's latitude/longitude.
+ *  - party has a precise ("verified") spot: within GEOFENCE_RADIUS_M (50m) plus an
+ *    allowance for a weak signal (the phone's reported accuracy, at most 25m extra);
+ *  - party only has a point from its address: within ROUGH_RADIUS_M (150m). When that
+ *    passes with a good GPS fix, `learn: true` tells the caller to save the phone's
+ *    position as the shop's precise spot, so later visits use the 50m rule;
+ *  - party has no point at all: refused with code 'no_location' (edit the party).
+ * @returns {{ ok: boolean, distance: number|null, mode?: 'precise'|'rough', learn?: boolean, code?: string, reason?: string }}
+ */
+function checkVisitLocation({ deviceLat, deviceLng, accuracy, party, action = 'perform this action' }) {
+  const lat = Number(deviceLat), lng = Number(deviceLng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return { ok: false, distance: null, code: 'no_gps', reason: 'A valid current location is required. Please turn on location and try again.' };
+  }
+  const acc = Number(accuracy);
+  const hasAcc = Number.isFinite(acc) && acc > 0;
+  if (hasAcc && acc > MAX_VISIT_ACCURACY_M) {
+    return { ok: false, distance: null, code: 'weak_gps', reason: `GPS signal is too weak (accurate to only ${Math.round(acc)}m). Move to open sky and try again; it must be within ${MAX_VISIT_ACCURACY_M}m.` };
+  }
+  const pLat = party && (party.latitude ?? party.lat);
+  const pLng = party && (party.longitude ?? party.lng);
+  if (pLat == null || pLng == null || pLat === '' || pLng === '') {
+    return { ok: false, distance: null, code: 'no_location', reason: "This party has no location yet. Edit the party and pick its address, then try again." };
+  }
+  const distance = distanceMeters(lat, lng, pLat, pLng);
+  if (distance == null) {
+    return { ok: false, distance: null, code: 'no_gps', reason: 'A valid current location is required.' };
+  }
+  const precise = party.location_source === 'verified';
+  const allowed = precise
+    ? GEOFENCE_RADIUS_M + (hasAcc ? Math.min(acc, ACCURACY_ALLOWANCE_CAP_M) : 0)
+    : ROUGH_RADIUS_M;
+  if (distance > allowed) {
+    return {
+      ok: false,
+      distance,
+      mode: precise ? 'precise' : 'rough',
+      code: 'too_far',
+      reason: precise
+        ? `You must be within ${GEOFENCE_RADIUS_M}m of the party to ${action}. You are about ${Math.round(distance)}m away.`
+        : `You are about ${Math.round(distance)}m from this party's address (limit ${ROUGH_RADIUS_M}m). Move closer to the shop, or check the party's address.`,
+    };
+  }
+  return { ok: true, distance, mode: precise ? 'precise' : 'rough', learn: !precise && hasAcc };
+}
+
 module.exports = {
   GEOFENCE_RADIUS_M,
+  ROUGH_RADIUS_M,
+  MAX_VISIT_ACCURACY_M,
+  checkVisitLocation,
   ADDRESS_PROXIMITY_RADIUS_M,
   CAPTURE_MAX_ACCURACY_M,
   CAPTURE_MAX_ADDRESS_DISTANCE_M,
