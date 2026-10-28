@@ -1,0 +1,132 @@
+/* Sample trays > Assign products: a tray card (who holds it, how full), one search to add frames,
+   and the tray's products as cards on a phone and a compact table on tablet and desktop.
+   Black and white, 44px touch targets, mobile first. Only affects the Assign products view (.tra). */
+
+:root .tra { display: flex; flex-direction: column; gap: 14px; min-width: 0; color: #0a0a0a; }
+:root .tra h2, :root .tra h3, :root .tra p { margin: 0; }
+:root .tra-head h2 { font-size: 20px; font-weight: 700; }
+:root .tra-head p, :root .tra-sub { font-size: 13px; color: #595959; overflow-wrap: anywhere; }
+:root .tra-head p { margin-top: 2px; }
+:root .tra h3 { font-size: 16px; font-weight: 700; }
+:root .tra-block { display: block; }
+:root .tra-error { border: 1px solid #e8b4b0; background: #fbe5e3; color: #b3261e; border-radius: 10px; padding: 10px 12px; font-size: 14px; }
+
+:root .tra-card { background: #fff; border: 1px solid #e1e1e1; border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+
+/* ---------- tray ---------- */
+:root .tra-tray { display: flex; flex-direction: column; gap: 12px; }
+:root .tra-tray__info { min-width: 0; }
+:root .tra-tray__pick { min-width: 0; }
+:root .tra .ui-dropdown-custom__trigger { min-height: 44px; font-size: 14px; border-radius: 10px; }
+:root .tra-bar { height: 6px; border-radius: 999px; background: #ececec; overflow: hidden; }
+:root .tra-bar i { display: block; height: 100%; background: #0a0a0a; border-radius: 999px; }
+
+/* ---------- add products ---------- */
+:root .tra-field { display: flex; flex-direction: column; gap: 6px; position: relative; }
+:root .tra-field label { font-size: 13px; font-weight: 600; color: #0a0a0a; }
+:root .tra-search {
+  position: relative; display: flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 6px 0 12px;
+  border: 1px solid #cfcfcf; border-radius: 10px; background: #fff; color: #595959;
+}
+:root .tra-search:focus-within, :root .tra-search.is-open { border-color: #0a0a0a; }
+:root .tra-search.is-open { z-index: 1002; }
+:root .tra-search input {
+  flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; box-shadow: none; padding: 0;
+  font-size: 15px; color: #0a0a0a; min-height: 42px;
+}
+:root .tra-search__done {
+  flex: none; min-height: 36px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent;
+  font-size: 14px; font-weight: 600; color: #0a0a0a; cursor: pointer;
+}
+:root .tra-search__done:hover { background: #f4f4f4; }
+:root .tra-backdrop { position: fixed; inset: 0; z-index: 1000; background: transparent; }
+:root .tra-panel {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 1003; display: flex; flex-direction: column;
+  max-height: 320px; background: #fff; border: 1px solid #cfcfcf; border-radius: 10px; box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+}
+:root .tra-panel__list { flex: 1; min-height: 0; overflow-y: auto; padding: 6px; }
+:root .tra-panel__msg { padding: 20px; text-align: center; font-size: 13px; color: #595959; }
+:root .tra-panel__foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 48px; padding: 6px 12px;
+  border-top: 1px solid #ececec; background: #fafafa; border-radius: 0 0 10px 10px; font-size: 13px; color: #595959;
+}
+:root .tra-opt {
+  display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border-radius: 8px; cursor: pointer;
+  border-left: 3px solid transparent;
+}
+:root .tra-opt:hover { background: #f4f4f4; }
+:root .tra-opt.is-on { background: #f4f4f4; border-left-color: #0a0a0a; }
+:root .tra-opt input { width: 18px; height: 18px; flex: none; accent-color: #0a0a0a; cursor: pointer; }
+:root .tra-opt__t { display: flex; flex-direction: column; min-width: 0; font-size: 13px; color: #595959; }
+:root .tra-opt__t strong { font-size: 14px; color: #0a0a0a; overflow-wrap: anywhere; }
+
+:root .tra-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+:root .tra-chip {
+  display: inline-flex; align-items: center; gap: 2px; min-height: 36px; padding: 0 4px 0 12px; border-radius: 999px;
+  border: 1px solid #cfcfcf; background: #f4f4f4; font-size: 13px; font-weight: 600; color: #0a0a0a;
+}
+:root .tra-chip button {
+  display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 50%;
+  background: transparent; color: #0a0a0a; cursor: pointer;
+}
+:root .tra-chip button:hover { background: #e1e1e1; }
+:root .tra-add__foot { display: flex; flex-direction: column; gap: 10px; }
+
+:root .tra-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 16px;
+  border-radius: 10px; border: 1px solid #0a0a0a; background: #fff; color: #0a0a0a; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+:root .tra-btn:hover { background: #f4f4f4; }
+:root .tra-btn--pri { background: #0a0a0a; color: #fff; }
+:root .tra-btn--pri:hover { background: #262626; }
+:root .tra-btn--sm { min-height: 36px; padding: 0 12px; }
+:root .tra-btn:disabled { opacity: .5; cursor: not-allowed; }
+:root .tra-btn:focus-visible, :root .tra-ic:focus-visible, :root .tra-chip button:focus-visible,
+:root .tra-search__done:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
+
+/* ---------- products in the tray ---------- */
+:root .tra-list { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+:root .tra-skel { gap: 14px; }
+:root .tra-cards { display: flex; flex-direction: column; gap: 10px; }
+:root .tra-desk { display: none; }
+:root .tra-pc { background: #fff; border: 1px solid #e1e1e1; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+:root .tra-pc__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+:root .tra-pc__top b { overflow-wrap: anywhere; }
+:root .tra-pc__foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+:root .tra-move { flex: 1 1 auto; min-width: 0; max-width: 180px; }
+:root .tra-acts { display: inline-flex; align-items: center; gap: 4px; flex: none; }
+:root .tra-ic {
+  display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; border: 0; border-radius: 10px;
+  background: transparent; color: #0a0a0a; cursor: pointer;
+}
+:root .tra-ic:hover { background: #f4f4f4; }
+:root .tra-status { display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+
+/* ---------- tablet and desktop: a compact table ---------- */
+@media (min-width: 768px) {
+  :root .tra-head h2 { font-size: 24px; }
+  :root .tra-tray { flex-direction: row; align-items: center; justify-content: space-between; }
+  :root .tra-tray__pick { flex: 0 0 220px; }
+  :root .tra-add__foot { flex-direction: row; align-items: center; justify-content: space-between; }
+  :root .tra-cards { display: none; }
+  :root .tra-desk { display: block; padding: 0; overflow: visible; }
+  :root .tra-desk table { width: 100%; border-collapse: collapse; table-layout: auto; }
+  :root .tra-desk th {
+    padding: 10px 12px; text-align: left; font-size: 12px; font-weight: 600; color: #595959; background: #fafafa;
+    border-bottom: 1px solid #e1e1e1; white-space: nowrap;
+  }
+  :root .tra-desk th:first-child { border-top-left-radius: 12px; }
+  :root .tra-desk th:last-child { border-top-right-radius: 12px; }
+  :root .tra-desk td { padding: 8px 12px; border-bottom: 1px solid #ececec; font-size: 14px; vertical-align: middle; }
+  :root .tra-desk tbody tr:last-child td { border-bottom: 0; }
+  :root .tra-desk .r { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  :root .tra-desk td b { overflow-wrap: anywhere; }
+  :root .tra-acts--row { justify-content: flex-end; }
+  :root .tra-acts--row .tra-move { flex: 0 0 140px; }
+  /* tablet keeps: Model no, Brand, WHP, Status, Actions */
+  :root .tra-c-coll, :root .tra-c-mrp, :root .tra-c-qty { display: none; }
+}
+@media (min-width: 1200px) {
+  :root .tra-c-coll, :root .tra-c-mrp, :root .tra-c-qty { display: table-cell; }
+}
+:root .tra-tray__pick > * { width: 100%; }
