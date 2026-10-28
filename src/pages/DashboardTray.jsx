@@ -11,6 +11,7 @@ import {
   getBrands,
   getCollections,
   getProductsPage,
+  getProductsByIds,
   getProductsInTray,
   getTrayTasks,
   getTraysPage,
@@ -121,6 +122,27 @@ const DashboardTray = () => {
   const [selectedTray, setSelectedTray] = useState('');
   const [trayProducts, setTrayProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
+  // Details of the products inside the open tray, fetched by id. (allProducts is only the first page
+  // of the picker, so a product beyond it used to show as N/A.)
+  const [trayProductMap, setTrayProductMap] = useState({});
+  useEffect(() => {
+    const ids = [...new Set((trayProducts || []).map((tp) => String(tp.product_id || tp.product?.product_id || tp.product?.id || '').toLowerCase()).filter(Boolean))]
+      .filter((id) => !trayProductMap[id]);
+    if (ids.length === 0) return undefined;
+    let cancelled = false;
+    getProductsByIds(ids)
+      .then((list) => {
+        if (cancelled) return;
+        setTrayProductMap((prev) => {
+          const next = { ...prev };
+          (list || []).forEach((p) => { const id = String(p.product_id || p.id || '').toLowerCase(); if (id) next[id] = p; });
+          return next;
+        });
+      })
+      .catch(() => { /* the row keeps showing its id */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trayProducts]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [brands, setBrands] = useState([]);
   const [collections, setCollections] = useState([]);
@@ -980,7 +1002,7 @@ const DashboardTray = () => {
                             trayProducts.map((tp) => {
                               // Match product by product_id - try both id and product_id fields
                               const productId = tp.product_id || tp.product?.product_id || tp.product?.id;
-                              const product = allProducts.find(p => {
+                              const product = trayProductMap[String(productId || '').toLowerCase()] || allProducts.find(p => {
                                 const pId = p.product_id || p.id;
                                 return pId && productId && String(pId).toLowerCase() === String(productId).toLowerCase();
                               });
@@ -1179,7 +1201,7 @@ const DashboardTray = () => {
         <div className="ui-form">
           {editingProduct && (() => {
             const productId = editingProduct.product_id || editingProduct.product?.product_id || editingProduct.product?.id;
-            const product = allProducts.find(p => {
+            const product = trayProductMap[String(productId || '').toLowerCase()] || allProducts.find(p => {
               const pId = p.product_id || p.id;
               return pId && productId && String(pId).toLowerCase() === String(productId).toLowerCase();
             });
