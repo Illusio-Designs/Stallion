@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Skeleton from '../ui/Skeleton';
 import StatusBadge from '../ui/StatusBadge';
+import DropdownSelector from '../ui/DropdownSelector';
 import { FiMapPin, FiShoppingCart, FiUsers, FiPackage, FiCreditCard, FiNavigation2, FiUser, FiChevronRight } from '../icons/hugeicons';
 import { captureCurrentPosition, distanceMeters, hasPartyPoint, visitRadius } from '../../utils/geolocation';
 import { createSalesmanCheckin } from '../../services/api/salesmanApi';
@@ -328,22 +329,20 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
         <p className="rdn-shop__note">You have no parties yet. Add one on the Parties page.</p>
       ) : (
         <>
-          <label className="rdn-shop__field">
+          <div className="rdn-shop__field">
             <span>Party</span>
-            <select value={partyId} onChange={(e) => setPartyId(e.target.value)} disabled={busy}>
-              <option value="">Choose a party</option>
-              {readyList.length > 0 && (
-                <optgroup label="Ready to check in">
-                  {readyList.map((p) => <option key={idOf(p)} value={idOf(p)}>{p.party_name || p.name}{cityOf(p) ? `, ${cityOf(p)}` : ''}</option>)}
-                </optgroup>
-              )}
-              {noLocation.length > 0 && (
-                <optgroup label="No location yet (edit the party)">
-                  {noLocation.map((p) => <option key={idOf(p)} value={idOf(p)}>{p.party_name || p.name}{cityOf(p) ? `, ${cityOf(p)}` : ''}</option>)}
-                </optgroup>
-              )}
-            </select>
-          </label>
+            <DropdownSelector
+              options={[
+                ...readyList.map((p) => ({ value: idOf(p), label: `${p.party_name || p.name}${cityOf(p) ? `, ${cityOf(p)}` : ''}` })),
+                ...noLocation.map((p) => ({ value: idOf(p), label: `${p.party_name || p.name}${cityOf(p) ? `, ${cityOf(p)}` : ''} (no location yet)` })),
+              ]}
+              value={partyId}
+              onChange={(v) => setPartyId(String(v))}
+              placeholder="Choose a party"
+              disabled={busy}
+              className="ui-dropdown-custom--full-width"
+            />
+          </div>
           {party && !hasLocation && (
             <div className="rdn-shop__test">
               <p className="rdn-shop__note rdn-shop__note--warn" role="status">
@@ -466,12 +465,17 @@ function TrayTaskForm({ task, onDone }) {
         New task: send {task.qty} pieces of {task.model_no || 'the model'} from {task.tray_name || 'your tray'} back to the office by courier, then enter the courier details here.
       </div>
       <div className="rdt-fields">
-        <label className="rdt-field" htmlFor={`rdt-c-${id}`}>
+        <div className="rdt-field">
           <span>Courier</span>
-          <select id={`rdt-c-${id}`} value={courier} disabled={busy} onChange={(e) => { setCourier(e.target.value); setErrors((x) => ({ ...x, courier: undefined })); }}>
-            {TASK_COURIERS.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </label>
+          <DropdownSelector
+            options={TASK_COURIERS.map((c) => ({ value: c, label: c }))}
+            value={courier}
+            onChange={(v) => { setCourier(v); setErrors((x) => ({ ...x, courier: undefined })); }}
+            disabled={busy}
+            searchable={false}
+            className="ui-dropdown-custom--full-width"
+          />
+        </div>
         {courier === 'Other' && (
           <label className="rdt-field" htmlFor={`rdt-o-${id}`}>
             <span>Courier name</span>
