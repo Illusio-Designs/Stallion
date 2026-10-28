@@ -75,3 +75,6 @@
 @media (min-width: 768px) and (max-width: 1100px) {
   :root .dash-card .ui-table tbody td:nth-child(n) { max-width: none; }
 }
+
+:root .sm-pills { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+:root .sm-pill { display: inline-block; border-radius: 99px; padding: 3px 10px; font-size: 12px; font-weight: 600; background: #ececec; color: #0a0a0a; white-space: nowrap; }
