@@ -1376,8 +1376,10 @@ const DashboardClients = () => {
       {formData.billing_same_as_shipping === false && (
         <div className="form-group form-group--full">
           <label className="ui-label">Billing Address</label>
-          <input
+          <textarea
             className="ui-input"
+            rows={2}
+            style={{ minHeight: 64, resize: 'vertical', lineHeight: 1.4 }}
             placeholder="Billing address"
             value={formData.billing_address}
             onChange={(e) => handleInputChange('billing_address', e.target.value)}

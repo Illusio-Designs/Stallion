@@ -3,7 +3,7 @@
 :root .addr-ac__input { width: 100%; min-height: 64px; resize: vertical; line-height: 1.4; padding-top: 10px; padding-bottom: 10px; }
 :root .addr-ac__status { display: block; margin-top: 4px; font-size: 12px; color: #b3261e; }
 :root .addr-ac__busy { display: block; margin-top: 4px; font-size: 12px; color: #595959; }
-:root .addr-ac__list { position: absolute; z-index: 30; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: 4px; list-style: none; background: #ffffff; border: 1px solid #e1e1e1; border-radius: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12); max-height: 320px; overflow-y: auto; }
+:root .addr-ac__list { position: fixed; z-index: 10100; margin: 0; padding: 4px; list-style: none; background: #ffffff; border: 1px solid #e1e1e1; border-radius: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12); overflow-y: auto; }
 :root .addr-ac__item { display: flex; flex-direction: column; gap: 1px; padding: 9px 10px; border-radius: 8px; cursor: pointer; min-height: 44px; justify-content: center; }
 :root .addr-ac__item b { font-size: 14px; font-weight: 600; color: #0a0a0a; }
 :root .addr-ac__item span { font-size: 12px; color: #595959; }
