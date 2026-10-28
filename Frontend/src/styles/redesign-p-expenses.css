@@ -1,0 +1,75 @@
+/* Expenses page: slim numbers row, Pending-first tabs, phone cards, compact add form. */
+:root .exp-head{display:flex;flex-wrap:wrap;align-items:flex-start;justify-content:space-between;gap:12px}
+:root .exp-head h1{margin:0}
+
+/* Numbers row: scroll row on a phone, four across from tablet */
+:root .exp-stats{display:flex;gap:8px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px;scrollbar-width:none}
+:root .exp-stats::-webkit-scrollbar{display:none}
+:root .exp-stat{flex:0 0 auto;min-width:132px;display:flex;flex-direction:column;gap:1px;padding:8px 12px;border:1px solid #e4e4e4;border-radius:10px;background:#fff}
+:root .exp-stat__l{font-size:12px;color:#666}
+:root .exp-stat__v{font-size:20px;line-height:1.2;font-weight:700;color:#111;font-variant-numeric:tabular-nums}
+:root .exp-stat__s{font-size:12px;color:#666;font-variant-numeric:tabular-nums}
+@media (min-width:768px){:root .exp-stats{overflow:visible}:root .exp-stat{flex:1 1 0}}
+
+/* Tabs */
+:root .exp-chips{margin-bottom:12px}
+:root .exp-chips .ui-tab{min-height:44px}
+
+/* List card: no heading, table or phone cards */
+:root .exp-list .ui-table__header{display:none}
+:root .exp-list td:last-child,:root .exp-list th:last-child{white-space:nowrap}
+:root .exp-list td:nth-last-child(2),:root .exp-list th:nth-last-child(2){text-align:right}
+:root .exp-amount{font-variant-numeric:tabular-nums}
+
+:root .exp-actions{display:flex;flex-wrap:wrap;gap:6px}
+:root .exp-act{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:44px;min-width:44px;padding:0 12px;border:1px solid #cfcfcf;border-radius:8px;background:#fff;color:#111;font-size:13px;font-weight:600;cursor:pointer}
+:root .exp-act--approve{background:#111;border-color:#111;color:#fff}
+:root .exp-act:disabled{opacity:.5;cursor:not-allowed}
+:root .exp-act:focus-visible{outline:2px solid #111;outline-offset:2px}
+
+:root .exp-cards{display:flex;flex-direction:column;gap:8px;padding:8px}
+:root .exp-cards__empty{margin:0;padding:24px 8px;text-align:center;color:#666;font-size:14px}
+:root .exp-card{border:1px solid #e4e4e4;border-radius:10px;padding:12px;background:#fff}
+:root .exp-card__top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+:root .exp-card__main{display:flex;flex-direction:column;gap:2px;min-width:0}
+:root .exp-card__cat{font-size:15px;color:#111;overflow-wrap:anywhere}
+:root .exp-card__sub{font-size:13px;color:#666}
+:root .exp-card__amt{font-size:16px;color:#111;font-variant-numeric:tabular-nums;white-space:nowrap}
+:root .exp-card__foot{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:10px}
+@media (max-width:767.98px){:root .exp-list .ui-table-container{display:none}}
+@media (min-width:768px){:root .exp-cards{display:none}}
+
+/* Add expense form */
+:root .exp-form{display:flex;flex-direction:column;gap:20px}
+:root .exp-form__sec{display:flex;flex-direction:column;gap:10px}
+:root .exp-form__h{margin:0;font-size:15px;font-weight:700;color:#111}
+:root .exp-form__d{margin:-4px 0 0;font-size:13px;color:#666}
+:root .exp-form__grid{display:grid;grid-template-columns:1fr;gap:12px}
+:root .exp-field{display:flex;flex-direction:column;gap:6px;min-width:0}
+:root .exp-field>label{font-size:13px;font-weight:600;color:#111}
+@media (min-width:768px){
+  :root .exp-form__grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  :root .exp-field--full{grid-column:1/-1}
+}
+:root .exp-input{box-sizing:border-box;width:100%;min-height:44px;padding:0 12px;border:1px solid #cfcfcf;border-radius:8px;background:#fff;color:#111;font-size:16px}
+:root .exp-input--area{min-height:84px;padding:10px 12px;resize:vertical}
+:root .exp-input:focus{outline:2px solid #111;outline-offset:1px}
+:root .exp-chips-row{display:flex;flex-wrap:wrap;gap:8px}
+:root .exp-chip{min-height:44px;padding:0 16px;border:1px solid #cfcfcf;border-radius:999px;background:#fff;color:#111;font-size:14px;font-weight:600;cursor:pointer}
+:root .exp-chip.is-on{background:#111;border-color:#111;color:#fff}
+:root .exp-chip:focus-visible{outline:2px solid #111;outline-offset:2px}
+
+:root .exp-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:96px;padding:16px;border:1.5px dashed #9a9a9a;border-radius:10px;background:#fafafa;text-align:center;cursor:pointer}
+:root .exp-tile:focus-within{outline:2px solid #111;outline-offset:2px}
+:root .exp-tile__input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+:root .exp-tile__t{font-size:14px;font-weight:600;color:#111}
+:root .exp-tile__s{font-size:12px;color:#666}
+:root .exp-files{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+:root .exp-file{display:flex;justify-content:space-between;gap:8px;padding:8px 12px;border-radius:8px;background:#f4f4f4;font-size:13px;color:#555}
+:root .exp-thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:8px;margin-top:8px}
+:root .exp-thumbs .image-preview-container{border:1px solid #e4e4e4;border-radius:8px;overflow:hidden}
+:root .exp-thumbs .bill-preview{display:block;width:100%;height:88px;object-fit:cover}
+
+:root .exp-form__actions{display:flex;flex-direction:column-reverse;gap:8px;padding-top:12px;border-top:1px solid #e4e4e4}
+:root .exp-form__actions button{width:100%;min-height:44px}
+@media (min-width:768px){:root .exp-form__actions{flex-direction:row;justify-content:flex-end}:root .exp-form__actions button{width:auto}}

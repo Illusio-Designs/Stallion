@@ -21,6 +21,7 @@ import { showSuccess, showError } from '../services/notificationService';
 import { getUserRole, getUserRoles, getUser } from '../services/authService';
 import '../styles/pages/dashboard-expenses.css';
 import '../styles/redesign-n-headings.css';
+import '../styles/redesign-p-expenses.css';
 
 
 const EXPENSE_TYPE_OPTIONS = [
@@ -56,7 +57,7 @@ const DashboardExpenses = () => {
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
-  const [activeTab, setActiveTab] = useState('All');
+  const [activeTab, setActiveTab] = useState('Pending');
   // The user role comes from localStorage, which is empty during SSR. Reading it
   // on the first render produces server/client markup that disagrees (hydration
   // mismatch). Gate role-dependent UI on `mounted` so the first client render
@@ -402,151 +403,117 @@ const DashboardExpenses = () => {
     };
   }, [expenses]);
 
-  const columns = useMemo(() => {
-    const baseColumns = [
-      { key: 'date', label: 'DATE' },
-      ...(shouldShowAdminFeatures ? [{ key: 'salesman', label: 'SALESMAN' }] : []),
-      { key: 'type', label: 'TYPE' },
-      { key: 'kilometers', label: 'KM' },
-      { 
-        key: 'status', 
-        label: 'STATUS', 
-        render: (v) => {
-          const k = String(v).toLowerCase();
-          const label = k.charAt(0).toUpperCase() + k.slice(1);
-          return <StatusBadge status={k === 'approved' ? 'completed' : k}>{label}</StatusBadge>;
-        }
-      },
-      { key: 'amount', label: 'AMOUNT', render: (v) => <b className="exp-amount">{v}</b> },
-      { 
-        key: 'action', 
-        label: 'ACTION', 
-        render: (_v, row) => (
-          <div className="flex gap-2 relative z-[1]">
-            <button 
-              className="ui-btn ui-btn--ghost ui-btn--sm has-tt" 
-              onClick={() => {
-                setSelectedExpense(row.originalExpense);
-                setEditModalOpen(true);
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M1 12S5 5 12 5s11 7 11 7-4 7-11 7-11-7-11-7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-              </svg>
-              <span className="ui-tt">View</span>
-            </button>
-            {shouldShowAdminFeatures && row.originalExpense.status === 'pending' && (
-              <>
-                <button
-                  className="ui-btn ui-btn--ghost ui-btn--sm has-tt"
-                  onClick={async () => {
-                    try {
-                      setLoading(true);
-                      await updateSalesmanExpense(row.id, { status: 'approved', remarks: row.originalExpense.remarks || '' });
-                      showSuccess('Expense approved successfully');
-                      await fetchExpenses();
-                    } catch (err) {
-                      showError(err?.message || 'Failed to approve expense');
-                    } finally {
-                      setLoading(false);
-                    }
-                  }}
-                  disabled={loading}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span className="ui-tt">Approve</span>
-                </button>
-                <button
-                  className="ui-btn ui-btn--ghost ui-btn--sm has-tt"
-                  onClick={async () => {
-                    const remarks = prompt('Enter rejection remarks (optional):');
-                    if (remarks !== null) { // User didn't cancel
-                      try {
-                        setLoading(true);
-                        await updateSalesmanExpense(row.id, { status: 'rejected', remarks: remarks || '' });
-                        showSuccess('Expense rejected successfully');
-                        await fetchExpenses();
-                      } catch (err) {
-                        showError(err?.message || 'Failed to reject expense');
-                      } finally {
-                        setLoading(false);
-                      }
-                    }
-                  }}
-                  disabled={loading}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    <path d="M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                  <span className="ui-tt">Reject</span>
-                </button>
-              </>
-            )}
-          </div>
-        ) 
-      },
-    ];
-    
-    return baseColumns;
-  }, [shouldShowAdminFeatures, shouldShowSalesmanFeatures, loading]);
+  const approveExpense = async (row) => {
+    try {
+      setLoading(true);
+      await updateSalesmanExpense(row.id, { status: 'approved', remarks: row.originalExpense.remarks || '' });
+      showSuccess('Expense approved successfully');
+      await fetchExpenses();
+    } catch (err) {
+      showError(err?.message || 'Failed to approve expense');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const rejectExpense = async (row) => {
+    const remarks = prompt('Enter rejection remarks (optional):');
+    if (remarks !== null) { // User didn't cancel
+      try {
+        setLoading(true);
+        await updateSalesmanExpense(row.id, { status: 'rejected', remarks: remarks || '' });
+        showSuccess('Expense rejected successfully');
+        await fetchExpenses();
+      } catch (err) {
+        showError(err?.message || 'Failed to reject expense');
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
+  const viewExpense = (row) => {
+    setSelectedExpense(row.originalExpense);
+    setEditModalOpen(true);
+  };
+
+  const statusBadge = (v) => {
+    const k = String(v).toLowerCase();
+    const label = k.charAt(0).toUpperCase() + k.slice(1);
+    return <StatusBadge status={k === 'approved' ? 'completed' : k}>{label}</StatusBadge>;
+  };
+
+  // View, plus Approve / Reject on the row for approvers (pending claims only).
+  const renderActions = (row) => (
+    <div className="exp-actions">
+      <button type="button" className="exp-act" onClick={() => viewExpense(row)} aria-label="View expense">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+          <path d="M1 12S5 5 12 5s11 7 11 7-4 7-11 7-11-7-11-7Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
+        </svg>
+        <span>View</span>
+      </button>
+      {shouldShowAdminFeatures && row.originalExpense.status === 'pending' && (
+        <>
+          <button type="button" className="exp-act exp-act--approve" onClick={() => approveExpense(row)} disabled={loading} aria-label="Approve expense">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span>Approve</span>
+          </button>
+          <button type="button" className="exp-act" onClick={() => rejectExpense(row)} disabled={loading} aria-label="Reject expense">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <span>Reject</span>
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  const columns = useMemo(() => [
+    { key: 'date', label: 'DATE' },
+    ...(shouldShowAdminFeatures ? [{ key: 'salesman', label: 'SALESMAN' }] : []),
+    { key: 'type', label: 'CATEGORY' },
+    { key: 'kilometers', label: 'KM' },
+    { key: 'status', label: 'STATUS', render: (v) => statusBadge(v) },
+    { key: 'amount', label: 'AMOUNT', render: (v) => <b className="exp-amount">{v}</b> },
+    { key: 'action', label: 'ACTION', render: (_v, row) => renderActions(row) },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [shouldShowAdminFeatures, shouldShowSalesmanFeatures, loading]);
 
   return (
     <div className="dash-page">
       <div className="dash-container exp-page">
-        <div className="pg-head"><div><h1>Expenses</h1><p>Salesmen submit claims with bills. Admin and expense managers review them.</p></div></div>
-        {/* Summary Cards */}
-        <div className="dash-row expenses-summary grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="dash-card p-5 lg:p-6">
-            <h2>Total Expenses</h2>
-            <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.totalExpenses}</div>
-            <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">₹{summaryStats.totalAmount.toLocaleString('en-IN')}</div>
-          </div>
-
-          <div className="dash-card p-5 lg:p-6">
-            <h2>Pending</h2>
-            <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingExpenses}</div>
-            <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">Awaiting Approval</div>
-          </div>
-
-          <div className="dash-card p-5 lg:p-6">
-            <h2>Approved</h2>
-            <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.approvedExpenses}</div>
-            <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">₹{summaryStats.approvedAmount.toLocaleString('en-IN')}</div>
-          </div>
-
-          <div className="dash-card p-5 lg:p-6">
-            <h2>Rejected</h2>
-            <div className="metric-value my-2 text-[length:var(--text-xl)] lg:text-[length:var(--text-2xl)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text tabular-nums">{loading ? <Skeleton width={90} height={24} /> : summaryStats.rejectedExpenses}</div>
-            <div className="metric-sub mt-2 text-[length:var(--text-sm)] text-text-muted tabular-nums">Need Review</div>
-          </div>
+        <div className="pg-head exp-head">
+          <div><h1>Expenses</h1><p>Claims waiting for a decision come first.</p></div>
+          {shouldShowSalesmanFeatures && (
+            <Button onClick={() => setCreateModalOpen(true)}>Add expense</Button>
+          )}
         </div>
 
-        {/* Status filter chips */}
+        {/* Slim numbers row (scrolls on a phone) */}
+        <div className="exp-stats" aria-label="Expense summary">
+          <div className="exp-stat"><span className="exp-stat__l">Claims</span><b className="exp-stat__v">{loading ? <Skeleton width={40} height={20} /> : summaryStats.totalExpenses}</b><span className="exp-stat__s">₹{summaryStats.totalAmount.toLocaleString('en-IN')}</span></div>
+          <div className="exp-stat"><span className="exp-stat__l">Pending</span><b className="exp-stat__v">{loading ? <Skeleton width={40} height={20} /> : summaryStats.pendingExpenses}</b><span className="exp-stat__s">Awaiting approval</span></div>
+          <div className="exp-stat"><span className="exp-stat__l">Approved</span><b className="exp-stat__v">{loading ? <Skeleton width={40} height={20} /> : summaryStats.approvedExpenses}</b><span className="exp-stat__s">₹{summaryStats.approvedAmount.toLocaleString('en-IN')}</span></div>
+          <div className="exp-stat"><span className="exp-stat__l">Rejected</span><b className="exp-stat__v">{loading ? <Skeleton width={40} height={20} /> : summaryStats.rejectedExpenses}</b><span className="exp-stat__s">Need review</span></div>
+        </div>
+
+        {/* Status tabs, Pending first */}
         <Tabs
           className="exp-chips mb-4"
           active={activeTab}
           onChange={setActiveTab}
-          tabs={['All', 'Pending', 'Approved', 'Rejected'].map((t) => ({
+          tabs={['Pending', 'Approved', 'Rejected', 'All'].map((t) => ({
             value: t,
             label: `${t} ${t === 'All' ? rows.length : rows.filter((r) => r.status.toLowerCase() === t.toLowerCase()).length}`,
           }))}
         />
 
-        {/* Expenses Table */}
-        <div className="dash-card">
-          <div className="card-header flex flex-col items-stretch md:flex-row md:items-center md:justify-between gap-4 p-6 border-b border-border">
-            <h2 className="m-0 text-center md:text-left text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{shouldShowAdminFeatures ? 'All Salesman Expenses' : 'My Expenses'}</h2>
-            {shouldShowSalesmanFeatures && (
-              <Button onClick={() => setCreateModalOpen(true)}>
-                New expense
-              </Button>
-            )}
-          </div>
-          
+        <div className="dash-card exp-list">
           {error && !loading ? (
             <div className="ui-state ui-state--error">
               <div className="ui-state__icon">
@@ -578,11 +545,30 @@ const DashboardExpenses = () => {
               </p>
               {shouldShowSalesmanFeatures && (
                 <button className="ui-btn ui-btn--primary" onClick={() => setCreateModalOpen(true)}>
-                  New expense
+                  Add expense
                 </button>
               )}
             </div>
           ) : (
+            <>
+            <div className="exp-cards">
+              {filteredRows.length === 0 && !loading && <p className="exp-cards__empty">No {activeTab === 'All' ? '' : activeTab.toLowerCase() + ' '}expenses.</p>}
+              {filteredRows.map((row) => (
+                <article key={row.id} className="exp-card">
+                  <div className="exp-card__top">
+                    <div className="exp-card__main">
+                      <b className="exp-card__cat">{row.type}</b>
+                      <span className="exp-card__sub">{row.salesman ? `${row.salesman} · ` : ''}{row.date}</span>
+                    </div>
+                    <b className="exp-card__amt">{row.amount}</b>
+                  </div>
+                  <div className="exp-card__foot">
+                    {statusBadge(row.status)}
+                    {renderActions(row)}
+                  </div>
+                </article>
+              ))}
+            </div>
             <TableWithControls
               titleAs="h3"
               columns={columns}
@@ -590,9 +576,10 @@ const DashboardExpenses = () => {
               loading={loading}
               activeTab={activeTab}
               onTabChange={setActiveTab}
-              tabs={['All', 'Pending', 'Approved', 'Rejected']}
+              tabs={['Pending', 'Approved', 'Rejected', 'All']}
               searchPlaceholder="Search expenses..."
             />
+            </>
           )}
         </div>
       </div>
@@ -604,124 +591,142 @@ const DashboardExpenses = () => {
           setCreateModalOpen(false);
           resetCreateForm();
         }}
-        title="New expense"
+        title="Add expense"
       >
-        <div className="modal-form flex flex-col gap-4">
-          <div className="form-group flex flex-col gap-2">
-            <label className="text-[length:var(--text-sm)] font-medium text-text">Expense Date *</label>
-            <DatePicker value={createFormData.expense_date} onChange={(v) => setCreateFormData({ ...createFormData, expense_date: v })} placeholder="Expense date" />
-          </div>
+        <div className="modal-form exp-form">
+          <section className="exp-form__sec">
+            <h3 className="exp-form__h">Claim</h3>
+            <div className="exp-form__grid">
+              <div className="form-group exp-field">
+                <label>Date *</label>
+                <DatePicker value={createFormData.expense_date} onChange={(v) => setCreateFormData({ ...createFormData, expense_date: v })} placeholder="Expense date" />
+              </div>
 
-          <div className="form-group flex flex-col gap-2">
-            <label className="text-[length:var(--text-sm)] font-medium text-text">Expense Type *</label>
-            <DropdownSelector
-              options={EXPENSE_TYPE_OPTIONS}
-              value={createFormData.expense_type}
-              onChange={(value) => setCreateFormData({ ...createFormData, expense_type: value, travel_mode: '', toll_message: '' })}
-              searchable={false}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
+              <div className="form-group exp-field">
+                <label>Category *</label>
+                <DropdownSelector
+                  options={EXPENSE_TYPE_OPTIONS}
+                  value={createFormData.expense_type}
+                  onChange={(value) => setCreateFormData({ ...createFormData, expense_type: value, travel_mode: '', toll_message: '' })}
+                  searchable={false}
+                  className="ui-dropdown-custom--full-width"
+                />
+              </div>
 
-          {createFormData.expense_type === 'travel' && (
-            <div className="form-group flex flex-col gap-2">
-              <label className="text-[length:var(--text-sm)] font-medium text-text">Mode *</label>
-              <DropdownSelector
-                options={TRAVEL_MODE_OPTIONS}
-                value={createFormData.travel_mode}
-                onChange={(value) => setCreateFormData({ ...createFormData, travel_mode: value })}
-                placeholder="Bus, train, Rapido ..."
-                searchable={false}
-                className="ui-dropdown-custom--full-width"
-              />
+              <div className="form-group exp-field">
+                <label>Amount (₹) *</label>
+                <input
+                  className="exp-input"
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="₹ 0"
+                  value={createFormData.expense_amount}
+                  onChange={(e) => setCreateFormData({ ...createFormData, expense_amount: e.target.value })}
+                  required
+                />
+              </div>
+
+              {/* Kilometers are optional for travel and city tour */}
+              {['travel', 'city_tour'].includes(createFormData.expense_type) && (
+                <div className="form-group exp-field">
+                  <label>Kilometers (optional)</label>
+                  <input
+                    className="exp-input"
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="Enter kilometers"
+                    value={createFormData.kilometers}
+                    onChange={(e) => setCreateFormData({ ...createFormData, kilometers: e.target.value })}
+                  />
+                </div>
+              )}
+
+              {createFormData.expense_type === 'travel' && (
+                <div className="form-group exp-field exp-field--full">
+                  <label id="exp-mode-label">How you travelled *</label>
+                  <div className="exp-chips-row" role="radiogroup" aria-labelledby="exp-mode-label">
+                    {TRAVEL_MODE_OPTIONS.map((o) => (
+                      <button
+                        key={o.value}
+                        type="button"
+                        role="radio"
+                        aria-checked={createFormData.travel_mode === o.value}
+                        className={`exp-chip${createFormData.travel_mode === o.value ? ' is-on' : ''}`}
+                        onClick={() => setCreateFormData({ ...createFormData, travel_mode: o.value })}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {createFormData.expense_type === 'toll' && (
+                <div className="form-group exp-field exp-field--full">
+                  <label>Toll message *</label>
+                  <input
+                    className="exp-input"
+                    type="text"
+                    maxLength={500}
+                    placeholder="Which toll, from where to where"
+                    value={createFormData.toll_message}
+                    onChange={(e) => setCreateFormData({ ...createFormData, toll_message: e.target.value })}
+                  />
+                </div>
+              )}
+
+              <div className="form-group exp-field exp-field--full">
+                <label>Description *</label>
+                <textarea
+                  className="exp-input exp-input--area"
+                  placeholder="Where and why"
+                  value={createFormData.expense_description}
+                  onChange={(e) => setCreateFormData({ ...createFormData, expense_description: e.target.value })}
+                  rows={3}
+                  required
+                />
+              </div>
             </div>
-          )}
+          </section>
 
-          {createFormData.expense_type === 'toll' && (
-            <div className="form-group flex flex-col gap-2">
-              <label className="text-[length:var(--text-sm)] font-medium text-text">Toll message *</label>
+          <section className="exp-form__sec">
+            <h3 className="exp-form__h">Bill</h3>
+            <p className="exp-form__d">A photo of the bill helps the approval.</p>
+            <label className="exp-tile">
               <input
-                className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] placeholder:text-text-subtle transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)]"
-                type="text"
-                maxLength={500}
-                placeholder="Which toll, from where to where"
-                value={createFormData.toll_message}
-                onChange={(e) => setCreateFormData({ ...createFormData, toll_message: e.target.value })}
+                className="exp-tile__input"
+                type="file"
+                multiple
+                accept="image/*"
+                onChange={handleFileSelect}
               />
-            </div>
-          )}
-
-          <div className="form-group flex flex-col gap-2">
-            <label className="text-[length:var(--text-sm)] font-medium text-text">Amount *</label>
-            <input
-              className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] placeholder:text-text-subtle transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
-              type="number"
-              placeholder="Enter amount"
-              value={createFormData.expense_amount}
-              onChange={(e) => setCreateFormData({ ...createFormData, expense_amount: e.target.value })}
-              required
-            />
-          </div>
-
-          {/* Kilometers are optional for travel and city tour */}
-          {['travel', 'city_tour'].includes(createFormData.expense_type) && (
-            <div className="form-group flex flex-col gap-2">
-              <label className="text-[length:var(--text-sm)] font-medium text-text">Kilometers (optional)</label>
-              <input
-                className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] placeholder:text-text-subtle transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
-                type="number"
-                placeholder="Enter kilometers"
-                value={createFormData.kilometers}
-                onChange={(e) => setCreateFormData({ ...createFormData, kilometers: e.target.value })}
-              />
-            </div>
-          )}
-
-          <div className="form-group flex flex-col gap-2">
-            <label className="text-[length:var(--text-sm)] font-medium text-text">Description *</label>
-            <textarea
-              className="min-h-20 p-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] leading-[var(--leading-normal)] resize-y placeholder:text-text-subtle transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
-              placeholder="Enter description"
-              value={createFormData.expense_description}
-              onChange={(e) => setCreateFormData({ ...createFormData, expense_description: e.target.value })}
-              rows={3}
-              required
-            />
-          </div>
-
-          <div className="form-group flex flex-col gap-2">
-            <label className="text-[length:var(--text-sm)] font-medium text-text">Upload Bills</label>
-            <input
-              className="min-h-10 px-3 rounded-md border border-border-strong bg-surface text-text text-[length:var(--text-base)] transition-[border-color,box-shadow] duration-[var(--transition-fast)] hover:border-grey-400 focus:outline-none focus:border-primary focus:shadow-[var(--focus-ring)] disabled:bg-surface-muted disabled:text-text-subtle disabled:cursor-not-allowed"
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={handleFileSelect}
-            />
+              <span className="exp-tile__t">{selectedFiles.length > 0 ? `${selectedFiles.length} photo${selectedFiles.length > 1 ? 's' : ''} chosen` : 'Take or upload a photo'}</span>
+              <span className="exp-tile__s">Tap to {selectedFiles.length > 0 ? 'change' : 'choose'}</span>
+            </label>
             {selectedFiles.length > 0 && (
-              <div className="file-preview-section mt-2">
-                <div className="file-list flex flex-col gap-2 mt-2">
+              <div className="file-preview-section">
+                <div className="file-list exp-files">
                   {selectedFiles.map((file, idx) => (
-                    <div key={idx} className="file-item flex flex-col items-start gap-1 sm:flex-row sm:justify-between sm:items-center sm:gap-3 px-3 py-2 rounded-md bg-surface-muted text-[length:var(--text-sm)] text-text-muted">
+                    <div key={idx} className="file-item exp-file">
                       <span>{file.name}</span>
-                      <span className="file-size text-[length:var(--text-xs)] text-text-subtle tabular-nums">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                      <span className="file-size">({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
                     </div>
                   ))}
                 </div>
                 {filePreviewUrls.length > 0 && (
-                  <div className="image-preview-grid grid grid-cols-2 sm:[grid-template-columns:repeat(auto-fill,minmax(100px,1fr))] md:[grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] gap-4 mt-2">
+                  <div className="image-preview-grid exp-thumbs">
                     {filePreviewUrls.map((url, idx) => (
-                      <div key={idx} className="image-preview-container group relative cursor-pointer rounded-lg overflow-hidden border border-border transition-[box-shadow,border-color] duration-[var(--transition)] hover:border-border-strong hover:shadow-sm focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]">
-                        <img src={url} alt={`Preview ${idx + 1}`} className="bill-preview block w-full h-[100px] md:h-[150px] object-cover transition-transform duration-[var(--transition)] group-hover:scale-[1.04]" />
+                      <div key={idx} className="image-preview-container">
+                        <img src={url} alt={`Preview ${idx + 1}`} className="bill-preview" />
                       </div>
                     ))}
                   </div>
                 )}
               </div>
             )}
-          </div>
+          </section>
 
-          <div className="modal-actions flex flex-col md:flex-row justify-end gap-3 mt-6 pt-4 border-t border-border [&_button]:w-full md:[&_button]:w-auto">
+          <div className="modal-actions exp-form__actions">
             <Button 
               variant="secondary" 
               onClick={() => {
@@ -735,7 +740,7 @@ const DashboardExpenses = () => {
               onClick={handleCreateExpense}
               disabled={loading || uploadingImages}
             >
-              {uploadingImages ? 'Uploading...' : loading ? 'Creating...' : 'Create Expense'}
+              {uploadingImages ? 'Uploading...' : loading ? 'Submitting...' : 'Submit claim'}
             </Button>
           </div>
         </div>
