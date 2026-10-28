@@ -1,0 +1,105 @@
+/* Add / edit form panels (party, salesman, expense, event, offer, tray, manage, people).
+   One look for all of them: compact panel, short section headings with a divider, two fields
+   to a row from tablet up, 44px touch targets, Save always in the footer (which AsidePanel keeps
+   above the phone keyboard). Black and white. Every form root carries the class rf-form.
+   Rules are prefixed with :root so they win over the page styles that load after this file. */
+
+/* ---------- panel chrome ---------- */
+:root .ui-aside-panel:has(.rf-form) { max-width: 600px; }
+:root .ui-aside-panel--lg:has(.rf-form) { max-width: 640px; }
+:root .ui-aside-panel:has(.rf-form) .ui-aside-panel__header { padding: 14px 18px; }
+:root .ui-aside-panel:has(.rf-form) .ui-aside-panel__title { font-size: 20px; line-height: 1.2; }
+:root .ui-aside-panel:has(.rf-form) .ui-aside-panel__close { width: 44px; height: 44px; margin-right: -8px; font-size: 24px; border-radius: 10px; }
+:root .ui-aside-panel:has(.rf-form) .ui-aside-panel__body { padding: 16px 18px; }
+:root .ui-aside-panel:has(.rf-form) .ui-aside-panel__footer { padding: 12px 18px; align-items: center; }
+:root .ui-aside-panel:has(.rf-form) .ui-aside-panel__footer .ui-btn { min-height: 44px; }
+
+/* The line on the left of the footer. It only shows where there is room, so on a phone the two
+   buttons keep the whole row and stay right above the keyboard. */
+:root .ui-aside-panel:has(.rf-form):not(:has(.pp-form)) .ui-aside-panel__footer::before {
+  content: 'Nothing is saved until you press Save.';
+  margin-right: auto;
+  font-size: 12.5px;
+  line-height: 1.3;
+  color: #595959;
+  display: none;
+}
+:root .ui-aside-panel:has(.pf.rf-form) .ui-aside-panel__footer::before { content: 'The shop location comes from the address you pick.'; }
+:root .ui-aside-panel:has(.exp-form.rf-form) .ui-aside-panel__footer::before { content: 'Nothing is sent until you press Submit claim.'; }
+@media (min-width: 640px) {
+  :root .ui-aside-panel:has(.rf-form):not(:has(.pp-form)) .ui-aside-panel__footer::before { display: block; }
+}
+@media (max-width: 639.98px) {
+  :root .ui-aside-panel:has(.rf-form) .ui-aside-panel__footer { gap: 10px; }
+  :root .ui-aside-panel:has(.rf-form) .ui-aside-panel__footer .ui-btn { flex: 1 1 0; }
+}
+
+/* ---------- progress row ---------- */
+:root .rf-prog { display: flex; flex-direction: column; gap: 6px; }
+:root .rf-prog__row { display: flex; justify-content: space-between; gap: 12px; font-size: 12.5px; color: #595959; }
+:root .rf-prog__bar { height: 4px; border-radius: 99px; background: #ececec; overflow: hidden; }
+:root .rf-prog__bar i { display: block; height: 100%; background: #0a0a0a; border-radius: 99px; transition: width .2s; }
+:root .sx-form.rf-form > .rf-prog { margin-bottom: 14px; }
+@media (prefers-reduced-motion: reduce) { :root .rf-prog__bar i { transition: none; } }
+
+/* ---------- sections ---------- */
+:root .rf-sec { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+:root .rf-sec + .rf-sec { border-top: 1px solid #e1e1e1; padding-top: 14px; }
+:root .rf-sec__h { margin: 0; font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: #0a0a0a; }
+:root .rf-sec__d { margin: 2px 0 0; font-size: 13px; color: #595959; }
+:root .rf-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+:root .rf-grid > .form-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; margin: 0; }
+@media (min-width: 560px) {
+  :root .rf-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+  :root .rf-grid > .rf-full { grid-column: 1 / -1; }
+}
+/* tray: a single column, never split */
+:root .rf-sec--one .rf-grid { grid-template-columns: minmax(0, 1fr); }
+
+/* the forms that the page styles lay out as a grid: stack their sections instead */
+:root .rf-form.pev-form,
+:root .rf-form.pof-form { display: flex; flex-direction: column; gap: 14px; }
+:root .rf-form.exp-form { gap: 14px; }
+:root .exp-form.rf-form .exp-form__h { font-family: var(--font-display); font-size: 16px; letter-spacing: -.01em; }
+:root .exp-form.rf-form .exp-form__sec + .exp-form__sec { border-top: 1px solid #e1e1e1; padding-top: 14px; }
+
+/* manage and the salesman visit and target forms: plain fields, two to a row when they are not full */
+:root .ui-form.rf-form:not(.sx-form):not(.pp-form) { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+@media (min-width: 560px) {
+  :root .ui-aside-panel__body .ui-form.rf-form:not(.sx-form):not(.pp-form) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
+}
+:root .ui-form.rf-form > .rf-sec,
+:root .ui-form.rf-form > .form-group--full,
+:root .ui-form.rf-form > .rf-full { grid-column: 1 / -1; }
+
+/* ---------- fields: 44px targets ---------- */
+:root .rf-form .ui-label { font-size: 13px; font-weight: 600; color: #0a0a0a; }
+:root .rf-form .ui-input,
+:root .rf-form .ui-dropdown-custom__trigger,
+:root .rf-form .exp-input,
+:root .rf-form .phone-intl input { min-height: 44px; }
+:root .rf-form textarea.ui-input,
+:root .rf-form textarea.exp-input { min-height: 72px; }
+
+/* ---------- chips (status, event length) ---------- */
+:root .rf-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+:root .rf-chip {
+  min-height: 44px; padding: 8px 16px; border: 1px solid #c9c9c9; border-radius: 99px;
+  background: #fff; color: #0a0a0a; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+:root .rf-chip.is-on { background: #0a0a0a; border-color: #0a0a0a; color: #fff; }
+:root .rf-chip:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
+:root .rf-chip:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ---------- switch (the manage styles only load on the manage page) ---------- */
+:root .rf-form .mng-switch { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; border: 0; background: transparent; padding: 0; }
+:root .rf-form .mng-switch__track { position: relative; display: inline-flex; align-items: center; flex: none; width: 44px; height: 26px; border-radius: 99px; background: #c9c9c9; transition: background .15s; }
+:root .rf-form .mng-switch__track.is-on { background: #0a0a0a; }
+:root .rf-form .mng-switch__dot { display: block; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0, 0, 0, .3); transform: translateX(3px); transition: transform .15s; }
+:root .rf-form .mng-switch__track.is-on .mng-switch__dot { transform: translateX(21px); }
+:root .rf-form .mng-switch__label { font-size: 14px; font-weight: 600; color: #0a0a0a; }
+:root .rf-form .mng-switch:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; border-radius: 8px; }
+:root .rf-form .mng-note { margin: 2px 0 0; font-size: 12px; color: #595959; }
+@media (prefers-reduced-motion: reduce) {
+  :root .rf-form .mng-switch__track, :root .rf-form .mng-switch__dot { transition: none; }
+}

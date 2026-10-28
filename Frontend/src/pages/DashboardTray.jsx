@@ -27,6 +27,8 @@ import '../styles/redesign-n-tray.css';
 import '../styles/redesign-n-manage.css';
 import '../styles/redesign-n-orders.css';
 import GooeySearch from '../components/ui/GooeySearch';
+import '../styles/redesign-p-forms.css';
+import { FormSec, ChipRow } from '../components/forms/FormBits';
 
 const TrayStatus = {
   AVAILABLE: 'available',
@@ -1101,53 +1103,56 @@ const DashboardTray = () => {
       <AsidePanel
         open={openAdd}
         onClose={() => setOpenAdd(false)}
-        title="Add New Sample"
+        title="Add tray"
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => { resetForm(); setOpenAdd(false); }}>Cancel</button>
-            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleSubmitNew}>Save</button>
+            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleSubmitNew}>Save tray</button>
           </>
         )}
       >
-        <div className="ui-form">
+        <div className="ui-form rf-form">
+          <FormSec title="Tray" className="rf-sec--one">
           <div className="form-group">
-            <label className="ui-label">Title</label>
+            <label className="ui-label">Tray name</label>
             <input
               className="ui-input"
-              placeholder="Sample title"
+              placeholder="Tray 7"
               value={form.tray_name}
               onChange={(e) => setForm((p) => ({ ...p, tray_name: e.target.value }))}
             />
           </div>
           <div className="form-group">
             <label className="ui-label">Status</label>
-            <DropdownSelector
+            <ChipRow
+              label="Tray status"
               options={[
-                { value: TrayStatus.AVAILABLE, label: 'AVAILABLE' },
-                { value: TrayStatus.ASSIGNED, label: 'ASSIGNED' },
-                { value: TrayStatus.CLOSED, label: 'CLOSED' }
+                { value: TrayStatus.AVAILABLE, label: 'Available' },
+                { value: TrayStatus.ASSIGNED, label: 'Assigned' },
+                { value: TrayStatus.CLOSED, label: 'Closed' }
               ]}
               value={form.tray_status}
               onChange={(value) => setForm((p) => ({ ...p, tray_status: value }))}
-              placeholder="Select status"
             />
           </div>
+          </FormSec>
         </div>
       </AsidePanel>
       <AsidePanel
         open={!!editRow}
         onClose={() => setEditRow(null)}
-        title="Edit Sample"
+        title="Edit tray"
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => { setEditRow(null); resetForm(); }}>Cancel</button>
-            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleUpdate}>Update</button>
+            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleUpdate}>Update tray</button>
           </>
         )}
       >
-        <div className="ui-form">
+        <div className="ui-form rf-form">
+          <FormSec title="Tray" className="rf-sec--one">
           <div className="form-group">
-            <label className="ui-label">Title</label>
+            <label className="ui-label">Tray name</label>
             <input
               className="ui-input"
               value={form.tray_name}
@@ -1156,15 +1161,15 @@ const DashboardTray = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">Status</label>
-            <DropdownSelector
+            <ChipRow
+              label="Tray status"
               options={[
-                { value: TrayStatus.AVAILABLE, label: 'AVAILABLE' },
-                { value: TrayStatus.ASSIGNED, label: 'ASSIGNED' },
-                { value: TrayStatus.CLOSED, label: 'CLOSED' }
+                { value: TrayStatus.AVAILABLE, label: 'Available' },
+                { value: TrayStatus.ASSIGNED, label: 'Assigned' },
+                { value: TrayStatus.CLOSED, label: 'Closed' }
               ]}
               value={form.tray_status}
               onChange={(value) => setForm((p) => ({ ...p, tray_status: value }))}
-              placeholder="Select status"
             />
           </div>
           <div className="form-group">
@@ -1183,6 +1188,7 @@ const DashboardTray = () => {
             </button>
             <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted. A tray can only be switched off when it is empty.</p>
           </div>
+          </FormSec>
         </div>
       </AsidePanel>
 
