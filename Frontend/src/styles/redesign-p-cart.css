@@ -42,19 +42,19 @@
     display: flex; align-items: center; gap: 14px;
     position: fixed; left: 0; right: 0; z-index: 880;
     bottom: calc(66px + env(safe-area-inset-bottom));
-    padding: 10px 16px; background: #ffffff; border-top: 1px solid #e1e1e1;
+    padding: 10px 16px; background: var(--b-card); border-top: 1px solid var(--l-line);
     box-shadow: 0 -6px 16px -12px rgba(0,0,0,.25);
   }
   :root .cart-bar__total { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-  :root .cart-bar__label { font-size: 12px; color: #595959; }
-  :root .cart-bar__amount { font-size: 18px; font-weight: 700; color: #0a0a0a; font-variant-numeric: tabular-nums; }
+  :root .cart-bar__label { font-size: 12px; color: var(--t-mute); }
+  :root .cart-bar__amount { font-size: 18px; font-weight: 700; color: var(--t-ink); font-variant-numeric: tabular-nums; }
   :root .cart-bar__btn {
-    flex: 1; min-height: 48px; border-radius: 11px; border: 1px solid #0a0a0a;
-    background: #0a0a0a; color: #fff; font-size: 15px; font-weight: 600;
+    flex: 1; min-height: 48px; border-radius: 11px; border: 1px solid var(--t-ink);
+    background: var(--b-ink); color: var(--t-on-ink); font-size: 15px; font-weight: 600;
     text-transform: none; letter-spacing: 0; cursor: pointer;
   }
-  :root .cart-bar__btn:disabled { background: #f4f4f4; color: #8c8c8c; border-color: #e1e1e1; cursor: not-allowed; }
-  :root .cart-bar__btn:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
+  :root .cart-bar__btn:disabled { background: var(--b-soft); color: var(--t-faint); border-color: var(--l-line); cursor: not-allowed; }
+  :root .cart-bar__btn:focus-visible { outline: 2px solid var(--t-ink); outline-offset: 2px; }
 }
 
 /* Tablet and up: no bar, the form card holds the total and the button */

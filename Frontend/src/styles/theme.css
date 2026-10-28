@@ -1,0 +1,105 @@
+/* ============================================================
+   Light / dark theme tokens.
+   Light values are exactly the colours the app always used.
+   The choice (light, dark, system) is resolved to data-theme="light|dark"
+   on <html> before first paint (see components/ThemeScript.jsx).
+   ============================================================ */
+:root {
+  --t-ink: #0a0a0a;        /* primary text, icons, outlines */
+  --t-mute: #595959;       /* secondary text */
+  --t-faint: #8c8c8c;      /* tertiary text */
+  --t-on-ink: #ffffff;     /* text on an ink (black) surface */
+  --b-card: #ffffff;       /* cards, panels, inputs */
+  --b-soft: #f4f4f4;       /* subtle fills */
+  --b-soft2: #ececec;      /* stronger subtle fills */
+  --b-ink: #0a0a0a;        /* ink surfaces: primary buttons, active chips */
+  --l-line: #e1e1e1;       /* hairlines and borders */
+  --c-ok: #0b7a53;
+  --c-ok-soft: #dcf2e8;
+  --c-bad: #b3261e;
+  --c-bad-soft: #fbe5e3;
+  --b-side: #0a0a0a;       /* sidebar stays dark in both themes */
+  --t-side: #c9c9c9;
+  --b-side-on: #1f1f1f;
+  --b-page: #ffffff;
+  --scrim: rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --t-ink: #f2f2f2;
+  --t-mute: #a3a3a8;
+  --t-faint: #85858a;
+  --t-on-ink: #0a0a0a;
+  --b-card: #151516;
+  --b-soft: #1e1e20;
+  --b-soft2: #28282b;
+  --b-ink: #f2f2f2;
+  --l-line: #2b2b2e;
+  --c-ok: #6fd1a2;
+  --c-ok-soft: #12332a;
+  --c-bad: #ff8f84;
+  --c-bad-soft: #3a1c1a;
+  --b-side: #121213;
+  --t-side: #a3a3a8;
+  --b-side-on: #232325;
+  --b-page: #0b0b0c;
+  --scrim: rgba(0, 0, 0, 0.65);
+
+  /* Tailwind / component tokens from app/globals.css */
+  --color-primary: #f2f2f2;
+  --color-primary-hover: #ffffff;
+  --color-primary-active: #d9d9db;
+  --color-primary-soft: #1e1e20;
+  --color-primary-soft-hover: #28282b;
+  --color-accent: #f2f2f2;
+  --color-accent-hover: #ffffff;
+  --color-accent-soft: #232325;
+  --color-grey-50: #121213;
+  --color-grey-100: #1e1e20;
+  --color-grey-200: #2b2b2e;
+  --color-grey-300: #38383c;
+  --color-grey-400: #55555a;
+  --color-grey-500: #85858a;
+  --color-grey-600: #a3a3a8;
+  --color-grey-700: #c4c4c8;
+  --color-grey-800: #dcdcdf;
+  --color-grey-900: #f2f2f2;
+  --color-error: #ff8f84;
+  --color-error-soft: #3a1c1a;
+  --color-success: #6fd1a2;
+  --color-success-soft: #12332a;
+  --color-warning: #f0b46a;
+  --color-warning-soft: #3b2a14;
+  --color-bg: #0b0b0c;
+  --color-surface: #151516;
+  --color-surface-muted: #1e1e20;
+  --color-border: #2b2b2e;
+  --color-border-strong: #38383c;
+  --color-text: #f2f2f2;
+  --color-text-muted: #a3a3a8;
+  --color-text-subtle: #85858a;
+  --color-text-on-primary: #0a0a0a;
+  --color-text-on-accent: #0a0a0a;
+  --background: #0b0b0c;
+  --foreground: #f2f2f2;
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.5), 0 6px 16px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 16px 48px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --focus-ring: 0 0 0 3px rgba(255, 255, 255, 0.28);
+}
+
+/* ---- Theme switch (Light / Dark / System) ---- */
+.theme-switch { display: flex; gap: 6px; }
+.theme-switch--segmented { border: 1px solid var(--l-line); border-radius: 999px; padding: 3px; }
+.theme-switch--segmented .theme-switch__btn { flex: 1; min-height: 36px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--t-mute); font-weight: 600; font-size: 13px; }
+.theme-switch--segmented .theme-switch__btn.is-on { background: var(--b-ink); color: var(--t-on-ink); }
+.theme-switch--cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.theme-switch--cards .theme-switch__btn { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px; min-height: 44px; border: 1px solid var(--l-line); border-radius: 12px; background: var(--b-card); color: var(--t-ink); font-weight: 600; }
+.theme-switch--cards .theme-switch__btn.is-on { border: 2px solid var(--t-ink); padding: 9px; }
+.theme-switch__pv { width: 100%; height: 44px; border-radius: 7px; border: 1px solid #cfcfcf; }
+.theme-switch__pv--light { background: #fff; }
+.theme-switch__pv--dark { background: #0b0b0c; border-color: #444; }
+.theme-switch__pv--system { background: linear-gradient(90deg, #fff 50%, #0b0b0c 50%); }

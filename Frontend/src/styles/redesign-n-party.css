@@ -19,7 +19,7 @@
 /* Table header: a real title, buttons on the right, and the row-count box small on the left
    instead of a big lone box under the buttons. */
 :root .dash-card.party-n-table h2.ui-table__title {
-  font-size: 18px; letter-spacing: 0; text-transform: none; color: #0a0a0a; margin: 0;
+  font-size: 18px; letter-spacing: 0; text-transform: none; color: var(--t-ink); margin: 0;
 }
 :root .party-n-table .ui-table__header { padding-bottom: 8px; align-items: center; }
 :root .party-n-table .ui-table__control-row { justify-content: flex-start; }

@@ -40,7 +40,7 @@
 .Toastify__toast--info,
 .Toastify__toast--warning,
 .Toastify__toast--default {
-  border-color: #0a0a0a !important;
+  border-color: var(--t-ink) !important;
 }
 
 .Toastify__toast-body {

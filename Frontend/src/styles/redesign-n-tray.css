@@ -1,17 +1,17 @@
 /* Sample tray cards (DashboardTray) */
 :root .trn-card { gap: 10px; padding: 16px; }
 :root .trn-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-:root .trn-who { font-size: 12px; color: #3b3b3b; overflow-wrap: anywhere; }
-:root .trn-who--none { color: #8a8a8a; }
+:root .trn-who { font-size: 12px; color: var(--t-mute); overflow-wrap: anywhere; }
+:root .trn-who--none { color: var(--t-faint); }
 :root .trn-fill { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-:root .trn-fill__pill { display: inline-flex; padding: 2px 10px; border-radius: 99px; background: #0a0a0a; color: #fff; font-size: 12px; font-weight: 600; }
-:root .trn-fill__more { font-size: 11px; color: #595959; }
+:root .trn-fill__pill { display: inline-flex; padding: 2px 10px; border-radius: 99px; background: var(--b-ink); color: var(--t-on-ink); font-size: 12px; font-weight: 600; }
+:root .trn-fill__more { font-size: 11px; color: var(--t-mute); }
 :root .trn-slots { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
 :root .trn-slot { box-sizing: border-box; aspect-ratio: 1.15; min-width: 0; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 10px; font-weight: 600; letter-spacing: 0; line-height: 1; padding: 0 2px; overflow: hidden; white-space: nowrap; }
 :root .trn-slot--empty { background: #f1f1f1; border: 1px dashed #d4d4d4; }
-:root .trn-slot--full { background: #fff; color: #0a0a0a; border: 1px solid #0a0a0a; cursor: pointer; font-family: inherit; }
-:root .trn-slot--full.on { background: #0a0a0a; color: #fff; }
-:root .trn-slot--full:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
+:root .trn-slot--full { background: var(--b-card); color: var(--t-ink); border: 1px solid var(--t-ink); cursor: pointer; font-family: inherit; }
+:root .trn-slot--full.on { background: var(--b-ink); color: var(--t-on-ink); }
+:root .trn-slot--full:focus-visible { outline: 2px solid var(--t-ink); outline-offset: 2px; }
 :root .trn-actions { flex-wrap: wrap; }
 :root .trn-actions .ui-btn { flex: 1 1 auto; justify-content: center; }
 @media (max-width: 560px) {

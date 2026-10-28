@@ -21,7 +21,7 @@
 
 .dashboard-footer .dashboard-footer-content .dashboard-copyright {
   font-size: var(--text-xs);
-  color: #595959;
+  color: var(--t-mute);
   text-align: center;
 }
 

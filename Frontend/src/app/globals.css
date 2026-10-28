@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "../styles/animations.css";
+@import "../styles/theme.css";
 @import "../styles/components/phone-input.css";
 
 /* ============================================================
@@ -228,7 +229,6 @@
   --foreground: #171717;
   --font-spoof: 'Figtree', 'Segoe UI', system-ui, sans-serif;
   --font-display: 'Bricolage Grotesque', 'Figtree', 'Segoe UI', sans-serif;
-  color-scheme: light only;
 }
 
 @theme inline {
@@ -302,7 +302,6 @@ body {
   background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-spoof);
-  color-scheme: light only;
 }
 
 * {

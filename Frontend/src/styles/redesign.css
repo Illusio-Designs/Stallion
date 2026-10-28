@@ -12,50 +12,50 @@ h1, h2, h3,
   letter-spacing: -0.015em;
 }
 
-.dashboard-layout { background: #ffffff; }
+.dashboard-layout { background: var(--b-card); }
 .dash-card { border-radius: 14px; }
 
 /* ---- Sidebar: ink black, white text ---- */
 :root .dashboard-sidebar {
-  background: #0a0a0a;
+  background: var(--b-side);
   color: #d2d2d2;
-  border-right: 1px solid #0a0a0a;
+  border-right: 1px solid #ffffff;
 }
 :root .dashboard-sidebar.expanded .sidebar-logo-img { filter: invert(1); } /* dark art on an opaque white file */
 :root .dashboard-sidebar-nav a { color: #d2d2d2; }
-:root .dashboard-sidebar-nav a:hover { background: #1c1c1c; color: #ffffff; }
+:root .dashboard-sidebar-nav a:hover { background: var(--b-side); color: #ffffff; }
 :root .dashboard-sidebar-nav a.active,
 :root .dashboard-sidebar.collapsed .dashboard-sidebar-nav a.active {
-  background: #1c1c1c;
+  background: var(--b-side);
   color: #ffffff;
 }
 :root .dashboard-sidebar-nav a.active::before { display: none; }
 :root .dashboard-sidebar-nav a:focus-visible { box-shadow: 0 0 0 2px #ffffff; }
 :root .dashboard-sidebar-footer { border-top-color: #1c1c1c; }
 :root .dashboard-sidebar .sidebar-toggle { color: #bdbdbd; }
-:root .dashboard-sidebar .sidebar-toggle:hover { background: #1c1c1c; color: #ffffff; }
+:root .dashboard-sidebar .sidebar-toggle:hover { background: var(--b-side); color: #ffffff; }
 :root .dashboard-sidebar .sidebar-mobile-close { color: #d2d2d2; }
-:root .dashboard-sidebar .sidebar-mobile-close:hover { background: #1c1c1c; color: #ffffff; }
+:root .dashboard-sidebar .sidebar-mobile-close:hover { background: var(--b-side); color: #ffffff; }
 /* The mobile "Back to Shop" button is a black fill; on the black sidebar it turns white. */
 :root .dashboard-sidebar a[aria-label="Back to Shop"] {
-  background: #ffffff;
-  color: #0a0a0a !important;
+  background: var(--b-side);
+  color: #ffffff !important;
 }
 
 /* ---- Dashboard numbers: the first card is the ink "hero" card ---- */
 .dash-kpis > .dash-card.metric:first-child {
-  background: #0a0a0a;
-  border-color: #0a0a0a;
+  background: var(--b-ink);
+  border-color: var(--t-ink);
 }
 .dash-kpis > .dash-card.metric:first-child h4 { color: #bdbdbd; }
-.dash-kpis > .dash-card.metric:first-child .metric-value { color: #ffffff; }
+.dash-kpis > .dash-card.metric:first-child .metric-value { color: var(--t-on-ink); }
 .dash-kpis > .dash-card.metric:first-child .metric-sub { color: #bdbdbd; }
 .dash-card.metric .metric-value { font-size: 30px; font-weight: 700; }
 
 /* ---- Sign in: black page, white card ---- */
-.login-page { background-color: #0a0a0a; }
+.login-page { background-color: var(--b-ink); }
 .login-bg-image, .login-gradient-overlay { display: none; }
-.login-container { border-color: #ffffff; box-shadow: none; }
+.login-container { border-color: var(--b-card); box-shadow: none; }
 
 /* ==========================================================================
    Dashboard area restyle (black and white, matches the approved mockups).
@@ -75,7 +75,7 @@ h1, h2, h3,
   letter-spacing: -0.01em;
 }
 .settings-subtitle,
-.support-subtitle { color: #595959; }
+.support-subtitle { color: var(--t-mute); }
 
 /* Hero KPI numbers use the display face on every dashboard page */
 .dash-card.metric .metric-value,
@@ -83,26 +83,26 @@ h1, h2, h3,
 .expenses-summary .metric-value,
 .analytics-card .metric-value { font-family: var(--font-display); letter-spacing: -0.02em; }
 .dash-card.metric h4,
-.orders-card h4 { color: #595959; }
+.orders-card h4 { color: var(--t-mute); }
 
 /* Profit / loss text stays green / red (status). Everything else is ink. */
 .dash-card .ui-table-container { box-shadow: none; }
 
 /* Dashboard shell: white page, hairline header */
-.dashboard-layout .dashboard-header { background: #ffffff; border-bottom-color: #e1e1e1; }
-.dashboard-layout .dashboard-footer { background: #ffffff; border-top-color: #e1e1e1; }
+.dashboard-layout .dashboard-header { background: var(--b-card); border-bottom-color: #e1e1e1; }
+.dashboard-layout .dashboard-footer { background: var(--b-card); border-top-color: #e1e1e1; }
 
 /* Phone bottom bar: white pill, black active item, neutral shadow */
 .dashboard-bottom-nav {
-  background: #ffffff;
-  border: 1px solid #e1e1e1;
+  background: var(--b-card);
+  border: 1px solid var(--l-line);
   box-shadow: 0 10px 30px -8px rgba(10, 10, 10, 0.2);
   backdrop-filter: none;
 }
-.dashboard-bottom-nav button { color: #595959; }
+.dashboard-bottom-nav button { color: var(--t-mute); }
 .dashboard-bottom-nav button[aria-current="page"] {
-  background: #0a0a0a;
-  color: #ffffff;
+  background: var(--b-ink);
+  color: var(--t-on-ink);
 }
 
 /* Cards hold tables edge to edge: keep the table card flat inside them */
@@ -110,7 +110,7 @@ h1, h2, h3,
 
 /* Lock / info notes inside drawers */
 .ui-aside-panel__body .ui-label { font-weight: 600; font-size: 13px; }
-.ui-label { font-weight: 600; font-size: 13px; color: #0a0a0a; }
+.ui-label { font-weight: 600; font-size: 13px; color: var(--t-ink); }
 
 /* Row action icon buttons */
 .row-action-btn { border-radius: 10px; }
@@ -126,7 +126,7 @@ h1, h2, h3,
 /* ---- White pages everywhere in the dashboard; sentence-case page card titles ---- */
 .dashboard-layout,
 .dashboard-layout .dashboard-shell,
-.dashboard-layout .dashboard-content { background: #ffffff; }
+.dashboard-layout .dashboard-content { background: var(--b-card); }
 .dashboard-layout .support-title,
 .dashboard-layout .settings-title {
   text-transform: none;
@@ -160,21 +160,21 @@ h1, h2, h3,
 }
 
 /* ---- Dashboard "Needs attention" ---- */
-.needs-attention { border-color: #e1e1e1; }
+.needs-attention { border-color: var(--l-line); }
 .needs-attention__item {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px;
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--b-card);
   text-align: left;
   cursor: pointer;
-  color: #0a0a0a;
+  color: var(--t-ink);
   transition: border-color 0.15s ease;
 }
-.needs-attention__item:hover { border-color: #0a0a0a; }
+.needs-attention__item:hover { border-color: var(--t-ink); }
 .needs-attention__item:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.18); }
 .needs-attention__icon {
   width: 36px;
@@ -183,22 +183,22 @@ h1, h2, h3,
   display: grid;
   place-items: center;
   flex: none;
-  background: #f4f4f4;
-  color: #0a0a0a;
+  background: var(--b-soft);
+  color: var(--t-ink);
 }
-.needs-attention__item--bad .needs-attention__icon { background: #fbe5e3; color: #b3261e; }
+.needs-attention__item--bad .needs-attention__icon { background: var(--c-bad-soft); color: var(--c-bad); }
 .needs-attention__text { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .needs-attention__title { font-weight: 600; font-size: 14px; }
-.needs-attention__desc { font-size: 12.5px; color: #595959; overflow-wrap: anywhere; }
-.needs-attention__go { color: #8c8c8c; flex: none; }
+.needs-attention__desc { font-size: 12.5px; color: var(--t-mute); overflow-wrap: anywhere; }
+.needs-attention__go { color: var(--t-faint); flex: none; }
 
 /* Order details: read-only note */
 .ord-view__lock {
   margin: 0;
   padding: 10px 12px;
   border-radius: 10px;
-  background: #f4f4f4;
-  color: #595959;
+  background: var(--b-soft);
+  color: var(--t-mute);
   font-size: 13px;
 }
 
@@ -210,20 +210,20 @@ html input[type="file"] {
   padding: 18px;
   border: 1.5px dashed #b5b5b5;
   border-radius: 12px;
-  background: #ffffff;
-  color: #595959;
+  background: var(--b-card);
+  color: var(--t-mute);
   font-size: 13px;
   cursor: pointer;
 }
-html input[type="file"]:hover { border-color: #0a0a0a; }
+html input[type="file"]:hover { border-color: var(--t-ink); }
 input[type="file"]::file-selector-button {
   margin-right: 12px;
   height: 34px;
   padding: 0 14px;
   border: 0;
   border-radius: 9px;
-  background: #0a0a0a;
-  color: #ffffff;
+  background: var(--b-ink);
+  color: var(--t-on-ink);
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -236,8 +236,8 @@ input[type="file"]::file-selector-button {
   gap: 18px;
   padding: 18px 20px;
   border-radius: 16px;
-  background: #0a0a0a;
-  color: #ffffff;
+  background: var(--b-ink);
+  color: var(--t-on-ink);
 }
 .target-ring__svg { flex: none; }
 .target-ring__text { display: flex; flex-direction: column; min-width: 0; }
@@ -247,9 +247,9 @@ input[type="file"]::file-selector-button {
 
 /* When the black target ring is shown, the first number card goes back to white. */
 .dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child {
-  background: #ffffff;
-  border-color: #e1e1e1;
+  background: var(--b-card);
+  border-color: var(--l-line);
 }
-.dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child h4 { color: #595959; }
-.dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-value { color: #0a0a0a; }
-.dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-sub { color: #595959; }
+.dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child h4 { color: var(--t-mute); }
+.dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-value { color: var(--t-ink); }
+.dash-row:has(.target-ring) + .dash-kpis > .dash-card.metric:first-child .metric-sub { color: var(--t-mute); }

@@ -86,7 +86,7 @@
   align-items: center;
   min-height: 40px;
   padding: 8px 14px;
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
   background: var(--color-surface);
   border-radius: var(--radius-pill);
   color: var(--color-text-muted);
@@ -119,9 +119,9 @@
 
 .order-tab.active,
 .order-tab.active:hover {
-  background: #0a0a0a;
-  border-color: #0a0a0a;
-  color: #ffffff;
+  background: var(--b-ink);
+  border-color: var(--t-ink);
+  color: var(--t-on-ink);
 }
 
 .order-tab.active:focus-visible {

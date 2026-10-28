@@ -1,11 +1,11 @@
 /* Address box with suggestions (unlayered, outranks Tailwind utilities) */
 :root .addr-ac { position: relative; }
 :root .addr-ac__input { width: 100%; min-height: 64px; resize: vertical; line-height: 1.4; padding-top: 10px; padding-bottom: 10px; }
-:root .addr-ac__status { display: block; margin-top: 4px; font-size: 12px; color: #b3261e; }
-:root .addr-ac__busy { display: block; margin-top: 4px; font-size: 12px; color: #595959; }
-:root .addr-ac__list { position: fixed; z-index: 10100; margin: 0; padding: 4px; list-style: none; background: #ffffff; border: 1px solid #e1e1e1; border-radius: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12); overflow-y: auto; }
+:root .addr-ac__status { display: block; margin-top: 4px; font-size: 12px; color: var(--c-bad); }
+:root .addr-ac__busy { display: block; margin-top: 4px; font-size: 12px; color: var(--t-mute); }
+:root .addr-ac__list { position: fixed; z-index: 10100; margin: 0; padding: 4px; list-style: none; background: var(--b-card); border: 1px solid var(--l-line); border-radius: 12px; box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12); overflow-y: auto; }
 :root .addr-ac__item { display: flex; flex-direction: column; gap: 1px; padding: 9px 10px; border-radius: 8px; cursor: pointer; min-height: 44px; justify-content: center; }
-:root .addr-ac__item b { font-size: 14px; font-weight: 600; color: #0a0a0a; }
-:root .addr-ac__item span { font-size: 12px; color: #595959; }
-:root .addr-ac__item:hover, :root .addr-ac__item.is-active { background: #f4f4f4; }
-:root .addr-ac__credit { padding: 6px 10px 4px; font-size: 11px; color: #8a8a8a; text-align: right; }
+:root .addr-ac__item b { font-size: 14px; font-weight: 600; color: var(--t-ink); }
+:root .addr-ac__item span { font-size: 12px; color: var(--t-mute); }
+:root .addr-ac__item:hover, :root .addr-ac__item.is-active { background: var(--b-soft); }
+:root .addr-ac__credit { padding: 6px 10px 4px; font-size: 11px; color: var(--t-faint); text-align: right; }

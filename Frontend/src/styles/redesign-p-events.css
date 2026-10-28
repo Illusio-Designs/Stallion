@@ -1,16 +1,16 @@
 :root .ev-page .pev-tabs{display:flex;width:100%;max-width:420px}
 :root .ev-page .pev-tabs button{flex:1;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px}
-:root .ev-page .pev-count{display:inline-block;min-width:20px;padding:0 6px;border-radius:99px;background:#ececec;color:#0a0a0a;font-size:12px;line-height:20px;text-align:center}
-:root .ev-page .pev-tabs button.on .pev-count{background:#fff}
+:root .ev-page .pev-count{display:inline-block;min-width:20px;padding:0 6px;border-radius:99px;background:var(--b-soft2);color:var(--t-ink);font-size:12px;line-height:20px;text-align:center}
+:root .ev-page .pev-tabs button.on .pev-count{background:var(--b-card)}
 :root .ev-page .pev-row{align-items:flex-start}
 :root .ev-page .pev-row .ev-row__main p{overflow-wrap:anywhere}
-:root .ev-page .pev-row .pev-orders{color:#0a0a0a;font-weight:600;font-size:13px}
+:root .ev-page .pev-row .pev-orders{color:var(--t-ink);font-weight:600;font-size:13px}
 :root .ev-page .pev-pills{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 :root .ev-page .ev-row__actions .ui-btn{min-height:44px}
 :root .ev-page .page-head__actions .ui-btn{min-height:44px}
 @media (max-width:640px){
-  :root .ev-page .pev-row{border:1px solid #e1e1e1;border-radius:14px;padding:14px;background:#fff;margin-top:10px}
-  :root .ev-page .pev-row:first-child{border-top:1px solid #e1e1e1;margin-top:0}
+  :root .ev-page .pev-row{border:1px solid var(--l-line);border-radius:14px;padding:14px;background:var(--b-card);margin-top:10px}
+  :root .ev-page .pev-row:first-child{border-top:1px solid var(--l-line);margin-top:0}
   :root .ev-page .pev-pills{flex:1 1 auto}
   :root .ev-page .ev-row__actions{margin-left:auto}
   :root .ev-page .pev-tabs{max-width:none}

@@ -2,11 +2,11 @@
 
 /* ---------- shared ---------- */
 :root .acc-card { padding: 16px; border-radius: 14px; }
-:root .acc-h { margin: 0; font-size: 17px; font-weight: 700; color: #0a0a0a; letter-spacing: -.01em; }
-:root .acc-sub { margin: 3px 0 0; font-size: 13.5px; color: #595959; }
-:root .acc-hint { font-size: 12.5px; color: #595959; }
-:root .acc-err { font-size: 12.5px; color: #b3261e; }
-:root .acc-empty { margin: 12px 0 0; font-size: 14px; color: #595959; }
+:root .acc-h { margin: 0; font-size: 17px; font-weight: 700; color: var(--t-ink); letter-spacing: -.01em; }
+:root .acc-sub { margin: 3px 0 0; font-size: 13.5px; color: var(--t-mute); }
+:root .acc-hint { font-size: 12.5px; color: var(--t-mute); }
+:root .acc-err { font-size: 12.5px; color: var(--c-bad); }
+:root .acc-empty { margin: 12px 0 0; font-size: 14px; color: var(--t-mute); }
 :root .acc-field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 :root .acc-field .ui-label { margin: 0; }
 :root .acc-field .ui-input { width: 100%; min-height: 44px; }
@@ -15,13 +15,13 @@
 /* ---------- Support ---------- */
 :root .acc-support { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; align-items: start; }
 :root .acc-search { position: relative; display: block; margin-top: 12px; }
-:root .acc-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #595959; pointer-events: none; }
+:root .acc-search svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--t-mute); pointer-events: none; }
 :root .acc-search .ui-input { width: 100%; min-height: 44px; padding-left: 38px; }
 :root .acc-faq { margin: 6px 0 0; }
-:root .acc-faq__item { padding: 12px 0; border-bottom: 1px solid #e1e1e1; }
+:root .acc-faq__item { padding: 12px 0; border-bottom: 1px solid var(--l-line); }
 :root .acc-faq__item:last-child { border-bottom: 0; }
-:root .acc-faq dt, :root .acc-faq__item dt { font-weight: 700; font-size: 14.5px; color: #0a0a0a; }
-:root .acc-faq__item dd { margin: 4px 0 0; font-size: 13.5px; line-height: 1.45; color: #595959; }
+:root .acc-faq dt, :root .acc-faq__item dt { font-weight: 700; font-size: 14.5px; color: var(--t-ink); }
+:root .acc-faq__item dd { margin: 4px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--t-mute); }
 :root .acc-form { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
 :root .acc-textarea { min-height: 120px; resize: vertical; }
 :root .acc-row-end { display: flex; flex-direction: column-reverse; gap: 10px; align-items: stretch; }
@@ -39,11 +39,11 @@
 /* ---------- Settings ---------- */
 :root .acc-settings { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; max-width: 880px; }
 :root .acc-profile { display: grid; grid-template-columns: 64px 1fr; gap: 12px 14px; align-items: center; }
-:root .acc-avatar { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: #0a0a0a; color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; }
+:root .acc-avatar { width: 64px; height: 64px; border-radius: 50%; overflow: hidden; background: var(--b-ink); color: var(--t-on-ink); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 20px; }
 :root .acc-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
 :root .acc-profile__who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-:root .acc-profile__name { font-size: 18px; font-weight: 700; color: #0a0a0a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-:root .acc-profile__meta { font-size: 13.5px; color: #595959; }
+:root .acc-profile__name { font-size: 18px; font-weight: 700; color: var(--t-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+:root .acc-profile__meta { font-size: 13.5px; color: var(--t-mute); }
 :root .acc-profile__actions { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
 :root .acc-profile__actions .ui-btn { min-height: 44px; }
 :root .acc-sec-head { margin-bottom: 12px; }
@@ -71,28 +71,28 @@
 :root .rep-periods button { min-height: 44px; white-space: nowrap; }
 :root .rep-dl { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; }
 :root .rep-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-:root .rep-kpi { background: #fff; border: 1px solid #e1e1e1; border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
-:root .rep-kpi small { font-size: 12px; color: #595959; font-weight: 600; }
-:root .rep-kpi b { font-size: 20px; line-height: 1.15; font-weight: 700; color: #0a0a0a; font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
-:root .rep-kpi--dk { background: #0a0a0a; border-color: #0a0a0a; }
+:root .rep-kpi { background: var(--b-card); border: 1px solid var(--l-line); border-radius: 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+:root .rep-kpi small { font-size: 12px; color: var(--t-mute); font-weight: 600; }
+:root .rep-kpi b { font-size: 20px; line-height: 1.15; font-weight: 700; color: var(--t-ink); font-variant-numeric: tabular-nums; overflow: hidden; text-overflow: ellipsis; }
+:root .rep-kpi--dk { background: var(--b-ink); border-color: var(--t-ink); }
 :root .rep-kpi--dk small { color: #c8c8c8; }
-:root .rep-kpi--dk b { color: #fff; }
-:root .rep-tabs { display: flex; gap: 4px; padding: 3px; background: #fff; border: 1px solid #e1e1e1; border-radius: 12px; overflow-x: auto; }
-:root .rep-tab { flex: 1 0 auto; min-height: 44px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-weight: 600; font-size: 14px; color: #595959; cursor: pointer; white-space: nowrap; }
-:root .rep-tab.on { background: #0a0a0a; color: #fff; }
-:root .rep-tab:focus-visible { outline: 2px solid #0a0a0a; outline-offset: 2px; }
+:root .rep-kpi--dk b { color: var(--t-on-ink); }
+:root .rep-tabs { display: flex; gap: 4px; padding: 3px; background: var(--b-card); border: 1px solid var(--l-line); border-radius: 12px; overflow-x: auto; }
+:root .rep-tab { flex: 1 0 auto; min-height: 44px; padding: 0 14px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-weight: 600; font-size: 14px; color: var(--t-mute); cursor: pointer; white-space: nowrap; }
+:root .rep-tab.on { background: var(--b-ink); color: var(--t-on-ink); }
+:root .rep-tab:focus-visible { outline: 2px solid var(--t-ink); outline-offset: 2px; }
 :root .rep-empty__actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
 :root .rep-empty__actions .gbtn { min-height: 44px; }
 
 /* phone card list replaces the wide table */
 :root .rep-cards { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-:root .rep-cardrow { padding: 12px 0; border-bottom: 1px solid #e1e1e1; display: flex; flex-direction: column; gap: 5px; }
+:root .rep-cardrow { padding: 12px 0; border-bottom: 1px solid var(--l-line); display: flex; flex-direction: column; gap: 5px; }
 :root .rep-cardrow:last-child { border-bottom: 0; }
 :root .rep-cardrow__top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
-:root .rep-cardrow__top b { font-size: 15px; color: #0a0a0a; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-:root .rep-cardrow__date, :root .rep-cardrow__sub { font-size: 13px; color: #595959; }
-:root .rep-cardrow__nums { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: #0a0a0a; font-variant-numeric: tabular-nums; }
-:root .rep-cardrow__note { font-size: 13px; color: #595959; }
+:root .rep-cardrow__top b { font-size: 15px; color: var(--t-ink); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+:root .rep-cardrow__date, :root .rep-cardrow__sub { font-size: 13px; color: var(--t-mute); }
+:root .rep-cardrow__nums { display: flex; justify-content: space-between; font-size: 13.5px; font-weight: 600; color: var(--t-ink); font-variant-numeric: tabular-nums; }
+:root .rep-cardrow__note { font-size: 13px; color: var(--t-mute); }
 :root .rep-table { display: none; }
 
 @media (min-width: 640px) {

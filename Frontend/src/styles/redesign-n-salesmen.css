@@ -2,7 +2,7 @@
 :root .sn-who{max-width:260px}
 :root .sn-who .sn-trunc{max-width:190px}
 :root .sn-locked{opacity:.55;cursor:not-allowed}
-:root .sn-lock-note{margin:6px 0 0;font-size:12px;color:#666}
+:root .sn-lock-note{margin:6px 0 0;font-size:12px;color:var(--t-mute)}
 @media (max-width:1400px){:root .sn-trunc{max-width:170px}:root .sn-who .sn-trunc{max-width:150px}}
 @media (max-width:767.98px){:root .sn-trunc,:root .sn-who,:root .sn-who .sn-trunc{max-width:100%;white-space:normal}}
 

@@ -84,7 +84,7 @@
 .ui-btn--secondary {
   background: var(--color-surface);
   color: var(--color-text);
-  border-color: #e1e1e1;
+  border-color: var(--l-line);
 }
 
 .ui-btn--secondary:hover {
@@ -122,12 +122,12 @@
 }
 
 .ui-btn--danger:hover {
-  background: color-mix(in srgb, var(--color-error) 88%, #000);
-  border-color: color-mix(in srgb, var(--color-error) 88%, #000);
+  background: color-mix(in srgb, var(--color-error) 88%, var(--b-ink));
+  border-color: color-mix(in srgb, var(--color-error) 88%, var(--t-ink));
 }
 
 .ui-btn--danger:active {
-  background: color-mix(in srgb, var(--color-error) 78%, #000);
+  background: color-mix(in srgb, var(--color-error) 78%, var(--b-ink));
 }
 
 .ui-btn--danger:focus-visible {
@@ -455,7 +455,7 @@
   border: 1px solid transparent;
   border-radius: var(--radius-md);
   background: transparent;
-  color: #3b3b3b;
+  color: var(--t-mute);
   cursor: pointer;
   transition: background var(--transition), color var(--transition), transform var(--transition-fast);
 }
@@ -870,7 +870,7 @@ textarea.ui-input {
   bottom: calc(100% + var(--space-2));
   transform: translateX(-50%) translateY(4px);
   background: var(--color-grey-900);
-  color: #fff;
+  color: var(--t-on-ink);
   padding: var(--space-1) var(--space-2);
   border-radius: var(--radius-sm);
   font-size: var(--text-xs);
@@ -935,13 +935,13 @@ textarea.ui-input {
 }
 
 .ui-badge--warning {
-  background: #ececec;
-  color: #0a0a0a;
+  background: var(--b-soft2);
+  color: var(--t-ink);
 }
 
 .ui-badge--info {
-  background: #ececec;
-  color: #0a0a0a;
+  background: var(--b-soft2);
+  color: var(--t-ink);
 }
 
 .ui-badge--danger {
@@ -967,7 +967,7 @@ textarea.ui-input {
   align-items: center;
   gap: 8px;
   padding: 8px 14px;
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
   background: var(--color-surface);
   color: var(--color-text-muted);
   border-radius: var(--radius-pill);
@@ -994,9 +994,9 @@ textarea.ui-input {
 
 .ui-tab--active,
 .ui-tab--active:hover {
-  background: #0a0a0a;
-  border-color: #0a0a0a;
-  color: #ffffff;
+  background: var(--b-ink);
+  border-color: var(--t-ink);
+  color: var(--t-on-ink);
   font-weight: var(--font-weight-semibold);
 }
 
@@ -1113,7 +1113,7 @@ textarea.ui-input {
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  border-color: #e1e1e1;
+  border-color: var(--l-line);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
@@ -1200,7 +1200,7 @@ textarea.ui-input {
   width: 100%;
   max-width: 520px;
   background: var(--color-surface);
-  border-left: 1px solid #e1e1e1;
+  border-left: 1px solid var(--l-line);
   box-shadow: -12px 0 32px rgba(10, 10, 10, 0.08);
   display: flex;
   flex-direction: column;
@@ -1428,13 +1428,13 @@ textarea.ui-input {
 }
 
 .ui-form .form-group .phone-input-container .selected-flag:hover {
-  background: #f5f5f5 !important;
+  background: var(--b-soft) !important;
 }
 
 .ui-form .form-group .phone-input-container .selected-flag .selected-dial-code {
   margin-right: 4px !important;
   font-size: 14px !important;
-  color: #000 !important;
+  color: var(--t-ink) !important;
   flex-shrink: 0 !important;
 }
 
@@ -1468,7 +1468,7 @@ textarea.ui-input {
   border: none !important;
   border-radius: 6px !important;
   font-size: 14px !important;
-  color: #000 !important;
+  color: var(--t-ink) !important;
   background: white !important;
   width: 100% !important;
   height: 42px !important;
@@ -1494,7 +1494,7 @@ textarea.ui-input {
   right: 0 !important;
   max-height: 200px !important;
   overflow-y: auto !important;
-  border: 1px solid #E0E0E0 !important;
+  border: 1px solid var(--l-line) !important;
   border-radius: 6px !important;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1) !important;
   z-index: 1000 !important;
@@ -1533,7 +1533,7 @@ textarea.ui-input {
   padding: var(--space-6);
   overflow: visible;
   background: var(--color-surface);
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   box-shadow: none;
   position: relative;
@@ -1750,8 +1750,8 @@ textarea.ui-input {
   padding: 0 12px 10px 0;
   font-size: 11px;
   font-weight: var(--font-weight-semibold);
-  color: #595959;
-  border-bottom: 1px solid #e1e1e1;
+  color: var(--t-mute);
+  border-bottom: 1px solid var(--l-line);
   position: sticky;
   top: 0;
   text-transform: uppercase;
@@ -1824,14 +1824,14 @@ textarea.ui-input {
 }
 
 .ui-table tbody tr:hover {
-  background: #fafafa;
+  background: var(--b-soft);
 }
 
 .ui-table tbody td {
   padding: 13px 12px 13px 0;
   font-size: var(--text-base);
   color: var(--color-text);
-  border-bottom: 1px solid #e1e1e1;
+  border-bottom: 1px solid var(--l-line);
   /* Show the full value on one line; the row scrolls horizontally rather than
      truncating. */
   white-space: nowrap;
@@ -1854,8 +1854,8 @@ textarea.ui-input {
 
 .ui-table__footer {
   background: var(--color-surface);
-  border: 1px solid #e1e1e1;
-  border-top: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
+  border-top: 1px solid var(--l-line);
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
   padding: var(--space-3) var(--space-6);
   display: flex;
@@ -2198,7 +2198,7 @@ input[type="number"] {
    ============================================================ */
 .card-full {
   background: var(--color-surface);
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
   border-radius: var(--radius-lg);
   padding: 0;
   box-shadow: none;
@@ -2209,7 +2209,7 @@ input[type="number"] {
 
 .ui-card {
   background: var(--color-surface);
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
   border-radius: var(--radius-lg);
   box-shadow: none;
   padding: var(--space-6);
@@ -2217,7 +2217,7 @@ input[type="number"] {
 
 .ui-panel {
   background: var(--color-surface);
-  border: 1px solid #e1e1e1;
+  border: 1px solid var(--l-line);
   border-radius: var(--radius-lg);
   box-shadow: none;
   padding: var(--space-6);
@@ -2316,9 +2316,9 @@ input[type="number"] {
 
 /* Empty variant: grey ring icon, bold title, grey hint */
 .ui-state--empty .ui-state__icon {
-  background: #f4f4f4;
-  border: 1px solid #e1e1e1;
-  color: #0a0a0a;
+  background: var(--b-soft);
+  border: 1px solid var(--l-line);
+  color: var(--t-ink);
 }
 
 /* Error variant */

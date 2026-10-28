@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
+import ThemeSwitch from '../components/ThemeSwitch';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import { showSuccess, showError } from '../services/notificationService';
@@ -507,6 +508,11 @@ const DashboardSettings = () => {
     <div className="dash-page">
       <div className="dash-container">
         <div className="pg-head"><div><h1>Settings</h1><p>Your profile and sign-in. Everyone can change their own.</p></div></div>
+        <section className="dash-card acc-card" aria-label="Appearance" style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 16, margin: '0 0 4px' }}>Appearance</h2>
+          <p style={{ margin: '0 0 12px', color: 'var(--t-mute)' }}>Choose how Stallion looks. System follows your device.</p>
+          <ThemeSwitch variant="cards" />
+        </section>
         <form onSubmit={handleSubmit} className="ui-form acc-settings">
           <section className="dash-card acc-card acc-profile" aria-label="Profile">
             <div className="acc-avatar">

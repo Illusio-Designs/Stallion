@@ -1,16 +1,16 @@
 :root .offers-page .page-head__actions .ui-btn{min-height:44px}
 :root .offers-page .pof-group{display:flex;flex-direction:column;gap:8px}
-:root .offers-page .pof-group__h{margin:8px 0 0;font-family:var(--font-display);font-size:16px;font-weight:600;color:#595959;display:flex;align-items:center;gap:8px}
-:root .offers-page .pof-count{display:inline-block;min-width:20px;padding:0 6px;border-radius:99px;background:#ececec;color:#0a0a0a;font-size:12px;line-height:20px;text-align:center}
-:root .offers-page .pof-none{margin:0;color:#595959;font-size:14px}
+:root .offers-page .pof-group__h{margin:8px 0 0;font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--t-mute);display:flex;align-items:center;gap:8px}
+:root .offers-page .pof-count{display:inline-block;min-width:20px;padding:0 6px;border-radius:99px;background:var(--b-soft2);color:var(--t-ink);font-size:12px;line-height:20px;text-align:center}
+:root .offers-page .pof-none{margin:0;color:var(--t-mute);font-size:14px}
 :root .offers-page .pof-list{display:flex;flex-direction:column;padding:0 16px}
-:root .offers-page .pof-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid #e1e1e1;flex-wrap:wrap}
+:root .offers-page .pof-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-top:1px solid var(--l-line);flex-wrap:wrap}
 :root .offers-page .pof-row:first-child{border-top:0}
 :root .offers-page .pof-row.is-off .pof-row__main{opacity:.6}
 :root .offers-page .pof-row__main{flex:1 1 220px;min-width:0}
-:root .offers-page .pof-row__main h3{margin:0;font-family:var(--font-display);font-size:16px;font-weight:600;color:#0a0a0a;overflow-wrap:anywhere}
-:root .offers-page .pof-row__main p{margin:2px 0 0;font-size:13px;color:#595959;overflow-wrap:anywhere}
-:root .offers-page .pof-row__main p b{color:#0a0a0a;font-weight:600}
+:root .offers-page .pof-row__main h3{margin:0;font-family:var(--font-display);font-size:16px;font-weight:600;color:var(--t-ink);overflow-wrap:anywhere}
+:root .offers-page .pof-row__main p{margin:2px 0 0;font-size:13px;color:var(--t-mute);overflow-wrap:anywhere}
+:root .offers-page .pof-row__main p b{color:var(--t-ink);font-weight:600}
 :root .offers-page .pof-row__act{display:flex;align-items:center;gap:12px;margin-left:auto}
 :root .offers-page .pof-edit{min-height:44px;padding:6px 16px;border-radius:10px;font-size:13px}
 :root .offers-page .pof-tgl{position:relative}
@@ -19,11 +19,11 @@
 :root .pof-form{display:grid;grid-template-columns:minmax(0,1fr);gap:16px}
 :root .pof-form .form-group{display:flex;flex-direction:column;gap:6px;min-width:0}
 :root .pof-chips{display:flex;flex-wrap:wrap;gap:8px}
-:root .pof-chip{min-height:44px;padding:8px 16px;border:1px solid #c9c9c9;border-radius:99px;background:#fff;color:#0a0a0a;font:inherit;font-size:14px;font-weight:600;cursor:pointer}
-:root .pof-chip.on{background:#0a0a0a;border-color:#0a0a0a;color:#fff}
-:root .pof-chip:focus-visible{outline:2px solid #0a0a0a;outline-offset:2px}
-:root .pof-sub{color:#595959;font-weight:400}
-:root .pof-hint{margin:0;font-size:12.5px;color:#595959}
+:root .pof-chip{min-height:44px;padding:8px 16px;border:1px solid #c9c9c9;border-radius:99px;background:var(--b-card);color:var(--t-ink);font:inherit;font-size:14px;font-weight:600;cursor:pointer}
+:root .pof-chip.on{background:var(--b-ink);border-color:var(--t-ink);color:var(--t-on-ink)}
+:root .pof-chip:focus-visible{outline:2px solid var(--t-ink);outline-offset:2px}
+:root .pof-sub{color:var(--t-mute);font-weight:400}
+:root .pof-hint{margin:0;font-size:12.5px;color:var(--t-mute)}
 :root .pof-form .pof-switch{min-height:44px}
 @media (min-width:560px){
   :root .pof-form{grid-template-columns:repeat(2,minmax(0,1fr))}

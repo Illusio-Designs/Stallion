@@ -5,7 +5,7 @@
 
 .login-page {
   min-height: 100vh;
-  background: #ffffff;
+  background: var(--b-card);
 }
 
 .login-container {
@@ -28,7 +28,7 @@
 .login-subtitle {
   font-size: var(--text-base);
   line-height: var(--leading-normal);
-  color: #595959;
+  color: var(--t-mute);
   text-align: left;
   margin: 0 0 var(--space-6) 0;
 }

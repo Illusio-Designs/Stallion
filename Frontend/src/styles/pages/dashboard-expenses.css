@@ -98,8 +98,8 @@
 }
 
 .status-pending {
-  color: #0a0a0a;
-  background-color: #ececec;
+  color: var(--t-ink);
+  background-color: var(--b-soft2);
 }
 
 .status-approved {

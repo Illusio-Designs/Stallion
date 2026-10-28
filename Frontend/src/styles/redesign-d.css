@@ -1,25 +1,25 @@
 /* Redesign area d: own rules for this area only (unlayered, outranks Tailwind utilities). */
 
 /* ===== Salesmen: name with initials avatar, target progress ===== */
-.sm-who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; color: #0a0a0a; white-space: nowrap; }
+.sm-who { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; color: var(--t-ink); white-space: nowrap; }
 .sm-pic {
   width: 32px; height: 32px; border-radius: 50%; flex: none;
   display: inline-grid; place-items: center;
-  background: #f4f4f4; border: 1px solid #e1e1e1; color: #0a0a0a;
+  background: var(--b-soft); border: 1px solid var(--l-line); color: var(--t-ink);
   font-size: 11px; font-weight: 700; letter-spacing: 0.02em;
 }
 .prog { display: block; height: 8px; border-radius: 99px; background: #e1e1e1; overflow: hidden; min-width: 90px; }
-.prog > i { display: block; height: 100%; border-radius: 99px; background: #0a0a0a; }
+.prog > i { display: block; height: 100%; border-radius: 99px; background: var(--b-ink); }
 .sm-prog { display: inline-flex; align-items: center; gap: 6px; min-width: 96px; }
 .sm-prog .prog { min-width: 44px; }
 .sm-prog .prog { flex: 1; }
-.sm-prog__n { font-size: 12.5px; font-weight: 600; color: #595959; min-width: 34px; text-align: right; }
+.sm-prog__n { font-size: 12.5px; font-weight: 600; color: var(--t-mute); min-width: 34px; text-align: right; }
 .sm-target-cards .dash-card.metric { grid-column: span 4; }
 @media (max-width: 767.98px) { .sm-target-cards .dash-card.metric { grid-column: span 12; } }
-.sm-target-cards .dash-card.metric:first-child { background: #ffffff; border-color: #e1e1e1; }
-.sm-target-cards .dash-card.metric:first-child h4 { color: #595959; }
-.sm-target-cards .dash-card.metric:first-child .metric-value { color: #0a0a0a; }
-.sm-target-cards .dash-card.metric:first-child .metric-sub { color: #595959; }
+.sm-target-cards .dash-card.metric:first-child { background: var(--b-card); border-color: var(--l-line); }
+.sm-target-cards .dash-card.metric:first-child h4 { color: var(--t-mute); }
+.sm-target-cards .dash-card.metric:first-child .metric-value { color: var(--t-ink); }
+.sm-target-cards .dash-card.metric:first-child .metric-sub { color: var(--t-mute); }
 .sm-target-cards .metric-sub .prog { margin-top: 6px; }
 
 /* Country filter wrapper on Salesmen and Distributor: no outer box around the filter + table */
@@ -31,14 +31,14 @@
 :root .dist-wrap > .dist-filter { padding: 0 0 14px; }
 :root .dist-filter > label {
   margin-bottom: 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
-  text-transform: uppercase; color: #595959;
+  text-transform: uppercase; color: var(--t-mute);
 }
 
 /* ===== Office team: role chips ===== */
 .ot-roles { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .ot-chip {
   display: inline-flex; align-items: center; height: 26px; padding: 0 10px; border-radius: 999px;
-  background: #f4f4f4; border: 1px solid #e1e1e1; color: #0a0a0a; font-size: 12px; font-weight: 600; white-space: nowrap;
+  background: var(--b-soft); border: 1px solid var(--l-line); color: var(--t-ink); font-size: 12px; font-weight: 600; white-space: nowrap;
 }
 
 /* Multi-role dropdown (Office team, Salesmen zones): real small checkboxes, not stretched inputs */
@@ -60,11 +60,11 @@
   .an-bars__val { width: 76px; font-size: 13px; }
 }
 /* Chart colours: black and grey only */
-:root .srchart__bar--sales { fill: #0a0a0a; }
+:root .srchart__bar--sales { fill: var(--t-ink); }
 :root .srchart__bar--revenue { fill: #b5b5b5; }
-:root .srchart__legend-item--sales::before { background: #0a0a0a; }
+:root .srchart__legend-item--sales::before { background: var(--b-ink); }
 :root .srchart__legend-item--revenue::before { background: #b5b5b5; }
-:root .analytics-card.metric { border-color: #e1e1e1; border-radius: 14px; box-shadow: none; }
+:root .analytics-card.metric { border-color: var(--l-line); border-radius: 14px; box-shadow: none; }
 :root .analytics-card .metric-value { font-size: 28px; }
 @media (max-width: 639.98px) {
   :root .analytics-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -74,15 +74,15 @@
 
 /* ===== Support: quick answers ===== */
 .support-faq__list { margin: 12px 0 0; display: flex; flex-direction: column; }
-.support-faq__item { padding: 14px 0; border-top: 1px solid #e1e1e1; }
+.support-faq__item { padding: 14px 0; border-top: 1px solid var(--l-line); }
 .support-faq__item:first-child { border-top: 0; padding-top: 6px; }
-.support-faq__item dt { font-weight: 700; color: #0a0a0a; font-size: 15px; }
-.support-faq__item dd { margin: 4px 0 0; color: #595959; font-size: 14px; line-height: 1.5; }
+.support-faq__item dt { font-weight: 700; color: var(--t-ink); font-size: 15px; }
+.support-faq__item dd { margin: 4px 0 0; color: var(--t-mute); font-size: 14px; line-height: 1.5; }
 :root .support-form textarea.ui-input { min-height: 120px; }
 
 /* ===== Settings: danger zone in red, round profile photo ===== */
 :root .dash-card.settings-danger { border-color: #e9b5b0; background: #fffafa; }
-:root .dash-card.settings-danger .settings-title { color: #b3261e; }
+:root .dash-card.settings-danger .settings-title { color: var(--c-bad); }
 :root .dash-card.settings-danger .settings-title::before { content: none; }
 :root .settings-avatar__preview { border-radius: 50%; overflow: hidden; }
-:root .support-faq .support-title { color: #0a0a0a; }
+:root .support-faq .support-title { color: var(--t-ink); }
