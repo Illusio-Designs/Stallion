@@ -3,6 +3,7 @@ import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import AsidePanel from '../components/ui/AsidePanel';
 import { useConfirm } from '../components/ui/ConfirmProvider';
+import { istNow } from '../utils/istTime';
 import DatePicker from '../components/ui/DatePicker';
 import DateTimePicker from '../components/ui/DateTimePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
@@ -1252,16 +1253,13 @@ const DashboardSuppliers = () => {
   };
 
   // ---- Check-in handlers ----
-  // datetime-local value for "now" (YYYY-MM-DDTHH:mm) — local time, no seconds.
-  const nowDatetimeLocal = () => {
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
+  // "Now" as YYYY-MM-DDTHH:mm in Indian time (IST), whatever the phone's own time zone is.
+  const nowDatetimeLocal = (minusMinutes = 0) => istNow(minusMinutes);
+
   // Default in/out time to "now" (the visit is being logged on the spot); the
   // salesman can adjust. Done here (a client-side user action) — not in the
   // initial state — to avoid an SSR/client hydration mismatch from new Date().
-  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: nowDatetimeLocal(), out_time: nowDatetimeLocal(), next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
+  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: nowDatetimeLocal(30), out_time: nowDatetimeLocal(), next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
 
   const handleCheckinSubmit = async (e) => {
     e.preventDefault();
@@ -1290,8 +1288,7 @@ const DashboardSuppliers = () => {
       return;
     }
     {
-      const today = new Date();
-      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const todayStr = istNow().slice(0, 10);
       if (checkinForm.next_visit_date < todayStr) {
         showError('Next visit date cannot be in the past.');
         return;
@@ -1304,7 +1301,7 @@ const DashboardSuppliers = () => {
       let longitude = checkinForm.longitude;
       let accuracy;
       // Keep the original date when editing; only a new check-in gets today's date.
-      const checkInDate = editCheckin?.check_in_date || new Date().toISOString().split('T')[0];
+      const checkInDate = editCheckin?.check_in_date || istNow().slice(0, 10);
 
       // A salesman's new check-in must carry their GPS (the server enforces the
       // geofence with it). Editing an existing check-in keeps its stored location.
@@ -1355,7 +1352,7 @@ const DashboardSuppliers = () => {
         } catch (sendErr) {
           if (!isNetworkError(sendErr)) throw sendErr;
           queueCheckin(payload);
-          showInfo('', null, 'Saved on this phone', 'There is no signal right now. This visit will be sent when you are online.');
+          showInfo('', null, 'Saved on this phone', `${sendErr.message || 'The visit could not be sent right now'}. This visit is kept and will be sent automatically when the connection or server is back.`);
         }
       }
       setOpenCheckinModal(false);
@@ -2194,7 +2191,7 @@ const DashboardSuppliers = () => {
             </div>
             <div className="form-group form-group--full">
               <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
-              <DatePicker min={new Date().toISOString().slice(0, 10)} value={checkinForm.next_visit_date} onChange={(v) => setCheckinForm(prev => ({ ...prev, next_visit_date: v }))} placeholder="Next visit date" />
+              <DatePicker min={istNow().slice(0, 10)} value={checkinForm.next_visit_date} onChange={(v) => setCheckinForm(prev => ({ ...prev, next_visit_date: v }))} placeholder="Next visit date" />
             </div>
             <div className="form-group form-group--full">
               <label className="ui-label">Remarks</label>
