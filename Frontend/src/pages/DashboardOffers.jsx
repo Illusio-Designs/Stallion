@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import DatePicker from '../components/ui/DatePicker';
 import AsidePanel from '../components/ui/AsidePanel';
-import DropdownSelector from '../components/ui/DropdownSelector';
 import PagedMultiSelect from '../components/ui/PagedMultiSelect';
 import {
   getOffers,
@@ -15,15 +14,16 @@ import { showSuccess, showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/redesign-n-offers.css';
+import '../styles/redesign-p-offers.css';
 
-const TYPE_LABELS = { flat: 'Flat (whole order)', product: 'Product-wise', bogo: 'Buy X Get Y' };
+const TYPE_LABELS = { flat: 'Flat (whole order)', product: 'Product-wise', bogo: 'Buy X get Y' };
 const TYPE_OPTIONS = [
-  { value: 'flat', label: TYPE_LABELS.flat },
-  { value: 'product', label: TYPE_LABELS.product },
-  { value: 'bogo', label: TYPE_LABELS.bogo },
+  { value: 'flat', label: 'Flat' },
+  { value: 'product', label: 'Product-wise' },
+  { value: 'bogo', label: 'Buy X get Y' },
 ];
 const MODE_OPTIONS = [
-  { value: 'percent', label: 'Percent (%)' },
+  { value: 'percent', label: 'Percent' },
   { value: 'amount', label: 'Amount (₹)' },
 ];
 
@@ -124,6 +124,29 @@ const fmtDate = (d) => {
   if (!d) return '—';
   try { return new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
   catch { return '—'; }
+};
+
+const ChipGroup = ({ label, options, value, onChange }) => (
+  <div className="pof-chips" role="radiogroup" aria-label={label}>
+    {options.map((o) => (
+      <button
+        key={o.value}
+        type="button"
+        role="radio"
+        aria-checked={value === o.value}
+        className={`pof-chip${value === o.value ? ' on' : ''}`}
+        onClick={() => onChange(o.value)}
+      >
+        {o.label}
+      </button>
+    ))}
+  </div>
+);
+
+const isEnded = (o) => {
+  if (!o.end_date) return false;
+  const e = new Date(o.end_date);
+  return !Number.isNaN(e.getTime()) && e.getTime() < Date.now();
 };
 
 const DashboardOffers = () => {
@@ -290,6 +313,45 @@ const DashboardOffers = () => {
     return parts.join(' · ');
   };
 
+  const current = offers.filter((o) => !isEnded(o));
+  const ended = offers.filter((o) => isEnded(o));
+
+  const renderRow = (o) => {
+    const active = o.is_active !== false;
+    const dates = o.start_date && o.end_date
+      ? `${fmtDate(o.start_date)} to ${fmtDate(o.end_date)}`
+      : o.start_date ? `From ${fmtDate(o.start_date)}` : o.end_date ? `Until ${fmtDate(o.end_date)}` : 'No dates set';
+    return (
+      <div className={`pof-row${active ? '' : ' is-off'}`} key={o.offer_id}>
+        <div className="pof-row__main">
+          <h3>{o.title}</h3>
+          <p><b>{summarise(o)}</b></p>
+          <p>{TYPE_LABELS[o.offer_type] || 'Offer'} · {dates}</p>
+        </div>
+        <div className="pof-row__act">
+          <button className="ui-btn ui-btn--secondary pof-edit" onClick={() => openEdit(o)}>Edit</button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={active}
+            aria-label={`${o.title}: ${active ? 'On' : 'Off'}`}
+            className={`tgl pof-tgl${active ? ' on' : ''}`}
+            disabled={togglingId === o.offer_id}
+            onClick={() => handleToggle(o)}
+          />
+        </div>
+      </div>
+    );
+  };
+  const renderGroup = (list, heading) => (
+    <section className="pof-group">
+      {heading && <h2 className="pof-group__h">{heading} <span className="pof-count">{list.length}</span></h2>}
+      {list.length === 0
+        ? <p className="pof-none">No running offers. Ended offers are listed below.</p>
+        : <div className="dash-card pof-list">{list.map(renderRow)}</div>}
+    </section>
+  );
+
   const showScope = form.offer_type === 'product' || form.offer_type === 'bogo';
   const showRate = form.offer_type === 'flat' || form.offer_type === 'product';
 
@@ -303,7 +365,7 @@ const DashboardOffers = () => {
           </div>
           <div className="page-head__actions">
             <button className="ui-btn ui-btn--secondary" onClick={fetchOffers} disabled={loading}>Refresh</button>
-            <button className="ui-btn ui-btn--primary" onClick={openAdd}>Add Offer</button>
+            {offers.length > 0 && <button className="ui-btn ui-btn--primary" onClick={openAdd}>Add offer</button>}
           </div>
         </div>
 
@@ -321,8 +383,8 @@ const DashboardOffers = () => {
             <button className="ui-btn ui-btn--secondary" onClick={fetchOffers}>Try again</button>
           </div>
         ) : loading && offers.length === 0 ? (
-          <div className="nof-grid" aria-busy="true">
-            {[0, 1].map((i) => <div key={i} className="nof-card ui-skeleton" style={{ height: 160 }} />)}
+          <div className="pof-list" aria-busy="true">
+            {[0, 1, 2].map((i) => <div key={i} className="pof-row"><span className="ui-skeleton" style={{ display: 'block', height: 44, width: '100%', borderRadius: 10 }} /></div>)}
           </div>
         ) : offers.length === 0 ? (
           <div className="dash-card ui-state ui-state--empty">
@@ -334,45 +396,20 @@ const DashboardOffers = () => {
             </div>
             <p className="ui-state__title">No offers yet</p>
             <p className="ui-state__desc">Create a flat, product-wise or buy-X-get-Y offer for the cart.</p>
-            <button className="ui-btn ui-btn--primary" onClick={openAdd}>Add Offer</button>
+            <button className="ui-btn ui-btn--primary" onClick={openAdd}>Add offer</button>
           </div>
         ) : (
-          <div className="nof-grid">
-            {offers.map((o) => {
-              const active = o.is_active !== false;
-              return (
-                <div className={`nof-card${active ? '' : ' nof-card--off'}`} key={o.offer_id}>
-                  <div className="nof-card__art">
-                    <span className="nof-card__type">{TYPE_LABELS[o.offer_type] || 'Offer'}</span>
-                    <span className="nof-card__title">{o.title}</span>
-                  </div>
-                  <div className="nof-card__body">
-                    <div className="nof-card__text">
-                      <b>{active ? 'Live' : 'Off'}</b>
-                      <small>{validityLine(o)}</small>
-                    </div>
-                    <button className="ui-btn ui-btn--secondary nof-card__edit" onClick={() => openEdit(o)}>Edit</button>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={active}
-                      aria-label={`${o.title}: ${active ? 'Live' : 'Off'}`}
-                      className={`tgl${active ? ' on' : ''}`}
-                      disabled={togglingId === o.offer_id}
-                      onClick={() => handleToggle(o)}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <>
+            {renderGroup(current, null)}
+            {ended.length > 0 && renderGroup(ended, 'Ended')}
+          </>
         )}
       </div>
 
       <AsidePanel
         open={panelOpen}
         onClose={() => setPanelOpen(false)}
-        title={form.offer_id ? 'Edit Offer' : 'Add Offer'}
+        title={form.offer_id ? 'Edit offer' : 'Add offer'}
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => setPanelOpen(false)} disabled={saving}>Cancel</button>
@@ -382,51 +419,51 @@ const DashboardOffers = () => {
           </>
         )}
       >
-        <div className="ui-form">
-          <div className="form-group form-group--full">
+        <div className="pof-form">
+          <div className="form-group pof-full">
             <label className="ui-label">Title *</label>
             <input className="ui-input" placeholder="e.g. Diwali 10% off" value={form.title} onChange={(e) => set('title', e.target.value)} />
           </div>
 
-          <div className="form-group form-group--full">
-            <label className="ui-label">Offer Type *</label>
-            <DropdownSelector className="ui-dropdown-custom--full-width" options={TYPE_OPTIONS} value={form.offer_type} onChange={(v) => set('offer_type', v)} placeholder="Select type" />
+          <div className="form-group pof-full">
+            <label className="ui-label">Type *</label>
+            <ChipGroup label="Offer type" options={TYPE_OPTIONS} value={form.offer_type} onChange={(v) => set('offer_type', v)} />
           </div>
 
           {showRate && (
             <>
-              <div className="form-group">
-                <label className="ui-label">Discount Mode *</label>
-                <DropdownSelector className="ui-dropdown-custom--full-width" options={MODE_OPTIONS} value={form.discount_mode} onChange={(v) => set('discount_mode', v)} placeholder="Mode" />
+              <div className="form-group pof-full">
+                <label className="ui-label">Discount mode *</label>
+                <ChipGroup label="Discount mode" options={MODE_OPTIONS} value={form.discount_mode} onChange={(v) => set('discount_mode', v)} />
               </div>
               <div className="form-group">
-                <label className="ui-label">Discount Value *</label>
+                <label className="ui-label">Value *</label>
                 <input type="number" min="0" className="ui-input" placeholder={form.discount_mode === 'percent' ? 'e.g. 10' : 'e.g. 500'} value={form.discount_value} onChange={(e) => set('discount_value', e.target.value)} />
               </div>
             </>
           )}
 
           {form.offer_type === 'flat' && (
-            <div className="form-group form-group--full">
-              <label className="ui-label">Minimum Order Amount</label>
-              <input type="number" min="0" className="ui-input" placeholder="Optional — e.g. 5000" value={form.min_order_amount} onChange={(e) => set('min_order_amount', e.target.value)} />
+            <div className="form-group">
+              <label className="ui-label">Minimum order (₹)</label>
+              <input type="number" min="0" className="ui-input" placeholder="Optional, e.g. 5000" value={form.min_order_amount} onChange={(e) => set('min_order_amount', e.target.value)} />
             </div>
           )}
 
           {form.offer_type === 'bogo' && (
             <>
               <div className="form-group">
-                <label className="ui-label">Buy Qty *</label>
+                <label className="ui-label">Buy qty *</label>
                 <input type="number" min="1" className="ui-input" value={form.buy_qty} onChange={(e) => set('buy_qty', e.target.value)} />
               </div>
               <div className="form-group">
-                <label className="ui-label">Get Qty (free) *</label>
+                <label className="ui-label">Get qty *</label>
                 <input type="number" min="1" className="ui-input" value={form.get_qty} onChange={(e) => set('get_qty', e.target.value)} />
               </div>
-              <div className="form-group form-group--full">
-                <label className="ui-label">Get Discount %</label>
+              <div className="form-group pof-full">
+                <label className="ui-label">Get discount %</label>
                 <input type="number" min="0" max="100" className="ui-input" placeholder="100 = free" value={form.get_discount_percent} onChange={(e) => set('get_discount_percent', e.target.value)} />
-                <p className="m-0 mt-1 text-[length:var(--text-xs)] text-text-muted">
+                <p className="pof-hint">
                   For every {Number(form.buy_qty) || 0} bought, the next {Number(form.get_qty) || 0} get {Number(form.get_discount_percent) >= 100 || form.get_discount_percent === '' ? '100% off (free)' : `${Number(form.get_discount_percent) || 0}% off`}.
                   The cart must contain at least {(Number(form.buy_qty) || 0) + (Number(form.get_qty) || 0)} units of a product before any discount applies.
                 </p>
@@ -435,22 +472,24 @@ const DashboardOffers = () => {
           )}
 
           {showScope && (
-            <div className="form-group form-group--full">
+            <div className="form-group pof-full">
               <label className="ui-label">
                 Products *{' '}
-                <span className="text-text-subtle font-normal">
+                <span className="pof-sub">
                   ({form.all_products ? 'all products' : `${form.products.length} selected`})
                 </span>
               </label>
-              <label className="mb-2 flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={form.all_products}
-                  onChange={(e) => set('all_products', e.target.checked)}
-                />
-                <span className="text-[length:var(--text-sm)] text-text">Apply to all products</span>
-              </label>
+              <div className="pof-chips">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={form.all_products}
+                  className={`pof-chip${form.all_products ? ' on' : ''}`}
+                  onClick={() => set('all_products', !form.all_products)}
+                >
+                  Apply to all products
+                </button>
+              </div>
               {!form.all_products && (
                 <PagedMultiSelect
                   fetchPage={fetchProductPage}
@@ -463,19 +502,17 @@ const DashboardOffers = () => {
                 />
               )}
               {form.all_products && (
-                <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
-                  This offer applies to every product — no need to pick them individually.
-                </p>
+                <p className="pof-hint">This offer applies to every product, so there is no need to pick them one by one.</p>
               )}
             </div>
           )}
 
           <div className="form-group">
-            <label className="ui-label">Start Date</label>
+            <label className="ui-label">Start date</label>
             <DatePicker value={form.start_date} onChange={(v) => set('start_date', v)} placeholder="Select date" />
           </div>
           <div className="form-group">
-            <label className="ui-label">End Date</label>
+            <label className="ui-label">End date</label>
             <DatePicker value={form.end_date} onChange={(v) => set('end_date', v)} placeholder="Select date" />
           </div>
 
@@ -483,9 +520,20 @@ const DashboardOffers = () => {
             <label className="ui-label">Priority</label>
             <input type="number" className="ui-input" value={form.priority} onChange={(e) => set('priority', e.target.value)} />
           </div>
-          <div className="form-group flex flex-row items-center gap-2">
-            <input id="offer-active" type="checkbox" className="ui-checkbox" checked={form.is_active} onChange={(e) => set('is_active', e.target.checked)} />
-            <label htmlFor="offer-active" className="ui-label !mb-0 cursor-pointer">Active</label>
+          <div className="form-group">
+            <label className="ui-label">Active</label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={!!form.is_active}
+              onClick={() => set('is_active', !form.is_active)}
+              className="mng-switch pof-switch"
+            >
+              <span className={`mng-switch__track ${form.is_active ? 'is-on' : ''}`}>
+                <span className="mng-switch__dot" />
+              </span>
+              <span className="mng-switch__label">{form.is_active ? 'On' : 'Off'}</span>
+            </button>
           </div>
         </div>
       </AsidePanel>
