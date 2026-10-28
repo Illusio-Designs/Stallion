@@ -8,6 +8,7 @@ import '../styles/pages/dashboard.css';
 import OrdersPerDayChart from '../components/charts/OrdersPerDayChart';
 import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets, getTrays } from '../services/apiService';
 import { getDashboardSummary } from '../services/api/dashboardApi';
+import SalesmanHome from '../components/home/SalesmanHome';
 import { SalesRevenueCard, QuickActionsCard, OrderOverviewCard, FieldCard, ShopCheckInCard, MySalesmanCard, MyTrayTasksCard } from '../components/home/HomeBlocks';
 import { getUserRole, getUserRoles, getUser } from '../services/authService';
 import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiPackage, FiInbox } from '../components/icons/hugeicons';
@@ -627,6 +628,36 @@ const Dashboard = () => {
       </div>
     </section>
   );
+
+  // The salesman has his own, shorter home.
+  if (isSalesman) {
+    return (
+      <div className="dash-page w-full rda-page">
+        <div className="dash-container flex flex-col gap-4">
+          <SalesmanHome
+            heading={heading}
+            subline={mounted ? todayText : ''}
+            loading={loading && recentOrders.length === 0}
+            hasTarget={targets.length > 0 && targetTotal > 0}
+            targetTotal={targetTotal}
+            targetDone={targetDone}
+            targetPct={targetPct}
+            monthLabel={mounted ? now.toLocaleDateString('en-GB', { month: 'long' }) : ''}
+            sales={stats.totalSales}
+            orderCount={stats.totalOrders}
+            openCount={stats.openCount}
+            orders={latestOrders}
+            partyOf={partyOf}
+            orderRef={orderRef}
+            amountOf={amountOf}
+            money={money}
+            statusLabel={orderStatusLabel}
+            parties={ownParties}
+          />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dash-page w-full rda-page">

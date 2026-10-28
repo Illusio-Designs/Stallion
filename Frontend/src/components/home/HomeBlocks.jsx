@@ -494,7 +494,7 @@ function TrayTaskForm({ task, onDone }) {
   );
 }
 
-export function MyTrayTasksCard() {
+export function MyTrayTasksCard({ hideWhenEmpty = false }) {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -529,6 +529,9 @@ export function MyTrayTasksCard() {
     .slice(0, 3);
   const count = open.length + transit.length;
   const head = (t) => `${t.tray_name || 'Tray'}: ${t.qty} pieces${t.order_number ? `, order ${String(t.order_number).startsWith('#') ? '' : '#'}${t.order_number}` : ''}`;
+
+  // Nothing to do and nothing to show: leave the card out (the salesman home does this).
+  if (hideWhenEmpty && !loading && !error && open.length === 0 && transit.length === 0 && received.length === 0) return null;
 
   return (
     <section className="rda-card rdt" aria-label="My tray tasks">

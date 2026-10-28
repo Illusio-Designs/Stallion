@@ -1,0 +1,23 @@
+/* Salesman home: one strip of numbers, then short cards. Black and white, compact. */
+:root .sh { display: flex; flex-direction: column; gap: 14px; }
+:root .sh-strip { display: grid; gap: 10px; grid-template-columns: 1fr; }
+:root .sh-strip--target { grid-template-columns: 1fr 1fr; }
+:root .sh-kpis { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+:root .sh-kpi { border: 1px solid #e1e1e1; border-radius: 12px; padding: 10px 12px; background: #ffffff; }
+:root .sh-kpi small { display: block; color: #595959; }
+:root .sh-kpi b { font-family: var(--font-display); font-size: 20px; font-variant-numeric: tabular-nums; }
+:root .sh-cols { display: grid; grid-template-columns: 1.1fr .9fr; gap: 14px; align-items: start; }
+:root .sh-ord { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid #e1e1e1; }
+:root .sh-ord:last-child { border-bottom: 0; }
+:root .sh-ord b { display: block; }
+:root .sh-ord span { color: #595959; font-size: 13px; }
+:root .sh-warn { color: #a3241b; font-style: normal; }
+:root .sh-search { width: 100%; height: 44px; margin-bottom: 4px; }
+:root .sh-iconbtn { flex: none; width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid #e1e1e1; border-radius: 10px; background: #ffffff; color: #0a0a0a; cursor: pointer; }
+:root .sh-iconbtn:hover { background: #f5f5f5; }
+:root .sh-linkbtn { background: none; border: 0; cursor: pointer; text-decoration: underline; font: inherit; }
+:root .sh-skel { display: flex; flex-direction: column; gap: 8px; }
+@media (max-width: 900px) {
+  :root .sh-strip--target, :root .sh-cols { grid-template-columns: 1fr; }
+  :root .sh-kpi b { font-size: 17px; }
+}
