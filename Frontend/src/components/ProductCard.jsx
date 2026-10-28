@@ -46,7 +46,6 @@ const ProductCard = ({
   const stockNum = stock == null ? null : Number(stock);
   const outOfStock = stockNum != null && stockNum <= 0;
   const atMax = stockNum != null && qty >= stockNum;
-  const lowStock = stockNum != null && stockNum > 0 && stockNum <= 10;
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgBroken, setImgBroken] = useState(false);
 
@@ -141,14 +140,18 @@ const ProductCard = ({
   const hasPrice = whp != null && Number(whp) > 0;
   const hasMrp = mrp != null && Number(mrp) > 0;
   const isDiscounted = hasPrice && hasMrp && Number(mrp) > Number(whp);
+  const offPct = isDiscounted ? Math.round(100 - (Number(whp) * 100) / Number(mrp)) : 0;
+  const lineTotal = formatPrice((Number(whp) || 0) * qty);
 
   return (
     <div className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
+      {hasPrice && (
+        <div className="pc-head">
+          <span className="pc-price-now">{formatPrice(whp)}</span>
+          {offPct > 0 && <span className="pc-off">{offPct}% off MRP</span>}
+        </div>
+      )}
       <div className={`product-image relative overflow-hidden rounded-md${imgBroken ? ' aspect-square' : ''}`}>
-        {/* Stock badge (top-left of the image): white chip, coloured dot */}
-        <span className={`pc-pill pc-badge ${outOfStock ? 'pc-pill--bad' : lowStock ? 'pc-pill--idle' : 'pc-pill--ok'}`}>
-          {outOfStock ? 'Sold out' : lowStock ? 'Low stock' : 'In stock'}
-        </span>
         {/* View (eye) button (top-right) — replaces the wishlist icon */}
         <button
           type="button"
@@ -193,17 +196,9 @@ const ProductCard = ({
           overflow onto the price row. */}
       <h3 className="product-name" title={productName}>{productName}</h3>
 
-      <div className="pc-row">
-      {hasPrice && (
-        <div className="pc-price flex items-baseline flex-wrap gap-2 mb-3">
-          <span className="pc-price-label self-center text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle">WHP</span>
-          <span className="pc-price-now text-[length:var(--text-md)] font-semibold text-text leading-[var(--leading-tight)]">{formatPrice(whp)}</span>
-          {isDiscounted && (
-            <span className="pc-price-mrp text-[length:var(--text-sm)] font-normal text-text-subtle line-through">{formatPrice(mrp)}</span>
-          )}
-        </div>
-      )}
-      </div>
+      <p className="pc-sub">
+        {outOfStock ? 'Sold out' : stockNum != null && stockNum <= 5 ? `Only ${stockNum} left` : 'In stock'}
+      </p>
 
       <div className="pc-actions flex w-full items-center gap-2 mt-3">
         <div className="pc-qty inline-flex h-10 flex-none items-center overflow-hidden rounded-md border border-border-strong bg-surface" role="group" aria-label="Quantity selector">
@@ -233,7 +228,7 @@ const ProductCard = ({
           className="pc-add-btn inline-flex items-center justify-center flex-1 min-w-0 min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle disabled:opacity-100 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
         >
           <FiShoppingCart size={18} aria-hidden="true" />
-          <span className="pc-add-label">{outOfStock ? 'Sold out' : 'Add to cart'}</span>
+          <span className="pc-add-label">{outOfStock ? 'Sold out' : hasPrice ? `Add · ${lineTotal}` : 'Add to cart'}</span>
         </button>
       </div>
     </div>
