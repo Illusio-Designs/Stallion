@@ -27,6 +27,8 @@ import '../styles/redesign-n-tray.css';
 import '../styles/redesign-n-manage.css';
 import '../styles/redesign-n-orders.css';
 import GooeySearch from '../components/ui/GooeySearch';
+import { FiSearch, FiX, FiEdit, FiUndo } from '../components/icons/hugeicons';
+import '../styles/redesign-p-trayassign.css';
 
 const TrayStatus = {
   AVAILABLE: 'available',
@@ -572,6 +574,51 @@ const DashboardTray = () => {
     }
   }, [activeTab]);
 
+  // Assign products view: values derived for display only.
+  const pickedLabels = useRef({});
+  const selTrayObj = selectedTray ? trays.find((t) => String(t.tray_id || t.id) === String(selectedTray)) : null;
+  const selTrayHolder = selTrayObj ? trayHolder(selTrayObj) : null;
+  const selTraySince = selTrayObj ? traySince(selTrayObj) : null;
+  const selTrayCount = selectedTray ? trayProducts.length : 0;
+  const moveOptions = [
+    { value: '__warehouse', label: 'Warehouse' },
+    ...trays
+      .filter((t) => (t.tray_id || t.id) !== selectedTray && t.tray_status !== 'inactive' && t.is_active !== false)
+      .map((t) => ({ value: t.tray_id || t.id, label: t.tray_name || t.name })),
+  ];
+  const inr = (v) => (v ? `₹${parseFloat(v || 0).toLocaleString('en-IN')}` : 'N/A');
+  const assignRows = trayProducts.map((tp) => {
+    const productId = tp.product_id || tp.product?.product_id || tp.product?.id;
+    const product = trayProductMap[String(productId || '').toLowerCase()] || allProducts.find(p => {
+      const pId = p.product_id || p.id;
+      return pId && productId && String(pId).toLowerCase() === String(productId).toLowerCase();
+    });
+    const productData = product || tp.product;
+    const brandId = productData?.brand_id;
+    const collectionId = productData?.collection_id;
+    const brand = brandId ? brands.find(b => {
+      const bId = b.brand_id || b.id;
+      return bId && String(bId).toLowerCase() === String(brandId).toLowerCase();
+    }) : null;
+    const collection = collectionId ? collections.find(c => {
+      const cId = c.collection_id || c.id;
+      return cId && String(cId).toLowerCase() === String(collectionId).toLowerCase();
+    }) : null;
+    const st = tp.status || TrayProductStatus.ALLOTED;
+    return {
+      tp,
+      key: tp.id,
+      model: productData?.model_no || 'N/A',
+      unresolvedId: !product && productId ? String(productId) : '',
+      brand: brand?.brand_name || productData?.brand_name || 'N/A',
+      collection: collection?.collection_name || productData?.collection_name || 'N/A',
+      mrp: inr(productData?.mrp),
+      whp: inr(productData?.whp),
+      statusColor: getStatusColor(st),
+      statusLabel: getStatusLabel(st),
+    };
+  });
+
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-[var(--space-4)]">
@@ -757,344 +804,238 @@ const DashboardTray = () => {
         )}
 
         {activeTab === 'assign-products' && (
-          <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
-            <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
-              <div className="p-3 sm:p-5">
-                <h2 className="mt-0 mb-5">Assign Products to Sample</h2>
+          <div className="tra">
+            <div className="tra-head">
+              <h2>Assign products</h2>
+              <p>Pick a tray, add frames, move them to another tray or take them back.</p>
+            </div>
 
-                {error && <div className="mb-3 rounded-lg border border-[#fcc] bg-[#fee] p-3 text-[#b00020]">{error}</div>}
+            {error && <div className="tra-error" role="alert">{error}</div>}
 
-                {/* Single Section: Tray Selection, Add Product, and Products Table */}
-                <div className="flex flex-col gap-6">
-                  {/* Tray Selection */}
-                  <div className="form-group">
-                    <label className="ui-label" style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 700 }}>Select Sample</label>
-                    <DropdownSelector
-                      options={trays.filter((t) => t.is_active !== false).map(t => ({
-                        value: t.tray_id || t.id,
-                        label: t.tray_name || 'N/A'
-                      }))}
-                      value={selectedTray}
-                      onChange={handleTrayChange}
-                      placeholder="Select a tray"
+            {/* Tray: pick one, then see who holds it and how full it is */}
+            <section className="tra-card" aria-label="Tray">
+              <div className="tra-tray">
+                <div className="tra-tray__info">
+                  <h3>{selTrayObj ? (selTrayObj.tray_name || 'Tray') : 'Select a tray'}</h3>
+                  <p className="tra-sub">
+                    {selTrayObj
+                      ? [
+                          selTrayHolder ? `With ${selTrayHolder}${selTraySince ? ` since ${selTraySince}` : ''}` : 'Not with a salesman',
+                          `${selTrayCount} of ${TRAY_SLOTS} pieces`,
+                        ].join(' · ')
+                      : 'Choose a tray to see its products and add more.'}
+                  </p>
+                </div>
+                <div className="tra-tray__pick">
+                  <DropdownSelector
+                    options={trays.filter((t) => t.is_active !== false).map(t => ({
+                      value: t.tray_id || t.id,
+                      label: t.tray_name || 'N/A'
+                    }))}
+                    value={selectedTray}
+                    onChange={handleTrayChange}
+                    placeholder="Select a tray"
+                  />
+                </div>
+              </div>
+              {selTrayObj && (
+                <div className="tra-bar" role="img" aria-label={`${selTrayCount} of ${TRAY_SLOTS} pieces`}>
+                  <i style={{ width: `${Math.min(100, Math.round((selTrayCount / TRAY_SLOTS) * 100))}%` }} />
+                </div>
+              )}
+            </section>
+
+            {/* Add products: one search, chips for what is picked, one Add button */}
+            {selectedTray && !readOnly && (
+              <section className="tra-card tra-add" aria-label="Add products">
+                <h3>Add products</h3>
+                <div className="tra-field">
+                  <label htmlFor="tra-search">Search frames to add</label>
+                  <div className={`tra-search${productDropdownOpen ? ' is-open' : ''}`}>
+                    <FiSearch size={18} />
+                    <input
+                      id="tra-search"
+                      type="text"
+                      autoComplete="off"
+                      placeholder="Search by model, brand or collection"
+                      value={productSearch}
+                      onFocus={() => setProductDropdownOpen(true)}
+                      onChange={(e) => { setProductDropdownOpen(true); handleProductSearchChange(e.target.value); }}
                     />
-                  </div>
-
-                  {/* Add Product Section - Only show when tray is selected */}
-                  {selectedTray && (
-                    <div className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-4 sm:p-6">
-                      <h3 className="mb-5 mt-0 text-[18px] font-bold text-[#000000]">
-                        Add Products to Tray
-                      </h3>
-                      <div className="flex flex-col gap-4">
-                        <div className="form-group" style={{ position: 'relative' }}>
-                          <label className="ui-label" style={{ marginBottom: '8px' }}>Select Products</label>
-                          <div className="relative">
-                            {/* Trigger button */}
-                            <button
-                              type="button"
-                              onClick={() => { setProductDropdownOpen(!productDropdownOpen); if (productDropdownOpen) setProductSearch(''); }}
-                              style={{
-                                width: '100%',
-                                padding: '10px 12px',
-                                border: `1px solid ${productDropdownOpen ? '#16171d' : '#e5e7eb'}`,
-                                borderRadius: '8px',
-                                backgroundColor: '#fff',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                fontSize: '14px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                color: selectedProducts.length === 0 ? '#999' : '#333'
-                              }}
-                            >
-                              <span>
-                                {selectedProducts.length === 0
-                                  ? 'Select products to add'
-                                  : `${selectedProducts.length} product(s) selected`}
-                              </span>
-                              <span className="text-[12px] text-[#666]">
-                                {productDropdownOpen ? '▲' : '▼'}
-                              </span>
-                            </button>
-
-                            {productDropdownOpen && (
-                              <>
-                                {/* Dropdown panel */}
-                                <div
-                                  className="absolute left-0 right-0 top-full z-[1001] mt-1 flex h-[270px] flex-col rounded-[10px] border border-[#e5e7eb] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
-                                >
-                                  {/* Search bar — sticky top */}
-                                  <div className="shrink-0 border-b border-[#f0f0f0] p-[10px]">
-                                    <input
-                                      type="text"
-                                      placeholder="🔍  Search by model, brand or collection..."
-                                      value={productSearch}
-                                      onChange={(e) => handleProductSearchChange(e.target.value)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      autoFocus
-                                      className="box-border w-full rounded-md border border-[#e5e7eb] bg-[#f9fafb] p-[8px_10px] text-[13px] outline-none"
-                                    />
-                                  </div>
-
-                                  {/* Product list — scrollable */}
-                                  <div className="flex-1 overflow-y-auto p-[6px]">
-                                    {loadingProducts ? (
-                                      <div className="p-5 text-center text-[13px] text-[#999]">
-                                        Loading…
-                                      </div>
-                                    ) : allProducts.length === 0 ? (
-                                      <div className="p-5 text-center text-[13px] text-[#999]">
-                                        {productSearch.trim() ? `No products match "${productSearch}"` : 'No products available'}
-                                      </div>
-                                    ) : (() => {
-                                      return allProducts.map((p) => {
-                                        const productId = p.id || p.product_id;
-                                        const productIdStr = String(productId);
-                                        const isSelected = selectedProducts.includes(productIdStr);
-                                        return (
-                                          <label
-                                            key={productId}
-                                            style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              padding: '9px 10px',
-                                              borderRadius: '6px',
-                                              cursor: 'pointer',
-                                              backgroundColor: isSelected ? '#f3f4f5' : 'transparent',
-                                              borderLeft: isSelected ? '3px solid #16171d' : '3px solid transparent',
-                                              marginBottom: '2px',
-                                              transition: 'all 0.15s'
-                                            }}
-                                            onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#f5f5f5'; }}
-                                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? '#f3f4f5' : 'transparent'; }}
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              checked={isSelected}
-                                              onChange={(e) => {
-                                                if (e.target.checked) {
-                                                  setSelectedProducts(prev => [...prev, productIdStr]);
-                                                } else {
-                                                  setSelectedProducts(prev => prev.filter(id => id !== productIdStr));
-                                                }
-                                              }}
-                                              className="mr-[10px] h-4 w-4 shrink-0 cursor-pointer accent-[#16171d]"
-                                            />
-                                            <span className="text-[13px] leading-[1.4] text-[#333]">
-                                              <strong className="text-[#111]">{p.model_no || 'N/A'}</strong>
-                                              {(p.brand_name || p.collection_name) && (
-                                                <span className="ml-[6px] text-[#5c5c5c]">
-                                                  {[p.brand_name, p.collection_name].filter(Boolean).join(' · ')}
-                                                </span>
-                                              )}
-                                            </span>
-                                          </label>
-                                        );
-                                      });
-                                    })()}
-                                  </div>
-
-                                  {/* Footer with actions — sticky bottom */}
-                                  <div className="flex shrink-0 items-center justify-between rounded-b-[10px] border-t border-[#f0f0f0] bg-[#fafafa] p-[10px_12px]">
-                                    <span className="text-[12px] text-[#5c5c5c]">
-                                      {selectedProducts.length > 0 ? `${selectedProducts.length} selected` : 'None selected'}
-                                    </span>
-                                    <div className="flex gap-2">
-                                      {selectedProducts.length > 0 && (
-                                        <button
-                                          type="button"
-                                          className="ui-btn ui-btn--secondary"
-                                          onClick={(e) => { e.stopPropagation(); setSelectedProducts([]); }}
-                                          style={{ padding: '6px 14px', fontSize: '13px' }}
-                                        >
-                                          Clear
-                                        </button>
-                                      )}
-                                      <button
-                                        type="button"
-                                        className="ui-btn ui-btn--primary"
-                                        disabled={saving || selectedProducts.length === 0}
-                                        onClick={(e) => { e.stopPropagation(); handleAddProduct(); }}
-                                        style={{ padding: '6px 16px', fontSize: '13px' }}
-                                      >
-                                        {saving ? 'Adding...' : `Add ${selectedProducts.length > 0 ? selectedProducts.length : ''} Product${selectedProducts.length !== 1 ? 's' : ''}`}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                                {/* Backdrop — rendered after panel so panel stays on top */}
-                                <div
-                                  className="fixed inset-0 z-[999]"
-                                  onClick={() => { setProductDropdownOpen(false); setProductSearch(''); }}
-                                />
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Products List - Always visible */}
-                  <div>
-                    <h3 className="mb-[15px] mt-0">
-                      Products in Sample ({trayProducts.length})
-                    </h3>
-                    <div className="tray-assign-table max-h-[500px] overflow-x-auto overflow-y-auto rounded-lg border border-[#e5e7eb]">
-                      <table className="w-full min-w-[720px] border-collapse">
-                        <thead>
-                          <tr className="sticky top-0 bg-[#f0f0f0]">
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">MODEL NO</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">BRAND</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">COLLECTION</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">MRP</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">WHP</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">QUANTITY</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">STATUS</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                    {productDropdownOpen && (
+                      <button type="button" className="tra-search__done" onClick={() => { setProductDropdownOpen(false); setProductSearch(''); }}>Done</button>
+                    )}
+                    {productDropdownOpen && (
+                      <div className="tra-panel" role="listbox" aria-multiselectable="true">
+                        <div className="tra-panel__list">
                           {loadingProducts ? (
-                            Array.from({ length: 4 }).map((_, i) => (
-                              <tr key={`sk-${i}`} className="border-b border-[#eee]">
-                                {Array.from({ length: 8 }).map((__, c) => (
-                                  <td key={c} className="p-3">
-                                    <span className="ui-skeleton" style={{ display: 'block', height: '14px', width: c === 7 ? '60px' : '100%', borderRadius: '6px' }} />
-                                  </td>
-                                ))}
-                              </tr>
-                            ))
-                          ) : error && selectedTray ? (
-                            <tr>
-                              <td colSpan="8" className="p-0">
-                                <div className="ui-state ui-state--error">
-                                  <div className="ui-state__icon">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                      <circle cx="12" cy="12" r="10" />
-                                      <line x1="12" y1="8" x2="12" y2="12" />
-                                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                                    </svg>
-                                  </div>
-                                  <p className="ui-state__title">Couldn't load products</p>
-                                  <p className="ui-state__desc">{error}</p>
-                                  <button className="ui-btn ui-btn--secondary" onClick={() => handleTrayChange(selectedTray)}>Try again</button>
-                                </div>
-                              </td>
-                            </tr>
-                          ) : trayProducts.length === 0 ? (
-                            <tr>
-                              <td colSpan="8" className="p-0">
-                                <div className="ui-state ui-state--empty">
-                                  <div className="ui-state__icon">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                      <rect x="3" y="7" width="18" height="13" rx="2" />
-                                      <path d="M3 11h18" />
-                                      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                    </svg>
-                                  </div>
-                                  <p className="ui-state__title">{selectedTray ? 'No products yet' : 'No tray selected'}</p>
-                                  <p className="ui-state__desc">
-                                    {selectedTray
-                                      ? 'This tray has no products. Use "Add Products to Tray" above to assign some.'
-                                      : 'Select a tray above to view and manage its products.'}
-                                  </p>
-                                </div>
-                              </td>
-                            </tr>
+                            <div className="tra-panel__msg">Loading…</div>
+                          ) : allProducts.length === 0 ? (
+                            <div className="tra-panel__msg">
+                              {productSearch.trim() ? `No products match "${productSearch}"` : 'No products available'}
+                            </div>
                           ) : (
-                            trayProducts.map((tp) => {
-                              // Match product by product_id - try both id and product_id fields
-                              const productId = tp.product_id || tp.product?.product_id || tp.product?.id;
-                              const product = trayProductMap[String(productId || '').toLowerCase()] || allProducts.find(p => {
-                                const pId = p.product_id || p.id;
-                                return pId && productId && String(pId).toLowerCase() === String(productId).toLowerCase();
-                              });
-
-                              // If product not found, try to get brand and collection from nested product object
-                              const productData = product || tp.product;
-                              const brandId = productData?.brand_id;
-                              const collectionId = productData?.collection_id;
-
-                              const brand = brandId ? brands.find(b => {
-                                const bId = b.brand_id || b.id;
-                                return bId && String(bId).toLowerCase() === String(brandId).toLowerCase();
-                              }) : null;
-
-                              const collection = collectionId ? collections.find(c => {
-                                const cId = c.collection_id || c.id;
-                                return cId && String(cId).toLowerCase() === String(collectionId).toLowerCase();
-                              }) : null;
-
+                            allProducts.map((p) => {
+                              const productId = p.id || p.product_id;
+                              const productIdStr = String(productId);
+                              const isSelected = selectedProducts.includes(productIdStr);
                               return (
-                                <tr key={tp.id} className="border-b border-[#eee]">
-                                  <td className="p-3">
-                                    {productData?.model_no || 'N/A'}
-                                    {!product && productId && (
-                                      <span className="block text-[10px] text-[#999]">
-                                        (ID: {productId.substring(0, 8)}...)
-                                      </span>
+                                <label key={productId} className={`tra-opt${isSelected ? ' is-on' : ''}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        pickedLabels.current[productIdStr] = p.model_no || 'N/A';
+                                        setSelectedProducts(prev => [...prev, productIdStr]);
+                                      } else {
+                                        setSelectedProducts(prev => prev.filter(id => id !== productIdStr));
+                                      }
+                                    }}
+                                  />
+                                  <span className="tra-opt__t">
+                                    <strong>{p.model_no || 'N/A'}</strong>
+                                    {(p.brand_name || p.collection_name) && (
+                                      <span>{[p.brand_name, p.collection_name].filter(Boolean).join(' · ')}</span>
                                     )}
-                                  </td>
-                                  <td className="p-3">
-                                    {brand?.brand_name || productData?.brand_name || 'N/A'}
-                                  </td>
-                                  <td className="p-3">
-                                    {collection?.collection_name || productData?.collection_name || 'N/A'}
-                                  </td>
-                                  <td className="p-3">
-                                    {productData?.mrp ? `₹${parseFloat(productData.mrp || 0).toLocaleString('en-IN')}` : 'N/A'}
-                                  </td>
-                                  <td className="p-3">
-                                    {productData?.whp ? `₹${parseFloat(productData.whp || 0).toLocaleString('en-IN')}` : 'N/A'}
-                                  </td>
-                                  <td className="p-3">
-                                    1
-                                  </td>
-                                  <td className="p-3">
-                                    <span style={{
-                                      padding: '4px 8px',
-                                      borderRadius: '4px',
-                                      fontSize: '12px',
-                                      backgroundColor: getStatusColor(tp.status || TrayProductStatus.ALLOTED).bg,
-                                      color: getStatusColor(tp.status || TrayProductStatus.ALLOTED).text
-                                    }}>
-                                      {getStatusLabel(tp.status || TrayProductStatus.ALLOTED)}
-                                    </span>
-                                  </td>
-                                  <td className="p-3">
-                                    <div className="flex items-center gap-2">
-                                      <DropdownSelector
-                                        options={[
-                                          { value: '__warehouse', label: 'Warehouse' },
-                                          ...trays
-                                            .filter((t) => (t.tray_id || t.id) !== selectedTray && t.tray_status !== 'inactive' && t.is_active !== false)
-                                            .map((t) => ({ value: t.tray_id || t.id, label: t.tray_name || t.name })),
-                                        ]}
-                                        value=""
-                                        placeholder="Move to…"
-                                        disabled={saving}
-                                        onChange={(v) => handleMoveProduct(tp, v === '__warehouse' ? '' : v)}
-                                      />
-                                      <RowActions
-                                        onEdit={() => startEditProduct(tp)}
-                                        onDelete={() => handleRemoveProduct(tp)}
-                                      />
-                                    </div>
-                                  </td>
-                                </tr>
+                                  </span>
+                                </label>
                               );
                             })
                           )}
-                        </tbody>
-                      </table>
-                    </div>
+                        </div>
+                        <div className="tra-panel__foot">
+                          <span>{selectedProducts.length > 0 ? `${selectedProducts.length} selected` : 'None selected'}</span>
+                          {selectedProducts.length > 0 && (
+                            <button type="button" className="tra-btn tra-btn--sm" onClick={() => setSelectedProducts([])}>Clear</button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {productDropdownOpen && (
+                    <div className="tra-backdrop" onClick={() => { setProductDropdownOpen(false); setProductSearch(''); }} />
+                  )}
+                </div>
+                {selectedProducts.length > 0 && (
+                  <div className="tra-chips" aria-label="Picked frames">
+                    {selectedProducts.map((id) => (
+                      <span className="tra-chip" key={id}>
+                        {pickedLabels.current[id] || 'Frame'}
+                        <button type="button" aria-label={`Remove ${pickedLabels.current[id] || 'frame'}`} onClick={() => setSelectedProducts(prev => prev.filter(x => x !== id))}>
+                          <FiX size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="tra-add__foot">
+                  <span className="tra-sub">Pick one or more frames, then add them to this tray.</span>
+                  <button type="button" className="tra-btn tra-btn--pri" disabled={saving || selectedProducts.length === 0} onClick={handleAddProduct}>
+                    {saving ? 'Adding…' : selectedProducts.length > 0 ? `Add ${selectedProducts.length} ${selectedProducts.length === 1 ? 'frame' : 'frames'}` : 'Add frames'}
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {/* Products in the tray: cards on a phone, a compact table on tablet and desktop */}
+            <section className="tra-list" aria-label="Products in tray">
+              <h3>Products in {selTrayObj ? (selTrayObj.tray_name || 'tray') : 'tray'} ({trayProducts.length})</h3>
+              {loadingProducts ? (
+                <div className="tra-card tra-skel" aria-busy="true">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <span key={`sk-${i}`} className="ui-skeleton" style={{ display: 'block', height: '16px', width: '100%', borderRadius: '6px' }} />
+                  ))}
+                </div>
+              ) : error && selectedTray ? (
+                <div className="tra-card">
+                  <div className="ui-state ui-state--error">
+                    <p className="ui-state__title">Couldn't load products</p>
+                    <p className="ui-state__desc">{error}</p>
+                    <button className="ui-btn ui-btn--secondary" onClick={() => handleTrayChange(selectedTray)}>Try again</button>
                   </div>
                 </div>
-              </div>
-            </div>
+              ) : trayProducts.length === 0 ? (
+                <div className="tra-card">
+                  <div className="ui-state ui-state--empty">
+                    <p className="ui-state__title">{selectedTray ? 'No products yet' : 'No tray selected'}</p>
+                    <p className="ui-state__desc">
+                      {selectedTray
+                        ? 'This tray has no products. Use "Add products" above to put some in.'
+                        : 'Select a tray above to view and manage its products.'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="tra-cards">
+                    {assignRows.map((r) => (
+                      <div className="tra-pc" key={r.key}>
+                        <div className="tra-pc__top">
+                          <b>{r.model}</b>
+                          <span className="tra-status" style={{ backgroundColor: r.statusColor.bg, color: r.statusColor.text }}>{r.statusLabel}</span>
+                        </div>
+                        <span className="tra-sub">{[r.brand, r.whp !== 'N/A' ? `WHP ${r.whp}` : null, 'Qty 1'].filter(Boolean).join(' · ')}</span>
+                        {!readOnly && (
+                          <div className="tra-pc__foot">
+                            <div className="tra-move">
+                              <DropdownSelector options={moveOptions} value="" placeholder="Move to…" disabled={saving} onChange={(v) => handleMoveProduct(r.tp, v === '__warehouse' ? '' : v)} />
+                            </div>
+                            <div className="tra-acts">
+                              <button type="button" className="tra-ic" aria-label="Edit status" title="Edit status" onClick={() => startEditProduct(r.tp)}><FiEdit size={18} /></button>
+                              <button type="button" className="tra-ic" aria-label="Take back" title="Take back" onClick={() => handleRemoveProduct(r.tp)}><FiUndo size={18} /></button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="tra-card tra-desk tray-assign-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Model no</th>
+                          <th>Brand</th>
+                          <th className="tra-c-coll">Collection</th>
+                          <th className="tra-c-mrp r">MRP</th>
+                          <th className="r">WHP</th>
+                          <th className="tra-c-qty r">Qty</th>
+                          <th>Status</th>
+                          {!readOnly && <th className="r">Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assignRows.map((r) => (
+                          <tr key={r.key}>
+                            <td>
+                              <b>{r.model}</b>
+                              {r.unresolvedId && <span className="tra-sub tra-block">(ID: {r.unresolvedId.substring(0, 8)}...)</span>}
+                            </td>
+                            <td>{r.brand}</td>
+                            <td className="tra-c-coll">{r.collection}</td>
+                            <td className="tra-c-mrp r">{r.mrp}</td>
+                            <td className="r">{r.whp}</td>
+                            <td className="tra-c-qty r">1</td>
+                            <td><span className="tra-status" style={{ backgroundColor: r.statusColor.bg, color: r.statusColor.text }}>{r.statusLabel}</span></td>
+                            {!readOnly && (
+                              <td className="r">
+                                <div className="tra-acts tra-acts--row">
+                                  <div className="tra-move">
+                                    <DropdownSelector options={moveOptions} value="" placeholder="Move to…" disabled={saving} onChange={(v) => handleMoveProduct(r.tp, v === '__warehouse' ? '' : v)} />
+                                  </div>
+                                  <button type="button" className="tra-ic" aria-label="Edit status" title="Edit status" onClick={() => startEditProduct(r.tp)}><FiEdit size={18} /></button>
+                                  <button type="button" className="tra-ic" aria-label="Take back" title="Take back" onClick={() => handleRemoveProduct(r.tp)}><FiUndo size={18} /></button>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </section>
           </div>
         )}
       </div>

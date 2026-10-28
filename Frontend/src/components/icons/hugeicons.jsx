@@ -17,6 +17,8 @@ import {
   DashboardSquare01Icon,
   DeliveryTruck01Icon,
   Download01Icon,
+  Edit02Icon,
+  ArrowTurnBackwardIcon,
   Facebook01Icon,
   FavouriteIcon,
   Globe02Icon,
@@ -92,3 +94,5 @@ export const FiCalendar = make(Calendar03Icon, 'FiCalendar');
 export const FiBriefcase = make(Briefcase01Icon, 'FiBriefcase');
 export const FiChevronsLeft = make(ArrowLeftDoubleIcon, 'FiChevronsLeft');
 export const FiHome = make(Home01Icon, 'FiHome');
+export const FiEdit = make(Edit02Icon, 'FiEdit');
+export const FiUndo = make(ArrowTurnBackwardIcon, 'FiUndo');
