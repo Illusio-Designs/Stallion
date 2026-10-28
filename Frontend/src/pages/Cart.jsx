@@ -320,7 +320,7 @@ const Cart = ({ onPageChange = null }) => {
   // comes back to this cart, with the visit order and the party chosen again.
   const handleEditPartyLocation = () => {
     if (!selectedParty) return;
-    rememberEditParty(selectedParty, '/cart', { orderType: 'visit_order' });
+    rememberEditParty(selectedParty, '/cart', { orderType: orderType || 'visit_order' });
     if (onPageChange) onPageChange('party'); else window.location.href = '/dashboard/party';
   };
 

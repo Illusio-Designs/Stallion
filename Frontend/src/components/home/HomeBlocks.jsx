@@ -203,6 +203,22 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
 
   const idOf = (p) => String(p.party_id || p.id);
   const list = useMemo(() => (parties || []).filter((p) => p.is_active !== false), [parties]);
+
+  // Back from Edit party (a party that had no location): choose that party again for the check-in.
+  useEffect(() => {
+    if (!list.length) return;
+    try {
+      const raw = sessionStorage.getItem('stallion.homeReturn');
+      if (!raw) return;
+      sessionStorage.removeItem('stallion.homeReturn');
+      const back = JSON.parse(raw);
+      if (back && back.party_id && Date.now() - Number(back.at) < 30 * 60 * 1000
+        && list.some((p) => idOf(p) === String(back.party_id))) {
+        setPartyId(String(back.party_id));
+      }
+    } catch { /* storage unavailable: the party is chosen again by hand */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list]);
   const readyList = list.filter(hasPartyPoint);
   const noLocation = list.filter((p) => !hasPartyPoint(p));
   const party = list.find((p) => idOf(p) === partyId) || null;
