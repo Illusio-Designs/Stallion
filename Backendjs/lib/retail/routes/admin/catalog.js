@@ -14,7 +14,10 @@ const { slugify, imageList } = require('../../services/catalog');
 const { audit } = require('../../services/audit');
 const { syncFromStallion } = require('../../services/sync');
 
-router.use(['/products', '/sync'], noStore, checkRole(RETAIL_ADMIN_ROLES));
+// Managers only, except that editors may READ the frame list (the blog editor links frames to an article).
+const managersOnly = checkRole(RETAIL_ADMIN_ROLES);
+router.use('/sync', noStore, managersOnly);
+router.use('/products', noStore, (req, res, next) => (req.method === 'GET' ? next() : managersOnly(req, res, next)));
 
 const serialize = (p) => ({
     id: p.id,

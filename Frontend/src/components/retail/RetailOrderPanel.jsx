@@ -33,7 +33,7 @@ export default function RetailOrderPanel({ orderId, onClose, onChanged }) {
 
   const apply = (o) => {
     setOrder(o);
-    setStatus(nextStatus(o.status) || '');
+    setStatus(nextStatus(o.status, o.allowed_next) || '');
     setNote('');
     setShip({ courier: o.courier || '', awb: o.awb || '', tracking_url: o.tracking_url || '' });
   };
@@ -101,6 +101,7 @@ export default function RetailOrderPanel({ orderId, onClose, onChanged }) {
 
   const o = order;
   const finished = o && ['delivered', 'cancelled', 'returned'].includes(o.status);
+  const noMoves = o && Array.isArray(o.allowed_next) && o.allowed_next.length === 0;
 
   return (
     <AsidePanel open={!!orderId} onClose={onClose} title={o ? `Order ${o.order_number}` : 'Order'} width="lg">
@@ -165,20 +166,22 @@ export default function RetailOrderPanel({ orderId, onClose, onChanged }) {
 
           <section className="rt-order__sec">
             <h3>Change status</h3>
-            {finished ? (
-              <p className="rt-mute">This order is {statusLabel(o.status).toLowerCase()}. You can still correct the status if it was set by mistake.</p>
+            {noMoves ? (
+              <p className="rt-mute">This order is {statusLabel(o.status).toLowerCase()}. No further changes are possible.</p>
+            ) : finished ? (
+              <p className="rt-mute">This order is {statusLabel(o.status).toLowerCase()}. It can only be moved on as the list below allows.</p>
             ) : null}
-            <div className="rf-grid">
+            {!noMoves && <div className="rf-grid">
               <Field label="New status">
-                <DropdownSelector options={statusChoices(o.status)} value={status} onChange={setStatus} placeholder="Pick a status" searchable={false} className="rt-dd" />
+                <DropdownSelector options={statusChoices(o.status, o.allowed_next)} value={status} onChange={setStatus} placeholder="Pick a status" searchable={false} className="rt-dd" />
               </Field>
               <Field label="Note for the timeline (optional)" full>
                 <textarea className="ui-input rt-ta" rows={2} value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder="For example: packed in a hard case" />
               </Field>
-            </div>
-            <button type="button" className="ui-btn ui-btn--primary rt-wide" onClick={changeStatus} disabled={savingStatus || !status}>
+            </div>}
+            {!noMoves && <button type="button" className="ui-btn ui-btn--primary rt-wide" onClick={changeStatus} disabled={savingStatus || !status}>
               {savingStatus ? 'Saving...' : 'Update status'}
-            </button>
+            </button>}
           </section>
 
           <section className="rt-order__sec">

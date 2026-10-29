@@ -46,6 +46,8 @@ export const bulkRetailProducts = (ids, showOnStore) => send('POST', `${ADMIN}/p
 
 // ---- Blog ----
 export const getRetailPosts = ({ status, search, page = 1, limit = 20 } = {}) => get(`${ADMIN}/posts`, { status, search, page, limit });
+/** One post with its body (the list leaves the body out) and its linked frames as related_products. */
+export const getRetailPost = (id) => get(`${ADMIN}/posts/${encodeURIComponent(id)}`);
 export const createRetailPost = (body) => send('POST', `${ADMIN}/posts`, body);
 /** Also used for the status (draft | published | archived). Nothing is deleted. */
 export const updateRetailPost = (id, body) => send('PUT', `${ADMIN}/posts/${encodeURIComponent(id)}`, body);

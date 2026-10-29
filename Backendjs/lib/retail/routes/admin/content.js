@@ -7,6 +7,7 @@ const router = express.Router();
 // Nothing is hard deleted: posts are archived, FAQs are switched off with is_active=false.
 
 const RetailPost = require('../../models/RetailPost');
+const RetailProduct = require('../../models/RetailProduct');
 const RetailFaq = require('../../models/RetailFaq');
 const RetailContent = require('../../models/RetailContent');
 const RetailPage = require('../../models/RetailPage');
@@ -116,7 +117,12 @@ router.get('/posts', wrap(async (req, res) => {
 router.get('/posts/:id', wrap(async (req, res) => {
     const p = isUuid(req.params.id) ? await RetailPost.findByPk(req.params.id) : null;
     if (!p) throw new HttpError(404, 'Post not found');
-    ok(res, postDto(p));
+    // The editor shows the linked frames by name, so send {id, model_no, title} next to the ids.
+    const ids = parseJson(p.related_product_ids, []).filter(isUuid);
+    const frames = ids.length ? await RetailProduct.findAll({ where: { id: ids }, attributes: ['id', 'model_no', 'title'] }) : [];
+    const byId = new Map(frames.map((f) => [f.id, f]));
+    const related_products = ids.filter((id) => byId.has(id)).map((id) => ({ id, model_no: byId.get(id).model_no, title: byId.get(id).title }));
+    ok(res, { ...postDto(p), related_products });
 }));
 
 router.post('/posts', wrap(async (req, res) => {

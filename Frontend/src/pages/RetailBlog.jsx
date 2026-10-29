@@ -9,7 +9,7 @@ import { FiSearch } from '../components/icons/hugeicons';
 import { FormSec, ChipRow } from '../components/forms/FormBits';
 import RichTextEditor from '../components/retail/RichTextEditor';
 import { PageHead, Chips, StateBox, Field, Thumb, TagInput, errorText } from '../components/retail/RetailBits';
-import { getRetailPosts, createRetailPost, updateRetailPost, getRetailProducts, retailList } from '../services/api/retailApi';
+import { getRetailPosts, getRetailPost, createRetailPost, updateRetailPost, getRetailProducts, retailData, retailList } from '../services/api/retailApi';
 import { showSuccess, showError } from '../services/notificationService';
 import { sanitizeHtml, htmlToText } from '../utils/sanitizeHtml';
 import { slugify, istDate, sentence } from '../utils/retailFormat';
@@ -30,8 +30,9 @@ const frameLabel = (p) => [p.model_no, p.title && p.title !== p.model_no ? p.tit
 
 const blank = () => ({ id: null, title: '', slug: '', summary: '', cover_image: '', tags: [], body: '', status: 'draft', frames: [] });
 const fromPost = (p) => {
-  const linked = p.related_products || p.linked_products || p.products || [];
-  const ids = p.product_ids || [];
+  const linked = Array.isArray(p.related_products) ? p.related_products : [];
+  const labelled = new Set(linked.map((f) => String(f.id)));
+  const ids = (Array.isArray(p.related_product_ids) ? p.related_product_ids : []).filter((id) => !labelled.has(String(id)));
   return {
     id: p.id,
     title: p.title || '',
@@ -41,9 +42,7 @@ const fromPost = (p) => {
     tags: Array.isArray(p.tags) ? p.tags : [],
     body: p.body || '',
     status: p.status || 'draft',
-    frames: linked.length
-      ? linked.map((f) => ({ id: f.id, label: frameLabel(f) || String(f.id) }))
-      : ids.map((id) => ({ id, label: String(id) })),
+    frames: [...linked.map((f) => ({ id: f.id, label: frameLabel(f) || String(f.id) })), ...ids.map((id) => ({ id, label: String(id) }))],
   };
 };
 
@@ -82,7 +81,20 @@ export default function RetailBlog() {
 
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
   const openNew = () => { slugTouched.current = false; setErrors({}); setForm(blank()); };
-  const openEdit = (p) => { slugTouched.current = true; setErrors({}); setForm(fromPost(p)); };
+  // The list leaves the article body out, so the full post is fetched before the editor opens.
+  const openEdit = async (p) => {
+    setBusyId(p.id);
+    try {
+      const full = retailData(await getRetailPost(p.id)) || p;
+      slugTouched.current = true;
+      setErrors({});
+      setForm(fromPost(full));
+    } catch (e) {
+      showError(errorText(e), null, 'Could not open the post');
+    } finally {
+      setBusyId('');
+    }
+  };
 
   const validate = () => {
     const e = {};
@@ -108,7 +120,7 @@ export default function RetailBlog() {
       tags: form.tags,
       body: sanitizeHtml(form.body),
       status: form.status,
-      product_ids: form.frames.map((f) => f.id),
+      related_product_ids: form.frames.map((f) => f.id),
     };
     setSaving(true);
     try {
@@ -154,7 +166,7 @@ export default function RetailBlog() {
       key: 'actions', label: 'Action',
       render: (_v, r) => (
         <span className="rt-actions">
-          <button type="button" className="ui-btn ui-btn--secondary rt-rowbtn" onClick={() => openEdit(r)} aria-label={`Edit ${r.title}`}>Edit</button>
+          <button type="button" className="ui-btn ui-btn--secondary rt-rowbtn" disabled={busyId === r.id} onClick={() => openEdit(r)} aria-label={`Edit ${r.title}`}>Edit</button>
           {r.status !== 'published' && <button type="button" className="ui-btn ui-btn--secondary rt-rowbtn" disabled={busyId === r.id} onClick={() => setStatus(r, 'published')} aria-label={`Publish ${r.title}`}>Publish</button>}
           {r.status !== 'archived' && <button type="button" className="ui-btn ui-btn--secondary rt-rowbtn" disabled={busyId === r.id} onClick={() => setStatus(r, 'archived')} aria-label={`Archive ${r.title}`}>Archive</button>}
         </span>

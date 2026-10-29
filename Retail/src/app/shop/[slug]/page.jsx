@@ -9,6 +9,7 @@ import ViewTrack from '../../../components/ViewTrack';
 import { get, SITE_URL } from '../../../lib/api';
 import { pageMetadata, jsonLd } from '../../../lib/seo';
 import { rs } from '../../../lib/format';
+import { cleanHtml, htmlText } from '../../../lib/html';
 
 const load = async (slug) => {
   const res = await get(`/products/${encodeURIComponent(slug)}`, { revalidate: 60 });
@@ -21,7 +22,7 @@ export async function generateMetadata({ params }) {
   if (!p) return { title: 'Frame not found', robots: { index: false, follow: false } };
   const seo = p.seo || {};
   const name = p.title || p.model_no;
-  const desc = (seo.description || p.description || `Buy ${name} online at ${rs(p.mrp)}.`).replace(/\s+/g, ' ').slice(0, 300);
+  const desc = (seo.description || htmlText(p.description) || `Buy ${name} online at ${rs(p.mrp)}.`).replace(/\s+/g, ' ').slice(0, 300);
   return pageMetadata(`/shop/${slug}`, {
     title: seo.title || `${name}${p.shape ? ` ${p.shape.toLowerCase()} frame` : ''}`,
     description: desc,
@@ -47,7 +48,7 @@ export default async function ProductPage({ params }) {
   const product = {
     '@context': 'https://schema.org', '@type': 'Product',
     name, sku: p.model_no, mpn: p.model_no,
-    image: images, description: p.description || undefined,
+    image: images, description: htmlText(p.description) || undefined,
     brand: { '@type': 'Brand', name: specs.brand || 'Stallion' },
     color: p.color || undefined, material: specs.frame_material || undefined,
     offers: {
@@ -106,7 +107,7 @@ export default async function ProductPage({ params }) {
           <ProductBuy product={{ id: p.id, slug: p.slug, title: name, model_no: p.model_no, image: p.image || images[0] || null, mrp: p.mrp, stock }} />
           <PincodeCheck subtotal={Number(p.mrp) || 0} />
 
-          {p.description ? <p className="pd-desc">{p.description}</p> : null}
+          {p.description ? <div className="pd-desc" dangerouslySetInnerHTML={{ __html: cleanHtml(p.description) }} /> : null}
 
           <div className="pd-specs">
             {SPECS.filter(([k]) => specs[k]).map(([k, label]) => (

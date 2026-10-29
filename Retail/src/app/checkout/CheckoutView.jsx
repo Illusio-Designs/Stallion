@@ -6,7 +6,7 @@ import '../../styles/cart.css';
 import '../../styles/checkout.css';
 import Glasses from '../../components/Glasses';
 import { CartLine } from '../cart/CartView';
-import { post } from '../../lib/api';
+import { post, getClient } from '../../lib/api';
 import { useCart, setQuantity, removeFromCart, clearCart } from '../../lib/cart';
 import { rs } from '../../lib/format';
 import { sessionId } from '../../lib/session';
@@ -49,6 +49,7 @@ export default function CheckoutView() {
   const [quote, setQuote] = useState({ status: 'idle', data: null, error: '' });
   const [issues, setIssues] = useState([]);
   const [nonce, setNonce] = useState(0);
+  const [stateList, setStateList] = useState(STATES);
   const [busy, setBusy] = useState(false);
   const [slow, setSlow] = useState(false);
   const [formError, setFormError] = useState('');
@@ -60,10 +61,19 @@ export default function CheckoutView() {
 
   useEffect(() => { setReady(true); key.current = newKey(); }, []);
 
+  // The store's own list of states (same names as the shipping zones and the order check); the built-in list is the fallback.
+  useEffect(() => {
+    getClient('/states').then((res) => {
+      const names = (Array.isArray(res.data) ? res.data : []).map((x) => (typeof x === 'string' ? x : x && x.name)).filter(Boolean);
+      if (names.length) setStateList(names);
+    }).catch(() => { /* keep the built-in list */ });
+  }, []);
+
   const itemsKey = useMemo(() => items.map((x) => `${x.product_id}:${x.quantity}`).join(','), [items]);
   const pinValid = pincodeOk(v.pincode);
   const pin = pinValid ? v.pincode.trim() : '';
   const subtotalKey = Math.round(subtotal);
+  const stateName = v.state || '';
 
   // begin_checkout, once, when the page opens with something in the cart.
   useEffect(() => {
@@ -79,7 +89,7 @@ export default function CheckoutView() {
     const seq = ++shipSeq.current;
     setShip((s) => ({ ...s, status: 'loading', error: '' }));
     try {
-      const res = await post('/shipping/check', { pincode: pin, subtotal: subtotalKey });
+      const res = await post('/shipping/check', { pincode: pin, subtotal: subtotalKey, ...(stateName ? { state: stateName } : {}) });
       if (seq !== shipSeq.current) return;
       const d = res.data || {};
       setShip({ status: 'ok', data: d, error: '' });
@@ -89,7 +99,7 @@ export default function CheckoutView() {
       if (seq !== shipSeq.current) return;
       setShip({ status: 'error', data: null, error: errorText(err, 'We could not check delivery for this pincode.') });
     }
-  }, [pinValid, pin, subtotalKey]);
+  }, [pinValid, pin, subtotalKey, stateName]);
   useEffect(() => { const t = setTimeout(checkShipping, 250); return () => clearTimeout(t); }, [checkShipping]);
 
   // Live totals. Re-runs whenever the cart, pincode or delivery option changes.
@@ -101,7 +111,7 @@ export default function CheckoutView() {
       try {
         const res = await post('/checkout/quote', {
           items: items.map((x) => ({ product_id: x.product_id, quantity: x.quantity })),
-          pincode: pin || undefined, shipping_option: optId, payment_type: 'cod',
+          pincode: pin || undefined, state: stateName || undefined, shipping_option: optId, payment_type: 'cod',
         });
         if (seq !== quoteSeq.current) return;
         const d = res.data || {};
@@ -117,7 +127,7 @@ export default function CheckoutView() {
     }, 300);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, itemsKey, pin, optId, nonce]);
+  }, [ready, itemsKey, pin, stateName, optId, nonce]);
 
   const errors = validate(v);
   if (ship.status === 'ok' && ship.data && ship.data.serviceable === false && pinValid) errors.pincode = 'We do not deliver to this pincode yet. Try another one.';
@@ -180,7 +190,6 @@ export default function CheckoutView() {
         notes: v.notes.trim() || undefined,
         session_id: sessionId() || undefined,
         utm: readUtm(),
-        consent: true,
         client_key: key.current,
       };
       const res = await post('/checkout/orders', payload);
@@ -291,7 +300,7 @@ export default function CheckoutView() {
             <Field id="state" label="State" error={show('state')}>
               <select id="state" className="input" value={v.state} onChange={set('state')} autoComplete="address-level1" {...aria('state')}>
                 <option value="">Choose a state</option>
-                {STATES.map((s) => <option key={s} value={s}>{s}</option>)}
+                {stateList.map((s) => <option key={s} value={s}>{s}</option>)}
               </select>
             </Field>
             <Field id="notes" label="Delivery notes (optional)">

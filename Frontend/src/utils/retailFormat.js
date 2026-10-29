@@ -114,9 +114,17 @@ export const normalizeOrder = (o) => {
   const r = o && typeof o === 'object' ? o : {};
   const rawItems = firstDefined(r.items, r.order_items, []);
   const rawTimeline = firstDefined(r.timeline, r.events, r.history, []);
-  const addr = [r.address_line1, r.address_line2, r.city, r.state, r.pincode].filter(Boolean);
+  // The detail answer nests the address and the shipment; the list answer is flat. Read both.
+  const a = r.address && typeof r.address === 'object' ? r.address : {};
+  const sh = r.shipment && typeof r.shipment === 'object' ? r.shipment : {};
+  const addr = [firstDefined(a.line1, r.address_line1), firstDefined(a.line2, r.address_line2), firstDefined(a.city, r.city), firstDefined(a.state, r.state), firstDefined(a.pincode, r.pincode)].filter(Boolean);
   return {
     ...r,
+    courier: firstDefined(r.courier, sh.courier, null),
+    awb: firstDefined(r.awb, sh.awb, null),
+    tracking_url: firstDefined(r.tracking_url, sh.tracking_url, null),
+    city: firstDefined(r.city, a.city, ''),
+    allowed_next: Array.isArray(r.allowed_next) ? r.allowed_next : null,
     id: r.id,
     order_number: firstDefined(r.order_number, r.number, r.id),
     customer_name: firstDefined(r.customer_name, r.customer?.name, r.name, ''),
@@ -145,4 +153,25 @@ export const normalizeOrder = (o) => {
       at: firstDefined(t.at, t.created_at, t.createdAt, ''),
     })),
   };
+};
+
+const ENTITIES = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&#x27;': "'", '&nbsp;': ' ' };
+const decode = (t) => String(t).replace(/&(?:amp|lt|gt|quot|#39|#x27|nbsp);/g, (m) => ENTITIES[m]);
+const escapeHtml = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+/**
+ * The server keeps a frame description as sanitised HTML. The frame form edits it as plain text:
+ * paragraphs become blank-line separated blocks, <br> a new line, entities are decoded.
+ */
+export const descriptionToText = (html) => decode(String(html || '')
+  .replace(/<\/p>\s*<p[^>]*>/gi, '\n\n')
+  .replace(/<br\s*\/?>/gi, '\n')
+  .replace(/<[^>]*>/g, ''))
+  .trim();
+
+/** Plain text from the frame form -> the HTML the server stores (escaped, paragraphs and line breaks kept). */
+export const textToDescription = (text) => {
+  const t = String(text || '').replace(/\r\n?/g, '\n').trim();
+  if (!t) return '';
+  return t.split(/\n{2,}/).map((block) => `<p>${escapeHtml(block).replace(/\n/g, '<br>')}</p>`).join('');
 };

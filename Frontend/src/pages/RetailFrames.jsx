@@ -9,7 +9,7 @@ import {
   getRetailProducts, updateRetailProduct, bulkRetailProducts, syncRetailProducts, retailData, retailList,
 } from '../services/api/retailApi';
 import { showSuccess, showError } from '../services/notificationService';
-import { rupees, count, slugify, lengthHint, TITLE_RANGE, DESC_RANGE } from '../utils/retailFormat';
+import { rupees, count, slugify, lengthHint, descriptionToText, textToDescription, TITLE_RANGE, DESC_RANGE } from '../utils/retailFormat';
 import '../styles/redesign-p-retail.css';
 import '../styles/dark-retail.css';
 
@@ -25,7 +25,7 @@ const emptyForm = (p) => ({
   id: p.id,
   model_no: p.model_no || '',
   title: p.title || '',
-  description: p.description || '',
+  description: descriptionToText(p.description),
   slug: p.slug || '',
   mrp: p.mrp ?? '',
   stock: p.stock ?? 0,
@@ -142,7 +142,7 @@ export default function RetailFrames() {
     try {
       await updateRetailProduct(form.id, {
         title: form.title.trim(),
-        description: form.description.trim(),
+        description: textToDescription(form.description),
         slug: form.slug.trim(),
         mrp: Number(form.mrp),
         stock: Number(form.stock),

@@ -12,12 +12,25 @@ import '../styles/dark-retail.css';
 
 const AUTOMATIC = ['Sitemap', 'Robots file', 'Product data (price, stock)', 'Article data', 'Canonical links', 'Share cards'];
 
+// The pages of the store. The server only lists rows somebody saved, so these are shown from the start
+// (blank until saved) and the other pages the admin adds are listed after them.
+const STORE_PAGES = [
+  ['/', 'Home'], ['/shop', 'Shop'], ['/blog', 'Blog'], ['/about', 'About'], ['/help', 'Help and FAQ'], ['/contact', 'Contact'],
+  ['/policies/shipping', 'Shipping policy'], ['/policies/returns', 'Returns policy'], ['/policies/privacy', 'Privacy policy'], ['/policies/terms', 'Terms'],
+];
+const withStorePages = (saved) => {
+  const byPath = new Map((saved || []).map((r) => [r.path, r]));
+  const known = STORE_PAGES.map(([path, label]) => ({ path, label, title: '', description: '', og_image: '', canonical: '', noindex: false, ...(byPath.get(path) || {}), label }));
+  const knownPaths = new Set(STORE_PAGES.map(([path]) => path));
+  return [...known, ...(saved || []).filter((r) => !knownPaths.has(r.path))];
+};
+
 const labelOf = (r) => r.label || r.name || (r.path === '/' ? 'Home' : String(r.path || '').replace(/^\//, '').replace(/[-/]+/g, ' ').replace(/^./, (c) => c.toUpperCase()) || 'Page');
 const blank = () => ({ isNew: true, path: '/', title: '', description: '', og_image: '', canonical: '', noindex: false });
 
 // SEO: the title, description and share image of each page of the store, with a Google-style preview.
 export default function RetailSeo() {
-  const { data, loading, error, reload } = useRetailLoad(async () => retailList(await getRetailPages()).rows, []);
+  const { data, loading, error, reload } = useRetailLoad(async () => withStorePages(retailList(await getRetailPages()).rows), []);
   const [form, setForm] = useState(null);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);

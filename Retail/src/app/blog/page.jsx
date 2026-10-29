@@ -35,9 +35,9 @@ export async function generateMetadata({ searchParams }) {
   return meta;
 }
 
-// Tag chips are built from a wide, cached read of the list (the contract has no tags endpoint).
+// Tag chips are built from a wide (50 newest posts), cached read of the list (the contract has no tags endpoint).
 async function loadTags() {
-  const res = await get('/blog?limit=100', { revalidate: 600 });
+  const res = await get('/blog?limit=50', { revalidate: 600 });
   const set = new Map();
   ((res && res.data) || []).forEach((p) => (p.tags || []).forEach((t) => set.set(t, (set.get(t) || 0) + 1)));
   return [...set.keys()].sort((a, b) => a.localeCompare(b));

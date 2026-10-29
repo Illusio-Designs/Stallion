@@ -15,7 +15,7 @@ const toForm = (d = {}) => {
   const soc = s.social || {};
   return {
     store_enabled: d.store_enabled !== false,
-    store: { name: str(s.name), tagline: str(s.tagline), logo_url: str(s.logo_url), support_phone: str(s.support_phone), whatsapp: str(s.whatsapp), email: str(s.email), address: str(s.address), hours: str(s.hours), social: { instagram: str(soc.instagram), facebook: str(soc.facebook), youtube: str(soc.youtube) } },
+    store: { name: str(s.name), tagline: str(s.tagline), logo_url: str(s.logo_url), site_url: str(s.site_url), support_phone: str(s.support_phone), whatsapp: str(s.whatsapp), email: str(s.email), address: str(s.address), hours: str(s.hours), social: { instagram: str(soc.instagram), facebook: str(soc.facebook), youtube: str(soc.youtube) } },
     banner: { headline: str(b.headline), sub: str(b.sub), image: str(b.image), cta_label: str(b.cta_label), cta_url: str(b.cta_url) },
     usps: Array.isArray(d.usps) ? d.usps.map((u) => ({ title: str(u.title), text: str(u.text) })) : [],
     tracking: { ga_id: str(t.ga_id), meta_pixel_id: str(t.meta_pixel_id), cookie_notice: !!t.cookie_notice },
@@ -57,6 +57,7 @@ export default function RetailSettings() {
     if (!store.name.trim()) e.name = 'Enter the store name.';
     if (store.email.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(store.email.trim())) e.email = 'Enter a valid email address.';
     ['support_phone', 'whatsapp'].forEach((k) => { if (store[k].trim() && !/^[+\d][\d\s-]{6,17}$/.test(store[k].trim())) e[k] = 'Enter a phone number, for example +91 98765 43210.'; });
+    if (store.site_url.trim() && !/^https?:\/\/\S+$/i.test(store.site_url.trim())) e.site_url = 'Enter the full web address, for example https://www.stallioneyewear.in';
     ['logo_url'].forEach((k) => { if (!urlOk(store[k])) e[k] = 'Enter a web address (https://) or a path that starts with /.'; });
     ['instagram', 'facebook', 'youtube'].forEach((k) => { if (!urlOk(store.social[k])) e[`s_${k}`] = 'Enter a web address that starts with https://'; });
     if (!urlOk(banner.image)) e.b_image = 'Enter a web address (https://) or a path that starts with /.';
@@ -121,6 +122,7 @@ export default function RetailSettings() {
                 <Field label="Support email"><input className="ui-input" type="email" inputMode="email" value={f.store.email} onChange={(e) => setIn('store', 'email', e.target.value)} />{err('email')}</Field>
                 <Field label="Opening hours"><input className="ui-input" value={f.store.hours} onChange={(e) => setIn('store', 'hours', e.target.value)} placeholder="Mon to Sat, 10am to 7pm" /></Field>
                 <Field label="Address" full><textarea className="ui-input rt-ta" rows={2} value={f.store.address} onChange={(e) => setIn('store', 'address', e.target.value)} /></Field>
+                <Field label="Store web address" full hint="Used for the links in search results and the Google Merchant product feed."><input className="ui-input" type="url" inputMode="url" value={f.store.site_url} onChange={(e) => setIn('store', 'site_url', e.target.value)} placeholder="https://www.stallioneyewear.in" />{err('site_url')}</Field>
                 <Field label="Logo address" full hint="A link to the logo picture."><input className="ui-input" type="url" inputMode="url" value={f.store.logo_url} onChange={(e) => setIn('store', 'logo_url', e.target.value)} placeholder="https://" />{err('logo_url')}</Field>
               </div>
             </Card>

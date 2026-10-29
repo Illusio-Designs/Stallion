@@ -5,6 +5,8 @@ import { useEffect, useState, useCallback } from 'react';
 // Prices here are only for display; the server re-prices everything at checkout.
 const KEY = 'stl-retail-cart';
 const EVT = 'stl-cart-change';
+// The server accepts at most this many pieces of one frame per order (bulk buyers contact us).
+export const MAX_PER_LINE = 10;
 
 export function readCart() {
   try { return JSON.parse(localStorage.getItem(KEY) || '[]'); } catch (_e) { return []; }
@@ -17,13 +19,13 @@ function write(items) {
 export function addToCart(item, quantity = 1) {
   const items = readCart();
   const i = items.findIndex((x) => x.product_id === item.product_id);
-  const max = item.stock != null ? Number(item.stock) : 99;
+  const max = Math.min(MAX_PER_LINE, item.stock != null ? Number(item.stock) : MAX_PER_LINE);
   if (i >= 0) items[i].quantity = Math.min(max, items[i].quantity + quantity);
   else items.push({ ...item, quantity: Math.min(max, quantity) });
   write(items);
 }
 export function setQuantity(product_id, quantity) {
-  const items = readCart().map((x) => (x.product_id === product_id ? { ...x, quantity: Math.max(1, Math.min(Number(x.stock) || 99, quantity)) } : x));
+  const items = readCart().map((x) => (x.product_id === product_id ? { ...x, quantity: Math.max(1, Math.min(Number(x.stock) || MAX_PER_LINE, MAX_PER_LINE, quantity)) } : x));
   write(items);
 }
 export function removeFromCart(product_id) { write(readCart().filter((x) => x.product_id !== product_id)); }

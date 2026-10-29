@@ -3,7 +3,7 @@ import '../../styles/article.css';
 import '../../styles/content.css';
 import HelpFaq from '../../components/HelpFaq';
 import { get } from '../../lib/api';
-import { stripHtml } from '../../lib/html';
+import { htmlText } from '../../lib/html';
 import { jsonLd, pageMetadata } from '../../lib/seo';
 
 export const revalidate = 600;
@@ -19,7 +19,7 @@ export default async function HelpPage() {
   const schema = {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: all.map((it) => ({ '@type': 'Question', name: it.question, acceptedAnswer: { '@type': 'Answer', text: stripHtml(it.answer) } })),
+    mainEntity: all.map((it) => ({ '@type': 'Question', name: it.question, acceptedAnswer: { '@type': 'Answer', text: htmlText(it.answer) } })),
   };
 
   return (

@@ -19,4 +19,7 @@ export function cleanHtml(html) {
 }
 
 export const stripHtml = (html) => String(html || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+// Plain text of an HTML snippet for meta descriptions and structured data (tags removed, common entities decoded).
+const ENT = { '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'", '&#x27;': "'", '&nbsp;': ' ' };
+export const htmlText = (html) => stripHtml(html).replace(/&(?:amp|lt|gt|quot|#39|#x27|nbsp);/g, (m) => ENT[m]);
 export const looksLikeHtml = (s) => /<[a-z][\s\S]*>/i.test(String(s || ''));

@@ -22,11 +22,11 @@ Already created: `RetailSetting` (`retail_settings`), `RetailProduct` (`retail_p
 `RetailPage` (SEO per path), `RetailPost` (blog), `RetailFaq`, `RetailContent` (about/privacy/terms/returns/shipping text).
 
 ## Settings keys (retail_settings, JSON values)
-`store` {name, tagline, logo_url, support_phone, whatsapp, email, address, hours, social{instagram,facebook,youtube}},
+`store` {name, tagline, logo_url, site_url (https address of the storefront, used for sitemap/feed links), support_phone, whatsapp, email, address, hours, social{instagram,facebook,youtube}},
 `banner` {headline, sub, image, cta_label, cta_url}, `usps` [{title, text}],
 `shipping` {free_over, cod_enabled, cod_fee, express_enabled, express_charge, packing_days, zones:[{name, states[], days_min, days_max, charge}], blocked_pincodes[]},
 `tracking` {ga_id, meta_pixel_id, cookie_notice(bool)} (public), `tracking_secrets` {meta_capi_token, ga_api_secret} (secret, never public),
-`store_enabled` (bool). Admin `GET/PUT /settings` reads and writes these; the public `GET /settings` returns only the public ones.
+`store_enabled` (bool). Admin `GET/PUT /settings` reads and writes these; the public `GET /settings` returns only the public ones. `PUT` replaces each key you send as a whole (send the full `store`, not just the changed field); a secret field that still starts with the mask `••••` keeps its stored value.
 
 ## PUBLIC API (no login, rate limited) — `/api/retail/public`
 
@@ -35,23 +35,24 @@ Catalogue (owner: backend-catalog)
 - `GET /home` -> { banner, featured: [Card], shapes: [{name, count, image}], posts: [PostCard] (3) }.
 - `GET /products?search&shape&frame_type&frame_material&gender&color&min_price&max_price&sort=popular|new|price_asc|price_desc&page&limit` -> Card[] + pagination. Only `show_on_store && is_active && stock > 0`.
 - `GET /products/filters` -> { shapes[], frame_types[], frame_materials[], genders[], colors[], price {min,max} } each with counts.
-- `GET /products/:slug` -> Product detail: Card fields + description, images[], specs {shape, frame_type, frame_material, lens, size_mm, gender, brand}, colors[{name, slug, stock}] (sibling frames with the same base model), related[Card] (4), seo {title, description}, stock, low_stock.
+- `GET /products/:slug` -> Product detail: Card fields + description (sanitised HTML; plain text is allowed too), images[], specs {shape, frame_type, frame_material, lens, size_mm, gender, brand}, colors[{name, slug, stock}] (sibling frames with the same base model), related[Card] (4), seo {title, description}, stock, low_stock.
 - `GET /search/suggest?q=` -> up to 6 {title, slug, image, mrp}.
 - Card = { id, slug, model_no, title, image, mrp, stock, low_stock (stock<=5), shape, frame_material, color }.
 
 Content and SEO (owner: backend-catalog)
-- `GET /blog?tag&page&limit` -> PostCard[] + pagination. `GET /blog/:slug` -> full post {…, body, tags, related_products[Card], seo}.
+- `GET /blog?tag&page&limit` (limit max 50) -> PostCard[] + pagination. `GET /blog/:slug` -> full post {…, body, tags, related_products[Card], seo}.
   PostCard = { slug, title, summary, cover_image, tags[], published_at, read_minutes }.
 - `GET /pages/:key` (about|privacy|terms|returns|shipping) -> { key, title, body (sanitised HTML), updated_at }.
+- `GET /states` -> [{ name, code }] active rows of Stallion's `states` table (the storefront address form uses it; names match shipping zones and the state check at checkout).
 - `GET /faqs` -> [{ category, items:[{id, question, answer}] }].
 - `GET /seo?path=/shop` -> { title, description, og_image, canonical, noindex } (falls back to defaults).
-- `GET /sitemap` -> [{ path, lastmod, changefreq, priority }] covering static pages, products, posts.
+- `GET /sitemap` -> [{ path, lastmod, changefreq, priority }] covering static pages, products, posts. Paths are the storefront's own routes: `/`, `/shop`, `/blog`, `/help`, `/contact`, `/about`, `/policies/{privacy|terms|returns|shipping}`, `/shop/:slug`, `/blog/:slug`.
 - `GET /feed/products` -> Google Merchant style JSON items {id, title, description, link, image_link, price "1250.00 INR", availability}.
 
 Checkout and shipping (owner: backend-orders)
-- `POST /shipping/check` { pincode, subtotal } -> { serviceable, cod_available, estimate_days_min, estimate_days_max, estimate_date, options:[{id:"standard"|"express", name, days_min, days_max, charge, free:bool}] }.
-- `POST /checkout/quote` { items:[{product_id, quantity}], pincode, shipping_option, payment_type:"cod" } -> { items:[{product_id, title, image, price, quantity, line_total, available_stock}], subtotal, shipping_fee, cod_fee, total, issues:[{product_id, code:"out_of_stock"|"limited_stock"|"inactive", message}] }. Prices come from the database only.
-- `POST /checkout/orders` { customer:{name, phone, email?}, address:{line1, line2?, city, state, pincode}, items, shipping_option, payment_type:"cod", notes?, session_id?, utm?:{source,medium,campaign,term,content}, consent?:bool } -> 201 { order_number, total, status, track_url_hint }. One transaction: validate, re-price, create order and items, reserve (deduct) stock; side effects only after commit. 422 with `issues` if stock changed.
+- `POST /shipping/check` { pincode, subtotal, state? } (state, name or code, picks the shipping zone; send it once the customer chose one) -> { serviceable, cod_available, estimate_days_min, estimate_days_max, estimate_date, options:[{id:"standard"|"express", name, days_min, days_max, charge, free:bool}] }.
+- `POST /checkout/quote` { items:[{product_id, quantity}], pincode, state?, shipping_option, payment_type:"cod" } -> { items:[{product_id, title, image, price, quantity, line_total, available_stock}], subtotal, shipping_fee, cod_fee, total, issues:[{product_id, code:"out_of_stock"|"limited_stock"|"inactive", message}] }. Prices come from the database only.
+- `POST /checkout/orders` { customer:{name, phone, email?}, address:{line1, line2?, city, state, pincode}, items, shipping_option, payment_type:"cod", notes?, session_id?, utm?:{source,medium,campaign,term,content}, client_key?, consent?:bool } -> 201 { order_number, total, status, track_url_hint }. One transaction: validate, re-price, create order and items, reserve (deduct) stock; side effects only after commit. 422 with `issues` if stock changed. `client_key` (8-64 chars of `A-Za-z0-9_.:-`, one per checkout attempt) makes the call idempotent: the same key again returns the order that already exists (still 201). `consent` is the customer's marketing opt-in, NOT the terms checkbox: omit it unless the form has a separate marketing tick box. At most 10 pieces of one frame per order; `state` must be a name or code from `GET /states` (400 otherwise).
 - `POST /orders/track` { order_number, phone } -> { order_number, status, payment_type, total, created_at, items[], address summary, shipment:{courier, awb, tracking_url}, timeline:[{status, note, at}], expected_delivery }. 404 if the pair does not match.
 - `POST /contact` { name, contact, message } -> { ok }.
 - Tracking pings (never fail the page): `POST /track/visit` { session_id, landing_page, referrer, utm_* } ; `POST /track/event` { session_id, type: view_item|add_to_cart|begin_checkout|purchase, product_id?, value? }. Bots (user-agent) are ignored.
@@ -62,10 +63,10 @@ Order statuses: `pending` -> `confirmed` -> `packed` -> `dispatched` -> `out_for
 Catalogue / settings (owner: backend-catalog)
 - `GET /settings`, `PUT /settings` { key: value, ... } (partial update; secrets are write-only and returned masked).
 - `POST /sync` (manager) copies/refreshes frames from the Stallion `products` table into `retail_products` (match on `source_product_id`; new frames start `show_on_store=false`, stock 0; existing frames keep store-owned fields: show_on_store, stock, slug, seo, title/description edits). Returns { created, updated, skipped }.
-- `GET /products?search&shown=true|false&page&limit`, `PUT /products/:id` { show_on_store, stock, mrp, title, description, slug, seo_title, seo_description, is_active }, `POST /products/bulk` { ids[], show_on_store }.
-- `GET/POST/PUT /posts` (+ `PUT /posts/:id` status draft|published|archived), `GET/POST/PUT /faqs`, `GET/PUT /content/:key`, `GET/PUT /pages` (SEO rows: path, title, description, og_image, canonical, noindex). Editors may use posts, faqs, content and pages only.
+- `GET /products?search&shown=true|false&page&limit` (also open to `retail_editor`, read only, so the blog editor can link frames), `PUT /products/:id` { show_on_store, stock, mrp, title, description, slug, seo_title, seo_description, is_active }, `POST /products/bulk` { ids[], show_on_store }.
+- `GET /posts?status&search&page&limit` (rows WITHOUT body), `GET /posts/:id` (full post with `body`, `related_product_ids` and `related_products:[{id, model_no, title}]`), `POST /posts`, `PUT /posts/:id` { title, slug, summary, body, cover_image, tags[], related_product_ids[], status draft|published|archived, seo_title, seo_description } (partial; a status-only body just changes the status), `GET/POST/PUT /faqs`, `GET/PUT /content/:key`, `GET/PUT /pages` (SEO rows: path, title, description, og_image, canonical, noindex; `GET` lists only saved rows, `PUT` is an upsert by `path` and an unsent field keeps its value). Frame `description` is sanitised HTML (the admin form edits it as plain text and converts). Editors may use posts, faqs, content and pages only.
 Orders / analytics (owner: backend-orders)
-- `GET /orders?status&q&from&to&page&limit` (q matches order number, name, phone), `GET /orders/:id` (full, with items and timeline), `PUT /orders/:id/status` { status, note }, `PUT /orders/:id/shipping` { courier, awb, tracking_url }, `GET /orders/summary` { counts by status, revenue today and 30 days }.
+- `GET /orders?status&q&from&to&page&limit` (q matches order number, name, phone), `GET /orders/:id` (full: `customer{id,name,phone,email}`, `address{line1,line2,city,state,pincode}`, `shipment{courier,awb,tracking_url}`, `allowed_next[]` (409 on any other status), `items[]`, `timeline[]`; list rows are flat: `customer_name`, `customer_phone`, `city`, `state`, `courier`, `awb`, `items_count`), `PUT /orders/:id/status` { status, note }, `PUT /orders/:id/shipping` { courier, awb, tracking_url }, `GET /orders/summary` { counts{status: n}, orders_today, revenue_today, orders_30_days, revenue_30_days }.
   Cancelling returns stock. Every change writes `RetailOrderEvent`.
 - `GET /analytics/summary?days=30` -> { visits, add_to_cart, begin_checkout, orders, funnel:[{step, count, pct}], sources:[{source, visits, orders}], top_posts:[{slug, title, visits}], top_products:[{id, title, views, orders}] } (India time days).
 - `GET /messages` (contact form), `PUT /messages/:id` { handled:true }.

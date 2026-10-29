@@ -3,12 +3,13 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import '../../styles/cart.css';
 import Glasses from '../../components/Glasses';
-import { useCart, setQuantity, removeFromCart } from '../../lib/cart';
+import { useCart, setQuantity, removeFromCart, MAX_PER_LINE } from '../../lib/cart';
 import { rs } from '../../lib/format';
 
 export function CartLine({ item }) {
   const stock = Number(item.stock) || 99;
-  const atMax = item.quantity >= stock;
+  const cap = Math.min(stock, MAX_PER_LINE);
+  const atMax = item.quantity >= cap;
   return (
     <div className="li">
       <Link href={item.slug ? `/shop/${item.slug}` : '/shop'} className="photo" aria-label={item.title}>
@@ -25,7 +26,7 @@ export function CartLine({ item }) {
           </div>
           <button type="button" className="lnk" onClick={() => removeFromCart(item.product_id)} aria-label={`Remove ${item.title} from cart`}>Remove</button>
         </div>
-        {atMax && stock < 99 ? <div className="stock-note">Only {stock} available</div> : null}
+        {atMax && stock < 99 ? <div className="stock-note">{stock <= MAX_PER_LINE ? `Only ${stock} available` : `Up to ${MAX_PER_LINE} per order`}</div> : null}
       </div>
       <b className="li__price">{rs(item.quantity * Number(item.price || 0))}</b>
     </div>

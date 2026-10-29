@@ -8,6 +8,7 @@ const RetailProduct = require('../../models/RetailProduct');
 const RetailPost = require('../../models/RetailPost');
 const RetailFaq = require('../../models/RetailFaq');
 const RetailPage = require('../../models/RetailPage');
+const State = require('../../../models/State');
 const { ok, wrap, cachePublic, paging, pagination, cleanText, HttpError } = require('../../services/httpCatalog');
 const { sanitizeHtml, htmlToText } = require('../../services/sanitizeHtml');
 const {
@@ -75,6 +76,13 @@ router.get('/faqs', wrap(async (_req, res) => {
     ok(res, [...groups.entries()].map(([category, items]) => ({ category, items })));
 }));
 
+// ---- States for the address form: Stallion's own `states` table, so names match the shipping zones and checkout ----
+router.get('/states', wrap(async (_req, res) => {
+    const rows = await State.findAll({ where: { is_active: true }, attributes: ['name', 'code'], order: [['name', 'ASC']], raw: true });
+    cachePublic(res, 600);
+    ok(res, rows);
+}));
+
 // ---- SEO for a storefront path ----
 function normalisePath(raw) {
     let p = String(raw || '/').split('#')[0].split('?')[0].trim();
@@ -104,7 +112,7 @@ router.get('/seo', wrap(async (req, res) => {
         const m = /^\/(shop|blog)\/([^/]+)$/.exec(path);
         if (m && m[1] === 'shop') {
             const p = await RetailProduct.findOne({ where: { slug: m[2], show_on_store: true, is_active: true } });
-            if (p) derived = { title: p.seo_title || `${displayTitle(p)} | ${store.name}`, description: p.seo_description || excerpt(sanitizeHtml(p.description)), og_image: imageList(p.images)[0] || null };
+            if (p) derived = { title: p.seo_title || `${displayTitle(p)} | ${store.name}`, description: p.seo_description || excerpt(sanitizeHtml(p.description)) || `Buy ${displayTitle(p)} online from ${store.name}.`, og_image: imageList(p.images)[0] || null };
         } else if (m) {
             const post = await RetailPost.findOne({ where: { slug: m[2], ...publishedWhere() } });
             if (post) derived = { title: post.seo_title || `${post.title} | ${store.name}`, description: post.seo_description || post.summary || '', og_image: post.cover_image || null };
@@ -126,7 +134,7 @@ const STATIC_PAGES = [
     { path: '/', changefreq: 'daily', priority: 1.0 },
     { path: '/shop', changefreq: 'daily', priority: 0.9 },
     { path: '/blog', changefreq: 'weekly', priority: 0.7 },
-    { path: '/faq', changefreq: 'monthly', priority: 0.5 },
+    { path: '/help', changefreq: 'monthly', priority: 0.5 },
     { path: '/contact', changefreq: 'yearly', priority: 0.4 },
 ];
 const iso = (d) => (d ? new Date(d).toISOString() : null);
@@ -142,7 +150,8 @@ router.get('/sitemap', wrap(async (_req, res) => {
     const contentDates = new Map(contents.map((c) => [c.content_key, c.updated_at]));
     const items = [
         ...STATIC_PAGES.map((p) => ({ ...p, lastmod: null })),
-        ...CONTENT_KEYS.map((k) => ({ path: `/${k}`, lastmod: iso(contentDates.get(k)), changefreq: 'yearly', priority: 0.3 })),
+        // storefront routes: /about, and the four policies under /policies/<key>
+        ...CONTENT_KEYS.map((k) => ({ path: k === 'about' ? '/about' : `/policies/${k}`, lastmod: iso(contentDates.get(k)), changefreq: 'yearly', priority: 0.3 })),
         ...products.map((p) => ({ path: `/shop/${p.slug}`, lastmod: iso(p.updated_at), changefreq: 'weekly', priority: 0.8 })),
         ...posts.map((p) => ({ path: `/blog/${p.slug}`, lastmod: iso(p.updated_at), changefreq: 'monthly', priority: 0.6 })),
     ].filter((i) => !hidden.has(i.path));
