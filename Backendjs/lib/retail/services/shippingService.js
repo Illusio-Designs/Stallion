@@ -68,11 +68,14 @@ async function resolveState(input) {
     return { name: raw.slice(0, 100), code: null, known: false, tableFilled: rows.length > 0 };
 }
 
-// First zone whose `states` list has the state (by name or code, case-insensitive). No state or no match -> null.
+// Zone for a state: a zone that lists the state (by name or code, case-insensitive) wins; otherwise the first
+// catch-all zone (empty or missing `states` = all states, e.g. 'All India'); otherwise null (default rates).
 function findZone(config, state) {
-    if (!state) return null;
-    const keys = [state.name, state.code].filter(Boolean).map((x) => String(x).trim().toLowerCase());
-    return config.zones.find((z) => Array.isArray(z.states) && z.states.some((x) => keys.includes(String(x).trim().toLowerCase()))) || null;
+    const keys = state ? [state.name, state.code].filter(Boolean).map((x) => String(x).trim().toLowerCase()) : [];
+    const listed = (z) => Array.isArray(z.states) && z.states.length > 0;
+    return config.zones.find((z) => listed(z) && z.states.some((x) => keys.includes(String(x).trim().toLowerCase())))
+        || config.zones.find((z) => !listed(z))
+        || null;
 }
 
 const isBlocked = (config, pincode) => config.blocked_pincodes.has(pincode);

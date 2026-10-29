@@ -209,6 +209,7 @@ function validateOrderInput(body) {
             term: cleanText(utm.term, 150), content: cleanText(utm.content, 150),
         },
         consent: body.consent === true,
+        clientKey: typeof body.client_key === 'string' && /^[A-Za-z0-9_.:-]{8,64}$/.test(body.client_key.trim()) ? body.client_key.trim() : null,
     };
 }
 
@@ -274,6 +275,14 @@ async function createOrder(body) {
     const input = validateOrderInput(body);
     const lines = parseCartItems(body.items);
 
+    // Same client_key again (double click, retry after a timeout): answer with the order that already exists.
+    const existing = () => (input.clientKey
+        ? RetailOrder.findOne({ where: { client_key: input.clientKey }, attributes: ['order_number', 'total', 'status'] })
+        : null);
+    const replay = (o) => ({ order_number: o.order_number, total: money(o.total), status: o.status, track_url_hint: `/track?order=${encodeURIComponent(o.order_number)}` });
+    const already = await existing();
+    if (already) return replay(already);
+
     // Read settings and work out the traffic source before the transaction so locks are held as briefly as possible.
     const [config, storeEnabled] = await Promise.all([getShippingConfig(), getSetting('store_enabled', true)]);
     if (storeEnabled === false) throw new HttpError(503, 'The store is not taking orders right now. Please try again later.');
@@ -286,7 +295,9 @@ async function createOrder(body) {
     const source = await resolveOrderSource(input.utm.source, input.sessionId);
     await ensureCounter();
 
-    const result = await inTransaction(async (t) => {
+    let result;
+    try {
+        result = await inTransaction(async (t) => {
         const products = await loadProducts(lines, t);
         const { priced, issues } = priceLines(lines, products);
         if (issues.length) {
@@ -324,6 +335,7 @@ async function createOrder(body) {
 
         const order = await RetailOrder.create({
             order_number: orderNumber,
+            client_key: input.clientKey,
             customer_id: customer.id,
             customer_name: input.name,
             customer_phone: input.phone,
@@ -370,7 +382,13 @@ async function createOrder(body) {
         }, { transaction: t });
 
         return { order_number: order.order_number, total: money(order.total), status: order.status, customer_name: input.name };
-    });
+        });
+    } catch (err) {
+        // A parallel request with the same key committed first: its order is the answer.
+        const dup = err.name === 'SequelizeUniqueConstraintError' ? await existing() : null;
+        if (dup) return replay(dup);
+        throw err;
+    }
 
     await notifyOffice(result);
     return { order_number: result.order_number, total: result.total, status: result.status, track_url_hint: `/track?order=${encodeURIComponent(result.order_number)}` };

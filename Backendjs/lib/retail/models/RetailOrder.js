@@ -6,6 +6,7 @@ const sequelize = require('../../constants/database');
 const RetailOrder = sequelize.define('RetailOrder', {
     id: { type: DataTypes.UUID, primaryKey: true, defaultValue: DataTypes.UUIDV4 },
     order_number: { type: DataTypes.STRING(20), allowNull: false, unique: true }, // WEB-1001
+    client_key: { type: DataTypes.STRING(64), allowNull: true, unique: true }, // idempotency key sent by the storefront
     customer_id: { type: DataTypes.UUID, allowNull: true },
     customer_name: { type: DataTypes.STRING(120), allowNull: false },
     customer_phone: { type: DataTypes.STRING(15), allowNull: false },
