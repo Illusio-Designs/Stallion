@@ -7,7 +7,7 @@ const router = express.Router();
 
 const RetailProduct = require('../../models/RetailProduct');
 const RetailPost = require('../../models/RetailPost');
-const { ok, wrap, cachePublic, paging, pagination, cleanText, HttpError } = require('../../services/http');
+const { ok, wrap, cachePublic, paging, pagination, cleanText, HttpError } = require('../../services/httpCatalog');
 const { sanitizeHtml } = require('../../services/sanitizeHtml');
 const {
     VISIBLE, CARD_ATTRS, LOW_STOCK_AT, toCard, imageList, displayTitle, loadSettings, loadPublicSettings, excerpt,

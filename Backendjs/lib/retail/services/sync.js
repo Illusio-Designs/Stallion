@@ -5,7 +5,7 @@
 // - The wholesale price (whp) and wholesale stock columns are never selected, so they cannot leak.
 const { Op } = require('sequelize');
 const RetailProduct = require('../models/RetailProduct');
-const { HttpError } = require('./http');
+const { HttpError } = require('./httpCatalog');
 const { slugify, productImageUrl } = require('./catalog');
 
 const BATCH = 500;

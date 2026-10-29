@@ -6,7 +6,7 @@ const router = express.Router();
 
 const { checkRole } = require('../../../middleware/roleAuth');
 const { RETAIL_ADMIN_ROLES } = require('../roles');
-const { ok, wrap, noStore, HttpError } = require('../../services/http');
+const { ok, wrap, noStore, HttpError } = require('../../services/httpCatalog');
 const { audit } = require('../../services/audit');
 const { setSetting } = require('../../services/settings');
 const { DEFAULT_SETTINGS, SECRET_KEYS, loadSettings } = require('../../services/catalog');

@@ -8,7 +8,7 @@ const RetailProduct = require('../../models/RetailProduct');
 const RetailPost = require('../../models/RetailPost');
 const RetailFaq = require('../../models/RetailFaq');
 const RetailPage = require('../../models/RetailPage');
-const { ok, wrap, cachePublic, paging, pagination, cleanText, HttpError } = require('../../services/http');
+const { ok, wrap, cachePublic, paging, pagination, cleanText, HttpError } = require('../../services/httpCatalog');
 const { sanitizeHtml, htmlToText } = require('../../services/sanitizeHtml');
 const {
     VISIBLE, CARD_ATTRS, cardsByIds, imageList, displayTitle, loadSettings, siteUrl, getContentPage, CONTENT_KEYS, excerpt, parseJson,
