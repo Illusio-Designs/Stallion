@@ -3,6 +3,7 @@ import '../styles/components.css';
 import Header from '../components/Header';
 import Footer from '../components/Footer';
 import Tracker from '../components/Tracker';
+import OrgJsonLd from '../components/OrgJsonLd';
 import ThemeScript from '../components/ThemeScript';
 import { get, SITE_URL } from '../lib/api';
 
@@ -37,6 +38,7 @@ export default async function RootLayout({ children }) {
       <body>
         <Header storeName={store.name || 'Stallion'} wholesaleUrl={wholesaleUrl} />
         <main>{children}</main>
+        <OrgJsonLd />
         <Footer store={store} wholesaleUrl={wholesaleUrl} />
         <Tracker tracking={s.tracking || {}} />
       </body>
