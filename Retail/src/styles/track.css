@@ -1,0 +1,25 @@
+/* Track order page. */
+.trk { max-width: 720px; margin-inline: auto; width: 100%; display: flex; flex-direction: column; gap: 14px; }
+.trk__g { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 560px) { .trk__g { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.trk__go { width: max-content; min-width: 120px; }
+.trk__no { font: 700 18px var(--font-display); overflow-wrap: anywhere; }
+.trk__ship { border-top: 1px solid var(--line); padding-top: 10px; }
+.trk__meta { font-size: 13px; }
+
+/* status steps */
+.steps { list-style: none; margin: 6px 0; padding: 0; display: flex; justify-content: space-between; gap: 4px; }
+.steps li { flex: 1 1 0; min-width: 0; text-align: center; font-size: 10.5px; line-height: 1.25; color: var(--mute); overflow-wrap: normal; word-break: normal; }
+.steps li i { display: grid; place-items: center; width: 26px; height: 26px; margin: 0 auto 4px; border-radius: 50%; border: 2px solid var(--line); font-style: normal; font-weight: 700; font-size: 12px; background: var(--card); }
+.steps .is-done i, .steps .is-now i { background: var(--btn); color: var(--btn-ink); border-color: var(--btn); }
+.steps .is-done, .steps .is-now { color: var(--ink); font-weight: 600; }
+@media (min-width: 560px) { .steps li { font-size: 12.5px; } }
+
+/* timeline */
+.trk__tl { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+.trk__tl ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.trk__tl li { display: flex; flex-direction: column; gap: 0; }
+.trk__when { font-size: 13px; }
+@media (min-width: 560px) { .trk__tl li { flex-direction: row; gap: 12px; } .trk__when { min-width: 120px; } }
+.trk__items { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 10px; }
+.trk__bad { padding: 12px; border-radius: 12px; background: var(--bad-soft); color: var(--bad); }
