@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { usePathname, useSearchParams, useRouter } from 'next/navigation';
 import AuthLayout from '../layouts/AuthLayout';
 import PublicLayout from '../layouts/PublicLayout';
@@ -23,6 +23,8 @@ import '../styles/pages/dashboard-support.css';
 import { getUserRoles, isLoggedIn } from '../services/authService';
 import { hasAnyRolePageAccess } from '../utils/rolePermissions';
 import { pageKeyToPath, pathToDashboardPage, isDashboardPage, parseProductPath } from '../utils/dashboardRoutes';
+import { sideOfPage, sideRedirect, homeForSide } from '../utils/retailSide';
+import { useRetailAccess, getRetailSnapshot } from '../hooks/useRetailAccess';
 
 // Auth + Public pages are imported eagerly so their CSS ships in the main
 // bundle and is applied on first paint (no unstyled flash on reload / direct
@@ -51,6 +53,16 @@ const AnalyticsReports = lazy(() => import('./AnalyticsReports'));
 const DashboardSupport = lazy(() => import('./DashboardSupport'));
 const DashboardSettings = lazy(() => import('./DashboardSettings'));
 const DashboardExpenses = lazy(() => import('./DashboardExpenses'));
+// Retail (B2C store) side
+const RetailDashboard = lazy(() => import('./RetailDashboard'));
+const RetailOrders = lazy(() => import('./RetailOrders'));
+const RetailFrames = lazy(() => import('./RetailFrames'));
+const RetailBlog = lazy(() => import('./RetailBlog'));
+const RetailSeo = lazy(() => import('./RetailSeo'));
+const RetailShipping = lazy(() => import('./RetailShipping'));
+const RetailAnalytics = lazy(() => import('./RetailAnalytics'));
+const RetailSettings = lazy(() => import('./RetailSettings'));
+const RetailRoles = lazy(() => import('./RetailRoles'));
 
 // Pages a logged-out visitor may open.
 const PUBLIC_PAGES = ['login', 'privacy-policy'];
@@ -139,9 +151,38 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
     router.replace(`/login?returnUrl=${encodeURIComponent(here)}`);
   }, [mounted, needsLogin, currentPage]);
 
+  // Wholesale / Retail: which sides this person may open (roles first, then GET /api/retail/access).
+  const retail = useRetailAccess(currentPage);
+  const sideTarget = mounted && retail.ready && isLoggedIn()
+    ? sideRedirect({ page: currentPage, roles: getUserRoles(), access: retail.access })
+    : null;
+  // A page of the wrong side (a link, a bookmark, a typed address) is sent to the person's own home.
+  useEffect(() => {
+    if (sideTarget) handlePageChange(sideTarget);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sideTarget, currentPage]);
+  // Coming back to the app on the generic home: open the side that was used last (only for people with both).
+  const landingChecked = useRef(false);
+  useEffect(() => {
+    if (landingChecked.current || !mounted || !retail.ready) return;
+    landingChecked.current = true;
+    if (isLoggedIn() && currentPage === 'dashboard' && retail.hasBoth && retail.saved === 'retail') {
+      handlePageChange(homeForSide('retail', getUserRoles()));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, retail.ready]);
+
   // Update URL when page or layout changes
   const handlePageChange = (page, productId = null) => {
     if (page === currentPage && productId === currentProductId) return;
+    // Right after signing in, open the side that was used last when the person has both.
+    if (page === 'dashboard' && currentPage === 'login') {
+      const s = getRetailSnapshot();
+      if (s.access.wholesale && s.access.retail && s.saved === 'retail') page = homeForSide('retail', getUserRoles());
+    }
+    // Opening a page of one side is also choosing that side: remember it.
+    const pageSide = sideOfPage(page);
+    if (retail.hasBoth && (pageSide === 'retail' || pageSide === 'wholesale')) retail.rememberSide(pageSide);
     // Dashboard pages -> nested routes (/dashboard/products, ...);
     // public pages keep their flat route. See utils/dashboardRoutes.
     const url = pageKeyToPath(page, productId);
@@ -158,6 +199,11 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   const renderPage = () => {
     // Wait for the login check (and the redirect) instead of flashing the page.
     if (needsLogin && (!mounted || !isLoggedIn())) {
+      return <Loader isLoading={true} />;
+    }
+    // Pages of the Wholesale or Retail side wait for the side check (and its redirect) instead of flashing.
+    const pageSide = sideOfPage(currentPage);
+    if ((pageSide === 'retail' || pageSide === 'wholesale') && (!retail.ready || sideTarget)) {
       return <Loader isLoading={true} />;
     }
     // Check if this is a dashboard page that requires role-based access
@@ -234,7 +280,27 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
         return <DashboardSettings />;
       case 'expenses':
         return <DashboardExpenses />;
-      
+
+      // Retail (B2C store) pages
+      case 'retail':
+        return <RetailDashboard onPageChange={handlePageChange} />;
+      case 'retail-orders':
+        return <RetailOrders />;
+      case 'retail-frames':
+        return <RetailFrames />;
+      case 'retail-blog':
+        return <RetailBlog />;
+      case 'retail-seo':
+        return <RetailSeo />;
+      case 'retail-shipping':
+        return <RetailShipping />;
+      case 'retail-analytics':
+        return <RetailAnalytics onPageChange={handlePageChange} />;
+      case 'retail-settings':
+        return <RetailSettings />;
+      case 'retail-roles':
+        return <RetailRoles onPageChange={handlePageChange} />;
+
       default:
         return <Home onPageChange={handlePageChange} />;
     }

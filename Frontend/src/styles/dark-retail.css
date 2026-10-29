@@ -1,0 +1,20 @@
+/* Dark mode for the Retail side. Most colours already come from the theme tokens;
+   these are the few that were fixed values. Every rule sits under :root[data-theme="dark"]. */
+:root[data-theme="dark"] .rt-thumb { background: #f1f1f2; border-color: var(--l-line); }
+:root[data-theme="dark"] .rt-thumb--empty { color: #6d6d72; }
+:root[data-theme="dark"] .rt-switch { background: var(--b-soft); }
+:root[data-theme="dark"] .rt-chip { border-color: var(--color-grey-300); }
+:root[data-theme="dark"] .rt-chip.is-on { border-color: var(--b-ink); }
+:root[data-theme="dark"] .rt-bulk { border-color: var(--color-grey-400); }
+:root[data-theme="dark"] .rt-rte__btn:hover { background: var(--b-soft2); }
+:root[data-theme="dark"] .rt-serp { background: var(--b-soft); }
+:root[data-theme="dark"] .rt-side-label { color: var(--t-faint); }
+:root[data-theme="dark"] .rt-error { color: var(--c-bad); }
+/* form panels: headings and labels were fixed dark values */
+:root[data-theme="dark"] .rt-form .rf-sec__h,
+:root[data-theme="dark"] .rt-order .rf-sec__h { color: var(--t-ink); }
+:root[data-theme="dark"] .rt-form .rf-sec__d,
+:root[data-theme="dark"] .rt-form .ui-label,
+:root[data-theme="dark"] .rt-order .ui-label { color: var(--t-mute); }
+:root[data-theme="dark"] .rt-form .rf-sec + .rf-sec { border-top-color: var(--l-line); }
+:root[data-theme="dark"] .rt-tags__list li { background: var(--b-soft2); }

@@ -95,6 +95,8 @@ const ROLE_NAME_MAP = {
   'party manager': 'party_manager',
   'sales manager': 'sales_manager',
   'distributor manager': 'distributor_manager',
+  'retail manager': 'retail_manager',
+  'retail editor': 'retail_editor',
 };
 
 // Normalize a single role value to its canonical lowercase snake_case name.

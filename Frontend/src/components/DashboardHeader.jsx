@@ -7,7 +7,10 @@ import ThemeSwitch from './ThemeSwitch';
 import NotificationPermissionPrompt from './NotificationPermissionPrompt';
 import { announceNew } from '../utils/systemNotify';
 import { resolveProfileImageUrl } from '../utils/profileImage';
-import { logout as authLogout, getUser, getUserRole } from '../services/authService';
+import { logout as authLogout, getUser, getUserRole, getUserRoles } from '../services/authService';
+import SideSwitch from './retail/SideSwitch';
+import { useRetailAccess } from '../hooks/useRetailAccess';
+import { homeForSide } from '../utils/retailSide';
 import { showLogoutSuccess } from '../services/notificationService';
 import { getMe } from '../services/apiService';
 import { getNotifications, markNotificationsRead } from '../services/api/notificationsApi';
@@ -20,6 +23,13 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
   const [avatarUrl, setAvatarUrl] = useState(null);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const userMenuRef = useRef(null);
+  // Wholesale / Retail: the switch shows only for a person who may open both sides.
+  const { hasBoth, side, rememberSide } = useRetailAccess(currentPage);
+  const isRetail = side === 'retail';
+  const chooseSide = (next) => {
+    rememberSide(next);
+    if (onPageChange) onPageChange(homeForSide(next, getUserRoles()));
+  };
 
   // Notification bell: unread count, a dropdown with the latest ones, polled every 60 s and on focus.
   const [notes, setNotes] = useState([]);
@@ -70,6 +80,11 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
       setNotes((list) => list.map((x) => (x.notification_id === n.notification_id ? { ...x, read_at: new Date().toISOString() } : x)));
       setUnread((c) => Math.max(0, c - 1));
       try { await markNotificationsRead({ ids: [n.notification_id] }); } catch (_e) { /* the next poll corrects the count */ }
+    }
+    // A new online (retail) order opens Online orders; this is the same bell, not a second one.
+    if (onPageChange && (/retail|web/i.test(String(n.kind || '')) || (isRetail && /order/i.test(String(n.kind || n.title || ''))))) {
+      onPageChange('retail-orders');
+      return;
     }
     if (onPageChange && (n.order_id || /task|tray|order/i.test(String(n.kind || '')))) {
       onPageChange(getUserRole() === 'salesman' ? 'dashboard' : 'orders');
@@ -272,12 +287,13 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
           <button
             type="button"
             className="dashboard-header-logo md:hidden bg-transparent border-none p-0 cursor-pointer flex items-center"
-            onClick={() => onPageChange?.('dashboard')}
+            onClick={() => onPageChange?.(isRetail ? homeForSide('retail', getUserRoles()) : 'dashboard')}
             aria-label="Stallion Eyewear, go to the dashboard"
           >
             <img src="/images/logo/logo.webp" alt="" className="block h-9 w-auto max-w-[120px] object-contain" />
           </button>
           <div className="dashboard-title text-[length:var(--text-md)] text-text font-semibold whitespace-nowrap overflow-hidden text-ellipsis">Welcome {userName}</div>
+          {hasBoth && <SideSwitch side={side} onChange={chooseSide} className="rt-switch--header" />}
         </div>
 
         <div className="dashboard-header-actions flex items-center gap-3 min-w-0">
@@ -293,7 +309,8 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
               openWidth={260}
               phoneAuto
             >
-              <GlobalSearchResults query={globalQuery} onPick={openResult} />
+              {/* The wholesale search finds parties, orders and products: never shown on the Retail side. */}
+              {!isRetail && <GlobalSearchResults query={globalQuery} onPick={openResult} />}
             </GooeySearch>
           </div>
 
@@ -393,7 +410,12 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
           </div>
         </div>
       </div>
-
+      {/* Phones: the switch gets its own row under the top bar. */}
+      {hasBoth && (
+        <div className="rt-switch-row">
+          <SideSwitch side={side} onChange={chooseSide} />
+        </div>
+      )}
     </header>
   );
 };

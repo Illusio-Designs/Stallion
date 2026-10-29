@@ -20,6 +20,16 @@ export const ALL_PAGES = {
   ANALYTICS: 'analytics',
   SUPPORT: 'support',
   SETTINGS: 'settings',
+  // Retail (B2C store) side. Only the retail roles and the super admin open these.
+  RETAIL: 'retail',
+  RETAIL_ORDERS: 'retail-orders',
+  RETAIL_FRAMES: 'retail-frames',
+  RETAIL_BLOG: 'retail-blog',
+  RETAIL_SEO: 'retail-seo',
+  RETAIL_SHIPPING: 'retail-shipping',
+  RETAIL_ANALYTICS: 'retail-analytics',
+  RETAIL_SETTINGS: 'retail-settings',
+  RETAIL_ROLES: 'retail-roles',
 };
 
 // Pages for a role that is not listed below, so it never sees an empty menu
@@ -59,6 +69,33 @@ export const ROLE_PERMISSIONS = {
     ALL_PAGES.MANAGE,
     ALL_PAGES.ANALYTICS,
     ALL_PAGES.SUPPORT,
+    ALL_PAGES.SETTINGS,
+    ALL_PAGES.RETAIL,
+    ALL_PAGES.RETAIL_ORDERS,
+    ALL_PAGES.RETAIL_FRAMES,
+    ALL_PAGES.RETAIL_BLOG,
+    ALL_PAGES.RETAIL_SEO,
+    ALL_PAGES.RETAIL_SHIPPING,
+    ALL_PAGES.RETAIL_ANALYTICS,
+    ALL_PAGES.RETAIL_SETTINGS,
+    ALL_PAGES.RETAIL_ROLES,
+  ],
+  // Retail roles: the store only. They never unlock a wholesale page.
+  'retail_manager': [
+    ALL_PAGES.RETAIL,
+    ALL_PAGES.RETAIL_ORDERS,
+    ALL_PAGES.RETAIL_FRAMES,
+    ALL_PAGES.RETAIL_BLOG,
+    ALL_PAGES.RETAIL_SEO,
+    ALL_PAGES.RETAIL_SHIPPING,
+    ALL_PAGES.RETAIL_ANALYTICS,
+    ALL_PAGES.RETAIL_SETTINGS,
+    ALL_PAGES.RETAIL_ROLES,
+    ALL_PAGES.SETTINGS,
+  ],
+  'retail_editor': [
+    ALL_PAGES.RETAIL_BLOG,
+    ALL_PAGES.RETAIL_SEO,
     ALL_PAGES.SETTINGS,
   ],
   'tray_manager': [

@@ -12,7 +12,7 @@ const DASHBOARD_TITLES = {
   products: 'Products', orders: 'Orders', expenses: 'Expenses', tray: 'Trays', events: 'Events',
   offers: 'Offers', party: 'Party', salesmen: 'Salesmen', distributor: 'Distributor',
   'office-team': 'Office Team', manage: 'Manage', analytics: 'Analytics & Reports',
-  support: 'Support', settings: 'Settings', sample: 'Sample',
+  support: 'Support', settings: 'Settings', sample: 'Sample', retail: 'Retail store',
 };
 
 /**

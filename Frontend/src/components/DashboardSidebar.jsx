@@ -1,13 +1,18 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import '../styles/components/DashboardSidebar.css';
+import '../styles/redesign-p-retail.css';
+import '../styles/dark-retail.css';
 import {
   FiGrid, FiPackage, FiShoppingCart, FiInbox, FiCalendar,
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
   FiHelpCircle, FiSettings, FiChevronsLeft, FiX, FiShoppingBag, FiTag,
+  FiEdit, FiSearch, FiBox,
 } from './icons/hugeicons';
 import RupeeIcon from './icons/RupeeIcon';
 import { getUserRoles } from '../services/authService';
 import { filterMenuItemsByRoles } from '../utils/rolePermissions';
+import { retailMenuFor } from '../utils/retailSide';
+import { useRetailAccess } from '../hooks/useRetailAccess';
 
 const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleCollapse, isMobileOpen = false, onMobileClose }) => {
   const [tooltipState, setTooltipState] = useState({ show: false, text: '', top: 0 });
@@ -66,7 +71,18 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     support: FiHelpCircle,
     settings: FiSettings,
     shop: FiShoppingBag,
+    // Retail (store) side
+    retail: FiGrid,
+    'retail-orders': FiShoppingBag,
+    'retail-frames': FiBox,
+    'retail-blog': FiEdit,
+    'retail-seo': FiSearch,
+    'retail-shipping': FiTruck,
+    'retail-analytics': FiBarChart2,
+    'retail-settings': FiSettings,
+    'retail-roles': FiUsers,
   };
+  const { side } = useRetailAccess(currentPage);
   
   // Role comes from localStorage, which doesn't exist during SSR. Reading it
   // directly makes the server render the full menu and the client render the
@@ -102,12 +118,14 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
   // Filter menu items based on the union of the user's roles
   const rolesKey = userRoles.join(',');
   const menuItems = useMemo(() => {
+    // The Retail side has its own, shorter menu. The Wholesale menu below is exactly what it always was.
+    if (side === 'retail') return retailMenuFor(userRoles);
     const list = userRoles.length ? filterMenuItemsByRoles(allMenuItems, userRoles) : allMenuItems; // no role: show all (fallback)
     // The shop is a row of this menu too, right after the Dashboard (there is no separate shop navigation).
     const at = list.findIndex((it) => it.id === 'dashboard');
     return [...list.slice(0, at + 1), { id: 'shop', text: 'Shop' }, ...list.slice(at + 1)];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rolesKey]);
+  }, [rolesKey, side]);
 
   return (
     <aside
@@ -153,6 +171,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
           isCollapsed ? 'overflow-x-visible' : 'overflow-x-hidden'
         }`}
       >
+        {side === 'retail' && !isCollapsed && <p className="rt-side-label">Retail store</p>}
         <ul className={`m-0 list-none overflow-visible ${isCollapsed ? 'px-2' : 'px-3'}`}>
           {menuItems.map((item) => (
             <li key={item.id} className="relative mb-1 overflow-visible">

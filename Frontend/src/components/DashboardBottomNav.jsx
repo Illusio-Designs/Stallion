@@ -2,12 +2,14 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   FiGrid, FiPackage, FiShoppingCart, FiInbox, FiCalendar,
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
-  FiHelpCircle, FiSettings, FiTag, FiShoppingBag,
+  FiHelpCircle, FiSettings, FiTag, FiShoppingBag, FiEdit, FiSearch, FiBox,
 } from './icons/hugeicons';
 import RupeeIcon from './icons/RupeeIcon';
 import { getUserRoles } from '../services/authService';
 import { getCartCount, registerCartListener } from '../services/cartService';
 import { filterMenuItemsByRoles } from '../utils/rolePermissions';
+import { retailMenuFor } from '../utils/retailSide';
+import { useRetailAccess } from '../hooks/useRetailAccess';
 
 // Floating pill-style bottom navigation for the dashboard on phones
 // (hidden ≥ md), mirroring the storefront nav. Shows the top role-allowed
@@ -30,6 +32,15 @@ const ICONS = {
   settings: FiSettings,
   shop: FiShoppingBag,
   cart: FiShoppingCart,
+  retail: FiGrid,
+  'retail-orders': FiShoppingBag,
+  'retail-frames': FiBox,
+  'retail-blog': FiEdit,
+  'retail-seo': FiSearch,
+  'retail-shipping': FiTruck,
+  'retail-analytics': FiBarChart2,
+  'retail-settings': FiSettings,
+  'retail-roles': FiUsers,
 };
 
 const ALL_ITEMS = [
@@ -59,6 +70,7 @@ const DashboardBottomNav = ({ onPageChange, currentPage }) => {
   // Union of every role the member holds (multi-role support).
   const userRoles = mounted ? getUserRoles() : [];
   const rolesKey = userRoles.join(',');
+  const { side } = useRetailAccess(currentPage);
   const [cartCount, setCartCount] = useState(0);
   useEffect(() => {
     setCartCount(getCartCount());
@@ -66,12 +78,14 @@ const DashboardBottomNav = ({ onPageChange, currentPage }) => {
   }, []);
 
   const primary = useMemo(() => {
+    // Retail has its own bar: the first five store pages the role may open (no cart).
+    if (side === 'retail') return retailMenuFor(userRoles).slice(0, 5).map((it) => ({ id: it.id, text: it.text, short: it.short }));
     const items = (userRoles.length ? filterMenuItemsByRoles(ALL_ITEMS, userRoles) : ALL_ITEMS)
       .filter((it) => it.id !== 'orders' && it.id !== 'salesmen'); // those are reached from the menu; the cart takes the last place
     // Dashboard first, then the shop, then the next role-allowed pages.
     return [{ id: 'shop', text: 'Shop' }, ...items].sort((a, b) => (a.id === 'dashboard' ? -1 : b.id === 'dashboard' ? 1 : 0)).slice(0, 4).concat([{ id: 'cart', text: 'Cart' }]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rolesKey]);
+  }, [rolesKey, side]);
 
   const go = (id) => {
     const page = id === 'shop' ? 'products' : id; // shop and cart are the order pages
@@ -103,7 +117,7 @@ const DashboardBottomNav = ({ onPageChange, currentPage }) => {
                 </span>
               )}
             </span>
-            <span className="dashboard-bottom-nav__label">{SHORT[it.id] || it.text}</span>
+            <span className="dashboard-bottom-nav__label">{it.short || SHORT[it.id] || it.text}</span>
           </button>
         );
       })}

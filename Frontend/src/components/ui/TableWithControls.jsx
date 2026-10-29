@@ -62,6 +62,8 @@ export default function TableWithControls({
   // so the parent can re-fetch page 1 with the search term. When provided, the
   // client-side row filter is skipped (the server already filtered).
   onServerSearch,
+  // Optional: called with the keys of the ticked rows ("id:<value>" for a row with an id) whenever they change.
+  onSelectionChange,
 }) {
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
@@ -193,6 +195,10 @@ export default function TableWithControls({
       return changed ? next : prev;
     });
   }, [sortedRows]);
+
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  useEffect(() => { onSelectionChangeRef.current = onSelectionChange; }, [onSelectionChange]);
+  useEffect(() => { onSelectionChangeRef.current?.(Array.from(selected)); }, [selected]);
 
   // Effective page / page size used for serial numbers and the footer pager.
   const effectivePage = serverPagination ? serverPage : safePage;

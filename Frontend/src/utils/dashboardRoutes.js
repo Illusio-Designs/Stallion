@@ -28,15 +28,40 @@ export const DASHBOARD_PAGE_KEYS = [
   'settings',
 ];
 
+// Retail (B2C store) side. Its own page keys and URLs: /dashboard/retail/...
+// Wholesale keys never start with "retail", so the two sides cannot be confused.
+export const RETAIL_PAGE_KEYS = [
+  'retail',
+  'retail-orders',
+  'retail-frames',
+  'retail-blog',
+  'retail-seo',
+  'retail-shipping',
+  'retail-analytics',
+  'retail-settings',
+  'retail-roles',
+];
+
 // page key -> URL slug under /dashboard. Only list keys whose slug differs.
 const KEY_TO_SLUG = {
   'dashboard-products': 'products',
+  'retail-orders': 'retail/orders',
+  'retail-frames': 'retail/frames',
+  'retail-blog': 'retail/blog',
+  'retail-seo': 'retail/seo',
+  'retail-shipping': 'retail/shipping',
+  'retail-analytics': 'retail/analytics',
+  'retail-settings': 'retail/settings',
+  'retail-roles': 'retail/roles',
 };
 const SLUG_TO_KEY = Object.fromEntries(
   Object.entries(KEY_TO_SLUG).map(([key, slug]) => [slug, key])
 );
 
-export const isDashboardPage = (page) => DASHBOARD_PAGE_KEYS.includes(page);
+export const isRetailPageKey = (page) => RETAIL_PAGE_KEYS.includes(page);
+
+// Retail pages sit inside the same dashboard frame (header, menu, bottom bar) as the wholesale ones.
+export const isDashboardPage = (page) => DASHBOARD_PAGE_KEYS.includes(page) || isRetailPageKey(page);
 
 /**
  * Product detail uses a clean, readable path: /product/<model_no>
@@ -83,7 +108,11 @@ export const pathToDashboardPage = (pathname) => {
   const clean = pathname.replace(/\/+$/, '') || '/';
   if (clean === '/dashboard') return 'dashboard';
   if (clean.startsWith('/dashboard/')) {
-    const slug = clean.slice('/dashboard/'.length).split('/')[0];
+    const rest = clean.slice('/dashboard/'.length);
+    // Nested slugs first (retail/orders), then the first segment (products, orders, ...).
+    const nested = SLUG_TO_KEY[rest];
+    if (nested) return nested;
+    const slug = rest.split('/')[0];
     const key = SLUG_TO_KEY[slug] || slug;
     return isDashboardPage(key) ? key : 'dashboard';
   }

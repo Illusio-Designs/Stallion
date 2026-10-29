@@ -5,9 +5,24 @@ import {
   isDashboardPage,
   productPath,
   parseProductPath,
+  RETAIL_PAGE_KEYS,
 } from './dashboardRoutes';
 
 describe('dashboardRoutes', () => {
+  it('maps retail pages to /dashboard/retail/... and back', () => {
+    expect(pageKeyToPath('retail')).toBe('/dashboard/retail');
+    expect(pageKeyToPath('retail-orders')).toBe('/dashboard/retail/orders');
+    expect(pageKeyToPath('retail-analytics')).toBe('/dashboard/retail/analytics');
+    expect(pathToDashboardPage('/dashboard/retail')).toBe('retail');
+    expect(pathToDashboardPage('/dashboard/retail/')).toBe('retail');
+    expect(pathToDashboardPage('/dashboard/retail/orders')).toBe('retail-orders');
+    expect(pathToDashboardPage('/dashboard/retail/unknown')).toBe('retail');
+    for (const key of RETAIL_PAGE_KEYS) {
+      expect(isDashboardPage(key)).toBe(true);
+      expect(pathToDashboardPage(pageKeyToPath(key))).toBe(key);
+    }
+  });
+
   it('maps dashboard page keys to nested paths', () => {
     expect(pageKeyToPath('dashboard')).toBe('/dashboard');
     expect(pageKeyToPath('dashboard-products')).toBe('/dashboard/products');
