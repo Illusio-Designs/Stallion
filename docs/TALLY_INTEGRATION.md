@@ -107,6 +107,55 @@ Hook points (small, guarded, never able to block an order): after a party is cre
 
 ---
 
+## 5A. When Tally already has the data (adopt mode)
+
+In a real company Tally is usually the older and richer system: the ledgers, stock items, groups, godowns, GST setup, voucher types and numbering already exist and accounts will not change them for us. So the integration runs in **adopt mode** by default. Stallion **links to what Tally already has** and only creates something new in Tally when an admin allows it.
+
+**Setting `Create masters in Tally`: Off (default) / Ask / On.**
+
+| Mode | Behaviour |
+|---|---|
+| Off | Stallion never creates a ledger or stock item. A party or product with no match waits in the **link review** list until accounts creates it in Tally (or an admin links it to an existing one). Orders for unlinked parties or items stay queued with a clear reason. |
+| Ask | Stallion proposes the new ledger or item, an admin approves it, then the connector creates it. |
+| On | Stallion creates it straight away (the flow in section 6). Use only when Stallion is the place new parties are born. |
+
+**First run: import and match, then go live**
+
+1. The connector exports everything that already exists in Tally: Sundry Debtor ledgers, stock items with groups and units, godowns, voucher types, GST ledgers.
+2. Stallion matches each of its parties and products to a Tally record and shows the result in an **Integration, First sync** screen:
+   - Parties: by GSTIN, then normalised phone, then exact name, then fuzzy name (same rules as the party search, so "Pratik" and "Partik" are offered as a likely match, never linked automatically).
+   - Products: by model number to stock item name, then by an alias list (Tally often has "STL BD IP2401 C6" where Stallion has "STL-BD.IP2401-C6"; the match ignores case, spaces, dots and dashes).
+3. Each row ends as **Linked** (stores `tally_ledger_name` and GUID, or `tally_item_name` and GUID), **Needs review** (several candidates), or **No match**. Admins confirm in bulk (accept all exact matches) and fix the rest by hand. A CSV export and import of the mapping is provided for large lists.
+4. Nothing is written to Tally during this step. Only after the mapping is accepted does the connector start the live flows.
+
+**Use Tally's predefined values instead of ours.** These are read from Tally and chosen once in Settings, Integrations, Tally (a dropdown filled from Tally itself):
+
+| Choice | Example from Tally |
+|---|---|
+| Voucher type for orders | `Sales Order` (or the company's own name such as `Wholesale Order`) |
+| Voucher type for invoices to read | `Sales`, `Tax Invoice`, or several |
+| Sales ledger for lines | `Sales - GST 12%` |
+| Warehouse godown(s) | `Main Location` |
+| Stock group | from the item itself; Stallion never regroups existing items |
+| Unit | taken from the item (`Nos`, `Pcs`) |
+| HSN code and GST rate | **read from the Tally stock item** into Stallion's `hsn_code` and `gst_rate`; not typed again |
+| Credit period and GSTIN on parties | read from the ledger |
+| Voucher number | the company's own series; Stallion's `order_number` goes into **reference and order number**, not the voucher number, unless accounts agree otherwise |
+
+**Who wins when both sides have a value.** Per field, in settings: `Tally wins` (default for GSTIN, PAN, credit period, address, HSN, GST rate, unit, stock quantity), `Stallion wins` (phone, email, contact person, salesman, zone), or `Only fill if empty`. Changes that lose are logged in the sync history rather than silently dropped.
+
+**Names that differ.** Stallion keeps its own display name (`party_name`, `model_no`) and stores the Tally name beside it. Orders always use the stored Tally name, so a rename on either side never breaks the link. Renames in Tally arrive through the GUID.
+
+**Gaps and clashes.**
+- A Tally stock item with no Stallion product: listed under "In Tally only"; admin can create the Stallion product from it (name, HSN, GST rate, rate) or ignore it.
+- A Stallion product with no Tally item and mode Off: its orders wait, with the message "Stock item not found in Tally: create it or link it".
+- Two Stallion parties pointing at one ledger: blocked, with a warning (one ledger can be linked once).
+- Inactive in Stallion: stays active in Tally; Stallion never deletes or renames Tally masters.
+
+Everything else in this document applies unchanged: in adopt mode the "create" steps in 6.1 and 6.2 become "link", and creation happens only if the mode allows it.
+
+---
+
 ## 6. The four flows
 
 ### 6.1 Party sync
@@ -234,6 +283,7 @@ Admin screens (login required):
 
 ## 10. Settings and rules to confirm with the accounts team
 
+0. Is Tally already set up with ledgers, stock items, groups, godowns and GST? (Then keep **adopt mode** with `Create masters in Tally` off, section 5A.)
 1. Which godown or godowns are the warehouse?
 2. Do orders go to Tally as **Sales Order** vouchers (recommended) or straight as **Sales** invoices?
 3. Who raises the invoice: accounts manually, or automatic on dispatch?
