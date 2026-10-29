@@ -1,0 +1,75 @@
+/* Shop list page */
+.crumb { color: var(--mute); font-size: 13px; }
+.crumb a:hover { text-decoration: underline; }
+.sh-head { align-items: flex-end; }
+.sh-title { font-size: 28px; }
+
+/* search with suggestions */
+.sg { position: relative; display: flex; gap: 8px; width: 100%; }
+.sg__in { flex: 1; min-width: 0; }
+.sg__go { flex: none; }
+@media (min-width: 820px) { .sg { width: 380px; } }
+.sg__list { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 6px); list-style: none; margin: 0; padding: 6px; background: var(--card); border: 1px solid var(--ink); border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0, 0, 0, .18); }
+.sg__list a { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; min-height: 52px; padding: 4px 6px; border-radius: 8px; }
+.sg__list a:hover, .sg__list a.is-on { background: var(--soft); }
+.sg__ph { width: 44px; height: 44px; border-radius: 8px; background: var(--photo); overflow: hidden; display: block; }
+.sg__ph img { width: 100%; height: 100%; object-fit: contain; }
+.sg__t { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* quick shape chips (phones; the side column carries them on desktop) */
+.sh-quick { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter); scrollbar-width: none; }
+.sh-quick::-webkit-scrollbar { display: none; }
+.sh-quick .chip { min-height: 44px; flex: none; }
+@media (min-width: 860px) { .sh-quick { display: none; } }
+
+.sh-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.sh-fbtn { gap: 8px; }
+.sh-sort { display: flex; align-items: center; gap: 8px; }
+.sh-sort .input { width: auto; min-width: 170px; }
+@media (max-width: 859px) { .sh-sort .mute { display: none; } }
+.sh-active { display: flex; gap: 6px; flex-wrap: wrap; }
+.sh-active .chip { min-height: 44px; }
+
+/* layout: side column on desktop, bottom sheet below 860px */
+.sh-main { min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+.sh-grid { gap: 12px; }
+.sh-empty { align-items: flex-start; padding: 24px; }
+.sh-empty h2 { font-size: 20px; }
+
+.sh-side { background: var(--bg); }
+.sh-side__hd, .sh-side__ft { display: none; }
+.sh-grp { display: flex; flex-direction: column; gap: 8px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+.sh-grp__t { font: 700 14px var(--font-display); }
+.sh-grp__o { display: flex; flex-wrap: wrap; gap: 6px; }
+.sh-grp .chip { min-height: 40px; gap: 6px; }
+.sh-grp .chip small { font-size: 11px; opacity: .7; }
+.sh-price { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+.sh-clear { display: inline-flex; align-items: center; min-height: 44px; font-weight: 600; text-decoration: underline; }
+.sh-scrim { display: none; }
+
+@media (max-width: 859px) {
+  .sh-side { position: fixed; z-index: 50; left: 0; right: 0; bottom: 0; max-height: 86vh; max-height: 86dvh; display: flex; flex-direction: column; border-radius: var(--radius-lg) var(--radius-lg) 0 0; border: 1px solid var(--line); border-bottom: 0; transform: translateY(105%); visibility: hidden; transition: transform .22s ease, visibility 0s .22s; }
+  .sh-side.is-open { transform: none; visibility: visible; transition: transform .22s ease; }
+  .sh-side__hd { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--line); font: 700 16px var(--font-display); }
+  .sh-side__body { overflow-y: auto; padding: 0 16px; flex: 1; overscroll-behavior: contain; }
+  .sh-side__ft { display: block; padding: 12px 16px max(12px, env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--line); }
+  .sh-side__ft .btn { width: 100%; }
+  .sh-scrim { display: block; position: fixed; inset: 0; z-index: 45; background: var(--scrim); opacity: 0; pointer-events: none; transition: opacity .2s; }
+  .sh-scrim.is-open { opacity: 1; pointer-events: auto; }
+}
+@media (min-width: 860px) {
+  .sh { display: grid; grid-template-columns: 240px minmax(0, 1fr); column-gap: 28px; row-gap: 0; grid-template-rows: auto auto auto auto 1fr; align-content: start; }
+  .sh > * { grid-column: 1 / -1; }
+  .sh-fbtn { display: none; }
+  .sh-bar { display: contents; }
+  .sh > .sh-head { margin-top: 14px; }
+  .sh-side { grid-column: 1; grid-row: 3 / span 3; margin-top: 14px; align-self: start; }
+  .sh-sort { grid-column: 2; grid-row: 3; justify-self: end; margin-top: 14px; }
+  .sh-active { grid-column: 2; grid-row: 4; margin-top: 14px; align-self: start; }
+  .sh-main { grid-column: 2; grid-row: 5; margin-top: 14px; align-self: start; }
+  .sh-grp:first-child { padding-top: 0; }
+}
+
+/* pagination */
+.sh-pager { display: flex; justify-content: center; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+.sh-pager .chip { min-height: 44px; min-width: 44px; justify-content: center; }
