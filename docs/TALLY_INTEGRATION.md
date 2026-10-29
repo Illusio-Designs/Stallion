@@ -75,7 +75,8 @@ Decide this once; it avoids every "who overwrote whom" bug.
 | Data | Owner | Direction | Notes |
 |---|---|---|---|
 | Party master (name, address, GSTIN, credit days) | **Stallion creates NEW parties only; Tally keeps accounting truth** | A brand-new Stallion party can become a Sundry Debtor ledger (setting Off, Ask or On). Existing linked parties are updated by the field rules. Tally → Stallion for GSTIN, credit period and opening balance changes made by accounts | A ledger created only in Tally appears in Stallion as an **unlinked candidate** for review, never auto-created. |
-| Product master (name, HSN, GST rate, unit, group) | **Tally** | Tally → Stallion | Stock items already exist in Tally; Stallion links to them and reads HSN, GST rate and unit. Stallion never creates stock items. WHP stays in Stallion. |
+| Product master (name, group, HSN, GST rate, unit, selling rate) | **Tally** | Tally → Stallion | A **new stock item in Tally creates the product in Stallion automatically**; an existing one is **updated**. Stallion never creates or changes stock items in Tally. |
+| Product details only Stallion knows (photos, shape, frame and lens type, materials, colours, gender, MRP if not in Tally, offers) | **Stallion** | none | Filled by staff in Stallion. Tally never overwrites them. |
 | Stock quantity (warehouse) | **Tally** | Tally → Stallion | `warehouse_qty` is refreshed from Tally's closing balance. Stallion's own reductions (orders, cancels) are applied locally at once, then corrected by the next Tally snapshot. |
 | Tray stock | **Stallion only** | none | Optional: a "Sample trays" godown in Tally fed by stock journals (phase 3). |
 | Orders | **Stallion** | Stallion → Tally | Sent as **Sales Order** vouchers. |
@@ -111,7 +112,7 @@ Hook points (small, guarded, never able to block an order): after a party is cre
 
 In a real company Tally is usually the older and richer system: the ledgers, stock items, groups, godowns, GST setup, voucher types and numbering already exist and accounts will not change them for us. So the integration runs in **adopt mode** by default. Stallion **links to what Tally already has** and only creates something new in Tally when an admin allows it.
 
-**Rule: Stallion creates in Tally only NEW PARTIES. Nothing else.** Stock items, stock groups, units, godowns, GST ledgers, sales ledgers and voucher types are never created, changed or deleted by Stallion; they always come from Tally and Stallion links to them. Only a party that does not exist in Tally yet can become a new ledger, and only when this setting allows it:
+**Rule: Stallion creates in Tally only NEW PARTIES. Nothing else. Everything else is read from Tally, and new products and other new records in Tally are created in Stallion automatically.** Stock items, stock groups, units, godowns, GST ledgers, sales ledgers and voucher types are never created, changed or deleted by Stallion; they always come from Tally and Stallion links to them. Only a party that does not exist in Tally yet can become a new ledger, and only when this setting allows it:
 
 **Setting `Create new parties in Tally`: Off (default) / Ask / On.**
 
@@ -149,8 +150,8 @@ In a real company Tally is usually the older and richer system: the ledgers, sto
 **Names that differ.** Stallion keeps its own display name (`party_name`, `model_no`) and stores the Tally name beside it. Orders always use the stored Tally name, so a rename on either side never breaks the link. Renames in Tally arrive through the GUID.
 
 **Gaps and clashes.**
-- A Tally stock item with no Stallion product: listed under "In Tally only"; admin can create the Stallion product from it (name, HSN, GST rate, rate) or ignore it.
-- A Stallion product with no Tally stock item: its orders wait, with the message "Stock item not found in Tally: ask accounts to create it, then link it". Stallion never creates stock items, in any mode.
+- A Tally stock item with no Stallion product: **Stallion creates the product automatically** (section 6.2). It does not wait for review.
+- A Stallion product with no Tally stock item (an old product, or one added by hand before this integration): shown in a "Not in Tally" list; its orders wait, with the message "Stock item not found in Tally: ask accounts to create it, then link it". Stallion never creates stock items, in any mode.
 - Two Stallion parties pointing at one ledger: blocked, with a warning (one ledger can be linked once).
 - Inactive in Stallion: stays active in Tally; Stallion never deletes or renames Tally masters.
 
@@ -182,7 +183,16 @@ Everything else in this document applies with this change: in 6.1 only the **new
 
 ### 6.2 Inventory sync
 
-**Stallion → Tally (masters): not done.** Products are linked to existing Tally stock items (section 5A); Stallion reads name, HSN, GST rate, unit and group from Tally. The text below describes the stock item shape only for a possible later phase and is switched off.
+**Tally → Stallion (product masters): this is how products are born and updated.** Tally is the master for products; Stallion never creates or changes stock items in Tally. Each poll exports stock items changed since the stored alter id and applies them:
+
+- **New stock item in Tally** (no Stallion product linked by `tally_guid`, and no safe name match): Stallion **creates the product**: `model_no` from the item name, `tally_item_name` and `tally_guid`, `hsn_code`, `gst_rate`, `unit`, brand from the **stock group** (matching an existing brand by name, creating the brand row when it does not exist), `whp` from the Tally selling rate or price list (setting says which), `warehouse_qty` from the closing balance of the warehouse godown, `tray_qty` 0.
+- **Details Tally cannot give** (photos, shape, frame type, lens, materials, colour, gender, MRP when it is not kept in Tally): the new product is created **inactive with status `needs_details`** so it never appears in the shop half-filled. It shows in a "New from Tally" list and a badge on Products; staff add the details and switch it on. Nothing about it blocks stock or order sync.
+- **Existing linked stock item**: Stallion **updates** name changes (kept by GUID), group (brand), HSN, GST rate, unit, `whp` and `warehouse_qty`. Fields Stallion owns (photos, attributes, MRP when not in Tally, offers, tray stock) are never touched.
+- **Item changed or removed in Tally**: a stock item no longer in use or marked inactive in Tally makes the Stallion product **inactive** (nothing is deleted). Reactivating it in Tally reactivates it.
+- **Name match on the first run**: before auto-creating, the first-sync matching (5A) links Tally items to the products Stallion already has, so existing products are not duplicated.
+- The same "Tally is the source" rule applies to **units, stock groups (brands) and godowns**: they are read from Tally and shown in Stallion's pickers. Parties are the one exception (section 6.1).
+
+The text below describes the old idea of Stallion creating stock items and is **switched off**; it is kept only for reference.
 
 - (Not used) Each product would become a **Stock Item**: name `model_no`, unit `Nos`, HSN, GST rate, standard selling rate = `whp`, under a stock group named after the brand (so reports group by brand).
 - Created when a product is created or when first synced; later edits update the same item. Name changes keep the GUID so history is kept.
@@ -285,6 +295,7 @@ Admin screens (login required):
 
 ## 10. Settings and rules to confirm with the accounts team
 
+00. Where do the selling rate (WHP) and the MRP live in Tally: standard selling rate, a price list, or a custom field? (They decide what a new product gets automatically.)
 0. Is Tally already set up with ledgers, stock items, groups, godowns and GST? (Then keep **adopt mode** with `Create new parties in Tally` set to Off or Ask, section 5A.)
 1. Which godown or godowns are the warehouse?
 2. Do orders go to Tally as **Sales Order** vouchers (recommended) or straight as **Sales** invoices?
@@ -302,7 +313,7 @@ Admin screens (login required):
 | Phase | Delivers | Done when |
 |---|---|---|
 | 1. Foundation | new columns and tables, outbox, `/api/tally` with key auth, admin Integrations and queue screens, connector skeleton with health check, party Stallion → Tally | a new Stallion party shows up as a ledger in the sample company |
-| 2. Link and stock | first-sync matching screen for parties and products, link review, HSN and GST read from Tally stock items, stock snapshot into Stallion, ledger import | every product is linked to a Tally stock item and `warehouse_qty` matches Tally within one poll |
+| 2. Products and stock from Tally | first-sync matching screen for parties and existing products, automatic product create and update from Tally stock items, "New from Tally" list with `needs_details`, brand from stock group, stock snapshot into Stallion, ledger import | every Tally stock item has a Stallion product, `warehouse_qty` matches Tally within one poll, and a stock item added in Tally appears in Stallion within a few minutes |
 | 3. Orders | order to Sales Order, edit and cancel, ordering and retries, totals check | 100 test orders create 100 vouchers, no duplicates after forced retries |
 | 4. Invoices | sales voucher feed, matching, invoice chip and PDF in the app, cancelled invoice handling, optional auto-invoice on dispatch | invoice number and PDF show on the order within a minute of raising it in Tally |
 | 5. Extras | outstanding per party in Stallion, receipts, tray godown journals, multi-company | agreed after phase 4 |
