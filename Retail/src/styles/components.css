@@ -4,7 +4,7 @@
 .logo { font: 700 18px var(--font-display); letter-spacing: .02em; }
 .nav { display: none; gap: 18px; color: var(--mute); font-weight: 600; margin-left: 10px; }
 .nav a[aria-current="page"], .nav a:hover { color: var(--ink); }
-@media (min-width: 860px) { .nav { display: flex; } .hd__menu { display: none; } }
+@media (min-width: 860px) { .nav { display: flex; } .ib.hd__menu { display: none; } }
 .hd__sp { flex: 1; }
 .hd__b2b { display: none; border: 1px solid var(--line); border-radius: 99px; padding: 6px 12px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
 @media (min-width: 1000px) { .hd__b2b { display: inline-flex; } }
