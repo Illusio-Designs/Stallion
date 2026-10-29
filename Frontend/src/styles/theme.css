@@ -103,3 +103,8 @@
 .theme-switch__pv--light { background: #fff; }
 .theme-switch__pv--dark { background: #0b0b0c; border-color: #444; }
 .theme-switch__pv--system { background: linear-gradient(90deg, #fff 50%, #0b0b0c 50%); }
+
+/* Notification permission card: clear of the phone bottom menu and the home bar. */
+.notify-ask { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
+.notify-ask > div { pointer-events: auto; }
+@media (min-width: 768px) { .notify-ask { padding-bottom: max(16px, env(safe-area-inset-bottom, 0px)); } }

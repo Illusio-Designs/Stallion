@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { FiBell } from './icons/hugeicons';
 import { askPermission, isInstalledApp, shouldAskPermission, snoozeAsking } from '../utils/systemNotify';
 
@@ -25,10 +26,11 @@ const NotificationPermissionPrompt = () => {
   };
   const later = () => { snoozeAsking(7); setOpen(false); };
 
-  return (
+  // Rendered on <body> so no header or layout wrapper can trap it behind the bottom menu.
+  // On phones it sits above the bottom menu (about 72px tall) so both buttons stay tappable.
+  return createPortal(
     <div
-      className="fixed inset-x-0 bottom-0 z-[2000] flex justify-center p-4"
-      style={{ paddingBottom: 'max(16px, env(safe-area-inset-bottom, 0px))' }}
+      className="notify-ask fixed inset-x-0 bottom-0 z-[3000] flex justify-center px-4"
       role="presentation"
     >
       <div
@@ -48,11 +50,12 @@ const NotificationPermissionPrompt = () => {
           </div>
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="ui-btn" onClick={later}>Not now</button>
-          <button type="button" className="ui-btn ui-btn--primary" onClick={turnOn}>Turn on</button>
+          <button type="button" className="ui-btn min-h-[44px] rounded-md border border-border-strong bg-transparent px-4 text-text" onClick={later}>Not now</button>
+          <button type="button" className="ui-btn ui-btn--primary min-h-[44px] rounded-md px-4" onClick={turnOn}>Turn on</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
