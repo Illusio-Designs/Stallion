@@ -6,6 +6,9 @@
  *
  * Applied on startup via DatabaseManager.syncIndexes().
  */
+// Retail (B2C) store indexes live next to the retail code and are spread in at the end of the list.
+const { RETAIL_CATALOG_INDEXES } = require('../retail/dbIndexes');
+
 const DB_INDEXES = [
     // ── users (manually managed table) ──────────────────────────────────────
     { table: 'users', fields: ['role_id'], name: 'idx_users_role_id' },
@@ -148,6 +151,9 @@ const DB_INDEXES = [
 
     // ── collection / brand (product catalog) ───────────────────────────────
     { table: 'collection', fields: ['brand_id'], name: 'idx_collection_brand_id' },
+
+    // ── retail store (catalogue + content) ───────────────────────────────────
+    ...RETAIL_CATALOG_INDEXES,
 ];
 
 module.exports = { DB_INDEXES };

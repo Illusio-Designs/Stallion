@@ -544,6 +544,9 @@ class DatabaseManager {
             await this.syncIndexes();
             await this.ensureUniqueOrderNumber();
 
+            // First-boot retail defaults (settings, policy text, FAQs). Only fills EMPTY tables and never throws.
+            try { await require('../retail/services/seed').seedRetailDefaults(); } catch (_e) { /* never block startup */ }
+
             await Country.initializeDefaultCountries();
             await State.initializeDefaultStates();
             console.log('✨ Database initialization completed');
