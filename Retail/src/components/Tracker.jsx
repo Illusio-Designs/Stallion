@@ -17,6 +17,16 @@ export default function Tracker({ tracking = {} }) {
   }, [tracking.cookie_notice]);
 
   useEffect(() => {
+    // Remember the ad parameters of this tab session so checkout can attach them to the order.
+    try {
+      const q = new URLSearchParams(window.location.search);
+      const u = {};
+      ['source', 'medium', 'campaign', 'term', 'content'].forEach((k) => { const v = q.get('utm_' + k); if (v) u[k] = v; });
+      if (Object.keys(u).length) sessionStorage.setItem('stl-utm', JSON.stringify(u));
+    } catch (_e) { /* blocked */ }
+  }, [path]);
+
+  useEffect(() => {
     if (consent === 'unknown') return;
     let first = false;
     try { first = !sessionStorage.getItem('stl-visit'); if (first) sessionStorage.setItem('stl-visit', '1'); } catch (_e) { /* blocked */ }
