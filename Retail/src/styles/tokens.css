@@ -1,0 +1,22 @@
+/* Retail store design tokens. Black and white identity; light, dark and system themes. */
+:root {
+  --bg: #ffffff; --card: #ffffff; --ink: #0a0a0a; --mute: #5c5c5c; --faint: #8c8c8c;
+  --line: #e1e1e1; --soft: #f4f4f4; --soft2: #ececec; --photo: #f1f1f2;
+  --btn: #0a0a0a; --btn-ink: #ffffff; --on-ink: #ffffff;
+  --ok: #0b7a53; --ok-soft: #dcf2e8; --bad: #b3261e; --bad-soft: #fbe5e3; --warn: #8a5a00; --warn-soft: #fbefd5;
+  --dark: #0a0a0a; --dark-ink: #ffffff; --dark-mute: #bdbdc2; --dark-line: #2b2b2e;
+  --lens: #b08d57; --scrim: rgba(0, 0, 0, 0.45);
+  --font-display: 'Bricolage Grotesque', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Figtree', 'Segoe UI', system-ui, sans-serif;
+  --radius: 12px; --radius-lg: 16px; --maxw: 1200px; --gutter: 16px;
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #0b0b0c; --card: #151516; --ink: #f2f2f2; --mute: #a3a3a8; --faint: #85858a;
+  --line: #2b2b2e; --soft: #1e1e20; --soft2: #28282b; --photo: #f1f1f2;
+  --btn: #f2f2f2; --btn-ink: #0a0a0a; --on-ink: #0a0a0a;
+  --ok: #6fd1a2; --ok-soft: #12332a; --bad: #ff8f84; --bad-soft: #3a1c1a; --warn: #f0b46a; --warn-soft: #3b2a14;
+  --dark: #151516; --dark-ink: #f2f2f2; --dark-mute: #a3a3a8; --dark-line: #2b2b2e;
+  --lens: #c9a469; --scrim: rgba(0, 0, 0, 0.65);
+  color-scheme: dark;
+}

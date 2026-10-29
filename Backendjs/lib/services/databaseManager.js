@@ -220,6 +220,8 @@ class DatabaseManager {
                 { role_name: 'reports_manager', description: 'Manages reports', is_office_role: true },
                 { role_name: 'product_manager', description: 'Manages product catalog', is_office_role: true },
                 { role_name: 'party_manager', description: 'Manages parties', is_office_role: true },
+                { role_name: 'retail_manager', description: 'Runs the retail (B2C) store', is_office_role: true },
+                { role_name: 'retail_editor', description: 'Edits retail blog and SEO', is_office_role: true },
                 { role_name: 'distributor_manager', description: 'Manages distributors', is_office_role: true },
                 { role_name: 'salesman', description: 'Field salesman mapped to zones', is_office_role: false },
                 { role_name: 'admin', description: 'Super admin', is_office_role: true },
@@ -442,6 +444,8 @@ class DatabaseManager {
             require('../models/SalesmanStates');
             require('../models/DistributorStates');
             require('../models/Offer');
+            // Retail (B2C) store models: tables are prefixed retail_ and never join to wholesale tables.
+            require('../retail/models');
 
             // Register the User <-> Role many-to-many association. The model files
             // declare it inside an `associate(models)` hook that nothing ever

@@ -77,6 +77,9 @@ router.use('/offers', offerRoutes);
 router.use('/admin', adminRoutes);
 router.use('/dashboard', dashboardRoutes);
 
+// Retail (B2C) store: its own tables and its own public + admin API. See retail/API_CONTRACT.md
+router.use('/retail', require('../retail/routes'));
+
 // API documentation route
 router.get('/docs', (req, res) => {
     res.json({
