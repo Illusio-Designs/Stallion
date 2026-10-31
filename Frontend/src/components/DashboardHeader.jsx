@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import '../styles/components/DashboardHeader.css';
-import { FiBell, FiMenu, FiSidebar } from './icons/hugeicons';
+import { FiBell, FiMenu, FiSidebar, FiShoppingCart } from './icons/hugeicons';
+import { getCartCount, registerCartListener } from '../services/cartService';
 import Tooltip from './ui/Tooltip';
 import InstallAppButton from './InstallAppButton';
 import ThemeSwitch from './ThemeSwitch';
@@ -26,6 +27,12 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
   // Wholesale / Retail: the switch shows only for a person who may open both sides.
   const { hasBoth, side, rememberSide } = useRetailAccess(currentPage);
   const isRetail = side === 'retail';
+  // Cart shortcut for tablets and computers (phones have the Cart button in the bottom bar).
+  const [cartCount, setCartCount] = useState(0);
+  useEffect(() => {
+    setCartCount(getCartCount());
+    return registerCartListener(() => setCartCount(getCartCount()));
+  }, []);
   const chooseSide = (next) => {
     rememberSide(next);
     if (onPageChange) onPageChange(homeForSide(next, getUserRoles()));
@@ -317,6 +324,19 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
           <div className="dashboard-action-icons flex items-center gap-2">
             <InstallAppButton />
             <NotificationPermissionPrompt />
+            {!isRetail && (
+              <Tooltip label="Cart" placement="bottom">
+                <button
+                  type="button"
+                  className="dashboard-icon-btn hidden md:inline-flex relative bg-transparent border-none w-10 h-10 rounded-pill items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]"
+                  aria-label={cartCount > 0 ? `Cart, ${cartCount} items` : 'Cart'}
+                  onClick={() => onPageChange?.('cart')}
+                >
+                  <FiShoppingCart size={20} aria-hidden="true" />
+                  {cartCount > 0 && <span className="rdb-badge" aria-hidden="true">{cartCount > 9 ? '9+' : cartCount}</span>}
+                </button>
+              </Tooltip>
+            )}
             <div className="rdb" ref={bellRef}>
               <Tooltip label="Notifications" placement="bottom">
                 <button
