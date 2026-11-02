@@ -9,6 +9,7 @@ const parsePartyFile = require('../middleware/party_parser');
 
 router.get('/', authenticateToken, (req, res) => partyController.getPartiesRoot(req, res));
 router.get('/my', authenticateToken, partyController.getMyParties);
+router.get('/filter-options', authenticateToken, (req, res) => partyController.getPartyFilterOptions(req, res));
 // Diagnostic: does the server's geocoder work? GET /parties/geocode-test?q=...
 // Admin only and read-only: it never saves coordinates on a party.
 // (declared before '/:id' so it isn't captured as an id)

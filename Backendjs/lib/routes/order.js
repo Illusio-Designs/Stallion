@@ -5,6 +5,7 @@ const orderController = require('../controllers/orderController');
 const { authenticateToken } = require('../middleware/auth');
 
 router.get('/my', authenticateToken, orderController.getMyOrders);
+router.get('/filter-options', authenticateToken, orderController.getOrderFilterOptions);
 router.get('/tray-tasks', authenticateToken, orderController.getTrayTasks);
 router.post('/tray-tasks/:taskId/in-transit', authenticateToken, orderController.trayTaskInTransit);
 router.post('/tray-tasks/:taskId/received', authenticateToken, orderController.trayTaskReceived);
