@@ -23,7 +23,7 @@ const { isOfferActive, offerScopeMatches, applyOfferToItems } = require('../util
 const Zone = require('../models/Zone');
 const User = require('../models/User');
 const sequelize = require('../constants/database');
-const { Op } = require('sequelize');
+const { Op, fn, col, literal } = require('sequelize');
 const Country = require('../models/Country');
 const State = require('../models/State');
 const Cities = require('../models/Cities');
@@ -38,7 +38,7 @@ const { toInt, allocateShipped, planItemCancel, spreadOver, upcomingToRelease } 
 
 // Most pieces one order line may hold (a sanity limit; upcoming products have no stock cap).
 const MAX_LINE_QTY = 100000;
-const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse, likeContains } = require('../utils/listSearchHelpers');
 
 const orderPartyInclude = {
     model: Party,
@@ -524,6 +524,100 @@ function resolveOrderDateRangeFilter(req) {
 }
 
 
+// Columns the Orders list may be sorted by (anything else falls back to the date).
+const ORDER_SORT_COLUMNS = { order_date: 'order_date', order_number: 'order_number', order_total: 'order_total', order_status: 'order_status', order_type: 'order_type' };
+
+// One page of orders for GET /orders and GET /orders/my. `scopeWhere` is the caller's role scope.
+// Filters: status, start_date/end_date, search (order fields, party name, salesman name), order_type,
+// salesman_id, sort/dir. With counts=1 the response also has `counts` per status (all filters except
+// the status tab, so the tab badges stay right); with summary=1 it has `summary` totals for the scope.
+async function listOrdersPage(req, res, scopeWhere) {
+    const pagination = parsePaginationParams(req);
+    const statusResult = resolveOrderStatusFilter(req);
+    if (statusResult.error) return res.status(statusResult.status).json({ error: statusResult.error });
+    const dateResult = resolveOrderDateRangeFilter(req);
+    if (dateResult.error) return res.status(dateResult.status).json({ error: dateResult.error });
+
+    const { name } = getListSearchParams(req);
+    const likeTerm = name ? sequelize.escape(likeContains(name)) : null;
+    const searchFilter = name ? { [Op.or]: [
+        buildNamePhoneFilter({
+            name,
+            phone: null,
+            nameFields: ['order_number', 'order_status', 'order_type', 'courier_name', 'courier_tracking_number'],
+            phoneFields: [],
+        }),
+        // Party and salesman names, through sub-selects so the order query needs no join.
+        { party_id: { [Op.in]: literal(`(SELECT party_id FROM parties WHERE party_name LIKE ${likeTerm})`) } },
+        { salesman_id: { [Op.in]: literal(`(SELECT salesman_id FROM salesmen WHERE full_name LIKE ${likeTerm})`) } },
+    ] } : null;
+
+    const extra = {};
+    const orderType = String(req.query.order_type ?? '').trim();
+    if (orderType) extra.order_type = orderType;
+    const salesmanId = String(req.query.salesman_id ?? '').trim();
+    if (salesmanId) extra.salesman_id = salesmanId;
+
+    // Everything except the status tab: this is also what the tab counts use.
+    const withoutStatus = mergeWhere({ ...scopeWhere, ...extra, ...(dateResult.filter ?? {}) }, searchFilter);
+    const where = statusResult.filter ? mergeWhere(withoutStatus, statusResult.filter) : withoutStatus;
+
+    const sortCol = ORDER_SORT_COLUMNS[String(req.query.sort ?? '').trim()] || 'order_date';
+    const sortDir = String(req.query.dir ?? '').toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    const wantCounts = ['1', 'true'].includes(String(req.query.counts ?? '').toLowerCase());
+    const wantSummary = ['1', 'true'].includes(String(req.query.summary ?? '').toLowerCase());
+
+    // Count without the party join (the filters use only order columns) and in parallel with the page.
+    const [count, orders, statusRows, summaryRows] = await Promise.all([
+        Order.count({ where }),
+        Order.findAll({
+            where,
+            include: [orderPartyInclude],
+            limit: pagination.limit,
+            offset: pagination.offset,
+            order: [[sortCol, sortDir], ['order_id', 'DESC']],
+        }),
+        wantCounts
+            ? Order.findAll({ attributes: ['order_status', [fn('COUNT', col('order_id')), 'n']], where: withoutStatus, group: ['order_status'], raw: true })
+            : [],
+        wantSummary
+            ? Order.findAll({
+                attributes: ['order_status', 'order_type', [fn('COUNT', col('order_id')), 'n'], [fn('SUM', col('order_total')), 'total']],
+                where: scopeWhere,
+                group: ['order_status', 'order_type'],
+                raw: true,
+            })
+            : [],
+    ]);
+    const body = buildPaginatedResponse(await mapOrdersWithPartyName(orders), pagination, count);
+    if (wantCounts) {
+        const counts = { all: 0 };
+        statusRows.forEach((r) => {
+            const key = String(r.order_status || '').toLowerCase();
+            counts[key] = (counts[key] || 0) + Number(r.n);
+            counts.all += Number(r.n);
+        });
+        body.counts = counts;
+    }
+    if (wantSummary) {
+        const summary = { totalOrders: 0, pendingOrders: 0, completedValue: 0, totalRevenue: 0, retailOrders: 0, bulkOrders: 0 };
+        summaryRows.forEach((r) => {
+            const n = Number(r.n) || 0;
+            const total = Number(r.total) || 0;
+            const status = String(r.order_status || '').toLowerCase();
+            const type = String(r.order_type || '');
+            summary.totalOrders += n;
+            summary.totalRevenue += total;
+            if (status === 'pending') summary.pendingOrders += n;
+            if (status === 'completed') summary.completedValue += total;
+            if (type.includes('retail')) summary.retailOrders += n;
+            if (type.includes('bulk')) summary.bulkOrders += n;
+        });
+        body.summary = summary;
+    }
+    return res.status(200).json(body);
+}
+
 // An error we expect and can explain to the user in plain words.
 class OrderError extends Error {
     constructor(message, status = 400) {
@@ -576,30 +670,7 @@ class OrderController {
                 return res.status(403).json({ error: 'Access denied' });
             }
 
-            const { name } = getListSearchParams(req);
-            const searchFilter = buildNamePhoneFilter({
-                name,
-                phone: null,
-                nameFields: ['order_number', 'order_status', 'order_type', 'courier_name', 'courier_tracking_number'],
-                phoneFields: [],
-            });
-            const where = mergeWhere(whereClause, searchFilter);
-            const pagination = parsePaginationParams(req);
-            if (pagination.error) {
-                return res.status(pagination.status).json({ error: pagination.error });
-            }
-            // Count without the party join (the filters use only order columns) and in parallel with the page.
-            const [count, orders] = await Promise.all([
-                Order.count({ where }),
-                Order.findAll({
-                    where,
-                    include: [orderPartyInclude],
-                    limit: pagination.limit,
-                    offset: pagination.offset,
-                    order: [['order_date', 'DESC']],
-                }),
-            ]);
-            res.status(200).json(buildPaginatedResponse(await mapOrdersWithPartyName(orders), pagination, count));
+            return await listOrdersPage(req, res, whereClause);
         } catch (error) {
             console.error('Error fetching orders:', error);
             res.status(500).json({ error: 'Failed to fetch orders' });
@@ -610,45 +681,56 @@ class OrderController {
             if (!canViewAllOrders(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
-            const pagination = parsePaginationParams(req);
-            if (pagination.error) {
-                return res.status(pagination.status).json({ error: pagination.error });
-            }
-            const { name } = getListSearchParams(req);
-            const statusResult = resolveOrderStatusFilter(req);
-            if (statusResult.error) {
-                return res.status(statusResult.status).json({ error: statusResult.error });
-            }
-            const dateResult = resolveOrderDateRangeFilter(req);
-            if (dateResult.error) {
-                return res.status(dateResult.status).json({ error: dateResult.error });
-            }
-            const searchFilter = buildNamePhoneFilter({
-                name,
-                phone: null,
-                nameFields: ['order_number', 'order_status', 'order_type', 'courier_name', 'courier_tracking_number'],
-                phoneFields: [],
-            });
-            const baseFilter = {
-                ...(statusResult.filter ?? {}),
-                ...(dateResult.filter ?? {}),
-            };
-            const where = mergeWhere(baseFilter, searchFilter);
-            // Count without the party join (the filters use only order columns) and in parallel with the page.
-            const [count, orders] = await Promise.all([
-                Order.count({ where }),
-                Order.findAll({
-                    where,
-                    include: [orderPartyInclude],
-                    limit: pagination.limit,
-                    offset: pagination.offset,
-                    order: [['order_date', 'DESC']],
-                }),
-            ]);
-            res.status(200).json(buildPaginatedResponse(await mapOrdersWithPartyName(orders), pagination, count));
+            return await listOrdersPage(req, res, {});
         } catch (error) {
             console.error('Error fetching orders:', error);
             res.status(500).json({ error: 'Failed to fetch orders' });
+        }
+    }
+    /**
+     * GET /orders/filter-options
+     * Values for the Orders page dropdowns (order types and salesmen that have orders), within the
+     * caller's own scope. Small lookup so the page does not need the loaded rows to build them.
+     */
+    async getOrderFilterOptions(req, res) {
+        try {
+            const user = req.user;
+            if (!user) return res.status(401).json({ error: 'Unauthorized' });
+            const role = normalizeRole(req.userRoleName);
+            if (!role) return res.status(400).json({ error: 'User role is required' });
+            const scope = await resolveUserScope(user.user_id, role);
+            const where = {};
+            if (role === 'party') {
+                if (!scope.partyId) return res.status(404).json({ error: 'Party not found' });
+                where.party_id = scope.partyId;
+            } else if (role === 'distributor') {
+                if (!scope.distributorId) return res.status(404).json({ error: 'Distributor not found' });
+                where.distributor_id = scope.distributorId;
+            } else if (role === 'salesman') {
+                if (!scope.salesmanId) return res.status(404).json({ error: 'Salesman not found' });
+                where.salesman_id = scope.salesmanId;
+            } else if (!canViewAllOrders(req.userRoleNames)) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const [typeRows, salesmanRows] = await Promise.all([
+                Order.findAll({ attributes: [[fn('DISTINCT', col('order_type')), 'order_type']], where, raw: true }),
+                Order.findAll({
+                    attributes: [[fn('DISTINCT', col('salesman_id')), 'salesman_id']],
+                    where: { ...where, salesman_id: { [Op.ne]: null } },
+                    raw: true,
+                }),
+            ]);
+            const salesmanIds = salesmanRows.map((r) => r.salesman_id).filter(Boolean);
+            const salesmen = salesmanIds.length
+                ? await Salesman.findAll({ where: { salesman_id: salesmanIds }, attributes: ['salesman_id', 'full_name'], order: [['full_name', 'ASC']] })
+                : [];
+            res.status(200).json({
+                types: typeRows.map((r) => r.order_type).filter(Boolean).sort(),
+                salesmen: salesmen.map((x) => ({ salesman_id: x.salesman_id, full_name: x.full_name })),
+            });
+        } catch (error) {
+            console.error('Error fetching order filter options:', error);
+            res.status(500).json({ error: 'Failed to fetch order filter options' });
         }
     }
     /**
