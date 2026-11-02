@@ -277,6 +277,9 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
   );
 };
 
+// Sentinel for the "+ Add New Party" item inside the party dropdown (same as the Cart).
+const ADD_PARTY_OPTION = '__add_party__';
+
 const DashboardSuppliers = () => {
   const confirm = useConfirm();
   const isSalesman = getUserRole() === 'salesman';
@@ -2153,33 +2156,33 @@ const DashboardSuppliers = () => {
               <DropdownSelector
                 options={[
                   { value: '', label: 'Select Party' },
+                  // Salesmen add a new party right from the dropdown, like in the Cart.
+                  ...((isSalesman && !editCheckin) ? [{ value: ADD_PARTY_OPTION, label: '+ Add New Party', className: 'ui-dropdown-custom__option--action' }] : []),
                   ...zoneParties.map(p => ({ value: p.party_id || p.id, label: p.party_name || p.name || p.party_id }))
                 ]}
                 value={checkinForm.party_id}
-                onChange={(v) => setCheckinForm(prev => ({ ...prev, party_id: v }))}
+                onChange={(v) => {
+                  if (v === ADD_PARTY_OPTION) {
+                    setVisitPartyPanel({ open: true, party: null });
+                    return; // keep the current party selected
+                  }
+                  setCheckinForm(prev => ({ ...prev, party_id: v }));
+                }}
                 placeholder="Select Party"
                 className="ui-dropdown-custom--full-width"
                 disabled={!!editCheckin}
               />
-              {isSalesman && (
-                <div className="mt-2 flex gap-2">
-                  {!editCheckin && (
-                    <button type="button" className="ui-btn ui-btn--secondary" onClick={() => setVisitPartyPanel({ open: true, party: null })}>
-                      Add party
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    className="ui-btn ui-btn--secondary"
-                    disabled={!checkinForm.party_id}
-                    onClick={() => {
-                      const row = zoneParties.find((p) => (p.party_id || p.id) === checkinForm.party_id);
-                      if (row) setVisitPartyPanel({ open: true, party: row });
-                    }}
-                  >
-                    Edit party
-                  </button>
-                </div>
+              {isSalesman && checkinForm.party_id && (
+                <button
+                  type="button"
+                  className="ui-btn ui-btn--secondary mt-2 self-start"
+                  onClick={() => {
+                    const row = zoneParties.find((p) => (p.party_id || p.id) === checkinForm.party_id);
+                    if (row) setVisitPartyPanel({ open: true, party: row });
+                  }}
+                >
+                  Edit party
+                </button>
               )}
               {isSalesman && checkinForm.party_id && (() => {
                 const sp = zoneParties.find(p => (p.party_id || p.id) === checkinForm.party_id);
