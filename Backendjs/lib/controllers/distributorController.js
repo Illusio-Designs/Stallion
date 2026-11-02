@@ -9,7 +9,8 @@ const DistributorZones = require('../models/DistributorZones');
 const DistributorStates = require('../models/DistributorStates');
 const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
-const { findOrCreateRoleUser } = require('../utils/userFactory');
+const { findOrCreateRoleUser, ensureUserRole } = require('../utils/userFactory');
+const Role = require('../models/Role');
 const sequelize = require('../constants/database');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse, listWithOptionalPagination } = require('../utils/listSearchHelpers');
 const { partyActiveFilter } = require('../utils/roleHelpers');
@@ -175,7 +176,13 @@ class DistributorController {
             // failed create never leaves an orphaned user that blocks retry.
             const distributor = await sequelize.transaction(async (t) => {
                 let distributorUser = existingUser;
-                if (!distributorUser) {
+                if (distributorUser) {
+                    // A user found by phone / email must also hold the distributor role, or the
+                    // distributor signs in as "User not found" / without distributor access.
+                    const role = await Role.findOne({ where: { role_name: 'distributor' }, transaction: t });
+                    if (!role) throw new Error("Role 'distributor' not found");
+                    distributorUser = await ensureUserRole(distributorUser, role, t);
+                } else {
                     distributorUser = await findOrCreateRoleUser({
                         phone,
                         email,

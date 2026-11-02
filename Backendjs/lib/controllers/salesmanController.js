@@ -10,7 +10,7 @@ const SalesmanStates = require('../models/SalesmanStates');
 const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const User = require('../models/User');
-const { findOrCreateRoleUser } = require('../utils/userFactory');
+const { findOrCreateRoleUser, acquireCreateLock, last10Of } = require('../utils/userFactory');
 const UserRole = require('../models/UserRole');
 const Role = require('../models/Role');
 const { isAdmin, hasRole, SALESMAN_DOC_ROLES } = require('../utils/roleHelpers');
@@ -131,6 +131,7 @@ class SalesmanController {
         }
     }
     async createSalesman(req, res) {
+        let releaseLock = () => {};
         try {
             const user = req.user;
             const { user_id, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date } = req.body;
@@ -176,6 +177,19 @@ class SalesmanController {
             const existingSalesman = await Salesman.findOne({ where: { employee_code: employee_code } });
             if (existingSalesman) {
                 return res.status(400).json({ error: 'Salesman with this employee code already exists' });
+            }
+
+            // One salesman per phone number (the phone is the login), and one create per number at a time.
+            releaseLock = acquireCreateLock('salesman', phone);
+            const phoneDigits = last10Of(phone);
+            if (phoneDigits.length >= 10) {
+                const samePhone = await Salesman.findOne({
+                    where: { phone: { [Op.like]: `%${phoneDigits}` } },
+                    attributes: ['salesman_id', 'full_name'],
+                });
+                if (samePhone) {
+                    return res.status(400).json({ error: `A salesman with this phone number already exists: ${samePhone.full_name}.` });
+                }
             }
 
             if (!user_id) {
@@ -311,6 +325,8 @@ class SalesmanController {
             }
             console.error(error);
             res.status(500).json({ error: error.message });
+        } finally {
+            releaseLock();
         }
     }
     async updateSalesman(req, res) {
