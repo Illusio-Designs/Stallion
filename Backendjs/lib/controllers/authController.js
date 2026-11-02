@@ -5,7 +5,7 @@ const Role = require('../models/Role');
 const UserRole = require('../models/UserRole');
 const Party = require('../models/Party');
 const msg91Service = require('../services/msg91Service');
-const { ensureLoginUserByPhone, findPartyByPhone } = require('../utils/userFactory');
+const { ensureLoginUserByPhone, findPartyByPhone, findPartnerLoginUser } = require('../utils/userFactory');
 const { markPhoneVerified, consumePhoneVerification, normalizePhone } = require('../services/otpSession');
 const { identifierMatchesPhone, allowUnboundToken } = require('../utils/otpBinding');
 const { getJwtSecret } = require('../utils/jwtSecret');
@@ -107,6 +107,11 @@ class AuthController {
                 // linked on the login call (after OTP is verified).
                 const party = await findPartyByPhone(phoneNumber);
                 if (party) {
+                    return res.status(200).json({ message: 'User found' });
+                }
+                // Same for a salesman or distributor whose login user is missing or saved in another phone format.
+                const partner = await findPartnerLoginUser(phoneNumber, { dryRun: true });
+                if (partner) {
                     return res.status(200).json({ message: 'User found' });
                 }
                 return res.status(400).json({ error: 'User not found' });
