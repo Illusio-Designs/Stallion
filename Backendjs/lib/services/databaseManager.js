@@ -44,6 +44,10 @@ class DatabaseManager {
             // Logout support: tokens issued before this time are rejected. Must exist before any
             // User query, because the User model selects it.
             await this.ensureColumn('users', 'tokens_valid_from', 'DATETIME NULL');
+            // Upcoming (pre-order) products. The Product model selects these on every query, so they
+            // are added here, before any Product query, even if the alter-sync below fails.
+            await this.ensureColumn('product', 'is_upcoming', 'TINYINT(1) NOT NULL DEFAULT 0');
+            await this.ensureColumn('product', 'preorder_qty', 'INT NOT NULL DEFAULT 0');
 
             // Define table schemas
             const schemas = {

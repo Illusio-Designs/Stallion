@@ -30,6 +30,7 @@ import {
   rememberEditParty,
 } from "../services/apiService";
 import { captureCurrentPosition, distanceMeters, hasPartyPoint, visitRadius } from "../utils/geolocation";
+import { isUpcoming, MAX_ORDER_QTY } from "../utils/upcoming";
 
 // Re-point any product image URL (legacy host, absolute server path, or
 // relative) to the configured image host — the same base the Media gallery and
@@ -59,6 +60,9 @@ const Cart = ({ onPageChange = null }) => {
   // truth for the per-item quantity cap so a user can't order more than we hold
   // (the order endpoint rejects it anyway, but this stops it at the UI).
   const [stockById, setStockById] = useState({});
+  // Live "upcoming (pre-order)" flag per product_id. Upcoming frames keep no stock, so they have
+  // no entry in stockById and no cap. Before the lookup finishes the line's own flag is used.
+  const [upcomingById, setUpcomingById] = useState({});
   
   // Get user role and user info
   const userRole = getUserRole();
@@ -427,18 +431,22 @@ const Cart = ({ onPageChange = null }) => {
   const cartIdsKey = cartItems.map((i) => i.id).filter(Boolean).sort().join(',');
   useEffect(() => {
     const ids = cartItems.map((i) => i.id).filter(Boolean);
-    if (ids.length === 0) { setStockById({}); return; }
+    if (ids.length === 0) { setStockById({}); setUpcomingById({}); return; }
     let cancelled = false;
     (async () => {
       try {
         const list = await getProductsByIds(ids);
         if (cancelled) return;
         const map = {};
+        const upcoming = {};
         (list || []).forEach((p) => {
           const pid = String(p.product_id ?? p.id);
-          map[pid] = Number(p.total_qty ?? p.warehouse_qty ?? 0);
+          upcoming[pid] = isUpcoming(p);
+          // No stock number for an upcoming frame: nothing to cap or warn about.
+          if (!upcoming[pid]) map[pid] = Number(p.total_qty ?? p.warehouse_qty ?? 0);
         });
         setStockById(map);
+        setUpcomingById(upcoming);
         // Pull any line that now exceeds available stock back down to the max.
         cartItems.forEach((it) => {
           const max = map[String(it.id)];
@@ -454,7 +462,14 @@ const Cart = ({ onPageChange = null }) => {
 
   // Available stock for a product id; Infinity when unknown so we never wrongly
   // block (the order endpoint still enforces the real limit server-side).
+  const isLineUpcoming = (productId) => {
+    const live = upcomingById[String(productId)];
+    if (live != null) return live;
+    return isUpcoming(cartItems.find((it) => it.id === productId));
+  };
+
   const maxFor = (productId) => {
+    if (isLineUpcoming(productId)) return MAX_ORDER_QTY;
     const s = stockById[String(productId)];
     return (s == null) ? Infinity : s;
   };
@@ -465,7 +480,9 @@ const Cart = ({ onPageChange = null }) => {
     if (item) {
       const max = maxFor(productId);
       if (item.quantity >= max) {
-        showError(max <= 0 ? 'This product is out of stock' : `Only ${max} in stock`);
+        showError(isLineUpcoming(productId)
+          ? `You can order up to ${MAX_ORDER_QTY.toLocaleString('en-IN')} pieces of one frame`
+          : max <= 0 ? 'This product is out of stock' : `Only ${max} in stock`);
         return;
       }
       const newQuantity = item.quantity + 1;
@@ -503,7 +520,11 @@ const Cart = ({ onPageChange = null }) => {
     if (newQuantity > max) { newQuantity = max; capped = true; }
     if (newQuantity !== item.quantity) updateCartQuantity(productId, newQuantity);
     // One message, only when the box is left, and only if something changed.
-    if (capped) showError(`Only ${max} in stock — quantity set to ${newQuantity}`);
+    if (capped) {
+      showError(isLineUpcoming(productId)
+        ? `You can order up to ${MAX_ORDER_QTY.toLocaleString('en-IN')} pieces of one frame — quantity set to ${newQuantity}`
+        : `Only ${max} in stock — quantity set to ${newQuantity}`);
+    }
     else if (newQuantity !== item.quantity) {
       showCartUpdateSuccess(`${item.name} (${item.lenseColour})`, newQuantity);
     }
@@ -511,6 +532,7 @@ const Cart = ({ onPageChange = null }) => {
 
   // Lines whose product has no stock left. They cannot be ordered.
   const outOfStockItems = cartItems.filter((it) => {
+    if (isLineUpcoming(it.id)) return false;
     const s = stockById[String(it.id)];
     return s != null && s <= 0;
   });
@@ -1318,7 +1340,9 @@ const Cart = ({ onPageChange = null }) => {
                           +
                         </button>
                       </div>
-                      {stockById[String(item.id)] != null && (
+                      {isLineUpcoming(item.id) ? (
+                        <span className="upc-tag">Upcoming</span>
+                      ) : stockById[String(item.id)] != null && (
                         stockById[String(item.id)] <= 0 ? (
                           <span className="item-stock-note m-0 whitespace-nowrap text-[length:var(--text-xs)] font-semibold text-error">Out of stock</span>
                         ) : (

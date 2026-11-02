@@ -95,7 +95,7 @@ span.shop-chip { cursor: default; }
 .products-page .product-card .pc-add-label { display: inline; overflow: hidden; text-overflow: ellipsis; }
 @container (min-width: 230px) {
   .products-page .product-card .pc-actions { grid-template-columns: auto 1fr; }
-  .products-page .product-card .pc-qty { grid-template-columns: 32px 28px 32px; width: auto; }
+  .products-page .product-card .pc-qty { grid-template-columns: 32px minmax(28px, auto) 32px; width: auto; }
 }
 
 /* ---- Refine: column (desktop) ---- */
