@@ -8,7 +8,7 @@ const Order = require('../models/Order');
 const Tray = require('../models/Tray');
 const TrayProducts = require('../models/TrayProducts');
 const { TrayStatus } = require('../constants/enums');
-const { isOfficeRole, hasRole } = require('../utils/roleHelpers');
+const { isOfficeRole, hasRole, canManageParties, isAdmin } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
 
 const WEEKS = 12;
@@ -72,6 +72,18 @@ async function countUnusedTrays(now) {
     return ids.filter((id) => !used.has(id)).length;
 }
 
+// Parties with no saved shop location (salesmen cannot place visit orders for them). The same rule
+// the party list screen used to be counted with: an active party that has no latitude or no longitude.
+// Admin sees inactive parties in the list too, so the active rule here is what the old count applied.
+async function countPartiesWithoutLocation(roles) {
+    const activeOnly = isAdmin(roles)
+        ? { [Op.or]: [{ is_active: true }, { is_active: null }] }
+        : { is_active: true };
+    return Party.count({
+        where: { [Op.and]: [activeOnly, { [Op.or]: [{ latitude: null }, { longitude: null }] }] },
+    });
+}
+
 class DashboardController {
     // GET /api/dashboard/summary  (admin and office managers only)
     async getSummary(req, res) {
@@ -89,12 +101,17 @@ class DashboardController {
                 ],
             };
 
-            const [salesmenTotal, checkIns, pendingExpenses, unusedTrays, weekly] = await Promise.all([
+            // Two numbers the home screen used to count by loading every party and every tray. They go
+            // only to the roles that could open those lists; everyone else gets null (the line is left out).
+            const roles = rolesOf(req);
+            const [salesmenTotal, checkIns, pendingExpenses, unusedTrays, weekly, partiesWithoutLocation, traysOut] = await Promise.all([
                 Salesman.count({ where: { is_active: { [Op.ne]: false } } }),
                 SalesmanCheckIns.findAll({ where: today, order: [['created_at', 'DESC']], raw: true }),
                 SalesmanExpense.count({ where: { status: 'pending' } }),
                 countUnusedTrays(now),
                 weeklySales(now),
+                canManageParties(roles) ? countPartiesWithoutLocation(roles) : null,
+                hasRole(roles, ['admin', 'tray_manager']) ? Tray.count({ where: { tray_status: TrayStatus.ASSIGNED } }) : null,
             ]);
 
             // One row per salesman: their latest check-in today.
@@ -129,6 +146,8 @@ class DashboardController {
                 visits_today: checkIns.length,
                 pending_expenses: pendingExpenses,
                 unused_trays: unusedTrays,
+                parties_without_location: partiesWithoutLocation,
+                trays_out: traysOut,
                 weekly_sales: weekly,
             });
         } catch (error) {
