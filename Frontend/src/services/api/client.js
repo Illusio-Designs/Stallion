@@ -6,6 +6,7 @@
 
 import { logout } from '../authService';
 import { showError } from '../notificationService';
+import { invalidateShared, mapLimit, shareRequest } from '../requestShare';
 
 // Cache TTLs (ms). Lookup data rarely changes; transactional data is shorter.
 const TTL_LOOKUP = 10 * 60 * 1000; // 10 min - countries, roles, brands, attributes
@@ -32,6 +33,10 @@ const getBaseURL = () => {
 // Get BASE_URL - will be evaluated at module load time
 // For dynamic access, use getBaseURL() function
 const BASE_URL = getBaseURL();
+
+// POST endpoints that only read (the list/search calls that need a body). They must not wipe the
+// shared list requests, or the shop and the party list would keep throwing each other's data away.
+const READ_ONLY_POST = /^\/(?:products\/?(?:\?|$)|[a-z_-]+\/get(?:\?|$)|offers\/available|orders\/quote)/;
 
 // Flag to prevent infinite redirect loops
 let isRedirecting = false;
@@ -419,6 +424,11 @@ const apiRequest = async (endpoint, options = {}) => {
     if (API_DEBUG) console.log(`[API Request] DELETE request - no body sent`);
   }
 
+  // A write (anything but a GET, except the POSTs that only read a list) may change what the
+  // shared list requests returned a moment ago: forget them before and after the call.
+  const isWrite = actualMethod !== 'GET' && !READ_ONLY_POST.test(normalizedEndpoint);
+  if (isWrite) invalidateShared();
+
   try {
     const response = await fetch(fullUrl, config);
     return await handleResponse(response);
@@ -433,6 +443,8 @@ const apiRequest = async (endpoint, options = {}) => {
       error.isNetworkFailure = true;
     }
     throw error;
+  } finally {
+    if (isWrite) invalidateShared();
   }
 };
 
@@ -446,6 +458,8 @@ const apiRequest = async (endpoint, options = {}) => {
 const PAGE_SIZE = 20;        // strict server page size for true server-paginated tables
 const SERVER_MAX_LIMIT = 100;   // backend clamps `limit` to 1..100
 const MAX_LOAD_ALL_PAGES = 50;  // safety bound for load-all loops
+const SHARED_READ_TTL = 10 * 1000; // how long a shared list answer is reused (ms)
+const PARALLEL_PAGES = 6;       // pages of one "load all" asked for at the same time (browser limit per host)
 const LIST_LIMIT = 1000;     // single-call "load all" size for client-side lists/dropdowns
 
 /** Normalize an array | { data, pagination } response to its array. */
@@ -457,6 +471,15 @@ const withListPaging = (endpoint, { page = 1, limit = LIST_LIMIT } = {}) => {
   const sep = endpoint.includes('?') ? '&' : '?';
   return `${endpoint}${sep}page=${page}&limit=${limit}`;
 };
+
+/**
+ * Share one "load a whole list" call between everything that asks for it at the same time, and
+ * reuse the answer for a few seconds. Any write (see apiRequest) or logout drops it. The key
+ * carries the login token, so one user's list is never handed to another.
+ * @param {string} key - what is being read, e.g. 'parties:all'
+ * @param {() => Promise<any>} fetcher
+ */
+const sharedRead = (key, fetcher) => shareRequest(`${getAuthToken() || ''}|${key}`, fetcher, SHARED_READ_TTL);
 
 /**
  * Single request that loads a full list (page 1, large limit) and returns the
@@ -474,11 +497,14 @@ const fetchAllPages = async (endpoint, opts = {}, { limit = LIST_LIMIT } = {}) =
   const wantAll = (Number(limit) || LIST_LIMIT) > SERVER_MAX_LIMIT;
   const totalPages = Number(first && first.pagination && first.pagination.totalPages) || 1;
   if (wantAll && totalPages > 1) {
+    // The first answer says how many pages there are, so the rest are asked for together
+    // (a few at a time) instead of one after the other. Same pages, same order.
     const last = Math.min(totalPages, MAX_LOAD_ALL_PAGES);
-    for (let page = 2; page <= last; page += 1) {
-      const res = await apiRequest(withListPaging(endpoint, { page, limit: perPage }), opts);
-      all = all.concat(unwrapList(res));
-    }
+    const pages = [];
+    for (let page = 2; page <= last; page += 1) pages.push(page);
+    const rest = await mapLimit(pages, PARALLEL_PAGES, (page) =>
+      apiRequest(withListPaging(endpoint, { page, limit: perPage }), opts));
+    rest.forEach((res) => { all = all.concat(unwrapList(res)); });
   }
   return all;
 };
@@ -520,4 +546,5 @@ export {
   withListPaging,
   fetchAllPages,
   fetchPage,
+  sharedRead,
 };

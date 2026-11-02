@@ -1,4 +1,16 @@
-import { apiRequest, fetchAllPages, fetchPage, getBaseURL, getAuthToken, handleResponse } from './client';
+import { apiRequest, fetchAllPages, fetchPage, getBaseURL, getAuthToken, handleResponse, sharedRead } from './client';
+import { invalidateShared } from '../requestShare';
+
+// File uploads go straight to fetch (multipart), not through apiRequest, so they tell the shared
+// list requests themselves that something changed.
+const rawWrite = async (url, init) => {
+  invalidateShared();
+  try {
+    return await fetch(url, init);
+  } finally {
+    invalidateShared();
+  }
+};
 
 // ==================== DISTRIBUTOR ENDPOINTS ====================
 
@@ -410,7 +422,8 @@ export const deleteDistributor = async (distributorId) => {
 // These derive everything from the JWT (no body needed), so they're callable
 // from the browser. Used to show end-user roles only their own parties.
 
-const scopedList = async (endpoint) => {
+const scopedList = (endpoint) => sharedRead(`scoped:${endpoint}`, () => loadScopedList(endpoint));
+const loadScopedList = async (endpoint) => {
   try {
     const response = await fetchAllPages(endpoint, { method: 'GET', includeAuth: true });
     return Array.isArray(response) ? response : (response?.data || []);
@@ -462,7 +475,9 @@ export const getDistributorsPage = (countryId, page = 1, limit = 20, search = ''
     includeAuth: true,
   });
 
-export const getParties = async (countryId) => {
+export const getParties = (countryId) => sharedRead(`parties:${countryId || ''}`, () => loadParties(countryId));
+
+const loadParties = async (countryId) => {
   // If no countryId provided, use POST /parties/get with empty body to get all parties
   if (!countryId) {
     try {
@@ -1139,7 +1154,7 @@ export const bulkUploadParties = async (file) => {
   const token = getAuthToken();
   const headers = { Accept: 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const response = await fetch(fullUrl, {
+  const response = await rawWrite(fullUrl, {
     method: 'POST',
     headers,
     credentials: 'omit',
@@ -1499,7 +1514,7 @@ export const createSalesman = async (salesmanData) => {
   const headers = { Accept: 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   // Don't set Content-Type — the browser adds the multipart boundary.
-  const response = await fetch(`${baseUrl}/salesmen`, {
+  const response = await rawWrite(`${baseUrl}/salesmen`, {
     method: 'POST',
     headers,
     credentials: 'omit',
@@ -1664,7 +1679,7 @@ export const updateSalesman = async (salesmanId, salesmanData) => {
     const token = getAuthToken();
     const headers = { Accept: 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const response = await fetch(`${baseUrl}/salesmen/${cleanSalesmanId}`, {
+    const response = await rawWrite(`${baseUrl}/salesmen/${cleanSalesmanId}`, {
       method: 'PUT', headers, credentials: 'omit', body: formData,
     });
     return await handleResponse(response);
