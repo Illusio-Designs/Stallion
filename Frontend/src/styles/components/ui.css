@@ -2368,3 +2368,5 @@ input[type="number"] {
 .price--accent {
   color: var(--color-accent);
 }
+/* Date and time picker: the hour and minute boxes fit their 72px columns instead of spilling over the panel edge. */
+.dtp-row > .ui-dropdown-custom { min-width: 0; width: 100%; }

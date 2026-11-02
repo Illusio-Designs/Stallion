@@ -16,7 +16,7 @@ export default function DateTimePicker({ value, onChange, min, disabled = false,
   const [hh = '00', mm = '00'] = time.split(':');
   const emit = (d, h, m) => onChange?.(d ? `${d}T${h}:${m}` : '');
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 72px 72px', gap: 8, alignItems: 'center' }}>
+    <div className="dtp-row" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) 86px 86px', gap: 8, alignItems: 'center' }}>
       <DatePicker value={date} min={min ? String(min).slice(0, 10) : undefined} disabled={disabled} placeholder={placeholder}
         onChange={(d) => emit(d, hh || '00', mm || '00')} />
       <DropdownSelector options={HOURS} value={hh} onChange={(h) => emit(date, h, mm)} disabled={disabled} />
