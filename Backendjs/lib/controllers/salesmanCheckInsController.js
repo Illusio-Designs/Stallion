@@ -76,7 +76,7 @@ async function enrichCheckIns(checkIns) {
 }
 
 function resolveCheckInFields(body, existing = {}) {
-    return {
+    const fields = {
         salesman_id: body.salesman_id !== undefined ? body.salesman_id : existing.salesman_id,
         check_in_date: body.check_in_date !== undefined ? body.check_in_date : existing.check_in_date,
         party_id: body.party_id !== undefined ? body.party_id : existing.party_id,
@@ -90,6 +90,11 @@ function resolveCheckInFields(body, existing = {}) {
         longitude: body.longitude !== undefined ? body.longitude : existing.longitude,
         check_in_remarks: body.check_in_remarks !== undefined ? body.check_in_remarks : existing.check_in_remarks,
     };
+    // In time and out time are optional on the visit report. The columns are NOT NULL and the visit report
+    // does not show them, so a visit saved without them gets the time it was saved (out time one minute later).
+    if (!fields.in_time) fields.in_time = new Date().toISOString();
+    if (!fields.out_time) fields.out_time = new Date(new Date(fields.in_time).getTime() + 60 * 1000).toISOString();
+    return fields;
 }
 
 function validateCheckInFields(fields) {
@@ -105,8 +110,8 @@ function validateCheckInFields(fields) {
         next_visit_date,
     } = fields;
 
-    if (!salesman_id || !check_in_date || !party_id || !contact_person || !type || !in_time || !out_time || !next_visit_date) {
-        return 'Salesman ID, check-in date, party ID, contact person, type, in time, out time, and next visit date are required';
+    if (!salesman_id || !check_in_date || !party_id || !contact_person || !type || !next_visit_date) {
+        return 'Salesman ID, check-in date, party ID, contact person, type, and next visit date are required';
     }
 
     const inAt = new Date(in_time);
