@@ -467,6 +467,33 @@ export const getPartiesPage = (countryId, page = 1, limit = 20, search = '') =>
     body: countryId ? { country_id: String(countryId).trim() } : {},
     includeAuth: true,
   });
+/**
+ * One page of the Party TABLE, filtered and sorted by the server -> { data, pagination, counts }.
+ * Managers use POST /parties/get; salesman, distributor and party use GET /parties/my (token-scoped).
+ * params: { page, limit, search, status ('active'|'inactive'|'no_location'|''), state_id, salesman_id, country_id, sort, dir }.
+ * `counts` = { all, active, inactive, no_location } for the tab badges (same search and filters, tab ignored).
+ */
+export const getPartiesTablePage = async (role, params = {}) => {
+  const { page = 1, limit = 20, search = '', status = '', state_id = '', salesman_id = '', country_id = '', sort = '', dir = '' } = params;
+  const manager = !['salesman', 'distributor', 'party'].includes((role || '').toLowerCase());
+  const q = new URLSearchParams({ page: String(page), limit: String(limit) });
+  const add = (k, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') q.set(k, String(v).trim()); };
+  add('search', search); add('status', status); add('state_id', state_id); add('salesman_id', salesman_id);
+  add('sort', sort); add('dir', sort ? dir : '');
+  if (manager) {
+    add('country_id', country_id);
+    const res = await apiRequest(`/parties/get?${q.toString()}`, { method: 'POST', body: country_id ? { country_id: String(country_id).trim() } : {}, includeAuth: true });
+    return { data: Array.isArray(res) ? res : (res?.data || []), pagination: res?.pagination || null, counts: res?.counts || null };
+  }
+  const res = await apiRequest(`/parties/my?${q.toString()}`, { method: 'GET', includeAuth: true });
+  return { data: Array.isArray(res) ? res : (res?.data || []), pagination: res?.pagination || null, counts: res?.counts || null };
+};
+/** States and salesmen the party list can be filtered by (for the dropdowns) -> { states: [{id,name}], salesmen: [{id,name}] }. */
+export const getPartyFilterOptions = async (countryId) => {
+  const q = countryId ? `?country_id=${encodeURIComponent(String(countryId).trim())}` : '';
+  const res = await apiRequest(`/parties/filter-options${q}`, { method: 'GET', includeAuth: true });
+  return { states: res?.states || [], salesmen: res?.salesmen || [] };
+};
 /** One page of distributors -> { data, pagination }. */
 export const getDistributorsPage = (countryId, page = 1, limit = 20, search = '') =>
   fetchPage('/distributors/get', { page, limit, search }, {

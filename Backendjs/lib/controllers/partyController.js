@@ -11,7 +11,7 @@ const Country = require('../models/Country');
 const State = require('../models/State');
 const Cities = require('../models/Cities');
 const Zone = require('../models/Zone');
-const { Op, fn, col, where } = require('sequelize');
+const { Op, fn, col, where, literal } = require('sequelize');
 
 // Case-insensitive exact match on a `name` column (LOWER(name) = lower(value)),
 // so "gujarat", "Gujarat" and "GUJARAT" all resolve to the same row and we never
@@ -109,6 +109,135 @@ function validPoint(lat, lng) {
     return { latitude: la, longitude: lo };
 }
 
+// ---- Party list: server-side tab / filters / sort / counts (all optional, so old callers are unchanged) ----
+const PARTY_TABS = new Set(['active', 'inactive', 'no_location']);
+const PARTY_SORT_SQL = {
+    party_name: null, // plain column
+    credit_days: null, // plain column
+    city: '(SELECT c.name FROM cities c WHERE c.id = Party.city_id)',
+    state: '(SELECT st.name FROM states st WHERE st.id = Party.state_id)',
+    salesman: '(SELECT sm.full_name FROM salesmen sm WHERE sm.salesman_id = Party.salesman_id)',
+    // Same three labels the page shows, in alphabetical order: Exact spot saved < From address < Not set.
+    location: "(CASE WHEN Party.location_source = 'verified' THEN 'a' WHEN Party.latitude IS NOT NULL AND Party.longitude IS NOT NULL THEN 'b' ELSE 'c' END)",
+};
+const PARTY_SORT_ALIASES = { cityLabel: 'city', stateLabel: 'state', salesmanLabel: 'salesman', locationLabel: 'location' };
+
+const tabWhere = (tab) => {
+    if (tab === 'active') return { [Op.or]: [{ is_active: true }, { is_active: null }] };
+    if (tab === 'inactive') return { is_active: false };
+    if (tab === 'no_location') return { [Op.or]: [{ latitude: null }, { longitude: null }] };
+    return null;
+};
+
+/** Safe ORDER BY: only whitelisted keys reach SQL; ties break on created_at then party_id so pages never shuffle. */
+function partyOrder(req) {
+    const q = req.query || {};
+    const key = PARTY_SORT_ALIASES[q.sort] || q.sort;
+    const dir = String(q.dir || '').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const tail = [['created_at', 'DESC'], ['party_id', 'ASC']];
+    if (!key || !Object.prototype.hasOwnProperty.call(PARTY_SORT_SQL, key)) return tail;
+    const head = PARTY_SORT_SQL[key] === null ? [key, dir] : [literal(PARTY_SORT_SQL[key]), dir];
+    return [head, ...tail];
+}
+
+/**
+ * Filters for the party list from query/body: status tab, state_id, salesman_id, country_id.
+ * Returns { base, tab }: `base` = every filter except the tab (used for the tab counts), `tab` = the tab fragment or null.
+ * A party with no salesman of its own counts as served by the salesmen working in its state (same as the name shown).
+ */
+async function partyListFilters(req) {
+    const q = req.query || {};
+    const b = (req.body && typeof req.body === 'object') ? req.body : {};
+    const pick = (k) => String(q[k] ?? b[k] ?? '').trim();
+    const parts = [];
+    const state = pick('state_id');
+    if (state) parts.push({ state_id: state });
+    const country = pick('country_id');
+    // Parties with no country stay visible under any country, as the page always did.
+    if (country) parts.push({ [Op.or]: [{ country_id: country }, { country_id: null }] });
+    const salesman = pick('salesman_id');
+    if (salesman) {
+        const links = await SalesmanStates.findAll({ where: { salesman_id: salesman }, attributes: ['state_id'] });
+        const ids = links.map((l) => l.state_id).filter(Boolean);
+        const own = [{ salesman_id: salesman }];
+        if (ids.length) own.push({ [Op.and]: [{ salesman_id: null }, { state_id: { [Op.in]: ids } }] });
+        parts.push({ [Op.or]: own });
+    }
+    const tabName = pick('status').toLowerCase().replace(/[\s-]+/g, '_');
+    return { base: parts.length ? { [Op.and]: parts } : null, tab: PARTY_TABS.has(tabName) ? tabWhere(tabName) : null };
+}
+
+/** { all, active, inactive, no_location } for the tab badges: ONE conditional-aggregate query. */
+async function partyTabCounts(where) {
+    const row = await Party.findOne({
+        where,
+        attributes: [
+            [fn('COUNT', literal('*')), 'all_count'],
+            [fn('SUM', literal('CASE WHEN is_active = 0 THEN 0 ELSE 1 END')), 'active_count'],
+            [fn('SUM', literal('CASE WHEN is_active = 0 THEN 1 ELSE 0 END')), 'inactive_count'],
+            [fn('SUM', literal('CASE WHEN latitude IS NULL OR longitude IS NULL THEN 1 ELSE 0 END')), 'no_location_count'],
+        ],
+        raw: true,
+    });
+    const n = (v) => Number(v) || 0;
+    return { all: n(row && row.all_count), active: n(row && row.active_count), inactive: n(row && row.inactive_count), no_location: n(row && row.no_location_count) };
+}
+
+/** One page + counts for a party list. `scopeWhere` = role scope + search; the tab only narrows the rows, not the counts. */
+async function listPartyPage(req, pagination, scopeWhere) {
+    const f = await partyListFilters(req);
+    const countWhere = mergeWhere(scopeWhere, f.base);
+    const rowsWhere = mergeWhere(countWhere, f.tab);
+    const [count, rows, counts] = await Promise.all([
+        Party.count({ where: rowsWhere }),
+        Party.findAll({ where: rowsWhere, order: partyOrder(req), limit: pagination.limit, offset: pagination.offset }),
+        partyTabCounts(countWhere),
+    ]);
+    return { count, rows, counts };
+}
+
+/** Role scope of GET /parties/my: { where, ownSalesman, roleName, empty } or { status, error }. */
+async function myPartiesScope(req) {
+    const user = req.user;
+    if (!user) return { status: 400, error: 'User is required' };
+    const userRole = await UserRole.findOne({ where: { user_id: user.user_id } });
+    if (!userRole) return { status: 404, error: 'User role not found' };
+    const role = await Role.findOne({ where: { role_id: userRole.role_id } });
+    if (!role) return { status: 404, error: 'Role not found' };
+    const roleName = role.role_name.toLowerCase();
+    let where;
+    let ownSalesman = null;
+
+    if (roleName === 'party') {
+        where = { user_id: user.user_id };
+    } else if (roleName === 'salesman') {
+        const salesman = await Salesman.findOne({ where: { user_id: user.user_id } });
+        if (!salesman) return { status: 404, error: 'Salesman not found' };
+        ownSalesman = salesman;
+        const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
+        const stateIds = salesmanStates.map((s) => s.state_id);
+        if (salesman.state_id && !stateIds.includes(salesman.state_id)) {
+            stateIds.push(salesman.state_id);
+        }
+        // Event orders: a salesman may take an order for ANY party (?scope=event). Every
+        // other use (visit, WhatsApp, check-in) is limited to his working states.
+        const forEvent = String((req.query && req.query.scope) || '').toLowerCase() === 'event';
+        if (forEvent) {
+            where = {};
+        } else {
+            if (stateIds.length === 0) return { empty: true, roleName, ownSalesman };
+            where = { state_id: { [Op.in]: stateIds } };
+        }
+    } else if (roleName === 'distributor') {
+        const distributor = await Distributor.findOne({ where: { user_id: user.user_id } });
+        if (!distributor) return { status: 404, error: 'Distributor not found' };
+        where = { distributor_id: distributor.distributor_id };
+    } else {
+        return { status: 400, error: `Role '${roleName}' is not supported for this operation` };
+    }
+    return { where, ownSalesman, roleName };
+}
+
 class PartyController {
     async getPartie(req, res) {
         try {
@@ -157,12 +286,8 @@ class PartyController {
                 phoneFields: ['phone'],
             });
             const where = mergeWhere(partyActiveFilter(req.userRoleNames), searchFilter);
-            const { count, rows: parties } = await Party.findAndCountAll({
-                where,
-                limit: pagination.limit,
-                offset: pagination.offset,
-            });
-            res.status(200).json(buildPaginatedResponse(await withSalesmanNames(parties), pagination, count));
+            const { count, rows: parties, counts } = await listPartyPage(req, pagination, where);
+            res.status(200).json({ ...buildPaginatedResponse(await withSalesmanNames(parties), pagination, count), counts });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -198,59 +323,18 @@ class PartyController {
 
     async getMyParties(req, res) {
         try {
-            const user = req.user;
-            if (!user) {
-                return res.status(400).json({ error: 'User is required' });
-            }
             const pagination = parsePaginationParams(req);
             if (pagination.error) {
                 return res.status(pagination.status).json({ error: pagination.error });
             }
-            const userRole = await UserRole.findOne({ where: { user_id: user.user_id } });
-            if (!userRole) {
-                return res.status(404).json({ error: 'User role not found' });
+            const scope = await myPartiesScope(req);
+            if (scope.error) {
+                return res.status(scope.status).json({ error: scope.error });
             }
-            const role = await Role.findOne({ where: { role_id: userRole.role_id } });
-            if (!role) {
-                return res.status(404).json({ error: 'Role not found' });
+            if (scope.empty) {
+                return res.status(200).json({ ...buildPaginatedResponse([], pagination, 0), counts: { all: 0, active: 0, inactive: 0, no_location: 0 } });
             }
-            const roleName = role.role_name.toLowerCase();
-            let where;
-            let ownSalesman = null;
-
-            if (roleName === 'party') {
-                where = { user_id: user.user_id };
-            } else if (roleName === 'salesman') {
-                const salesman = await Salesman.findOne({ where: { user_id: user.user_id } });
-                if (!salesman) {
-                    return res.status(404).json({ error: 'Salesman not found' });
-                }
-                ownSalesman = salesman;
-                const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
-                const stateIds = salesmanStates.map((s) => s.state_id);
-                if (salesman.state_id && !stateIds.includes(salesman.state_id)) {
-                    stateIds.push(salesman.state_id);
-                }
-                // Event orders: a salesman may take an order for ANY party (?scope=event). Every
-                // other use (visit, WhatsApp, check-in) is limited to his working states.
-                const forEvent = String((req.query && req.query.scope) || '').toLowerCase() === 'event';
-                if (forEvent) {
-                    where = {};
-                } else {
-                    if (stateIds.length === 0) {
-                        return res.status(200).json(buildPaginatedResponse([], pagination, 0));
-                    }
-                    where = { state_id: { [Op.in]: stateIds } };
-                }
-            } else if (roleName === 'distributor') {
-                const distributor = await Distributor.findOne({ where: { user_id: user.user_id } });
-                if (!distributor) {
-                    return res.status(404).json({ error: 'Distributor not found' });
-                }
-                where = { distributor_id: distributor.distributor_id };
-            } else {
-                return res.status(400).json({ error: `Role '${roleName}' is not supported for this operation` });
-            }
+            const { roleName, ownSalesman } = scope;
 
             const { name, phone } = getListSearchParams(req);
             const searchFilter = buildNamePhoneFilter({
@@ -260,15 +344,62 @@ class PartyController {
                 ignoreSpaces: true,
                 phoneFields: ['phone'],
             });
-            where = mergeWhere(where, searchFilter);
+            let where = mergeWhere(scope.where, searchFilter);
             where = mergeWhere(where, partyActiveFilter(roleName));
 
-            const { count, rows: parties } = await Party.findAndCountAll({
-                where,
-                limit: pagination.limit,
-                offset: pagination.offset,
-            });
-            res.status(200).json(hidePartySecrets(req, buildPaginatedResponse(await withSalesmanNames(parties, ownSalesman), pagination, count)));
+            const { count, rows: parties, counts } = await listPartyPage(req, pagination, where);
+            const body = hidePartySecrets(req, buildPaginatedResponse(await withSalesmanNames(parties, ownSalesman), pagination, count));
+            res.status(200).json({ ...body, counts });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    /**
+     * GET /parties/filter-options: the states and salesmen the party list can be filtered by, for the
+     * dropdowns (not read off the loaded page). Same role scope as the list; ?country_id= narrows it.
+     */
+    async getPartyFilterOptions(req, res) {
+        try {
+            let where;
+            let ownSalesman = null;
+            if (canManageParties(req.userRoleNames)) {
+                where = partyActiveFilter(req.userRoleNames);
+            } else {
+                const scope = await myPartiesScope(req);
+                if (scope.error) return res.status(scope.status).json({ error: scope.error });
+                if (scope.empty) return res.status(200).json({ states: [], salesmen: [] });
+                where = mergeWhere(scope.where, partyActiveFilter(scope.roleName));
+                ownSalesman = scope.ownSalesman;
+            }
+            const country = String((req.query && req.query.country_id) || '').trim();
+            if (country) where = mergeWhere(where, { [Op.or]: [{ country_id: country }, { country_id: null }] });
+
+            const [stateRows, salesmanRows, noOwnerRows] = await Promise.all([
+                Party.findAll({ where: mergeWhere(where, { state_id: { [Op.ne]: null } }), attributes: ['state_id'], group: ['state_id'], raw: true }),
+                Party.findAll({ where: mergeWhere(where, { salesman_id: { [Op.ne]: null } }), attributes: ['salesman_id'], group: ['salesman_id'], raw: true }),
+                Party.findAll({ where: mergeWhere(where, { salesman_id: null, state_id: { [Op.ne]: null } }), attributes: ['state_id'], group: ['state_id'], raw: true }),
+            ]);
+            const stateIds = stateRows.map((r) => r.state_id);
+            const states = stateIds.length
+                ? await State.findAll({ where: { id: { [Op.in]: stateIds } }, attributes: ['id', 'name'], order: [['name', 'ASC']], raw: true })
+                : [];
+            let salesmen;
+            if (ownSalesman) {
+                salesmen = [{ id: ownSalesman.salesman_id, name: ownSalesman.full_name }];
+            } else {
+                const ids = new Set(salesmanRows.map((r) => r.salesman_id));
+                const orphanStates = noOwnerRows.map((r) => r.state_id);
+                if (orphanStates.length) {
+                    const links = await SalesmanStates.findAll({ where: { state_id: { [Op.in]: orphanStates } }, attributes: ['salesman_id'], raw: true });
+                    links.forEach((l) => ids.add(l.salesman_id));
+                }
+                const people = ids.size
+                    ? await Salesman.findAll({ where: { salesman_id: { [Op.in]: [...ids] } }, attributes: ['salesman_id', 'full_name'], order: [['full_name', 'ASC']], raw: true })
+                    : [];
+                salesmen = people.filter((p) => p.full_name).map((p) => ({ id: p.salesman_id, name: p.full_name }));
+            }
+            res.status(200).json({ states: states.map((x) => ({ id: x.id, name: x.name })), salesmen });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
