@@ -1,4 +1,4 @@
-import { apiRequest, fetchAllPages, fetchPage, API_DEBUG, TTL_TRANSACTIONAL } from './client';
+import { apiRequest, fetchAllPages, fetchPage, sharedRead, API_DEBUG, TTL_TRANSACTIONAL } from './client';
 import { getCached, invalidateCache } from '../cacheService';
 
 // ==================== TRAYS ENDPOINTS ====================
@@ -7,7 +7,9 @@ import { getCached, invalidateCache } from '../cacheService';
  * Get all trays
  * @returns {Promise<Array>} Array of tray objects
  */
-export const getTrays = async () => {
+export const getTrays = () => sharedRead('trays:all', loadTrays);
+
+const loadTrays = async () => {
   try {
     const response = await fetchAllPages('/trays', {
       method: 'GET',
