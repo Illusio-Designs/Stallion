@@ -52,7 +52,9 @@ async function findPartnerLoginUser(phone, { dryRun = false } = {}) {
 
         const linked = row.user_id ? await User.findByPk(row.user_id) : null;
         let user = linked;
-        if (linked && !linked.is_active) return null; // switched off on purpose: stays blocked
+        // The partner record is active (filtered above) and is where admins switch a person on or off: it mirrors
+        // the choice onto the login user. A login user left inactive next to an active partner is drift, so bring it back.
+        if (linked && !linked.is_active) await linked.update({ is_active: true });
         if (!user) {
             user = await findOrCreateRoleUser({
                 phone: toE164(phone),
