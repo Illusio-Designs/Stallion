@@ -1,4 +1,6 @@
 const Party = require('../models/Party');
+const Order = require('../models/Order');
+const SalesmanCheckIns = require('../models/SalesmanCheckIns');
 const { logAudit } = require('../utils/auditLogger');
 const Distributor = require('../models/distributor');
 const User = require('../models/User');
@@ -1003,8 +1005,47 @@ class PartyController {
 
     // A party is never deleted: its orders, check-ins and login all refer to it.
     // Make the party inactive instead (edit the party and switch it off).
+    /**
+     * Delete a party that was added by mistake (a duplicate, a typo). A party with history is never
+     * deleted, because its orders and visits must keep pointing at it: those stay and the party is made
+     * inactive instead. The login user is left alone, since another party can share it.
+     */
     async deleteParty(req, res) {
-        return res.status(409).json({ error: 'A party cannot be deleted because its records are kept. Make the party inactive instead.' });
+        try {
+            const { id } = req.params;
+            const party = await Party.findByPk(id);
+            if (!party) return res.status(404).json({ error: 'Party not found' });
+
+            const [orderCount, visitCount] = await Promise.all([
+                Order.count({ where: { party_id: id } }),
+                SalesmanCheckIns.count({ where: { party_id: id } }),
+            ]);
+            if (orderCount > 0 || visitCount > 0) {
+                const parts = [];
+                if (orderCount) parts.push(`${orderCount} order${orderCount === 1 ? '' : 's'}`);
+                if (visitCount) parts.push(`${visitCount} visit${visitCount === 1 ? '' : 's'}`);
+                return res.status(409).json({
+                    error: `This party has ${parts.join(' and ')}, so it cannot be deleted. Make it inactive instead.`,
+                    orders: orderCount,
+                    visits: visitCount,
+                });
+            }
+
+            const oldValues = party.toJSON();
+            await party.destroy();
+            await logAudit({
+                req,
+                action: 'delete',
+                description: 'Party deleted (no orders or visits)',
+                tableName: 'parties',
+                recordId: id,
+                oldValues,
+                newValues: null,
+            });
+            return res.status(200).json({ message: 'Party deleted', party_id: id });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
     }
 
     /**

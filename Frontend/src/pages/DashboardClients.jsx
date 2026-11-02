@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { searchRows } from '../utils/search';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsidePanel from '../components/ui/AsidePanel';
@@ -5,7 +6,7 @@ import { useConfirm } from '../components/ui/ConfirmProvider';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import Pagination from '../components/ui/Pagination';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { Add01Icon, Call02Icon, Download01Icon, Location01Icon, MoreHorizontalIcon, PencilEdit02Icon, RefreshIcon, Search01Icon, Upload01Icon } from '@hugeicons/core-free-icons';
+import { Add01Icon, Call02Icon, Delete02Icon, Download01Icon, Location01Icon, MoreHorizontalIcon, PencilEdit02Icon, RefreshIcon, Search01Icon, Upload01Icon } from '@hugeicons/core-free-icons';
 import {
   bulkUploadParties,
   deleteParty,
@@ -452,122 +453,26 @@ const DashboardClients = () => {
     })();
   }, []);
 
+  // Delete a party that was added by mistake (a duplicate). The server refuses when the party has orders
+  // or visits and says so; the login user is never touched, because another party can share it.
   const handleDelete = async (row) => {
-    if (!(await confirm(`Are you sure you want to delete this party? This will also delete the associated user account.`))) {
-      return;
-    }
-
-    // Check for ID in various possible field names
     const partyId = row.id || row.party_id || row._id;
     if (!partyId || typeof partyId !== 'string' || partyId.trim() === '') {
       showError('Party ID is missing. Please refresh and try again.');
       return;
     }
-
-    // Get phone number from party to find associated user
-    const partyPhone = row.phone || row.phoneNumber || '';
-
+    if (!(await confirm(`Delete ${row.party_name || 'this party'}? Use this only for a party added by mistake, such as a duplicate. A party with orders or visits cannot be deleted; make it inactive instead.`))) {
+      return;
+    }
     try {
       setLoading(true);
-      setError(null);
-
-      // Delete party first
-      console.log('[Delete Party] Deleting party with ID:', partyId.trim());
       await deleteParty(partyId.trim());
-      console.log('[Delete Party] Party deleted successfully');
-
-      // Optimistically remove from table immediately
-      setParties(prevParties => prevParties.filter(party => {
-        const id = party.id || party.party_id || party._id;
-        return id !== partyId.trim();
-      }));
-
-      // Now find and delete the associated login account by phone number. Listing
-      // users is admin-only, so other managers skip this step.
-      if (partyPhone && isAdmin) {
-        try {
-          const { getUsers, deleteUser } = await import('../services/apiService');
-          console.log('[Delete Party] Finding user account with phone:', partyPhone);
-
-          // Get all users
-          const usersResponse = await getUsers();
-          let usersArray = [];
-          if (Array.isArray(usersResponse)) {
-            usersArray = usersResponse;
-          } else if (usersResponse && Array.isArray(usersResponse.data)) {
-            usersArray = usersResponse.data;
-          } else if (usersResponse && Array.isArray(usersResponse.users)) {
-            usersArray = usersResponse.users;
-          }
-
-          console.log('[Delete Party] Total users found:', usersArray.length);
-
-          // Normalize phone numbers for comparison (remove +, spaces, dashes)
-          const normalizePhone = (phone) => {
-            if (!phone) return '';
-            return String(phone).trim().replace(/^\+/, '').replace(/[\s-]/g, '');
-          };
-
-          const normalizedPartyPhone = normalizePhone(partyPhone);
-
-          // Find user by phone number
-          const foundUser = usersArray.find(u => {
-            const userPhone = (u.phone || u.phoneNumber || '').trim();
-            const normalizedUserPhone = normalizePhone(userPhone);
-
-            return userPhone === partyPhone ||
-              normalizedUserPhone === normalizedPartyPhone ||
-              userPhone === `+${partyPhone}` ||
-              `+${userPhone}` === partyPhone;
-          });
-
-          if (foundUser) {
-            const userId = foundUser.user_id || foundUser.id;
-            console.log('[Delete Party] Found associated user account:', {
-              userId,
-              userPhone: foundUser.phone || foundUser.phoneNumber,
-              userName: foundUser.full_name || foundUser.name
-            });
-
-            try {
-              await deleteUser(userId);
-              console.log('[Delete Party] User account deleted successfully');
-              showSuccess('Party and associated user account deleted successfully!');
-            } catch (deleteError) {
-              console.error('[Delete Party] Error calling deleteUser:', deleteError);
-              throw deleteError;
-            }
-          } else {
-            console.warn('[Delete Party] No user account found with phone:', partyPhone);
-            console.warn('[Delete Party] Available user phones:', usersArray.map(u => ({
-              id: u.user_id || u.id,
-              phone: u.phone || u.phoneNumber,
-              name: u.full_name || u.name
-            })));
-            showSuccess('Party deleted successfully!');
-          }
-        } catch (userDeleteError) {
-          console.error('[Delete Party] Error deleting user account:', userDeleteError);
-          console.error('[Delete Party] Error details:', {
-            message: userDeleteError.message,
-            errorData: userDeleteError.errorData,
-            statusCode: userDeleteError.statusCode
-          });
-          showSuccess('Party deleted. Its login account could not be removed, please ask an admin to remove it.');
-        }
-      } else {
-        console.warn('[Delete Party] No phone number found in party record');
-        showSuccess('Party deleted successfully!');
-      }
-
+      setParties(prev => prev.filter(party => (party.id || party.party_id || party._id) !== partyId.trim()));
+      showSuccess('Party deleted');
       setError(null);
-    } catch (error) {
-      if (!error.message?.toLowerCase().includes('token expired') &&
-        !error.message?.toLowerCase().includes('unauthorized')) {
-        const errorMsg = error.message || 'Failed to delete party';
-        setError(errorMsg);
-        showError(errorMsg);
-      }
+    } catch (err) {
+      const msg = err?.errorData?.error || err?.message || 'Could not delete the party.';
+      if (!/token expired|unauthorized/i.test(msg)) showError(msg);
     } finally {
       setLoading(false);
     }
@@ -905,7 +810,7 @@ const DashboardClients = () => {
         )}
       </div>
 
-      {moreFor && (
+      {moreFor && typeof document !== 'undefined' && createPortal(
         <>
           <div className="pp-more__shade" onClick={() => setMoreFor(null)} aria-hidden="true" />
           <div className="pp-more" role="menu" style={{ top: moreFor.top, left: moreFor.left }}>
@@ -919,8 +824,14 @@ const DashboardClients = () => {
                 <HugeiconsIcon icon={Location01Icon} size={18} strokeWidth={1.8} />View on map
               </a>
             )}
+            {isPartyManager && (
+              <button type="button" role="menuitem" className="pp-more__item pp-more__item--danger" onClick={() => { const r = moreFor.row; setMoreFor(null); handleDelete(r); }}>
+                <HugeiconsIcon icon={Delete02Icon} size={18} strokeWidth={1.8} />Delete party
+              </button>
+            )}
           </div>
-        </>
+        </>,
+        document.body,
       )}
 
       <PartyFormPanel
