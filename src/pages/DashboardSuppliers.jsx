@@ -5,7 +5,6 @@ import AsidePanel from '../components/ui/AsidePanel';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import { istNow } from '../utils/istTime';
 import DatePicker from '../components/ui/DatePicker';
-import DateTimePicker from '../components/ui/DateTimePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import FileUpload from '../components/ui/FileUpload';
@@ -1443,12 +1442,11 @@ const DashboardSuppliers = () => {
 
   // ---- Check-in handlers ----
   // "Now" as YYYY-MM-DDTHH:mm in Indian time (IST), whatever the phone's own time zone is.
-  const nowDatetimeLocal = (minusMinutes = 0) => istNow(minusMinutes);
 
   // Default in/out time to "now" (the visit is being logged on the spot); the
   // salesman can adjust. Done here (a client-side user action) — not in the
   // initial state — to avoid an SSR/client hydration mismatch from new Date().
-  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: nowDatetimeLocal(30), out_time: nowDatetimeLocal(), next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
+  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: '', out_time: '', next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
 
   const handleCheckinSubmit = async (e) => {
     e.preventDefault();
@@ -1460,20 +1458,8 @@ const DashboardSuppliers = () => {
       showError('Please enter the contact person.');
       return;
     }
-    if (!checkinForm.in_time) {
-      showError('Please set the in time.');
-      return;
-    }
-    if (!checkinForm.out_time) {
-      showError('Please set the out time.');
-      return;
-    }
     if (!checkinForm.next_visit_date) {
       showError('Please set the next visit date.');
-      return;
-    }
-    if (new Date(checkinForm.out_time) <= new Date(checkinForm.in_time)) {
-      showError('Out time must be after in time.');
       return;
     }
     {
@@ -1518,8 +1504,7 @@ const DashboardSuppliers = () => {
         party_id: checkinForm.party_id,
         contact_person: checkinForm.contact_person.trim(),
         type: checkinType,
-        in_time: checkinForm.in_time,
-        out_time: checkinForm.out_time,
+        // In and out time are no longer asked: the server stamps a new visit with the time it was saved.
         next_visit_date: checkinForm.next_visit_date,
         latitude,
         longitude,
@@ -1619,6 +1604,21 @@ const DashboardSuppliers = () => {
       showError(`Failed to delete target: ${error.message}`);
     }
   };
+
+  // The salesman home's "Add visit" shortcut lands here with ?addVisit=1: open the form once, then clean the address.
+  useEffect(() => {
+    if (!isSalesman || typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('addVisit') !== '1') return;
+    q.delete('addVisit');
+    const rest = q.toString();
+    window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''));
+    setMainTab('Visit Report');
+    resetCheckinForm();
+    setEditCheckin(null);
+    setOpenCheckinModal(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSalesman]);
 
   return (
     <div className="dash-page">
@@ -1825,6 +1825,16 @@ const DashboardSuppliers = () => {
                 </div>
               ) : (
                 <>
+                {/* On phones the visits show as cards and the table (with its Add button) is hidden, so the salesman needs the button here. */}
+                {isSalesman && (
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn--primary sx-addvisit"
+                    onClick={() => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); }}
+                  >
+                    Add visit
+                  </button>
+                )}
                 <div className="sx-cards" aria-label="Visit report">
                   {checkinsLoading ? <p className="sx-cards__note">Loading visits...</p> : checkins.map((row, i) => {
                     const raw = String(row.order_notes || row.check_in_remarks || '');
@@ -2148,14 +2158,6 @@ const DashboardSuppliers = () => {
             <div className="form-group form-group--full">
               <label className="ui-label">Contact Person <span className="text-error">*</span></label>
               <input className="ui-input" placeholder="Person you met" value={checkinForm.contact_person} onChange={(e) => setCheckinForm(prev => ({ ...prev, contact_person: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label className="ui-label">In Time <span className="text-error">*</span></label>
-              <DateTimePicker value={checkinForm.in_time} onChange={(v) => setCheckinForm(prev => ({ ...prev, in_time: v }))} />
-            </div>
-            <div className="form-group">
-              <label className="ui-label">Out Time <span className="text-error">*</span></label>
-              <DateTimePicker min={checkinForm.in_time || undefined} value={checkinForm.out_time} onChange={(v) => setCheckinForm(prev => ({ ...prev, out_time: v }))} />
             </div>
             <div className="form-group form-group--full">
               <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
