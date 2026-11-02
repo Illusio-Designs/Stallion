@@ -23,7 +23,8 @@ const DistributorZones = require('../models/DistributorZones');
 const SalesmanStates = require('../models/SalesmanStates');
 const DistributorStates = require('../models/DistributorStates');
 const { resolveStateId } = require('../utils/stateResolver');
-const { findOrCreateRoleUser } = require('../utils/userFactory');
+const { findOrCreateRoleUser, acquireCreateLock, last10Of } = require('../utils/userFactory');
+const sequelize = require('../constants/database');
 const { hasRole, canManageParties, canCreateParty, normalizeRole, partyActiveFilter, denyInactiveParty, isAdmin } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
 const { salesmanCoversState, distributorCoversState, salesmanStateIds } = require('../utils/workingStates');
@@ -423,6 +424,7 @@ class PartyController {
     }
 
     async createParty(req, res) {
+        let releaseLock = () => {};
         try {
             if (!canCreateParty(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
@@ -487,13 +489,24 @@ class PartyController {
                 if (ss) finalSalesmanId = ss.salesman_id;
             }
 
-            const loginUser = await findOrCreateRoleUser({
-                phone,
-                email,
-                fullName: contact_person || party_name,
-                roleName: 'party',
-                address,
-            });
+            // One party per phone number: the phone is the party's login, so a second party with the
+            // same number would share that login and show up twice. Refuse it, and refuse a second
+            // request for the same number while the first is still being saved (double tap / two tabs).
+            releaseLock = acquireCreateLock('party', phone);
+            const phoneDigits = last10Of(phone);
+            if (phoneDigits.length >= 10) {
+                const dup = await Party.findOne({
+                    where: { phone: { [Op.like]: `%${phoneDigits}` } },
+                    attributes: ['party_id', 'party_name', 'is_active'],
+                });
+                if (dup) {
+                    return res.status(409).json({
+                        error: `A party with this phone number already exists: ${dup.party_name}.`,
+                        code: 'duplicate_party',
+                        party_id: dup.party_id,
+                    });
+                }
+            }
 
             // Prefer an on-site GPS capture from "I'm at shop" on create (trusted
             // verified anchor). Otherwise fall back to geocoding the address so the
@@ -537,7 +550,17 @@ class PartyController {
                 locationSource = 'geocoded';
             }
 
-            const party = await Party.create({
+            // The login user and the party are saved together: if either fails neither is kept, so a
+            // failed create never leaves a login user with no party (or a party with no login).
+            const party = await sequelize.transaction(async (t) => {
+              const loginUser = await findOrCreateRoleUser({
+                phone,
+                email,
+                fullName: contact_person || party_name,
+                roleName: 'party',
+                address,
+              }, { transaction: t });
+              return Party.create({
                 distributor_id: finalDistributorId,
                 salesman_id: finalSalesmanId,
                 user_id: loginUser.user_id,
@@ -567,6 +590,7 @@ class PartyController {
                 is_active: true,
                 credit_days: canManageParties(req.userRoleNames) ? credit_days : 0,
                 prefered_courier
+              }, { transaction: t });
             });
             await logAudit({
                 req,
@@ -586,7 +610,9 @@ class PartyController {
             out.address_mismatch = createFarFromAddress;
             res.status(200).json(out);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(error && error.status ? error.status : 500).json({ error: error.message });
+        } finally {
+            releaseLock();
         }
     }
 
