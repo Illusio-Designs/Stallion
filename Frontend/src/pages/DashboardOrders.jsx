@@ -738,7 +738,7 @@ const DashboardOrders = () => {
                     <path d="M12 8V12M12 16H12.01M12 3L2 20H22L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
-                <p className="ui-state__title">Couldn't load orders</p>
+                <p className="ui-state__title">Couldn&apos;t load orders</p>
                 <p className="ui-state__desc">{error}</p>
                 <button className="ui-btn ui-btn--secondary" onClick={() => fetchOrders()}>Try again</button>
               </div>
