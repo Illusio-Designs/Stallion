@@ -3,6 +3,8 @@
 This list covers the wholesale app (Stallion B2B) from 22 July 2026 (the first saved version) to 2 November 2026.
 It is grouped by area so you can find a change quickly. Each line says what changed for the people using the app.
 
+**For developers:** how the layout, theme and styles are organised is in `docs/WEB_APP_STRUCTURE.md`.
+
 **Not in this list:** the retail store (D2C) and the Tally integration.
 
 **Marked "branch only":** finished and tested, but not yet on the live site (`main`). See section 11.
