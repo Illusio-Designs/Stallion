@@ -34,7 +34,10 @@ const { canManageOrders, normalizeRole, hasRole } = require('../utils/roleHelper
 const { resolveUserScope, canViewAllOrders } = require('../utils/scopeHelpers');
 const { salesmanCoversState, salesmanStateIds } = require('../utils/workingStates');
 const { recordStockMove } = require('../utils/stockLedger');
-const { toInt, allocateShipped, planItemCancel, spreadOver } = require('../utils/orderCancel');
+const { toInt, allocateShipped, planItemCancel, spreadOver, upcomingToRelease } = require('../utils/orderCancel');
+
+// Most pieces one order line may hold (a sanity limit; upcoming products have no stock cap).
+const MAX_LINE_QTY = 100000;
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
 
 const orderPartyInclude = {
@@ -329,7 +332,7 @@ async function cancelTrayTasks(order, transaction) {
 // everything goes back and the operation rows are removed, as for any full cancel.
 // Returns { restoredQty } = the pieces put back into stock (warehouse + tray).
 async function reverseOrderOperation(orderId, transaction, actor = null, { shippedByProduct = {} } = {}) {
-    const orderRow = await Order.findOne({ where: { order_id: orderId }, attributes: ['order_number'], transaction });
+    const orderRow = await Order.findOne({ where: { order_id: orderId }, attributes: ['order_number', 'order_items', 'cancelled_qty'], transaction });
     const orderOperations = await OrderOperation.findAll({
         where: { order_id: orderId },
         transaction,
@@ -436,6 +439,24 @@ async function reverseOrderOperation(orderId, transaction, actor = null, { shipp
             await orderOperation.save({ transaction });
         } else {
             await orderOperation.destroy({ transaction });
+        }
+    }
+    // Upcoming (pre-order) lines hold no stock and have no operation rows: nothing goes back to the
+    // warehouse or a tray. Only the pre-order count of the product goes down (never below 0), by the
+    // unsent pieces. A later delete of a part-cancelled order does not lower it a second time.
+    const partlyCancelledBefore = (Number(orderRow && orderRow.cancelled_qty) || 0) > 0
+        && Object.keys(shippedByProduct || {}).length === 0;
+    if (orderRow && !partlyCancelledBefore) {
+        const release = upcomingToRelease(orderRow.order_items, shippedByProduct);
+        for (const productId of Object.keys(release).sort()) {
+            const product = await Product.findOne({
+                where: { product_id: productId },
+                transaction,
+                lock: transaction.LOCK.UPDATE,
+            });
+            if (!product) continue;
+            product.preorder_qty = Math.max(0, (Number(product.preorder_qty) || 0) - release[productId]);
+            await product.save({ transaction });
         }
     }
     return { restoredQty };
@@ -923,6 +944,9 @@ class OrderController {
                 if (typeof item.quantity !== 'number' || !Number.isInteger(item.quantity) || item.quantity <= 0) {
                     return res.status(400).json({ error: 'Quantity must be a whole number, 1 or more.' });
                 }
+                if (item.quantity > MAX_LINE_QTY) {
+                    return res.status(400).json({ error: `Quantity cannot be more than ${MAX_LINE_QTY} for one frame.` });
+                }
                 const product = await Product.findOne({ where: { product_id: item.product_id } });
                 if (!product) {
                     return res.status(404).json({ error: 'Product not found' });
@@ -967,6 +991,9 @@ class OrderController {
                     else merged.set(it.product_id, { ...it });
                 }
                 order_items.splice(0, order_items.length, ...merged.values());
+                if (order_items.some((it) => it.quantity > MAX_LINE_QTY)) {
+                    return res.status(400).json({ error: `Quantity cannot be more than ${MAX_LINE_QTY} for one frame.` });
+                }
             }
 
             let orderTotal = 0;
@@ -996,7 +1023,9 @@ class OrderController {
                     if (product.is_active === false) {
                         throw new OrderError('This frame is no longer available.', 409);
                     }
-                    if (product.total_qty < item.quantity) {
+                    // An upcoming (pre-order) frame keeps no stock: any quantity can be ordered.
+                    const isUpcoming = !!product.is_upcoming;
+                    if (!isUpcoming && product.total_qty < item.quantity) {
                         throw new OrderError(`Sorry, ${product.model_no} does not have enough stock for this quantity.`, 409);
                     }
 
@@ -1006,11 +1035,15 @@ class OrderController {
                     }
 
                     const warehouse_qty = product.warehouse_qty;
-                    let orderOperationData;
+                    let orderOperationData = null;
 
                     const oldProductSnapshot = product.toJSON();
 
-                    if (item.quantity > warehouse_qty) {
+                    if (isUpcoming) {
+                        // No availability check, no warehouse / tray deduction, no operation row and
+                        // no stock history line. Only the pre-order count goes up.
+                        product.preorder_qty = (Number(product.preorder_qty) || 0) + item.quantity;
+                    } else if (item.quantity > warehouse_qty) {
                         const left = item.quantity - warehouse_qty;
                         product.warehouse_qty = 0;
                         product.tray_qty = product.tray_qty - left;
@@ -1072,14 +1105,16 @@ class OrderController {
                     }
 
                     await product.save({ transaction });
-                    orderOperationsToCreate.push(orderOperationData);
-                    stockLines.push({
-                        productId: product.product_id,
-                        warehouseAfter: product.warehouse_qty,
-                        trayAfter: product.tray_qty,
-                        dWarehouse: -(Number(orderOperationData.warehouse_reduced_qty) || 0),
-                        dTray: -(Number(orderOperationData.tray_reduced_qty) || 0),
-                    });
+                    if (orderOperationData) {
+                        orderOperationsToCreate.push(orderOperationData);
+                        stockLines.push({
+                            productId: product.product_id,
+                            warehouseAfter: product.warehouse_qty,
+                            trayAfter: product.tray_qty,
+                            dWarehouse: -(Number(orderOperationData.warehouse_reduced_qty) || 0),
+                            dTray: -(Number(orderOperationData.tray_reduced_qty) || 0),
+                        });
+                    }
 
                     const resolvedItem = {
                         product_id: item.product_id,
@@ -1091,6 +1126,9 @@ class OrderController {
                         model_no: product.model_no,
                         quantity: item.quantity,
                         price: unitPrice,
+                        // Stored on the line so cancel / dispatch / the order screens know it was a
+                        // pre-order line (old orders have no flag and are unaffected).
+                        ...(isUpcoming ? { is_upcoming: true } : {}),
                     };
                     resolvedOrderItems.push(resolvedItem);
                     orderTotal += unitPrice * item.quantity;
@@ -1810,6 +1848,10 @@ class OrderController {
                 }));
             if (resolvedItems.some((i) => !Number.isInteger(i.quantity) || i.quantity <= 0)) {
                 return res.status(400).json({ error: 'Quantity must be a whole number, 1 or more.' });
+            }
+            // The preview takes any quantity (upcoming frames have no stock cap), up to a sanity limit.
+            if (resolvedItems.some((i) => i.quantity > MAX_LINE_QTY)) {
+                return res.status(400).json({ error: `Quantity cannot be more than ${MAX_LINE_QTY} for one frame.` });
             }
             {
                 const merged = new Map();

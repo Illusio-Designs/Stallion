@@ -21,6 +21,12 @@ const { canManageInventory, hasRole } = require('../utils/roleHelpers');
 const { getListSearchParams, likeContains } = require('../utils/listSearchHelpers');
 const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 
+// true for true / 1 / yes / y / on (any case); everything else is false.
+function toBool(v) {
+    if (v === true || v === 1) return true;
+    return ['true', '1', 'yes', 'y', 'on'].includes(String(v ?? '').trim().toLowerCase());
+}
+
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
 
 // Reduce any historically-messy image_urls value to a clean array of BARE
@@ -182,13 +188,15 @@ class ProductController {
             if (wantsActive) {
                 conditions.push({ is_active: true });
             }
-            // The shop lists only frames that can be ordered: warehouse plus tray stock above zero.
+            // The shop lists only frames that can be ordered: warehouse plus tray stock above zero,
+            // or an upcoming (pre-order) frame, which can be ordered in any quantity.
             if (in_stock === true || String(in_stock).toLowerCase() === 'true') {
-                conditions.push(Sequelize.literal(`(COALESCE(\`${Product.name}\`.warehouse_qty, 0) + COALESCE(\`${Product.name}\`.tray_qty, 0)) > 0`));
+                conditions.push(Sequelize.literal(`((COALESCE(\`${Product.name}\`.warehouse_qty, 0) + COALESCE(\`${Product.name}\`.tray_qty, 0)) > 0 OR COALESCE(\`${Product.name}\`.is_upcoming, 0) = 1)`));
             }
             // The tray assign picker lists only frames that have warehouse stock to put in a tray.
+            // An upcoming frame keeps no stock, so it is not listed even if an old number is kept.
             if (warehouse_in_stock === true || String(warehouse_in_stock).toLowerCase() === 'true') {
-                conditions.push(Sequelize.literal(`COALESCE(\`${Product.name}\`.warehouse_qty, 0) > 0`));
+                conditions.push(Sequelize.literal(`(COALESCE(\`${Product.name}\`.warehouse_qty, 0) > 0 AND COALESCE(\`${Product.name}\`.is_upcoming, 0) = 0)`));
             }
             if (price) {
                 conditions.push({
@@ -254,11 +262,15 @@ class ProductController {
             const user = req.user;
             const { model_no, gender_id, color_code_id, shape_id, lens_color_id,
                 frame_color_id, frame_type_id, lens_material_id, frame_material_id,
-                mrp, whp, size_mm, warehouse_qty, status, brand_id, collection_id, image_urls } = req.body;
+                mrp, whp, size_mm, warehouse_qty: warehouseQtyBody, status, brand_id, collection_id, image_urls } = req.body;
+            const isUpcoming = toBool(req.body.is_upcoming);
+            // An upcoming product keeps no stock, so the starting quantity is optional (default 0).
+            const warehouse_qty = (isUpcoming && (warehouseQtyBody === undefined || warehouseQtyBody === null || warehouseQtyBody === ''))
+                ? 0 : warehouseQtyBody;
             // The attribute FKs (gender/shape/lens color/color code/frame color/
             // frame type/lens material/frame material) and size_mm are OPTIONAL.
             // Only these core fields are required.
-            if (!model_no || !mrp || !whp || !warehouse_qty || !status || !brand_id || !collection_id) {
+            if (!model_no || !mrp || !whp || (!warehouse_qty && !isUpcoming) || !status || !brand_id || !collection_id) {
                 return res.status(400).json({ error: 'model_no, mrp, whp, warehouse_qty, status, brand and collection are required' });
             }
             // Normalise optional integer FKs: empty/0/invalid -> null (0 is not a
@@ -293,6 +305,8 @@ class ProductController {
                 warehouse_qty,
                 tray_qty: 0,
                 total_qty: warehouse_qty,
+                is_upcoming: isUpcoming,
+                preorder_qty: 0,
                 status,
                 brand_id,
                 collection_id,
@@ -363,6 +377,8 @@ class ProductController {
                 whp: whp !== undefined ? whp : product.whp,
                 size_mm: size_mm !== undefined ? (size_mm || null) : product.size_mm,
                 status: status !== undefined ? status : product.status,
+                // Switching upcoming on or off never changes the stock or pre-order numbers.
+                is_upcoming: req.body.is_upcoming !== undefined ? toBool(req.body.is_upcoming) : !!product.is_upcoming,
                 ...activeUpdate(req.body),
                 brand_id: brand_id ? brand_id : product.brand_id,
                 collection_id: collection_id ? collection_id : product.collection_id,
@@ -919,6 +935,9 @@ class ProductController {
                     const { model_no, gender, color_code, shape, lens_color, frame_color,
                         frame_type, lens_material, frame_material, mrp, whp, size_mm,
                         warehouse_qty, brand, collection } = item;
+                    // Optional sheet column "upcoming": yes / true / 1 marks the frame as upcoming.
+                    const upcomingCell = item.upcoming !== undefined ? item.upcoming : item.is_upcoming;
+                    const hasUpcomingCell = upcomingCell !== undefined && upcomingCell !== null && String(upcomingCell).trim() !== '';
 
                     let { status } = item;
 
@@ -1003,6 +1022,7 @@ class ProductController {
                         // warehouse + tray, so it is recalculated here (it used to stay stale).
                         const bulkUpdatePayload = {
                             status: status,
+                            ...(hasUpcomingCell ? { is_upcoming: toBool(upcomingCell) } : {}),
                             warehouse_qty: qtyNumber,
                             total_qty: qtyNumber + (Number(existingProduct.tray_qty) || 0),
                             mrp: mrp,
@@ -1057,6 +1077,8 @@ class ProductController {
                         warehouse_qty: qtyNumber,
                         tray_qty: 0,
                         total_qty: qtyNumber,
+                        is_upcoming: hasUpcomingCell ? toBool(upcomingCell) : false,
+                        preorder_qty: 0,
                         status,
                         brand_id: brandModel.brand_id,
                         collection_id: collectionModel.collection_id,
