@@ -14,6 +14,7 @@ import {
   getShapes
 } from '../services/apiService';
 import { isLoggedIn } from '../services/authService';
+import { getOfferProducts } from '../services/api/offerApi';
 import '../styles/components/filter-chips.css';
 import '../styles/pages/Products.css';
 import '../styles/redesign-p-shop.css';
@@ -95,6 +96,9 @@ const Products = ({ onPageChange }) => {
   const [selectedColorCode, setSelectedColorCode] = useState(null); // Single color_code_id
 
   // Products display
+  // Products that an active offer touches: { [product_id]: { label, title } }. They get an offer badge and the "On offer" chip.
+  const [offerMap, setOfferMap] = useState({});
+  const [onlyOffers, setOnlyOffers] = useState(false);
   const [products, setProducts] = useState([]);
   const [totalResults, setTotalResults] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -178,6 +182,15 @@ const Products = ({ onPageChange }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!isLoggedIn()) return;
+    let cancelled = false;
+    getOfferProducts()
+      .then((res) => { if (!cancelled) setOfferMap((res && res.products) || {}); })
+      .catch(() => { /* offers are optional: the shop works without them */ });
+    return () => { cancelled = true; };
+  }, []);
+
   // Build filter object for API - Only include fields with actual values
   const buildFilters = useCallback(() => {
     // The shop shows only frames that are in stock (also when searching).
@@ -229,11 +242,18 @@ const Products = ({ onPageChange }) => {
       filters.brand_id = selectedBrands.length === 1 ? selectedBrands[0] : selectedBrands;
     }
 
+    // "On offer": only the products an active offer touches.
+    if (onlyOffers && Object.keys(offerMap).length > 0) {
+      filters.product_ids = Object.keys(offerMap);
+    }
+
     // Always filter to show only active products in public page (hide draft products)
     filters.status = 'active';
 
     return filters;
   }, [
+    onlyOffers,
+    offerMap,
     selectedGender,
     selectedColorCode,
     selectedShapes,
@@ -359,6 +379,7 @@ const Products = ({ onPageChange }) => {
     setSelectedLensMaterial([]);
     setSelectedFrameColor(null);
     setSelectedColorCode(null);
+    setOnlyOffers(false);
     setPage(1);
   };
 
@@ -699,6 +720,16 @@ const Products = ({ onPageChange }) => {
 
           <div className="shop-chips" role="group" aria-label="Quick filters">
             <span className="shop-chip is-on" aria-label="Showing only frames in stock">In stock</span>
+            {Object.keys(offerMap).length > 0 && (
+              <button
+                type="button"
+                className={`shop-chip shop-chip--offer${onlyOffers ? ' is-on' : ''}`}
+                aria-pressed={onlyOffers}
+                onClick={() => { setOnlyOffers((v) => !v); setPage(1); }}
+              >
+                On offer
+              </button>
+            )}
             {quickShapes.map(q => {
               const on = selectedShapes.includes(q.id);
               return (
@@ -771,6 +802,7 @@ const Products = ({ onPageChange }) => {
                     mrp={product.mrp}
                     stock={Number(product.total_qty ?? product.warehouse_qty ?? 0)}
                     isUpcoming={isUpcoming(product)}
+                    offer={offerMap[String(productId)] || null}
                     onViewMore={handleViewMore}
                   />
                 );

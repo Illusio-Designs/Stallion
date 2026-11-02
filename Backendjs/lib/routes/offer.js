@@ -16,4 +16,7 @@ router.delete('/:id', authenticateToken, noDelete('An offer'));
 // offers that apply to a given cart, with the discount computed for it.
 router.post('/available', authenticateToken, offerController.getAvailableOffers);
 
+// Products that an active offer touches (the shop highlights them). Same people as above.
+router.get('/highlighted', authenticateToken, offerController.getOfferProducts);
+
 module.exports = router;
