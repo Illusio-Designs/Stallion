@@ -126,6 +126,11 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
       filterBody.status = filters.status;
     }
 
+    // product_ids: only these products (the shop's "On offer" filter)
+    if (Array.isArray(filters.product_ids) && filters.product_ids.length > 0) {
+      filterBody.product_ids = filters.product_ids;
+    }
+
     // in_stock: true -> only frames with stock (the shop never lists sold-out ones)
     if (filters.in_stock === true) {
       filterBody.in_stock = true;

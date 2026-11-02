@@ -67,6 +67,14 @@ export const getAvailableOffers = async (orderItems) => {
 };
 
 /**
+ * Products that an active offer touches, so the shop can highlight them.
+ * @returns {Promise<{products: Object<string, {offer_id, title, offer_type, label}>}>}
+ */
+export const getOfferProducts = async () => {
+  return apiRequest('/offers/highlighted', { method: 'GET', includeAuth: true });
+};
+
+/**
  * Price preview for a cart with an optional selected offer (no order created).
  * @returns {Promise<{subtotal, discount_total, order_total, applied_offer, lines}>}
  */
