@@ -10,6 +10,7 @@ import { getProductsByIds } from '../services/apiService';
 import { RUPEE_FONT_BASE64 } from './rupeeFont';
 import { orderStatusLabel, getShipments, heldNote, fmtDate } from './orderStatus';
 import { addressRows } from './addressParts';
+import { isUpcoming } from './upcoming';
 
 const parseOrderItems = (orderItems) => {
   if (!orderItems) return [];
@@ -93,7 +94,7 @@ export async function downloadOrderPdf(row, products = []) {
     const name = it.model_no || it.product?.model_no || it.product_name || it.product?.product_name
       || p.model_no || p.product_name || p.name || 'Unknown Product';
     const imgUrl = firstImageUrl(it.image_urls || p.image_urls);
-    return { name: String(name), qty, price, subtotal: qty * price, imgUrl };
+    return { name: String(name), qty, price, subtotal: qty * price, imgUrl, upcoming: isUpcoming(it) };
   });
   // Fetch all thumbnails in parallel (graceful — nulls are fine).
   const thumbs = await Promise.all(items.map((it) => loadThumb(it.imgUrl)));
@@ -247,9 +248,16 @@ export async function downloadOrderPdf(row, products = []) {
       }
       // title (up to 2 lines), vertically centred
       doc.setTextColor(...INK); doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-      const nameLines = doc.splitTextToSize(it.name, (prodR - prodL) - pad * 2).slice(0, 2);
-      const nameY = y + rowH / 2 - (nameLines.length - 1) * 2 + 1;
+      // An upcoming (pre-order) line gets a small "Upcoming" note under its title.
+      const nameLines = doc.splitTextToSize(it.name, (prodR - prodL) - pad * 2).slice(0, it.upcoming ? 1 : 2);
+      const shownLines = nameLines.length + (it.upcoming ? 1 : 0);
+      const nameY = y + rowH / 2 - (shownLines - 1) * 2 + 1;
       doc.text(nameLines, prodL + pad, nameY);
+      if (it.upcoming) {
+        doc.setFontSize(7.5); doc.setTextColor(...MUTE);
+        doc.text('Upcoming', prodL + pad, nameY + nameLines.length * 4);
+        doc.setFontSize(9); doc.setTextColor(...INK);
+      }
       // qty + total, vertically centred
       const midY = y + rowH / 2 + 1.5;
       doc.text(String(it.qty), qtyR - pad, midY, { align: 'right' });

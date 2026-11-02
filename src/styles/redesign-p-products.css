@@ -30,6 +30,7 @@
 .pp-chip--low { background: var(--color-primary-soft); }
 .pp-chip--out, .pp-chip--off { background: var(--color-grey-100); color: var(--color-text-muted); border-style: dashed; }
 .pp-chip--draft { color: var(--color-text-muted); }
+.pp-chip--upcoming { background: var(--b-card); border-color: var(--t-ink); color: var(--t-ink); }
 
 /* Phone cards: hidden until the phone breakpoint */
 .pp-cards { list-style: none; margin: 0; padding: 0; display: none; flex-direction: column; gap: 8px; }

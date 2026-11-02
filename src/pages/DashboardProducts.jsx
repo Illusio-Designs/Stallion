@@ -180,10 +180,31 @@ const stockInfo = (row) => {
   const qty = Number(row.total_qty) || 0;
   if (row.is_active === false) return { label: 'Inactive', tone: 'off' };
   if (st !== 'active') return { label: st ? st.charAt(0).toUpperCase() + st.slice(1) : 'Draft', tone: 'draft' };
+  if (row.is_upcoming) return { label: 'Upcoming', tone: 'upcoming' };
   if (qty <= 0) return { label: 'Sold out', tone: 'out' };
   if (qty <= 5) return { label: 'Low stock', tone: 'low' };
   return { label: 'In stock', tone: 'in' };
 };
+
+// The Upcoming (pre-order) switch of the add / edit form.
+const UpcomingSwitch = ({ checked, onToggle }) => (
+  <div className="form-group form-group--full">
+    <label className="ui-label">Upcoming product</label>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onToggle}
+      className="mng-switch"
+    >
+      <span className={`mng-switch__track ${checked ? 'is-on' : ''}`}>
+        <span className="mng-switch__dot" />
+      </span>
+      <span className="mng-switch__label">{checked ? 'Upcoming' : 'Regular'}</span>
+    </button>
+    <p className="mng-note">No stock is kept. Customers can order any quantity.</p>
+  </div>
+);
 
 const StockChip = ({ row }) => {
   const info = stockInfo(row);
@@ -264,6 +285,7 @@ const DashboardProducts = () => {
     warehouse_qty: '',
     status: 'draft',
     is_active: true,
+    is_upcoming: false,
   });
 
   // Load orphaned images from localStorage on mount
@@ -1294,6 +1316,8 @@ const DashboardProducts = () => {
         total_qty: product.total_qty || product.qty || 0,
         status: product.status || 'draft',
         is_active: product.is_active !== false,
+        is_upcoming: product.is_upcoming === true || product.is_upcoming === 1,
+        preorder_qty: Number(product.preorder_qty) || 0,
         hasUploadedMedia: hasUploadedMedia,
         data: product,
       };
@@ -1921,6 +1945,7 @@ const DashboardProducts = () => {
       total_qty: '',
       status: 'draft',
       is_active: true,
+      is_upcoming: false,
     });
   };
 
@@ -1953,6 +1978,7 @@ const DashboardProducts = () => {
       total_qty: product.total_qty || '',
       status: product.status || 'draft',
       is_active: product.is_active !== false,
+      is_upcoming: product.is_upcoming === true || product.is_upcoming === 1,
     });
     setEditRow(row);
   };
@@ -2143,7 +2169,10 @@ const DashboardProducts = () => {
     {
       key: 'total_qty', label: 'STOCK', width: '110px',
       render: (v, row) => (
-        <span className="pp-stock"><StockChip row={row} /><span className="pp-qty">{Number(v) || 0}</span></span>
+        <span className="pp-stock">
+          <StockChip row={row} />
+          <span className="pp-qty">{row.is_upcoming ? `${row.preorder_qty || 0} ordered` : (Number(v) || 0)}</span>
+        </span>
       ),
     },
     { key: 'whp', label: 'WHP', width: '90px', render: (_v, row) => <b>{row.whp_formatted}</b> },
@@ -2218,6 +2247,8 @@ const DashboardProducts = () => {
         collection_id: formData.collection_id,
         warehouse_qty: parseInt(formData.warehouse_qty) || 0,
         status: formData.status,
+        // Upcoming (pre-order): no stock is kept; the stock fields are ignored for availability.
+        is_upcoming: formData.is_upcoming === true,
       };
 
       // Include tray_qty and total_qty only when updating (edit mode)
@@ -2550,12 +2581,12 @@ const DashboardProducts = () => {
     const headers = [
       'model_no', 'gender', 'color_code', 'shape', 'lens_color', 'frame_color',
       'frame_type', 'lens_material', 'frame_material', 'mrp', 'whp', 'size_mm',
-      'warehouse_qty', 'brand', 'collection', 'status',
+      'warehouse_qty', 'brand', 'collection', 'status', 'upcoming',
     ];
     const example = [
       'STL-1001', 'Unisex', 'C1', 'Round', 'Brown', 'Black',
       'Full Rim', 'Polycarbonate', 'Acetate', '1999', '900', '52',
-      '10', 'Stallion', 'Classic', 'active',
+      '10', 'Stallion', 'Classic', 'active', 'no',
     ];
     const esc = (v) => {
       const s = String(v ?? '');
@@ -3015,18 +3046,23 @@ const DashboardProducts = () => {
               onChange={(e) => handleInputChange('size_mm', e.target.value)}
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Warehouse Qty *</label>
+          <UpcomingSwitch
+            checked={formData.is_upcoming === true}
+            onToggle={() => handleInputChange('is_upcoming', formData.is_upcoming !== true)}
+          />
+          <div className={`form-group ${formData.is_upcoming ? 'opacity-50' : ''}`}>
+            <label className="ui-label">{formData.is_upcoming ? 'Warehouse Qty' : 'Warehouse Qty *'}</label>
             <input
               className="ui-input"
               type="number"
               placeholder="Enter warehouse quantity"
               value={formData.warehouse_qty}
               onChange={(e) => handleInputChange('warehouse_qty', e.target.value)}
-              required
+              required={!formData.is_upcoming}
+              disabled={formData.is_upcoming === true}
             />
           </div>
-          <div className="form-group">
+          <div className={`form-group ${formData.is_upcoming ? 'opacity-50' : ''}`}>
             <label className="ui-label">Total Qty</label>
             <input
               className="ui-input bg-surface-muted"
@@ -3230,18 +3266,23 @@ const DashboardProducts = () => {
               onChange={(e) => handleInputChange('size_mm', e.target.value)}
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Warehouse Qty *</label>
+          <UpcomingSwitch
+            checked={formData.is_upcoming === true}
+            onToggle={() => handleInputChange('is_upcoming', formData.is_upcoming !== true)}
+          />
+          <div className={`form-group ${formData.is_upcoming ? 'opacity-50' : ''}`}>
+            <label className="ui-label">{formData.is_upcoming ? 'Warehouse Qty' : 'Warehouse Qty *'}</label>
             <input
               className="ui-input"
               type="number"
               placeholder="Enter warehouse quantity"
               value={formData.warehouse_qty}
               onChange={(e) => handleInputChange('warehouse_qty', e.target.value)}
-              required
+              required={!formData.is_upcoming}
+              disabled={formData.is_upcoming === true}
             />
           </div>
-          <div className="form-group">
+          <div className={`form-group ${formData.is_upcoming ? 'opacity-50' : ''}`}>
             <label className="ui-label">Total Qty</label>
             <input
               className="ui-input bg-surface-muted"

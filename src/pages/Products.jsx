@@ -19,6 +19,7 @@ import '../styles/pages/Products.css';
 import '../styles/redesign-p-shop.css';
 import { FiChevronRight, FiSearch, FiSliders, FiX } from '../components/icons/hugeicons';
 import { productPath } from '../utils/dashboardRoutes';
+import { isUpcoming } from '../utils/upcoming';
 import { encodeUploadName } from '../utils/imageUrl';
 
 const Products = ({ onPageChange }) => {
@@ -769,6 +770,7 @@ const Products = ({ onPageChange }) => {
                     whp={product.whp}
                     mrp={product.mrp}
                     stock={Number(product.total_qty ?? product.warehouse_qty ?? 0)}
+                    isUpcoming={isUpcoming(product)}
                     onViewMore={handleViewMore}
                   />
                 );

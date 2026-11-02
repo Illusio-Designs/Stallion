@@ -7,6 +7,7 @@ import { addToCart } from "../services/cartService";
 import { showAddToCartSuccess } from "../services/notificationService";
 import { parseProductPath, productPath } from "../utils/dashboardRoutes";
 import { encodeUploadName } from "../utils/imageUrl";
+import { isUpcoming, MAX_ORDER_QTY } from "../utils/upcoming";
 import {
   getProductModels,
   getProductById,
@@ -201,9 +202,12 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   };
 
   // Available stock for a variation id (0 when unknown/out of stock).
+  // Upcoming (pre-order) frames have no stock cap, only the sanity limit.
   const getStock = (variationId) => {
     const v = productVariations.find((pv) => pv.id === variationId);
-    return v ? Number(v.stock ?? 0) : 0;
+    if (!v) return 0;
+    if (v.isUpcoming) return MAX_ORDER_QTY;
+    return Number(v.stock ?? 0);
   };
 
   const updateQuantity = (variationId, newQuantity) => {
@@ -243,7 +247,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
     if (e) {
       e.stopPropagation(); // Prevent card click when clicking button
     }
-    const stock = Number(variation.stock ?? 0);
+    const upcoming = !!variation.isUpcoming;
+    const stock = upcoming ? MAX_ORDER_QTY : Number(variation.stock ?? 0);
     if (stock <= 0) return; // out of stock — button is disabled, guard anyway
     const quantity = Math.min(getQuantity(variation.id), stock);
     addToCart({
@@ -253,7 +258,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
       lenseColour: variation.lenseColour,
       whp: variation.whp,
       quantity: quantity,
-      stock, // snapshot so the cart has an immediate cap before its live refresh
+      // snapshot so the cart has an immediate cap before its live refresh (upcoming has none)
+      ...(upcoming ? { is_upcoming: true } : { stock }),
     });
     // Show success notification
     showAddToCartSuccess(
@@ -430,6 +436,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
         qty: formatQty(model.total_qty || model.warehouse_qty || 0),
         // Raw available stock (number) — drives the qty cap and out-of-stock UI.
         stock: Number(model.total_qty ?? model.warehouse_qty ?? 0),
+        isUpcoming: isUpcoming(model),
         image: getImageUrl(model.image_urls, model.image_url),
         images: getAllImageUrls(model.image_urls),
         mrp: formatPrice(model.mrp),
@@ -738,11 +745,13 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   }
 
   const cur = currentProduct;
-  const curStock = Number(cur.stock ?? 0);
+  const curUpcoming = !!cur.isUpcoming;
+  // Upcoming frames keep no stock, so they are always orderable and have no cap.
+  const curStock = curUpcoming ? MAX_ORDER_QTY : Number(cur.stock ?? 0);
   const curQty = curStock > 0 ? Math.min(getQuantity(cur.id), curStock) : getQuantity(cur.id);
   const brandName = display(cur.brand);
   const mainImageSrc = galleryImages[Math.min(imageIndex, galleryImages.length - 1)] || cur.image || '/images/products/spac1.webp';
-  const stockState = curStock <= 0 ? { cls: "bad", text: "Sold out" } : curStock <= 10 ? { cls: "warn", text: `Low stock, ${curStock} left` } : { cls: "ok", text: `In stock, ${curStock} left` };
+  const stockState = curUpcoming ? { cls: "upcoming", text: "Upcoming" } : curStock <= 0 ? { cls: "bad", text: "Sold out" } : curStock <= 10 ? { cls: "warn", text: `Low stock, ${curStock} left` } : { cls: "ok", text: `In stock, ${curStock} left` };
   const lensText = [cur.lenseColour, cur.lenseMaterial].map(display).filter((v) => v !== "—").join(", ") || "—";
   const specRows = [
     ["Shape", cur.shape],
@@ -880,7 +889,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                     aria-pressed={i === selectedVariation}
                     onClick={() => handleVariationClick(i)}
                   >
-                    {colourName(v)} <b>{Number(v.stock ?? 0)}</b>
+                    {colourName(v)} <b>{v.isUpcoming ? "Upcoming" : Number(v.stock ?? 0)}</b>
                   </button>
                 ))}
               </div>

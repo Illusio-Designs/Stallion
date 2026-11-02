@@ -15,6 +15,7 @@ import { getUserRole, getUserRoles, getUser } from '../services/authService';
 import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiPackage, FiInbox } from '../components/icons/hugeicons';
 import RupeeIcon from '../components/icons/RupeeIcon';
 import { orderStatusLabel, orderStatusBadgeKey, heldNote } from '../utils/orderStatus';
+import { isUpcoming } from '../utils/upcoming';
 
 // A link that switches pages inside the app instead of reloading the whole page.
 const AppLink = ({ href, children, ...rest }) => {
@@ -409,6 +410,8 @@ const Dashboard = () => {
     const outOfStock = [];
     const lowStock = [];
     products.forEach(p => {
+      // Upcoming (pre-order) frames keep no stock, so they are never out of stock or low.
+      if (isUpcoming(p)) return;
       const stock = Number(p.total_qty ?? p.warehouse_qty ?? 0);
       const entry = {
         name: p.model_no || p.product_name || `Product ${p.product_id ?? p.id}`,
@@ -512,7 +515,7 @@ const Dashboard = () => {
   const isOfficeView = !isSalesman && !isParty && !isDistributor;
   const attention = [];
   if (isOfficeView) {
-    const outOfStockCount = products.filter((p) => Number(p.total_qty ?? p.warehouse_qty ?? 0) === 0).length;
+    const outOfStockCount = products.filter((p) => !isUpcoming(p) && Number(p.total_qty ?? p.warehouse_qty ?? 0) === 0).length;
     if (outOfStockCount > 0) {
       attention.push({ icon: FiAlertTriangle, tone: 'bad', title: `${outOfStockCount} item${outOfStockCount > 1 ? 's' : ''} out of stock`, desc: inventoryAlerts.filter((a) => a.type === 'danger').slice(0, 3).map((a) => a.name || a.model_no).filter(Boolean).join(', ') || 'Check the product list', onClick: go('/dashboard/products') });
     }
