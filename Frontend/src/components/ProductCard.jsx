@@ -35,6 +35,7 @@ const ProductCard = ({
   mrp,
   stock,
   isUpcoming = false,
+  offer = null,
   colors = [
     { color: '#000000', name: 'Black' },
     { color: '#E5E5E5', name: 'Grey' },
@@ -147,7 +148,7 @@ const ProductCard = ({
   const lineTotal = formatPrice((Number(whp) || 0) * qty);
 
   return (
-    <div className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
+    <div data-offer={offer ? 'true' : undefined} className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
       {hasPrice && (
         <div className="pc-head">
           <span className="pc-price-now">{formatPrice(whp)}</span>
@@ -203,6 +204,7 @@ const ProductCard = ({
             : stockNum != null && stockNum <= 5
               ? <span className="pc-status pc-status--low">{`Only ${stockNum} left`}</span>
               : <span className="pc-status pc-status--in">In stock</span>}
+        {offer && offer.label ? <span className="pc-offer" title={offer.title || 'Offer'}>{offer.label}</span> : null}
       </p>
 
       {/* Clamp/height owned entirely by .product-name in CSS — mixing Tailwind

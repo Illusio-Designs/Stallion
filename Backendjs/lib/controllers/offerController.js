@@ -195,6 +195,53 @@ class OfferController {
             res.status(500).json({ error: error.message });
         }
     }
+
+    /**
+     * Products that an active offer touches, so the shop can highlight them.
+     * Returns { products: { [product_id]: { offer_id, title, offer_type, label } } }.
+     * Only offers tied to named products count: product-wise offers with chosen items
+     * and buy-X-get-Y offers with chosen products. Flat offers and "all products"
+     * offers touch everything, so they highlight nothing. When a product is in
+     * several offers, the offer with the higher priority (then the newer one) is shown.
+     */
+    async getOfferProducts(req, res) {
+        try {
+            const offers = await Offer.findAll({ order: [['priority', 'DESC'], ['created_at', 'DESC']] });
+            const now = new Date();
+            const products = {};
+            const money = (n) => `\u20B9${Number(n || 0).toLocaleString('en-IN')}`;
+            for (const offer of offers) {
+                if (!isOfferActive(offer, now)) continue;
+                const raw = offer.config;
+                let cfg = raw;
+                if (typeof raw === 'string') { try { cfg = JSON.parse(raw); } catch { cfg = {}; } }
+                cfg = cfg || {};
+                if (cfg.all_products === true) continue;
+                const put = (id, label) => {
+                    const key = String(id);
+                    if (!key || products[key]) return; // the first (highest priority) offer wins
+                    products[key] = { offer_id: offer.offer_id, title: offer.title, offer_type: offer.offer_type, label };
+                };
+                if (offer.offer_type === 'product' && Array.isArray(cfg.items)) {
+                    for (const it of cfg.items) {
+                        const v = Number(it.discount_value) || 0;
+                        if (!(v > 0)) continue;
+                        put(it.product_id, it.discount_mode === 'percent' ? `${v}% off` : `${money(v)} off each`);
+                    }
+                } else if (offer.offer_type === 'bogo' && Array.isArray(cfg.product_ids)) {
+                    const buy = Math.max(1, Number(cfg.buy_qty) || 0);
+                    const get = Math.max(0, Number(cfg.get_qty) || 0);
+                    if (!(get > 0)) continue;
+                    const pct = cfg.get_discount_percent == null ? 100 : Number(cfg.get_discount_percent);
+                    const label = pct >= 100 ? `Buy ${buy} get ${get} free` : `Buy ${buy} get ${get} at ${pct}% off`;
+                    for (const id of cfg.product_ids) put(id, label);
+                }
+            }
+            res.status(200).json({ products });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
 }
 
 module.exports = new OfferController();
