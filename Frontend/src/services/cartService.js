@@ -54,6 +54,9 @@ export const addToCart = (product) => {
   if (existingItem) {
     // Update quantity if item already exists
     existingItem.quantity = product.quantity;
+    // Keep the upcoming (pre-order) flag in step with the product the buyer just added.
+    if (product.is_upcoming) existingItem.is_upcoming = true;
+    else delete existingItem.is_upcoming;
   } else {
     // Add new item
     cartItems.push({ ...product });

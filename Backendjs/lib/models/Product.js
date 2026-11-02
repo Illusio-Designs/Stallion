@@ -139,6 +139,19 @@ const Product = sequelize.define('Product', {
         allowNull: true,
         defaultValue: 0
     },
+    // Upcoming (pre-order) product: no stock is kept and any quantity can be ordered.
+    // warehouse_qty / tray_qty are ignored for availability while this is on, but kept.
+    is_upcoming: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false
+    },
+    // Pieces ordered while the product is upcoming (office information only).
+    preorder_qty: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        defaultValue: 0
+    },
     status: {
         type: DataTypes.STRING(20),
         allowNull: true,

@@ -100,6 +100,7 @@ class TrayProductsController {
                 if (targetTray.tray_status === TrayStatus.INACTIVE) return { status: 409, error: 'This tray is inactive, so nothing can be added to it.' };
                 const duplicate = await TrayProducts.findOne({ where: { tray_id, product_id }, transaction });
                 if (duplicate) return { status: 409, error: 'This product is already in the tray' };
+                if (product.is_upcoming) return { status: 409, error: 'This frame is upcoming. It keeps no stock, so it cannot be put in a tray.' };
                 if ((Number(product.warehouse_qty) || 0) < 1) return { status: 400, error: 'Product out of stock' };
 
                 const created = await TrayProducts.create({

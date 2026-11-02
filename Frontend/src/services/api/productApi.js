@@ -257,6 +257,7 @@ export const createProduct = async (productData) => {
     collection_id,
     warehouse_qty,
     status,
+    is_upcoming,
   } = productData;
 
   const result = await apiRequest('/products/create', {
@@ -278,6 +279,8 @@ export const createProduct = async (productData) => {
       collection_id,
       warehouse_qty,
       status,
+      // Upcoming (pre-order) product: no stock kept, any quantity can be ordered.
+      ...(is_upcoming !== undefined ? { is_upcoming: !!is_upcoming } : {}),
     },
     includeAuth: true,
   });
@@ -330,6 +333,7 @@ export const updateProduct = async (productId, productData) => {
     total_qty,
     status,
     is_active,
+    is_upcoming,
     image_urls, // Array of image paths
   } = productData;
 
@@ -361,6 +365,10 @@ export const updateProduct = async (productId, productData) => {
   // The manual Active/Inactive switch: only sent when the caller sets it.
   if (is_active !== undefined) {
     body.is_active = is_active;
+  }
+  // The Upcoming (pre-order) switch: only sent when the caller sets it.
+  if (is_upcoming !== undefined) {
+    body.is_upcoming = !!is_upcoming;
   }
 
   const result = await apiRequest(`/products/${productId}`, {

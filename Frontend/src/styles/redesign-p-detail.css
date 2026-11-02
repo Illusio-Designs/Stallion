@@ -12,6 +12,7 @@
 :root:root .pdp-stock.ok { background: var(--c-ok-soft); color: var(--c-ok); border-color: #dcf2e8; }
 :root:root .pdp-stock.warn { background: var(--b-soft2); color: var(--t-ink); border-color: #ececec; }
 :root:root .pdp-stock.bad { background: var(--b-card); color: var(--t-ink); border-color: var(--t-ink); }
+:root:root .pdp-stock.upcoming { background: var(--b-card); color: var(--t-ink); border-color: var(--t-ink); font-weight: 700; }
 
 :root:root .pdp-thumbs { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 :root:root .pdp-thumb { width: 64px; height: 50px; display: grid; place-items: center; padding: 4px; background: var(--b-soft); border: 1px solid var(--l-line); border-radius: 8px; cursor: pointer; overflow: hidden; }

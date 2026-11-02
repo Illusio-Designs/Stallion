@@ -454,3 +454,10 @@ footer.footer, footer.footer > *, .footer .footer-background { background: var(-
   .products-grid-container .product-card { padding: 8px; }
   .products-grid-container .product-card .product-image { height: 112px; }
 }
+
+/* Upcoming (pre-order) tag: a compact black pill, theme tokens only. */
+.pc-pill--upcoming { background: var(--b-ink); color: var(--t-on-ink); }
+.upc-tag {
+  display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px;
+  background: var(--b-ink); color: var(--t-on-ink); font-size: 11px; font-weight: 600; line-height: 1; white-space: nowrap; flex: none;
+}

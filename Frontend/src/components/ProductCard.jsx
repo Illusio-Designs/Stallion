@@ -5,6 +5,7 @@ import { showAddToCartSuccess } from '../services/notificationService';
 import { encodeUploadName } from '../utils/imageUrl';
 import { FiShoppingCart } from './icons/hugeicons';
 import '../styles/redesign-p-shop.css';
+import { MAX_ORDER_QTY } from '../utils/upcoming';
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-IN', {
@@ -33,6 +34,7 @@ const ProductCard = ({
   whp,
   mrp,
   stock,
+  isUpcoming = false,
   colors = [
     { color: '#000000', name: 'Black' },
     { color: '#E5E5E5', name: 'Grey' },
@@ -43,9 +45,10 @@ const ProductCard = ({
   const [activeColor, setActiveColor] = useState(0);
   const [qty, setQty] = useState(1);
   // Available stock (number). undefined => unknown, treat as available.
-  const stockNum = stock == null ? null : Number(stock);
+  // An upcoming (pre-order) frame keeps no stock: no cap, never sold out.
+  const stockNum = isUpcoming || stock == null ? null : Number(stock);
   const outOfStock = stockNum != null && stockNum <= 0;
-  const atMax = stockNum != null && qty >= stockNum;
+  const atMax = isUpcoming ? qty >= MAX_ORDER_QTY : stockNum != null && qty >= stockNum;
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgBroken, setImgBroken] = useState(false);
 
@@ -71,7 +74,7 @@ const ProductCard = ({
       whp: whp != null ? whp : 0,
       mrp: mrp != null ? mrp : 0,
       quantity: quantity,
-      ...(stockNum != null ? { stock: stockNum } : {}),
+      ...(isUpcoming ? { is_upcoming: true } : stockNum != null ? { stock: stockNum } : {}),
     });
     showAddToCartSuccess(productName, quantity);
   };
@@ -197,7 +200,9 @@ const ProductCard = ({
       <h3 className="product-name" title={productName}>{productName}</h3>
 
       <p className="pc-sub">
-        {outOfStock ? 'Sold out' : stockNum != null && stockNum <= 5 ? `Only ${stockNum} left` : 'In stock'}
+        {isUpcoming
+          ? <span className="pc-pill pc-pill--upcoming">Upcoming</span>
+          : outOfStock ? 'Sold out' : stockNum != null && stockNum <= 5 ? `Only ${stockNum} left` : 'In stock'}
       </p>
 
       <div className="pc-actions flex w-full items-center gap-2 mt-3">
@@ -213,7 +218,7 @@ const ProductCard = ({
           <button
             type="button"
             className="pc-qty-btn h-full w-8 cursor-pointer border-none bg-primary-soft text-primary text-[length:var(--text-lg)] leading-none transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-soft-hover active:not-disabled:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle focus-visible:relative focus-visible:z-[1] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
-            onClick={() => setQty(q => (stockNum != null ? Math.min(stockNum, q + 1) : q + 1))}
+            onClick={() => setQty(q => Math.min(isUpcoming ? MAX_ORDER_QTY : stockNum != null ? stockNum : MAX_ORDER_QTY, q + 1))}
             disabled={outOfStock || atMax}
             aria-label="Increase quantity"
           >+</button>
