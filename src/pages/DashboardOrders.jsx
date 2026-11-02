@@ -1129,7 +1129,7 @@ const DashboardOrders = () => {
                         viewItems.map((item, i) => (
                           <tr key={i}>
                             <td style={{ color: '#6b7280' }}>{i + 1}</td>
-                            <td className="font-medium">{item._name}{isUpcoming(item) && <> <span className="upc-tag">Upcoming</span></>}</td>
+                            <td className="font-medium">{item._name}{isUpcoming(item) && <> <span className="upc-tag">Preorder</span></>}</td>
                             <td className="ta-r">{item.quantity}</td>
                             <td className="ta-r">₹{Number(item.price || 0).toLocaleString('en-IN')}</td>
                             <td className="ta-r font-medium">₹{Number(item._subtotal || 0).toLocaleString('en-IN')}</td>

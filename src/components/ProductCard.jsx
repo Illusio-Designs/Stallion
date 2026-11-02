@@ -194,16 +194,21 @@ const ProductCard = ({
           />
         )}
       </div>
+      {/* One status badge under the photo, never on it: Preorder, Sold out, Only N left or In stock. */}
+      <p className="pc-sub">
+        {isUpcoming
+          ? <span className="pc-status pc-status--pre">Preorder</span>
+          : outOfStock
+            ? <span className="pc-status pc-status--out">Sold out</span>
+            : stockNum != null && stockNum <= 5
+              ? <span className="pc-status pc-status--low">{`Only ${stockNum} left`}</span>
+              : <span className="pc-status pc-status--in">In stock</span>}
+      </p>
+
       {/* Clamp/height owned entirely by .product-name in CSS — mixing Tailwind
           display utilities here fought the -webkit-box clamp and let long titles
           overflow onto the price row. */}
       <h3 className="product-name" title={productName}>{productName}</h3>
-
-      <p className="pc-sub">
-        {isUpcoming
-          ? <span className="pc-pill pc-pill--upcoming">Upcoming</span>
-          : outOfStock ? 'Sold out' : stockNum != null && stockNum <= 5 ? `Only ${stockNum} left` : 'In stock'}
-      </p>
 
       <div className="pc-actions flex w-full items-center gap-2 mt-3">
         <div className="pc-qty inline-flex h-10 flex-none items-center overflow-hidden rounded-md border border-border-strong bg-surface" role="group" aria-label="Quantity selector">

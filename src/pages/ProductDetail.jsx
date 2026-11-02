@@ -751,7 +751,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   const curQty = curStock > 0 ? Math.min(getQuantity(cur.id), curStock) : getQuantity(cur.id);
   const brandName = display(cur.brand);
   const mainImageSrc = galleryImages[Math.min(imageIndex, galleryImages.length - 1)] || cur.image || '/images/products/spac1.webp';
-  const stockState = curUpcoming ? { cls: "upcoming", text: "Upcoming" } : curStock <= 0 ? { cls: "bad", text: "Sold out" } : curStock <= 10 ? { cls: "warn", text: `Low stock, ${curStock} left` } : { cls: "ok", text: `In stock, ${curStock} left` };
+  const stockState = curUpcoming ? { cls: "upcoming", text: "Preorder" } : curStock <= 0 ? { cls: "bad", text: "Sold out" } : curStock <= 10 ? { cls: "warn", text: `Low stock, ${curStock} left` } : { cls: "ok", text: `In stock, ${curStock} left` };
   const lensText = [cur.lenseColour, cur.lenseMaterial].map(display).filter((v) => v !== "—").join(", ") || "—";
   const specRows = [
     ["Shape", cur.shape],
@@ -889,7 +889,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
                     aria-pressed={i === selectedVariation}
                     onClick={() => handleVariationClick(i)}
                   >
-                    {colourName(v)} <b>{v.isUpcoming ? "Upcoming" : Number(v.stock ?? 0)}</b>
+                    {colourName(v)} <b>{v.isUpcoming ? "Preorder" : Number(v.stock ?? 0)}</b>
                   </button>
                 ))}
               </div>

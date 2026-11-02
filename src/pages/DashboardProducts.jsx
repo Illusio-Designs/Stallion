@@ -180,7 +180,7 @@ const stockInfo = (row) => {
   const qty = Number(row.total_qty) || 0;
   if (row.is_active === false) return { label: 'Inactive', tone: 'off' };
   if (st !== 'active') return { label: st ? st.charAt(0).toUpperCase() + st.slice(1) : 'Draft', tone: 'draft' };
-  if (row.is_upcoming) return { label: 'Upcoming', tone: 'upcoming' };
+  if (row.is_upcoming) return { label: 'Preorder', tone: 'upcoming' };
   if (qty <= 0) return { label: 'Sold out', tone: 'out' };
   if (qty <= 5) return { label: 'Low stock', tone: 'low' };
   return { label: 'In stock', tone: 'in' };
@@ -189,7 +189,7 @@ const stockInfo = (row) => {
 // The Upcoming (pre-order) switch of the add / edit form.
 const UpcomingSwitch = ({ checked, onToggle }) => (
   <div className="form-group form-group--full">
-    <label className="ui-label">Upcoming product</label>
+    <label className="ui-label">Preorder product</label>
     <button
       type="button"
       role="switch"
@@ -200,7 +200,7 @@ const UpcomingSwitch = ({ checked, onToggle }) => (
       <span className={`mng-switch__track ${checked ? 'is-on' : ''}`}>
         <span className="mng-switch__dot" />
       </span>
-      <span className="mng-switch__label">{checked ? 'Upcoming' : 'Regular'}</span>
+      <span className="mng-switch__label">{checked ? 'Preorder' : 'Regular'}</span>
     </button>
     <p className="mng-note">No stock is kept. Customers can order any quantity.</p>
   </div>
@@ -1924,6 +1924,15 @@ const DashboardProducts = () => {
     }));
   };
 
+  // One Status control: Draft, Active or Inactive. It drives the two stored fields together:
+  // status (draft / active) and the manual on/off switch is_active.
+  const statusChoice = (f) => ((f.is_active === false || f.status === 'inactive') ? 'inactive' : (f.status === 'active' ? 'active' : 'draft'));
+  const handleStatusChoice = (value) => setFormData((prev) => ({
+    ...prev,
+    status: value === 'inactive' ? (prev.status === 'inactive' ? 'draft' : prev.status) : value,
+    is_active: value !== 'inactive',
+  }));
+
   const resetForm = () => {
     setFormData({
       model_no: '',
@@ -2581,7 +2590,7 @@ const DashboardProducts = () => {
     const headers = [
       'model_no', 'gender', 'color_code', 'shape', 'lens_color', 'frame_color',
       'frame_type', 'lens_material', 'frame_material', 'mrp', 'whp', 'size_mm',
-      'warehouse_qty', 'brand', 'collection', 'status', 'upcoming',
+      'warehouse_qty', 'brand', 'collection', 'status', 'preorder',
     ];
     const example = [
       'STL-1001', 'Unisex', 'C1', 'Round', 'Brown', 'Black',
@@ -3081,12 +3090,13 @@ const DashboardProducts = () => {
               options={[
                 { value: 'draft', label: 'Draft' },
                 { value: 'active', label: 'Active' },
-                ...(formData.status === 'inactive' ? [{ value: 'inactive', label: 'Inactive (use Availability below)' }] : [])
+                { value: 'inactive', label: 'Inactive' },
               ]}
-              value={formData.status}
-              onChange={(value) => handleInputChange('status', value)}
+              value={statusChoice(formData)}
+              onChange={handleStatusChoice}
               placeholder="Select status"
             />
+            <p className="mng-note">Draft is not ready yet. Inactive hides the product from the shop and pickers. Nothing is ever deleted.</p>
           </div>
         </form>
       </AsidePanel>
@@ -3301,30 +3311,14 @@ const DashboardProducts = () => {
               options={[
                 { value: 'draft', label: 'Draft' },
                 { value: 'active', label: 'Active' },
-                ...(formData.status === 'inactive' ? [{ value: 'inactive', label: 'Inactive (use Availability below)' }] : [])
+                { value: 'inactive', label: 'Inactive' },
               ]}
-              value={formData.status}
-              onChange={(value) => handleInputChange('status', value)}
+              value={statusChoice(formData)}
+              onChange={handleStatusChoice}
               placeholder="Select status"
             />
+            <p className="mng-note">Draft is not ready yet. Inactive hides the product from the shop and pickers. Nothing is ever deleted.</p>
           </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Availability</label>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={formData.is_active !== false}
-              onClick={() => handleInputChange('is_active', formData.is_active === false)}
-              className="mng-switch"
-            >
-              <span className={`mng-switch__track ${formData.is_active !== false ? 'is-on' : ''}`}>
-                <span className="mng-switch__dot" />
-              </span>
-              <span className="mng-switch__label">{formData.is_active !== false ? 'Active' : 'Inactive'}</span>
-            </button>
-            <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted.</p>
-          </div>
-
           {editRow && <h3 className="pp-group form-group--full">Images</h3>}
           {/* Assigned Images Preview + Assign Button */}
           {editRow && (() => {

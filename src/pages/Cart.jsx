@@ -1413,7 +1413,7 @@ const Cart = ({ onPageChange = null }) => {
                         </button>
                       </div>
                       {isLineUpcoming(item.id) ? (
-                        <span className="upc-tag">Upcoming</span>
+                        <span className="upc-tag">Preorder</span>
                       ) : stockById[String(item.id)] != null && (
                         stockById[String(item.id)] <= 0 ? (
                           <span className="item-stock-note m-0 whitespace-nowrap text-[length:var(--text-xs)] font-semibold text-error">Out of stock</span>
