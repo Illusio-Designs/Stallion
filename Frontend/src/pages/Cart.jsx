@@ -12,21 +12,18 @@ import {
   showPlaceOrderSuccess,
   showCartUpdateSuccess,
   showError,
-  showSuccess,
 } from "../services/notificationService";
 import { getUserRole, getUser } from "../services/authService";
 import { encodeUploadName } from "../utils/imageUrl";
 import DropdownSelector from "../components/ui/DropdownSelector";
-import AsidePanel from "../components/ui/AsidePanel";
+import PartyFormPanel from "../components/party/PartyFormPanel";
 import {
   getMyParties,
   getPartyById,
   getEvents,
   getIndianCountries,
-  getStates,
   getDistributors,
   createOrder,
-  createParty,
   getAvailableOffers,
   quoteOrder,
   getProductsByIds,
@@ -87,18 +84,8 @@ const Cart = ({ onPageChange = null }) => {
   const [selectedOffer, setSelectedOffer] = useState("");
   const [quote, setQuote] = useState(null);
 
-  // Inline "Add Party" (salesman + distributor can create a party from here)
+  // Inline "Add party": the same shared party form as the Parties page (salesman + distributor).
   const [addPartyOpen, setAddPartyOpen] = useState(false);
-  const [addPartySaving, setAddPartySaving] = useState(false);
-  const [addPartyStates, setAddPartyStates] = useState([]);
-  const [addPartyForm, setAddPartyForm] = useState({
-    party_name: "",
-    phone: "",
-    address: "",
-    state_id: "",
-    pincode: "",
-    contact_person: "",
-  });
   
   // Visit-order location is captured silently (no UI). State holds the coords;
   // locationRef mirrors them for synchronous reads during checkout (state would
@@ -206,79 +193,20 @@ const Cart = ({ onPageChange = null }) => {
     }
   };
 
-  // ---- Inline "Add Party" (salesman + distributor) -----------------------
-  // Load the state list (drives the backend's distributor/salesman assignment).
-  // Defaults to India's states, matching the rest of the app.
-  const loadAddPartyStates = async () => {
-    try {
-      let list = countries;
-      if (!list || list.length === 0) {
-        list = await getIndianCountries().catch(() => []);
-        setCountries(list || []);
-      }
-      const india = (list || []).find(c =>
-        c.name?.toLowerCase() === 'india' || c.code?.toLowerCase() === 'in'
-      ) || (list || [])[0];
-      if (india) {
-        const states = await getStates(india.id).catch(() => []);
-        setAddPartyStates((states || []).map(s => ({ value: s.id, label: s.name })));
-      }
-    } catch (err) {
-      console.error('[Cart] Failed to load states for Add Party:', err);
-      setAddPartyStates([]);
-    }
-  };
+  // ---- Inline "Add party" (salesman + distributor) -----------------------
+  const openAddParty = () => setAddPartyOpen(true);
 
-  const openAddParty = () => {
-    setAddPartyForm({ party_name: '', phone: '', address: '', state_id: '', pincode: '', contact_person: '' });
-    setAddPartyOpen(true);
-    if (addPartyStates.length === 0) loadAddPartyStates();
-  };
-
-  const handleAddPartyField = (field, value) => {
-    setAddPartyForm(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleCreateParty = async () => {
-    const name = addPartyForm.party_name.trim();
-    const phone = addPartyForm.phone.trim();
-    const address = addPartyForm.address.trim();
-    if (!name || !phone || !address) {
-      showError('Party name, phone and address are required.');
-      return;
+  // The shared party form saved a party: refresh the list and select the new party. If
+  // backend scoping doesn't surface it immediately, fall back to the returned record.
+  const handlePartySaved = async (created) => {
+    const newId = created?.party_id || created?.id;
+    const partiesData = await getMyParties().catch(() => []);
+    const list = Array.isArray(partiesData) ? partiesData : [];
+    if (newId && created && !list.some(p => (p.id || p.party_id) === newId)) {
+      list.push(created);
     }
-    if (!addPartyForm.state_id) {
-      showError('Please select a state.');
-      return;
-    }
-    try {
-      setAddPartySaving(true);
-      const created = await createParty({
-        party_name: name,
-        phone,
-        address,
-        state_id: addPartyForm.state_id,
-        pincode: addPartyForm.pincode.trim(),
-        contact_person: addPartyForm.contact_person.trim(),
-      });
-      const newId = created?.party_id || created?.id;
-      // Refresh the list and select the new party. If backend scoping doesn't
-      // surface it immediately, fall back to appending the returned record.
-      const partiesData = await getMyParties().catch(() => []);
-      const list = Array.isArray(partiesData) ? partiesData : [];
-      if (newId && created && !list.some(p => (p.id || p.party_id) === newId)) {
-        list.push(created);
-      }
-      setParties(list);
-      if (newId) setSelectedParty(newId);
-      showSuccess('Party added successfully.');
-      setAddPartyOpen(false);
-    } catch (err) {
-      const message = err?.response?.data?.message || err?.message || 'Failed to add party';
-      showError(message);
-    } finally {
-      setAddPartySaving(false);
-    }
+    setParties(list);
+    if (newId) setSelectedParty(newId);
   };
 
   // Note: fetchCountries removed - countries are fetched on-demand when needed for party orders only
@@ -1695,51 +1623,14 @@ const Cart = ({ onPageChange = null }) => {
         </div>
       )}
 
-      <AsidePanel
+      <PartyFormPanel
         open={addPartyOpen}
         onClose={() => setAddPartyOpen(false)}
-        title="Add Party"
-        footer={(
-          <>
-            <button className="ui-btn ui-btn--secondary" onClick={() => setAddPartyOpen(false)} disabled={addPartySaving}>Cancel</button>
-            <button className="ui-btn ui-btn--primary" onClick={handleCreateParty} disabled={addPartySaving}>
-              {addPartySaving ? 'Saving...' : 'Add Party'}
-            </button>
-          </>
-        )}
-      >
-        <div className="ui-form">
-          <div className="form-group">
-            <label className="ui-label">Party Name *</label>
-            <input className="ui-input" placeholder="Enter party name" value={addPartyForm.party_name} onChange={(e) => handleAddPartyField('party_name', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Phone *</label>
-            <input className="ui-input" placeholder="Enter phone number" value={addPartyForm.phone} onChange={(e) => handleAddPartyField('phone', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Address *</label>
-            <input className="ui-input" placeholder="Enter address" value={addPartyForm.address} onChange={(e) => handleAddPartyField('address', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">State *</label>
-            <DropdownSelector
-              options={addPartyStates}
-              value={addPartyForm.state_id}
-              onChange={(value) => handleAddPartyField('state_id', value)}
-              placeholder="Select state"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Pincode</label>
-            <input className="ui-input" placeholder="Enter pincode" value={addPartyForm.pincode} onChange={(e) => handleAddPartyField('pincode', e.target.value)} />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Contact Person</label>
-            <input className="ui-input" placeholder="Enter contact person" value={addPartyForm.contact_person} onChange={(e) => handleAddPartyField('contact_person', e.target.value)} />
-          </div>
-        </div>
-      </AsidePanel>
+        party={null}
+        mode="add"
+        defaultToIndia
+        onSaved={handlePartySaved}
+      />
     </div>
   );
 };
