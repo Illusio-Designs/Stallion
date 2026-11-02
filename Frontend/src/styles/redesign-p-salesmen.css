@@ -34,7 +34,10 @@
 :root .sx-card__act{display:flex;gap:8px}
 :root .sx-card__act .ui-btn{flex:1;min-height:44px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none}
 :root .sx-tablewrap{display:none}
+/* Add visit: shown with the phone cards, hidden when the table (which has its own Add button) takes over */
+:root .sx-addvisit{display:flex;align-items:center;justify-content:center;width:100%;min-height:44px;margin-bottom:10px}
 @media (min-width:768px){
+  :root .sx-addvisit{display:none}
   :root .sx-cards{display:none}
   :root .sx-tablewrap{display:block}
 }

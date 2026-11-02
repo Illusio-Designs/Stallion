@@ -54,3 +54,6 @@
   :root .rdb { position: static; }
   :root .rdb-panel { position: fixed; left: 12px; right: 12px; top: 64px; width: auto; max-width: none; }
 }
+
+/* The header cart shortcut is for tablets and computers; phones have Cart in the bottom bar. */
+@media (max-width: 767px) { :root .dashboard-action-icons .dashboard-cart-btn { display: none; } }

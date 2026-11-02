@@ -1825,6 +1825,16 @@ const DashboardSuppliers = () => {
                 </div>
               ) : (
                 <>
+                {/* On phones the visits show as cards and the table (with its Add button) is hidden, so the salesman needs the button here. */}
+                {isSalesman && (
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn--primary sx-addvisit"
+                    onClick={() => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); }}
+                  >
+                    Add visit
+                  </button>
+                )}
                 <div className="sx-cards" aria-label="Visit report">
                   {checkinsLoading ? <p className="sx-cards__note">Loading visits...</p> : checkins.map((row, i) => {
                     const raw = String(row.order_notes || row.check_in_remarks || '');
