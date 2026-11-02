@@ -6,7 +6,6 @@ import { useConfirm } from '../components/ui/ConfirmProvider';
 import { istNow } from '../utils/istTime';
 import DatePicker from '../components/ui/DatePicker';
 import PartyFormPanel from '../components/party/PartyFormPanel';
-import DateTimePicker from '../components/ui/DateTimePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import FileUpload from '../components/ui/FileUpload';
@@ -1448,12 +1447,11 @@ const DashboardSuppliers = () => {
 
   // ---- Check-in handlers ----
   // "Now" as YYYY-MM-DDTHH:mm in Indian time (IST), whatever the phone's own time zone is.
-  const nowDatetimeLocal = (minusMinutes = 0) => istNow(minusMinutes);
 
   // Default in/out time to "now" (the visit is being logged on the spot); the
   // salesman can adjust. Done here (a client-side user action) — not in the
   // initial state — to avoid an SSR/client hydration mismatch from new Date().
-  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: nowDatetimeLocal(30), out_time: nowDatetimeLocal(), next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
+  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: '', out_time: '', next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
 
   const handleCheckinSubmit = async (e) => {
     e.preventDefault();
@@ -1467,11 +1465,6 @@ const DashboardSuppliers = () => {
     }
     if (!checkinForm.next_visit_date) {
       showError('Please set the next visit date.');
-      return;
-    }
-    // In and out time are optional; only compare them when both are filled.
-    if (checkinForm.in_time && checkinForm.out_time && new Date(checkinForm.out_time) <= new Date(checkinForm.in_time)) {
-      showError('Out time must be after in time.');
       return;
     }
     {
@@ -1516,8 +1509,7 @@ const DashboardSuppliers = () => {
         party_id: checkinForm.party_id,
         contact_person: checkinForm.contact_person.trim(),
         type: checkinType,
-        ...(checkinForm.in_time ? { in_time: checkinForm.in_time } : {}),
-        ...(checkinForm.out_time ? { out_time: checkinForm.out_time } : {}),
+        // In and out time are no longer asked: the server stamps a new visit with the time it was saved.
         next_visit_date: checkinForm.next_visit_date,
         latitude,
         longitude,
@@ -2202,14 +2194,6 @@ const DashboardSuppliers = () => {
             <div className="form-group form-group--full">
               <label className="ui-label">Contact Person <span className="text-error">*</span></label>
               <input className="ui-input" placeholder="Person you met" value={checkinForm.contact_person} onChange={(e) => setCheckinForm(prev => ({ ...prev, contact_person: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label className="ui-label">In Time <span className="text-text-subtle">(optional)</span></label>
-              <DateTimePicker value={checkinForm.in_time} onChange={(v) => setCheckinForm(prev => ({ ...prev, in_time: v }))} />
-            </div>
-            <div className="form-group">
-              <label className="ui-label">Out Time <span className="text-text-subtle">(optional)</span></label>
-              <DateTimePicker min={checkinForm.in_time || undefined} value={checkinForm.out_time} onChange={(v) => setCheckinForm(prev => ({ ...prev, out_time: v }))} />
             </div>
             <div className="form-group form-group--full">
               <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
