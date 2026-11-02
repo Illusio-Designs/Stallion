@@ -47,6 +47,11 @@ app.use(
     checkRole(SALESMAN_DOC_ROLES),
     express.static(path.join(uploadsPath, 'salesman'), { fallthrough: false, dotfiles: 'deny', index: false })
 );
+// Product photos get a new file name (a timestamp is part of it) every time one is uploaded, so a
+// copy the browser already has never goes stale: let it keep the photo for a week instead of asking
+// the server "has this changed?" for every picture on every visit. A miss falls through to the
+// handler below, so nothing else changes.
+app.use('/uploads/products', express.static(path.join(uploadsPath, 'products'), { maxAge: '7d', index: false }));
 app.use('/uploads', express.static(uploadsPath));
 
 // NOTE: the backend folder is deliberately NOT served as static files. It used to
