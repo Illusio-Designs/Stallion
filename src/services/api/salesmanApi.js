@@ -1,4 +1,4 @@
-import { apiRequest, fetchAllPages, fetchPage } from './client';
+import { apiRequest, fetchAllPages, fetchPage, sharedRead } from './client';
 
 // ==================== SALESMAN CHECK-IN ENDPOINTS ====================
 
@@ -106,11 +106,11 @@ export const deleteSalesmanCheckin = async (checkinId) => {
 export const getAllSalesmanTargets = async () => {
   // GET /salesman_targets now requires page & limit (400 otherwise). Fetch the
   // full set for the analytics report (page=1&limit=1000) and unwrap { data }.
-  return fetchAllPages('/salesman_targets', {
+  return sharedRead('salesman_targets:all', () => fetchAllPages('/salesman_targets', {
     method: 'GET',
     includeAuth: true,
     silent: true, // empty -> 404 "not found"; callers treat as empty list
-  });
+  }));
 };
 
 /**

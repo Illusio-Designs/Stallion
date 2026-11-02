@@ -179,7 +179,14 @@ const DashboardOrders = () => {
         .map(order => order.party_id)
       )];
 
-      if (uniquePartyIds.length > 0) {
+      // The server already puts the party name and address on every order. The whole party list
+      // is only fetched when some order lacks one of them (for example the party was removed).
+      const needsPartyLookup = allOrders.some((order) => order.party_id && (
+        !(order.party?.party_name || order.party_name) ||
+        !(order.party_address || [order.party?.address, order.party?.pincode].filter(Boolean).join(' - '))
+      ));
+
+      if (uniquePartyIds.length > 0 && needsPartyLookup) {
         try {
           // One call for all parties instead of one getPartyById per order (N+1).
           // Role-scoped: field roles (salesman/distributor/party) get /parties/my;
@@ -235,8 +242,12 @@ const DashboardOrders = () => {
 
   // Resolve salesman names for the SALESMAN column (orders only carry salesman_id).
   useEffect(() => {
+    // Orders from the server carry salesman_name already; only an order without any name is looked up.
     const ids = [...new Set(
-      orders.map(o => o.salesman_id || o.salesman?.salesman_id || o.salesman?.id).filter(Boolean)
+      orders
+        .filter(o => !(o.salesman?.salesman_name || o.salesman?.full_name || o.salesman_name))
+        .map(o => o.salesman_id || o.salesman?.salesman_id || o.salesman?.id)
+        .filter(Boolean)
     )].filter(id => !salesmanNamesMap[id]);
     if (ids.length === 0) return;
     let cancelled = false;

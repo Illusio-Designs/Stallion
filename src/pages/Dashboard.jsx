@@ -74,19 +74,21 @@ const Dashboard = () => {
 
   // Fetch orders and products — runs once on mount
   useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
       try {
         setLoading(true);
         setLoadError(false);
+        // The salesman's page shows no stock or top-product card, so it skips the product call.
         const [ordersData, productsData] = await Promise.all([
           getOrdersForRole(userRole),
-          getProducts()
+          userRole === 'salesman' ? Promise.resolve([]) : getProducts()
         ]);
 
         setProducts(Array.isArray(productsData) ? productsData : (productsData?.data || []));
 
         let filteredOrders = Array.isArray(ordersData) ? ordersData : [];
-        
+
         if (isDistributor && user?.distributor_id) {
           filteredOrders = filteredOrders.filter(o =>
             String(o.distributor_id || o.distributor?.id || '').trim() === String(user.distributor_id).trim()
@@ -97,26 +99,27 @@ const Dashboard = () => {
           );
         }
         // salesman filtering done in recentOrders once mySalesmanId resolves
-        
+
         setOrders(filteredOrders);
 
-        // Resolve party names for orders missing them
+        // Resolve party names for orders missing them. The numbers do not wait for this: the
+        // names fill in when the party list arrives (only a deleted party's orders lack one).
         const missingPartyIds = [...new Set(
           filteredOrders
             .filter(o => o.party_id && !o.party?.party_name && !o.party_name && !o.party?.name)
             .map(o => o.party_id)
         )];
         if (missingPartyIds.length > 0) {
-          try {
-            // One call for all parties instead of one getPartyById per order (N+1)
-            const allParties = await getPartiesForRole(userRole);
+          // One call for all parties instead of one getPartyById per order (N+1)
+          getPartiesForRole(userRole).then((allParties) => {
+            if (cancelled) return;
             const map = {};
             (allParties || []).forEach(p => {
               const id = p.id || p.party_id;
               if (id) map[id] = p.party_name || p.name || id;
             });
             setPartyNamesMap(map);
-          } catch { /* leave party ids unresolved */ }
+          }).catch(() => { /* leave party ids unresolved */ });
         }
       } catch (error) {
         console.error('Failed to fetch orders:', error);
@@ -128,6 +131,7 @@ const Dashboard = () => {
       }
     };
     fetchData();
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The role's own parties (the server scopes this list to them): a distributor's count and
@@ -149,8 +153,13 @@ const Dashboard = () => {
 
   // Office view: how many parties still have no saved shop location (salesmen cannot
   // place visit orders for them). Only managers need this, so field roles skip the call.
+  // The summary carries the number; a server that does not send it yet is asked for the list.
   useEffect(() => {
     if (['salesman', 'party', 'distributor'].includes(userRole)) return;
+    if (summaryLoading) return;
+    const fromSummary = summary ? summary.parties_without_location : undefined;
+    if (typeof fromSummary === 'number') { setPartiesNoLocation(fromSummary); return; }
+    if (fromSummary === null) return; // the server says this person may not see it: the line is omitted
     let cancelled = false;
     (async () => {
       try {
@@ -161,7 +170,7 @@ const Dashboard = () => {
       } catch { /* the panel just omits this line */ }
     })();
     return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [summaryLoading, summary]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Office view: every salesman's target, for the "Salesmen against target" table.
   useEffect(() => {
@@ -196,9 +205,14 @@ const Dashboard = () => {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Office view: sample trays still with a salesman (only roles that can open the Tray page).
+  // The summary carries the number; a server that does not send it yet is asked for the tray list.
   useEffect(() => {
     if (['salesman', 'party', 'distributor'].includes(userRole)) return;
     if (!userRoles.some((r) => ['admin', 'tray_manager'].includes(r))) return;
+    if (summaryLoading) return;
+    const fromSummary = summary ? summary.trays_out : undefined;
+    if (typeof fromSummary === 'number') { setTraysOut(fromSummary); return; }
+    if (fromSummary === null) return;
     let cancelled = false;
     (async () => {
       try {
@@ -207,7 +221,7 @@ const Dashboard = () => {
       } catch { /* item omitted */ }
     })();
     return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [summaryLoading, summary]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch salesman targets — runs once on mount if salesman.
   // Key off the RAW userRole, not the mounted-gated `isSalesman`: this effect
@@ -372,6 +386,7 @@ const Dashboard = () => {
   // likely to time out, and no big payloads.
   const [extraNames, setExtraNames] = useState({});
   useEffect(() => {
+    if (userRole === 'salesman') return undefined; // the top-products card is not on the salesman's page
     const missing = topProductRaw
       .filter(t => !t.name) // already labelled from the order_items snapshot
       .map(t => t.pid)
