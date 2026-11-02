@@ -475,6 +475,32 @@ export const getDistributorsPage = (countryId, page = 1, limit = 20, search = ''
     includeAuth: true,
   });
 
+/**
+ * One server-filtered page of distributors for the Distributors list.
+ * -> { data, pagination, counts: { All, Active, Inactive } }
+ * status: 'all' | 'active' | 'inactive'; stateId filters by state; sort: name|contact|status|created.
+ */
+export const getDistributorsListPage = async (
+  countryId,
+  { page = 1, limit = 20, search = '', status = 'all', stateId = '', sort = '', dir = 'asc' } = {},
+) => {
+  const res = await apiRequest(
+    (() => {
+      const qs = new URLSearchParams({ page: String(page), limit: String(limit), status: String(status || 'all').toLowerCase() });
+      if (String(search || '').trim()) qs.set('search', String(search).trim());
+      if (stateId) qs.set('state_id', String(stateId));
+      if (sort) { qs.set('sort', sort); qs.set('dir', dir === 'desc' ? 'desc' : 'asc'); }
+      return `/distributors/get?${qs.toString()}`;
+    })(),
+    { method: 'POST', body: countryId ? { country_id: String(countryId).trim() } : {}, includeAuth: true },
+  );
+  return {
+    data: Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []),
+    pagination: (res && res.pagination) || null,
+    counts: (res && res.counts) || null,
+  };
+};
+
 export const getParties = (countryId) => sharedRead(`parties:${countryId || ''}`, () => loadParties(countryId));
 
 const loadParties = async (countryId) => {
