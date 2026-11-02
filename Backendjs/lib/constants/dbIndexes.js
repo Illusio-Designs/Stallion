@@ -38,6 +38,8 @@ const DB_INDEXES = [
     { table: 'parties', fields: ['is_active'], name: 'idx_parties_is_active' },
     { table: 'parties', fields: ['salesman_id', 'is_active'], name: 'idx_parties_salesman_active' },
     { table: 'parties', fields: ['phone'], name: 'idx_parties_phone' },
+    // A salesman's party list is `state_id IN (his working states)`; the sales-by-state report joins on it too.
+    { table: 'parties', fields: ['state_id'], name: 'idx_parties_state_id' },
 
     // ── distributors ───────────────────────────────────────────────────────
     { table: 'distributors', fields: ['user_id'], name: 'idx_distributors_user_id' },
@@ -139,6 +141,8 @@ const DB_INDEXES = [
     { table: 'salesman_check_ins', fields: ['check_in_date'], name: 'idx_salesman_check_ins_date' },
     { table: 'salesman_check_ins', fields: ['order_id'], name: 'idx_salesman_check_ins_order_id' },
     { table: 'salesman_check_ins', fields: ['type'], name: 'idx_salesman_check_ins_type' },
+    // The dashboard summary asks for today's check-ins by check_in_date OR created_at.
+    { table: 'salesman_check_ins', fields: ['created_at'], name: 'idx_salesman_check_ins_created_at' },
 
     // ── zones / cities / states (lookup paths) ───────────────────────────────
     { table: 'zones', fields: ['city_id'], name: 'idx_zones_city_id' },
