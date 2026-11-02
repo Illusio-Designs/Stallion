@@ -189,6 +189,7 @@ const ProductCard = ({
             src={imageUrl}
             alt={productName}
             loading="lazy"
+            decoding="async"
             className={`pc-image-img transition duration-300 ease-[ease] motion-reduce:transition-none ${imgLoaded ? 'is-loaded opacity-100 group-hover:scale-105' : 'opacity-0'}`}
             onLoad={() => setImgLoaded(true)}
             onError={handleImageError}

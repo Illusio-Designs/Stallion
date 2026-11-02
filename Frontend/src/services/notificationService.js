@@ -1,4 +1,4 @@
-import { gooeyToast } from 'goey-toast';
+import { showToast } from './toastQueue';
 
 // Icons for notifications
 const CartIcon = () => (
@@ -22,7 +22,7 @@ const show = (type, message, icon, title, description) => {
   const heading = title || TYPE_TITLE[type];
   // Short, self-explanatory messages (under ~28 chars) stay as the title on their own.
   const short = !title && body.length <= 28;
-  gooeyToast[type](short ? body : heading, {
+  showToast(type, short ? body : heading, {
     duration: DURATION,
     ...(short ? (description ? { description } : {}) : { description: description || body }),
     ...(icon ? { icon } : {}),
