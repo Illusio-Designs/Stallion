@@ -328,7 +328,7 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
               <Tooltip label="Cart" placement="bottom">
                 <button
                   type="button"
-                  className="dashboard-icon-btn hidden md:inline-flex relative bg-transparent border-none w-10 h-10 rounded-pill items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]"
+                  className="dashboard-icon-btn dashboard-cart-btn hidden md:inline-flex relative bg-transparent border-none w-10 h-10 rounded-pill items-center justify-center cursor-pointer text-text-muted transition duration-200 ease-[ease] motion-reduce:transition-none hover:bg-surface-muted hover:text-text focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.96]"
                   aria-label={cartCount > 0 ? `Cart, ${cartCount} items` : 'Cart'}
                   onClick={() => onPageChange?.('cart')}
                 >
