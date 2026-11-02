@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const path = require('path');
 const dotenv = require('dotenv');
 const sequelize = require('./constants/database');
@@ -26,6 +27,9 @@ app.use((req, res, next) => {
     }
     next();
 });
+// Gzip every JSON response (lists of products and orders are large and repeat the same keys, so they
+// shrink to roughly a fifth). Photos and other already-compressed files are skipped automatically.
+app.use(compression({ threshold: 1024 }));
 app.use(express.json());
 // Express 5 leaves req.body undefined when a request has no body (a DELETE, a bare POST). Handlers read
 // fields from it, so give them an empty object instead of a crash.
