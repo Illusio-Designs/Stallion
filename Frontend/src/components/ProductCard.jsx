@@ -201,7 +201,7 @@ const ProductCard = ({
 
       <p className="pc-sub">
         {isUpcoming
-          ? <span className="pc-pill pc-pill--upcoming">Upcoming</span>
+          ? <span className="pc-pill pc-pill--upcoming">Preorder</span>
           : outOfStock ? 'Sold out' : stockNum != null && stockNum <= 5 ? `Only ${stockNum} left` : 'In stock'}
       </p>
 
