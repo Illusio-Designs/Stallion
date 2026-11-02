@@ -12,21 +12,20 @@ import { resolveUploadUrl } from '../utils/imageUrl';
 import MatchMeter from '../components/ui/MatchMeter';
 import RowActions from '../components/ui/RowActions';
 import StatusBadge from '../components/ui/StatusBadge';
+import Pagination from '../components/ui/Pagination';
 import TableWithControls from '../components/ui/TableWithControls';
 import {
   createSalesman,
   createSalesmanCheckin,
   createSalesmanTarget,
   deleteSalesmanTarget,
-  getAllSalesmanCheckins,
+  getVisitReportPage,
+  getSalesmenPage,
   getAllSalesmanTargets,
   getAllZones,
   getCities,
   getIndianCountries,
-  getMyOrders,
   getMyParties,
-  getParties,
-  getSalesmanCheckins,
   getSalesmanProfile,
   getSalesmanTargets,
   getSalesmen,
@@ -49,6 +48,10 @@ import { FiSearch, FiMapPin } from '../components/icons/hugeicons';
 // GEOFENCE_RADIUS_M). A recorded location within this distance of the party's
 // geocoded address counts as a verified, on-site visit.
 const GEOFENCE_RADIUS_M = 50;
+
+// Rows per server page for the Salesmen and Visit Report tables.
+const SALESMEN_PER_PAGE = 20;
+const VISITS_PER_PAGE = 20;
 
 // Haversine distance in metres between two lat/lng points.
 const distanceMeters = (lat1, lng1, lat2, lng2) => {
@@ -278,13 +281,19 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
 const DashboardSuppliers = () => {
   const confirm = useConfirm();
   const isSalesman = getUserRole() === 'salesman';
-  const [activeTab, setActiveTab] = useState('All');
   const [mainTab, setMainTab] = useState(isSalesman ? 'Visit Report' : 'Salesmen');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [salesmen, setSalesmen] = useState([]);
+  const [salesmen, setSalesmen] = useState([]); // the CURRENT PAGE of the Salesmen table (server-paged)
+  const [salesmenLookup, setSalesmenLookup] = useState([]); // all active salesmen, for dropdowns / name lookups only
+  const [salesPage, setSalesPage] = useState(1);
+  const [salesPagination, setSalesPagination] = useState({ total: 0, totalPages: 1 });
+  const [salesCounts, setSalesCounts] = useState(null); // { all, active, inactive } from the server
+  const [salesSearch, setSalesSearch] = useState(''); // debounced listQuery
+  const [salesReload, setSalesReload] = useState(0);
+  const salesReqRef = useRef(0);
   const [countries, setCountries] = useState([]);
   const [selectedCountryFilter, setSelectedCountryFilter] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -292,6 +301,7 @@ const DashboardSuppliers = () => {
   const [stateFilter, setStateFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [states, setStates] = useState([]);
+  const [filterStates, setFilterStates] = useState([]); // states of the chosen country, for the state filter dropdown
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
   const [zoneParties, setZoneParties] = useState([]); // parties for salesman's zones
@@ -299,7 +309,11 @@ const DashboardSuppliers = () => {
   const [allPartiesLookup, setAllPartiesLookup] = useState([]); // all parties for name lookup in tables
 
   // Check-ins state
-  const [checkins, setCheckins] = useState([]);
+  const [checkins, setCheckins] = useState([]); // the CURRENT PAGE of the Visit Report (server-paged)
+  const [visitPage, setVisitPage] = useState(1);
+  const [visitSearch, setVisitSearch] = useState('');
+  const [visitPagination, setVisitPagination] = useState({ total: 0, totalPages: 1 });
+  const visitReqRef = useRef(0);
   const [checkinsLoading, setCheckinsLoading] = useState(false);
   const [openCheckinModal, setOpenCheckinModal] = useState(false);
   const [editCheckin, setEditCheckin] = useState(null);
@@ -358,89 +372,45 @@ const DashboardSuppliers = () => {
     }
   };
 
-  const fetchSalesmenForCountry = useCallback(async (countryId) => {
-    if (!countryId) {
-      console.log('[fetchSalesmenForCountry] No country ID provided, clearing salesmen');
+  // One page of salesmen from the server (search, state and status filters run in SQL).
+  // Re-run whenever the country, page, search, state or status changes, or after a save.
+  const fetchSalesmenPage = useCallback(async () => {
+    if (!selectedCountryFilter) {
       setSalesmen([]);
       setHasSearched(false);
       return;
     }
-
+    const reqId = ++salesReqRef.current;
     setLoading(true);
     setError(null);
-    setHasSearched(false);
     try {
-      // Validate countryId before making API call
-      const cleanCountryId = String(countryId).trim();
-      if (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null') {
-        console.error('[fetchSalesmenForCountry] Invalid country ID:', countryId);
-        setSalesmen([]);
-        setLoading(false);
+      const result = await getSalesmenPage({
+        page: salesPage,
+        limit: SALESMEN_PER_PAGE,
+        country_id: String(selectedCountryFilter).trim(),
+        search: salesSearch,
+        state_id: stateFilter,
+        status: statusFilter || 'all',
+      });
+      if (reqId !== salesReqRef.current) return; // a newer request is already in flight
+      const list = Array.isArray(result.data) ? result.data : [];
+      const totalPages = Math.max(1, Number(result.pagination?.totalPages) || 1);
+      if (list.length === 0 && salesPage > totalPages) {
+        setSalesPage(totalPages); // the last page emptied (e.g. after a status change): go back
         return;
       }
-
-      console.log('[fetchSalesmenForCountry] Fetching salesmen for country:', cleanCountryId);
-      const salesmenData = await getSalesmen(cleanCountryId);
-
-      console.log('[fetchSalesmenForCountry] Received', salesmenData?.length || 0, 'salesmen from API');
-
-      // CRITICAL: Backend returns wrong data, so we MUST filter strictly
-      // Filter out ALL salesmen that don't match the requested country
-      const validSalesmen = (salesmenData || []).filter(d => {
-        if (!d) {
-          console.warn('[fetchSalesmenForCountry] Skipping null/undefined salesman');
-          return false;
-        }
-
-        const salesmanCountryId = String(d.country_id || d.countryId || '').trim();
-        const matches = salesmanCountryId === cleanCountryId;
-
-        if (!matches) {
-          console.warn('[fetchSalesmenForCountry] ❌ REJECTING salesman - country mismatch:', {
-            salesman_id: d.id || d.salesman_id,
-            salesman_name: d.full_name,
-            salesman_country_id: salesmanCountryId,
-            requested_country_id: cleanCountryId,
-            match: false
-          });
-        } else {
-          console.log('[fetchSalesmenForCountry] ✅ ACCEPTING salesman - country matches:', {
-            salesman_id: d.id || d.salesman_id,
-            salesman_name: d.full_name,
-            country_id: salesmanCountryId
-          });
-        }
-        return matches;
-      });
-
-      const filteredOut = salesmenData.length - validSalesmen.length;
-      if (filteredOut > 0) {
-        console.warn('[fetchSalesmenForCountry] ⚠️ Backend returned', filteredOut, 'salesmen with WRONG country_id!');
-        console.warn('[fetchSalesmenForCountry] This is a backend issue - it should filter by country_id');
-      }
-
-      if (validSalesmen.length > 0) {
-        console.log('[fetchSalesmenForCountry] ✅ Found', validSalesmen.length, 'valid salesmen for country:', cleanCountryId);
-      } else {
-        console.log('[fetchSalesmenForCountry] ℹ️ No salesmen found for country:', cleanCountryId);
-        if (salesmenData.length > 0) {
-          console.warn('[fetchSalesmenForCountry] ⚠️ Backend returned', salesmenData.length, 'salesmen but none matched the requested country');
-        }
-      }
-
-      // Force update by creating a new array reference
-      const newSalesmen = Array.isArray(validSalesmen) ? [...validSalesmen] : [];
-      console.log('[fetchSalesmenForCountry] Setting', newSalesmen.length, 'salesmen for country:', cleanCountryId);
-      setSalesmen(newSalesmen);
-      setHasSearched(true); // Mark that we've completed a search - even if empty
+      setSalesmen(list);
+      setSalesPagination({ total: Number(result.pagination?.total) || 0, totalPages });
+      if (result.counts) setSalesCounts(result.counts);
+      setHasSearched(true);
     } catch (error) {
-      console.error('[fetchSalesmenForCountry] Error:', error);
+      if (reqId !== salesReqRef.current) return;
+      console.error('[fetchSalesmenPage] Error:', error);
       const errorMessage = error.message?.toLowerCase() || '';
       const isNotFound = errorMessage.includes('salesmen not found') ||
         errorMessage.includes('no salesmen found') ||
         errorMessage.includes('salesman not found') ||
         error.statusCode === 404;
-
       if (!isNotFound &&
         !errorMessage.includes('token expired') &&
         !errorMessage.includes('unauthorized')) {
@@ -448,11 +418,14 @@ const DashboardSuppliers = () => {
         showError(`Failed to load salesmen: ${error.message}`);
       }
       setSalesmen([]);
-      setHasSearched(true); // Mark that we've completed a search - even if empty
+      setHasSearched(true);
     } finally {
-      setLoading(false);
+      if (reqId === salesReqRef.current) setLoading(false);
     }
-  }, []);
+  }, [selectedCountryFilter, salesPage, salesSearch, stateFilter, statusFilter, salesReload]);
+
+  // Reload the current page (after create / edit / status change / Refresh).
+  const fetchSalesmenForCountry = useCallback(() => { setSalesReload((n) => n + 1); }, []);
 
   const fetchStates = async (countryId) => {
     if (!countryId) {
@@ -568,89 +541,39 @@ const DashboardSuppliers = () => {
     }
   };
 
-  const fetchCheckins = async () => {
+  // One page of the Visit Report from the server. The server attaches party / salesman names,
+  // the linked order's qty / total / notes, and lists visit orders that have no check-in row,
+  // for this page's rows only.
+  const fetchCheckins = async (targetPage = visitPage, search = visitSearch) => {
+    const reqId = ++visitReqRef.current;
     setCheckinsLoading(true);
     try {
-      let data;
+      let salesmanId = '';
       if (isSalesman) {
-        const sid = await ensureMySalesmanId();
-        data = sid ? await getSalesmanCheckins(sid) : [];
-      } else {
-        data = await getAllSalesmanCheckins();
+        salesmanId = await ensureMySalesmanId();
+        if (!salesmanId) {
+          if (reqId === visitReqRef.current) { setCheckins([]); setVisitPagination({ total: 0, totalPages: 1 }); }
+          return;
+        }
       }
-      let rows = Array.isArray(data) ? data : (data?.data || []);
-
-      // Visit ORDERS are placed from the cart and live in the orders table —
-      // they don't create a check-in row, so they'd otherwise be missing from
-      // the Visit Report. Merge the salesman's own visit orders in as "ordered"
-      // rows, skipping any order already represented by a check-in (order_id).
-      // Populate QTY / AMOUNT for order rows (salesman AND admin views):
-      //  1) attach a linked order's qty/amount to its check-in row, and
-      //  2) merge visit orders that have no check-in row of their own.
-      // getMyOrders returns the caller's orders (all orders for admin).
-      try {
-        const orders = await getMyOrders();
-        const orderList = Array.isArray(orders) ? orders : [];
-        // order_items can be a real array OR a JSON string — parse both, else the
-        // QTY column computed to 0/'-' for every order.
-        const parseItems = (v) => {
-          if (Array.isArray(v)) return v;
-          if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; } }
-          if (v && typeof v === 'object') return Object.values(v);
-          return [];
-        };
-        // Prefer the backend-computed total_qty; fall back to parsing order_items.
-        const qtyOf = (o) => Number(o.total_qty)
-          || parseItems(o.order_items).reduce((s, it) => s + (Number(it.quantity ?? it.qty) || 0), 0)
-          || 0;
-        const orderById = new Map(orderList.map((o) => [String(o.order_id || o.id), o]));
-
-        // 1) enrich check-in rows that reference an order
-        rows = rows.map((c) => {
-          const oid = c.order_id ? String(c.order_id) : null;
-          if (oid && orderById.has(oid)) {
-            const o = orderById.get(oid);
-            return {
-              ...c,
-              order_qty: c.order_qty != null ? c.order_qty : qtyOf(o),
-              order_total: c.order_total != null ? c.order_total : o.order_total,
-              order_notes: c.order_notes != null ? c.order_notes : o.order_notes,
-            };
-          }
-          return c;
-        });
-
-        // 2) merge visit orders not already represented by a check-in row
-        const linked = new Set(rows.map((c) => c.order_id).filter(Boolean).map(String));
-        const visitRows = orderList
-          .filter((o) => (o.order_type === 'visit_order') && !linked.has(String(o.order_id || o.id)))
-          .map((o) => ({
-            id: `order-${o.order_id || o.id}`,
-            type: 'ordered',
-            salesman_id: o.salesman_id,
-            party_id: o.party_id,
-            party_name: o.party_name,
-            order_id: o.order_id || o.id,
-            order_total: o.order_total,
-            order_qty: qtyOf(o),
-            order_notes: o.order_notes,
-            check_in_date: o.order_date || o.created_at || o.createdAt,
-            latitude: o.latitude,
-            longitude: o.longitude,
-          }));
-        rows = [...rows, ...visitRows];
-      } catch (e) {
-        console.error('Failed to merge visit orders into Visit Report:', e);
+      const result = await getVisitReportPage({ page: targetPage, limit: VISITS_PER_PAGE, search, salesmanId });
+      if (reqId !== visitReqRef.current) return; // a newer request is already in flight
+      const rows = Array.isArray(result.data) ? result.data : [];
+      const totalPages = Math.max(1, Number(result.pagination?.totalPages) || 1);
+      if (rows.length === 0 && targetPage > totalPages) {
+        fetchCheckins(totalPages, search); // the last page emptied: show the new last page
+        return;
       }
-
-      // Newest first (works for both check-ins and merged orders).
-      rows.sort((a, b) => new Date(b.check_in_date || 0) - new Date(a.check_in_date || 0));
       setCheckins(rows);
+      setVisitPage(targetPage);
+      setVisitPagination({ total: Number(result.pagination?.total) || 0, totalPages });
     } catch (error) {
+      if (reqId !== visitReqRef.current) return;
       console.error('Failed to load check-ins:', error);
       setCheckins([]);
+      setVisitPagination({ total: 0, totalPages: 1 });
     } finally {
-      setCheckinsLoading(false);
+      if (reqId === visitReqRef.current) setCheckinsLoading(false);
     }
   };
 
@@ -688,20 +611,52 @@ const DashboardSuppliers = () => {
     }
   }, [countries, selectedCountryFilter]);
 
-  // Fetch salesmen when country filter changes
+  // Fetch the current page of salesmen whenever the country, page, search, state or status changes.
+  // Zones are only needed inside the Add/Edit form, and loading them walks
+  // states -> cities -> zones (100+ requests). Defer to when the form opens.
   useEffect(() => {
+    if (isSalesman) return;
     if (selectedCountryFilter) {
-      console.log('[Filter] Country changed, fetching salesmen for:', selectedCountryFilter);
-      fetchSalesmenForCountry(selectedCountryFilter);
-      // Zones are only needed inside the Add/Edit form, and loading them walks
-      // states -> cities -> zones (100+ requests). Defer to when the form opens.
+      fetchSalesmenPage();
     } else {
-      // If no country selected (All Countries), clear salesmen
-      console.log('[Filter] No country selected (All Countries), clearing salesmen');
       setSalesmen([]);
       setLoading(false);
     }
-  }, [selectedCountryFilter, fetchSalesmenForCountry]);
+  }, [selectedCountryFilter, fetchSalesmenPage, isSalesman]);
+
+  // Debounce the search box (~300ms) and go back to page 1 when it changes.
+  const salesSearchRef = useRef('');
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const next = listQuery.trim();
+      if (next === salesSearchRef.current) return;
+      salesSearchRef.current = next;
+      setSalesSearch(next);
+      setSalesPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [listQuery]);
+
+  // State filter options come from the chosen country's states, not from the loaded rows.
+  useEffect(() => {
+    if (isSalesman || !selectedCountryFilter) { setFilterStates([]); return; }
+    let live = true;
+    getStates(selectedCountryFilter)
+      .then((list) => { if (live) setFilterStates(Array.isArray(list) ? list : []); })
+      .catch(() => { if (live) setFilterStates([]); });
+    return () => { live = false; };
+  }, [selectedCountryFilter, isSalesman]);
+
+  // Name lookup / dropdown source (Targets tab and its form): all active salesmen of the country,
+  // loaded only when that tab is opened. The Salesmen table itself never needs it.
+  useEffect(() => {
+    if (isSalesman || mainTab !== 'Targets' || !selectedCountryFilter) return;
+    let live = true;
+    getSalesmen(selectedCountryFilter)
+      .then((list) => { if (live) setSalesmenLookup(Array.isArray(list) ? list : []); })
+      .catch(() => { if (live) setSalesmenLookup([]); });
+    return () => { live = false; };
+  }, [mainTab, selectedCountryFilter, isSalesman]);
 
   // Fetch states when country changes in form
   useEffect(() => {
@@ -735,22 +690,15 @@ const DashboardSuppliers = () => {
 
   // Fetch checkins/targets when switching to those tabs
   useEffect(() => {
-    if (mainTab === 'Salesmen' && !isSalesman) fetchCheckins();
-    if (mainTab === 'Visit Report') {
-      fetchCheckins();
-      // For admin: fetch all parties for name lookup
-      if (!isSalesman) {
-        getParties().then(data => setAllPartiesLookup(Array.isArray(data) ? data : [])).catch(() => { });
-      }
-    }
-    if (mainTab === 'Targets' || (mainTab === 'Salesmen' && !isSalesman)) fetchTargets();
+    // The visit rows already carry party / salesman names and party coordinates, so no all-parties load here.
+    if (mainTab === 'Visit Report') fetchCheckins();
+    if (mainTab === 'Targets') fetchTargets();
   }, [mainTab]);
 
   // For salesman: load zone parties on mount
   useEffect(() => {
     if (isSalesman) {
       fetchZoneParties();
-      fetchCheckins();
     }
   }, []);
 
@@ -768,40 +716,31 @@ const DashboardSuppliers = () => {
   // GPS can be checked against where the party actually is.
   const partyCoordsMap = useMemo(() => {
     const map = {};
+    // Visit rows carry the party's coordinates (set by the server for this page's rows)...
+    checkins.forEach(c => {
+      if (c.party_id && c.party_latitude != null && c.party_longitude != null) {
+        map[c.party_id] = { lat: Number(c.party_latitude), lng: Number(c.party_longitude) };
+      }
+    });
+    // ...and the salesman's own party list fills in any gaps.
     allPartiesLookup.forEach(p => {
       const id = p.party_id || p.id;
-      if (id && p.latitude != null && p.longitude != null) {
+      if (id && !map[id] && p.latitude != null && p.longitude != null) {
         map[id] = { lat: Number(p.latitude), lng: Number(p.longitude) };
       }
     });
     return map;
-  }, [allPartiesLookup]);
+  }, [allPartiesLookup, checkins]);
 
   const salesmanNameMap = useMemo(() => {
     const map = {};
-    salesmen.forEach(s => {
+    [...salesmenLookup, ...salesmen].forEach(s => {
       const id = s.id || s.salesman_id;
       if (id) map[id] = s.full_name || id;
     });
+    checkins.forEach(c => { if (c.salesman_id && c.salesman_name) map[c.salesman_id] = c.salesman_name; });
     return map;
-  }, [salesmen]);
-
-  // Display only: achieved / target per salesman from the targets list (admin loads it with the list).
-  const salesmanTargetPct = useMemo(() => {
-    const sums = {};
-    (targets || []).forEach(t => {
-      const id = t.salesman_id;
-      if (!id) return;
-      sums[id] = sums[id] || { done: 0, goal: 0 };
-      sums[id].done += Number(t.completed_amount) || 0;
-      sums[id].goal += Number(t.target_amount) || 0;
-    });
-    const out = {};
-    Object.keys(sums).forEach(id => {
-      if (sums[id].goal > 0) out[id] = Math.round((sums[id].done / sums[id].goal) * 100);
-    });
-    return out;
-  }, [targets]);
+  }, [salesmen, salesmenLookup, checkins]);
 
   // States each salesman works in, as plain names (the API may return objects or ids).
   const stateNamesOf = (row) => {
@@ -811,20 +750,6 @@ const DashboardSuppliers = () => {
       .map(x => (x && typeof x === 'object') ? (x.state_name || x.name || '') : String(x || ''))
       .filter(Boolean);
   };
-
-  // Visits today (IST) per salesman, from the visit report list (orders are not visits).
-  const visitsTodayMap = useMemo(() => {
-    const today = istNow().slice(0, 10);
-    const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata', year: 'numeric', month: '2-digit', day: '2-digit' });
-    const out = {};
-    (checkins || []).forEach(c => {
-      if (!c || c.type === 'ordered' || !c.salesman_id || !c.check_in_date) return;
-      const d = new Date(c.check_in_date);
-      if (Number.isNaN(d.getTime())) return;
-      if (fmt.format(d) === today) out[c.salesman_id] = (out[c.salesman_id] || 0) + 1;
-    });
-    return out;
-  }, [checkins]);
 
   const renderStatePills = (row) => {
     const names = stateNamesOf(row);
@@ -838,7 +763,7 @@ const DashboardSuppliers = () => {
   };
 
   const renderTargetBar = (row) => {
-    const pct = salesmanTargetPct[row.id || row.salesman_id];
+    const pct = row.target_pct;
     if (pct == null) return <span className="text-text-subtle">No target</span>;
     return (
       <span className="sm-prog" title={`${pct}% of target`}>
@@ -879,7 +804,7 @@ const DashboardSuppliers = () => {
       }
     },
     { key: 'states', label: 'STATES', render: (_v, row) => renderStatePills(row) },
-    { key: 'visits_today', label: 'VISITS TODAY', render: (_v, row) => visitsTodayMap[row.id || row.salesman_id] || 0 },
+    { key: 'visits_today', label: 'VISITS TODAY', render: (_v, row) => row.visits_today || 0 },
     { key: 'target', label: 'TARGET', render: (_v, row) => renderTargetBar(row) },
     { key: 'status', label: 'STATUS', render: (_v, row) => renderStatusButton(row) },
     {
@@ -889,43 +814,20 @@ const DashboardSuppliers = () => {
         />
       )
     },
-  ]), [salesmanTargetPct, visitsTodayMap]);
+  ]), []);
 
-  const rows = useMemo(() => {
-    let filteredSalesmen = [];
-    if (selectedCountryFilter) {
-      const cleanFilterId = String(selectedCountryFilter).trim();
-      filteredSalesmen = salesmen.filter(salesman => {
-        if (!salesman) return false;
-        const salesmanCountryId = String(salesman.country_id || salesman.countryId || '').trim();
-        return salesmanCountryId === cleanFilterId;
-      });
-    }
-    const q = listQuery.trim().toLowerCase();
-    return filteredSalesmen.map(salesman => ({
-      ...salesman,
-      isActive: salesman.is_active !== false,
-    })).filter(r => {
-      if (statusFilter === 'active' && !r.isActive) return false;
-      if (statusFilter === 'inactive' && r.isActive) return false;
-      if (stateFilter && !stateNamesOf(r).includes(stateFilter)) return false;
-      if (q && !`${r.full_name || ''} ${r.employee_code || ''} ${r.phone || ''} ${r.email || ''}`.toLowerCase().includes(q)) return false;
-      return true;
-    });
-  }, [salesmen, selectedCountryFilter, listQuery, stateFilter, statusFilter]);
+  // The server already applied country, search, state and status; just add the display flag.
+  const rows = useMemo(() => salesmen.map(salesman => ({
+    ...salesman,
+    isActive: salesman.is_active !== false,
+  })), [salesmen]);
 
-  const stateFilterOptions = useMemo(() => {
-    const set = new Set();
-    salesmen.forEach(r => stateNamesOf(r).forEach(n => set.add(n)));
-    return Array.from(set).sort((x, y) => x.localeCompare(y));
-  }, [salesmen]);
-
-  const filteredRowsByTab = useMemo(() => {
-    if (activeTab === 'All') return rows;
-    if (activeTab === 'Activate') return rows.filter(r => r.isActive);
-    if (activeTab === 'Deactivate') return rows.filter(r => !r.isActive);
-    return rows;
-  }, [rows, activeTab]);
+  const stateFilterOptions = useMemo(() => (
+    filterStates
+      .map(st => ({ value: String(st.id || st.state_id || ''), label: st.name || st.state_name || '' }))
+      .filter(o => o.value && o.label)
+      .sort((x, y) => x.label.localeCompare(y.label))
+  ), [filterStates]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -1058,6 +960,7 @@ const DashboardSuppliers = () => {
         is_active: next,
       });
       showSuccess(next ? 'Salesman activated' : 'Salesman deactivated');
+      fetchSalesmenForCountry(); // counts and the status filter may now put this row elsewhere
     } catch (e) {
       // Revert on failure.
       setSalesmen(prev => prev.map(s => {
@@ -1350,6 +1253,7 @@ const DashboardSuppliers = () => {
 
           // Show success notification
           showSuccess('Salesman updated successfully');
+          fetchSalesmenForCountry();
           setError(null);
           setOpenAdd(false);
           setEditRow(null);
@@ -1357,10 +1261,8 @@ const DashboardSuppliers = () => {
         } catch (error) {
           console.error('Update salesman error:', error);
 
-          // Revert optimistic update on error by refetching
-          if (selectedCountryFilter) {
-            await fetchSalesmenForCountry(selectedCountryFilter);
-          }
+          // Revert optimistic update on error by refetching the page
+          fetchSalesmenForCountry();
 
           if (!error.message?.toLowerCase().includes('token expired') &&
             !error.message?.toLowerCase().includes('unauthorized')) {
@@ -1392,19 +1294,10 @@ const DashboardSuppliers = () => {
             phone: phoneNumber,
           };
 
-          const newSalesman = await createSalesman(salesmanData);
+          await createSalesman(salesmanData);
 
-          // Optimistically add to table if it matches the current filter
-          if (selectedCountryFilter && newSalesman && newSalesman.country_id === selectedCountryFilter) {
-            setSalesmen(prev => [...prev, {
-              ...newSalesman,
-              id: newSalesman.id || newSalesman.salesman_id,
-              isActive: newSalesman.is_active !== false,
-            }]);
-          } else if (selectedCountryFilter) {
-            // If country doesn't match filter, just refresh
-            await fetchSalesmenForCountry(selectedCountryFilter);
-          }
+          // Refetch the current page so the new salesman, the counts and the page count are right.
+          fetchSalesmenForCountry();
 
           // Show success notification
           showSuccess('Salesman created successfully');
@@ -1416,9 +1309,7 @@ const DashboardSuppliers = () => {
           console.error('Create salesman error:', createError);
 
           // Revert by refreshing if needed
-          if (selectedCountryFilter) {
-            await fetchSalesmenForCountry(selectedCountryFilter);
-          }
+          fetchSalesmenForCountry();
 
           if (!createError.message?.toLowerCase().includes('token expired') &&
             !createError.message?.toLowerCase().includes('unauthorized')) {
@@ -1670,6 +1561,7 @@ const DashboardSuppliers = () => {
                       setSalesmen([]);
                       setHasSearched(false);
                       setStateFilter('');
+                      setSalesPage(1);
                       setSelectedCountryFilter(value);
                     }}
                     placeholder="Country"
@@ -1679,18 +1571,22 @@ const DashboardSuppliers = () => {
                 </div>
                 <div className="sx-select">
                   <DropdownSelector
-                    options={[{ value: '', label: 'All states' }, ...stateFilterOptions.map((n) => ({ value: n, label: n }))]}
+                    options={[{ value: '', label: 'All states' }, ...stateFilterOptions]}
                     value={stateFilter}
-                    onChange={(v) => setStateFilter(v)}
+                    onChange={(v) => { setStateFilter(v); setSalesPage(1); }}
                     placeholder="All states"
                     className="ui-dropdown-custom--full-width"
                   />
                 </div>
                 <div className="sx-select">
                   <DropdownSelector
-                    options={[{ value: '', label: 'All status' }, { value: 'active', label: 'Active' }, { value: 'inactive', label: 'Inactive' }]}
+                    options={[
+                      { value: '', label: salesCounts ? `All status (${salesCounts.all})` : 'All status' },
+                      { value: 'active', label: salesCounts ? `Active (${salesCounts.active})` : 'Active' },
+                      { value: 'inactive', label: salesCounts ? `Inactive (${salesCounts.inactive})` : 'Inactive' },
+                    ]}
                     value={statusFilter}
-                    onChange={(v) => setStatusFilter(v)}
+                    onChange={(v) => { setStatusFilter(v); setSalesPage(1); }}
                     placeholder="All status"
                     searchable={false}
                     className="ui-dropdown-custom--full-width"
@@ -1714,7 +1610,7 @@ const DashboardSuppliers = () => {
                     onClick={() => {
                       setError(null);
                       if (selectedCountryFilter) {
-                        fetchSalesmenForCountry(selectedCountryFilter);
+                        fetchSalesmenForCountry();
                       } else {
                         window.location.reload();
                       }
@@ -1746,7 +1642,7 @@ const DashboardSuppliers = () => {
               ) : (
 <>
                   <div className="sx-cards" aria-label="Salesmen">
-                    {loading ? <p className="sx-cards__note">Loading salesmen...</p> : rows.length === 0 ? <p className="sx-cards__note">No salesmen match these filters.</p> : rows.map(row => {
+                    {loading && rows.length === 0 ? <p className="sx-cards__note">Loading salesmen...</p> : rows.length === 0 ? <p className="sx-cards__note">No salesmen match these filters.</p> : rows.map(row => {
                       const sid = row.id || row.salesman_id;
                       return (
                         <article key={sid} className="sx-card">
@@ -1760,7 +1656,7 @@ const DashboardSuppliers = () => {
                           </div>
                           <div className="sx-card__states">{renderStatePills(row)}</div>
                           <div className="sx-card__meta">
-                            <span><b>{visitsTodayMap[sid] || 0}</b> visits today</span>
+                            <span><b>{row.visits_today || 0}</b> visits today</span>
                             {renderTargetBar(row)}
                           </div>
                           <div className="sx-card__act">
@@ -1770,8 +1666,11 @@ const DashboardSuppliers = () => {
                         </article>
                       );
                     })}
+                    {salesPagination.totalPages > 1 ? (
+                      <Pagination page={salesPage} pageCount={salesPagination.totalPages} onPageChange={(p) => setSalesPage(p)} />
+                    ) : null}
                   </div>
-                  <div className="sx-tablewrap">
+                  <div className="sx-tablewrap" style={loading && rows.length > 0 ? { opacity: 0.55, transition: 'opacity .15s' } : undefined} aria-busy={loading}>
                     <TableWithControls
                       title="Salesmen"
                       columns={columns}
@@ -1781,13 +1680,21 @@ const DashboardSuppliers = () => {
                       onImport={() => {
                         setError(null);
                         if (selectedCountryFilter) {
-                          fetchSalesmenForCountry(selectedCountryFilter);
+                          fetchSalesmenForCountry();
                         }
                       }}
                       importText="Refresh"
                       showFilter={false}
                       showSerialNumber={false}
-                      loading={loading}
+                      loading={loading && rows.length === 0}
+                      itemName="Salesmen"
+                      serverPagination
+                      serverPage={salesPage}
+                      serverPageCount={salesPagination.totalPages}
+                      serverPageSize={SALESMEN_PER_PAGE}
+                      serverTotal={salesPagination.total}
+                      onServerPageChange={(p) => setSalesPage(p)}
+                      onServerSearch={(q) => setListQuery(q)}
                     />
                   </div>
                 </>
@@ -1800,7 +1707,7 @@ const DashboardSuppliers = () => {
         {mainTab === 'Visit Report' && (
           <div className="dash-row">
             <div className="dash-card full">
-              {!checkinsLoading && checkins.length === 0 ? (
+              {!checkinsLoading && checkins.length === 0 && !visitSearch ? (
                 <div className="ui-state ui-state--empty">
                   <div className="ui-state__icon">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1836,7 +1743,7 @@ const DashboardSuppliers = () => {
                   </button>
                 )}
                 <div className="sx-cards" aria-label="Visit report">
-                  {checkinsLoading ? <p className="sx-cards__note">Loading visits...</p> : checkins.map((row, i) => {
+                  {checkinsLoading && checkins.length === 0 ? <p className="sx-cards__note">Loading visits...</p> : checkins.map((row, i) => {
                     const raw = String(row.order_notes || row.check_in_remarks || '');
                     const text = raw.replace(/^\s*\[In progress\]\s*/i, '').trim();
                     const inProgress = row.in_progress === true || /^\s*\[In progress\]/i.test(raw);
@@ -1866,8 +1773,11 @@ const DashboardSuppliers = () => {
                       </article>
                     );
                   })}
+                  {visitPagination.totalPages > 1 ? (
+                    <Pagination page={visitPage} pageCount={visitPagination.totalPages} onPageChange={(p) => fetchCheckins(p)} />
+                  ) : null}
                 </div>
-                <div className="sx-tablewrap">
+                <div className="sx-tablewrap" style={checkinsLoading && checkins.length > 0 ? { opacity: 0.55, transition: 'opacity .15s' } : undefined} aria-busy={checkinsLoading}>
                 <TableWithControls
                   title="Visit Report"
                   columns={[
@@ -1920,10 +1830,18 @@ const DashboardSuppliers = () => {
                   rows={checkins}
                   onAddNew={isSalesman ? () => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); } : undefined}
                   addNewText="Add Visit Report"
-                  onImport={fetchCheckins}
+                  onImport={() => fetchCheckins()}
                   importText="Refresh"
                   showSerialNumber={false}
-                  loading={checkinsLoading}
+                  loading={checkinsLoading && checkins.length === 0}
+                  itemName="Visits"
+                  serverPagination
+                  serverPage={visitPage}
+                  serverPageCount={visitPagination.totalPages}
+                  serverPageSize={VISITS_PER_PAGE}
+                  serverTotal={visitPagination.total}
+                  onServerPageChange={(p) => fetchCheckins(p)}
+                  onServerSearch={(q) => { setVisitSearch(q); fetchCheckins(1, q); }}
                 />
                 </div>
                 </>
@@ -2192,7 +2110,7 @@ const DashboardSuppliers = () => {
               <DropdownSelector
                 options={[
                   { value: '', label: 'Select Salesman' },
-                  ...salesmen.map(s => ({ value: s.id || s.salesman_id, label: s.full_name }))
+                  ...(salesmenLookup.length ? salesmenLookup : salesmen).map(s => ({ value: s.id || s.salesman_id, label: s.full_name }))
                 ]}
                 value={targetForm.salesman_id}
                 onChange={(v) => setTargetForm(prev => ({ ...prev, salesman_id: v }))}

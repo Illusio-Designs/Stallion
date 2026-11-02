@@ -3,7 +3,8 @@ const Party = require('../models/Party');
 const Order = require('../models/Order');
 const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
-const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
+const { parsePaginationParams, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP, getListSearchParams, likeContains } = require('../utils/listSearchHelpers');
+const sequelize = require('../constants/database');
 const { SalesmanCheckInType } = require('../constants/enums');
 const { checkVisitLocation } = require('../utils/geo');
 const { learnShopSpot } = require('../utils/shopSpot');
@@ -73,6 +74,110 @@ async function enrichCheckIns(checkIns) {
             order_status: o ? o.order_status : null,
         };
     });
+}
+
+// ---- Visit Report page (server-side filters, search, sort, counts) ----
+// A request is a "report" request when it sends any of these. Without them the old behaviour is kept.
+const REPORT_PARAMS = ['include_orders', 'type', 'from', 'to', 'party_id', 'salesman_id', 'search', 'name', 'sort', 'dir'];
+const isReportRequest = (req) => REPORT_PARAMS.some((k) => req.query && req.query[k] !== undefined && String(req.query[k]).trim() !== '');
+
+// One page of the Visit Report. Query params:
+//   include_orders=1  also list visit ORDERS that have no check-in row of their own (as 'ordered' rows)
+//   type              visit | ordered
+//   from / to         YYYY-MM-DD (IST days, inclusive)
+//   salesman_id, party_id
+//   search            party name, salesman name, contact person, remarks / order notes / order number
+//   sort / dir        date | party | salesman | type  /  asc | desc   (default: date desc)
+// Response: { data, pagination, counts: { all, visit, ordered } }. counts ignore the type filter.
+// The page's rows carry party / salesman names and the linked order's number, qty, total, notes and status,
+// looked up in batched queries for the page's ids only.
+async function reportPage(req, res, { pagination, forcedSalesmanId = null }) {
+    const q = req.query || {};
+    const clean = (v) => (v === undefined || v === null ? '' : String(v).trim());
+    const repl = {};
+    const where = (alias, dateCol, searchCols) => {
+        const parts = [];
+        const sid = forcedSalesmanId || clean(q.salesman_id);
+        if (sid) { parts.push(`${alias}.salesman_id = :sid`); repl.sid = sid; }
+        const pid = clean(q.party_id);
+        if (pid) { parts.push(`${alias}.party_id = :pid`); repl.pid = pid; }
+        const dayStart = (d) => new Date(`${d}T00:00:00+05:30`);
+        const from = clean(q.from);
+        const to = clean(q.to);
+        if (/^\d{4}-\d{2}-\d{2}$/.test(from) && !Number.isNaN(dayStart(from).getTime())) { parts.push(`${alias}.${dateCol} >= :dfrom`); repl.dfrom = dayStart(from); }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(to) && !Number.isNaN(dayStart(to).getTime())) { parts.push(`${alias}.${dateCol} < :dto`); repl.dto = new Date(dayStart(to).getTime() + 24 * 60 * 60 * 1000); }
+        const { name } = getListSearchParams(req);
+        if (name) {
+            repl.q = likeContains(name);
+            parts.push(`(${['p.party_name', 's.full_name', ...searchCols].map((c) => `${c} LIKE :q`).join(' OR ')})`);
+        }
+        return parts.length ? ` AND ${parts.join(' AND ')}` : '';
+    };
+    const checkInTable = SalesmanCheckIns.getTableName();
+    const orderTable = Order.getTableName();
+    const partyTable = Party.getTableName();
+    const salesmanTable = Salesman.getTableName();
+    const includeOrders = ['1', 'true'].includes(clean(q.include_orders).toLowerCase());
+    const typeFilter = clean(q.type).toLowerCase();
+    const fromCheckIns = `SELECT 'c' AS src, c.id AS rid, c.check_in_date AS sort_date, c.created_at AS sort_created, c.type AS vtype, p.party_name AS pname, s.full_name AS sname
+        FROM \`${checkInTable}\` c
+        LEFT JOIN \`${partyTable}\` p ON p.party_id = c.party_id
+        LEFT JOIN \`${salesmanTable}\` s ON s.salesman_id = c.salesman_id
+        WHERE 1 = 1${where('c', 'check_in_date', ['c.contact_person', 'c.check_in_remarks'])}`;
+    // Visit orders that no check-in points at (the visit report shows them as their own rows).
+    const fromOrders = includeOrders ? ` UNION ALL SELECT 'o' AS src, o.order_id AS rid, o.order_date AS sort_date, o.created_at AS sort_created, 'ordered' AS vtype, p.party_name AS pname, s.full_name AS sname
+        FROM \`${orderTable}\` o
+        LEFT JOIN \`${partyTable}\` p ON p.party_id = o.party_id
+        LEFT JOIN \`${salesmanTable}\` s ON s.salesman_id = o.salesman_id
+        WHERE o.order_type = 'visit_order'
+          AND NOT EXISTS (SELECT 1 FROM \`${checkInTable}\` x WHERE x.order_id = o.order_id)${where('o', 'order_date', ['o.order_notes', 'o.order_number'])}` : '';
+    const union = `(${fromCheckIns}${fromOrders}) u`;
+
+    const SORTS = { date: 'u.sort_date', party: 'u.pname', salesman: 'u.sname', type: 'u.vtype' };
+    const sortKey = SORTS[clean(q.sort).toLowerCase()] || SORTS.date;
+    const dir = clean(q.dir).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+    const typeWhere = ['visit', 'ordered'].includes(typeFilter) ? ' WHERE u.vtype = :vtype' : '';
+    if (typeWhere) repl.vtype = typeFilter;
+    const run = (sql, extra = {}) => sequelize.query(sql, { replacements: { ...repl, ...extra }, type: sequelize.QueryTypes.SELECT });
+
+    const [pageIds, groups] = await Promise.all([
+        run(`SELECT u.src, u.rid FROM ${union}${typeWhere} ORDER BY ${sortKey} ${dir}, u.sort_created DESC, u.rid DESC LIMIT :limit OFFSET :offset`,
+            { limit: pagination.limit, offset: pagination.offset }),
+        run(`SELECT u.vtype AS vtype, COUNT(*) AS n FROM ${union} GROUP BY u.vtype`),
+    ]);
+    const counts = { all: 0, visit: 0, ordered: 0 };
+    groups.forEach((g) => { const n = Number(g.n) || 0; counts.all += n; if (g.vtype === 'visit') counts.visit += n; else counts.ordered += n; });
+    const total = typeWhere ? (counts[typeFilter] || 0) : counts.all;
+
+    const checkInIds = pageIds.filter((r) => r.src === 'c').map((r) => r.rid);
+    const orderIds = pageIds.filter((r) => r.src === 'o').map((r) => r.rid);
+    const [checkInRows, orderRows] = await Promise.all([
+        checkInIds.length ? SalesmanCheckIns.findAll({ where: { id: checkInIds } }) : [],
+        orderIds.length ? Order.findAll({ where: { order_id: orderIds }, attributes: ['order_id', 'salesman_id', 'party_id', 'order_date', 'created_at', 'latitude', 'longitude'] }) : [],
+    ]);
+    const ciById = {};
+    checkInRows.forEach((r) => { ciById[r.id] = r.toJSON(); });
+    const ordById = {};
+    orderRows.forEach((o) => { ordById[o.order_id] = o.toJSON(); });
+    const ordered = [];
+    pageIds.forEach((r) => {
+        if (r.src === 'c') { if (ciById[r.rid]) ordered.push(ciById[r.rid]); return; }
+        const o = ordById[r.rid];
+        if (!o) return;
+        ordered.push({
+            id: `order-${o.order_id}`,
+            type: 'ordered',
+            salesman_id: o.salesman_id,
+            party_id: o.party_id,
+            order_id: o.order_id,
+            check_in_date: o.order_date || o.created_at,
+            latitude: o.latitude,
+            longitude: o.longitude,
+            check_in_remarks: null,
+        });
+    });
+    const data = await enrichCheckIns(ordered);
+    return res.status(200).json({ ...buildPaginatedResponse(data, pagination, total), counts });
 }
 
 function resolveCheckInFields(body, existing = {}) {
@@ -263,6 +368,9 @@ class SalesmanCheckInsController {
             if (pagination.error) {
                 return res.status(pagination.status).json({ error: pagination.error });
             }
+            if (isReportRequest(req)) {
+                return await reportPage(req, res, { pagination });
+            }
             const { count, rows: checkIns } = await SalesmanCheckIns.findAndCountAll({
                 order: [['created_at', 'DESC'], ['id', 'DESC']],
                 limit: pagination.limit,
@@ -291,6 +399,9 @@ class SalesmanCheckInsController {
 
             const pagination = parseOptionalPagination(req);
             const order = [['created_at', 'DESC'], ['id', 'DESC']];
+            if (pagination && isReportRequest(req)) {
+                return await reportPage(req, res, { pagination, forcedSalesmanId: salesman_id });
+            }
             if (pagination) {
                 const { count, rows } = await SalesmanCheckIns.findAndCountAll({
                     where: { salesman_id }, order, limit: pagination.limit, offset: pagination.offset,

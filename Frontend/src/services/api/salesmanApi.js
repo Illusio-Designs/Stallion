@@ -1,4 +1,4 @@
-import { apiRequest, fetchAllPages, fetchPage, sharedRead } from './client';
+import { apiRequest, fetchAllPages, fetchPage, sharedRead, unwrapList } from './client';
 
 // ==================== SALESMAN CHECK-IN ENDPOINTS ====================
 
@@ -25,6 +25,49 @@ export const getSalesmanCheckinsPage = async (page = 1, limit = 20) => {
     includeAuth: true,
     silent: true,
   });
+};
+
+/**
+ * One server page of the Visit Report with filters, search, sort and counts, plus the linked
+ * order's number / qty / total / notes (and visit orders with no check-in row) already attached
+ * server-side for this page's rows. Returns { data, pagination, counts: { all, visit, ordered } }.
+ * `salesmanId` (a salesman's own id) reads the salesman-scoped endpoint; without it the office list.
+ * params: { page, limit, search, type: 'visit'|'ordered', from, to (YYYY-MM-DD), salesman_id, party_id, sort, dir }
+ */
+export const getVisitReportPage = async ({ page = 1, limit = 20, salesmanId = '', ...params } = {}) => {
+  const qs = new URLSearchParams({ page: String(page), limit: String(limit), include_orders: '1' });
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && String(v).trim() !== '') qs.set(k, String(v).trim());
+  });
+  const path = salesmanId ? `/salesman_checkins/${salesmanId}` : '/salesman_checkins';
+  const res = await apiRequest(`${path}?${qs.toString()}`, { method: 'GET', includeAuth: true, silent: true });
+  return {
+    data: unwrapList(res),
+    pagination: (res && res.pagination) || null,
+    counts: (res && res.counts) || null,
+  };
+};
+
+/**
+ * One server page of the Salesmen table. Returns { data, pagination, counts: { all, active, inactive } }.
+ * Rows carry state names, visits_today and target_pct for this page's salesmen.
+ * params: { page, limit, search, country_id, state_id, status: 'all'|'active'|'inactive', sort, dir }
+ */
+export const getSalesmenPage = async ({ page = 1, limit = 20, country_id = '', ...params } = {}) => {
+  const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
+  Object.entries(params).forEach(([k, v]) => {
+    if (v !== undefined && v !== null && String(v).trim() !== '') qs.set(k, String(v).trim());
+  });
+  const res = await apiRequest(`/salesmen/get?${qs.toString()}`, {
+    method: 'POST',
+    body: country_id ? { country_id } : {},
+    includeAuth: true,
+  });
+  return {
+    data: unwrapList(res),
+    pagination: (res && res.pagination) || null,
+    counts: (res && res.counts) || null,
+  };
 };
 
 /**
