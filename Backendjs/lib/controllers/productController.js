@@ -229,13 +229,18 @@ class ProductController {
                 conditions.push(Sequelize.literal(image_status === 'unuploaded' ? emptyExpr : `NOT ${emptyExpr}`));
             }
             const where = conditions.length > 0 ? { [Op.and]: conditions } : {};
-            const { count, rows: products } = await Product.findAndCountAll({
-                where,
-                include: productIncludes,
-                limit: limitNum,
-                offset: (pageNum - 1) * limitNum,
-                distinct: true,
-            });
+            // The filters only touch the product's own columns, so the total is counted without the ten
+            // joins (they are all one-to-one, so they never change the count) and at the same time as the
+            // page itself, instead of one after the other.
+            const [count, products] = await Promise.all([
+                Product.count({ where }),
+                Product.findAll({
+                    where,
+                    include: productIncludes,
+                    limit: limitNum,
+                    offset: (pageNum - 1) * limitNum,
+                }),
+            ]);
             // Always present total_qty as warehouse + tray so the list never shows a
             // stale/drifted stored total — matches the invariant enforced on write.
             const rows = products.map((p) => {
