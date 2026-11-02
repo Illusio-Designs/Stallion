@@ -255,7 +255,7 @@ export async function downloadOrderPdf(row, products = []) {
       doc.text(nameLines, prodL + pad, nameY);
       if (it.upcoming) {
         doc.setFontSize(7.5); doc.setTextColor(...MUTE);
-        doc.text('Upcoming', prodL + pad, nameY + nameLines.length * 4);
+        doc.text('Preorder', prodL + pad, nameY + nameLines.length * 4);
         doc.setFontSize(9); doc.setTextColor(...INK);
       }
       // qty + total, vertically centred
