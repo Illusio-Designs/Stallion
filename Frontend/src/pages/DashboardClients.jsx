@@ -1,5 +1,4 @@
 import { createPortal } from 'react-dom';
-import { searchRows } from '../utils/search';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AsidePanel from '../components/ui/AsidePanel';
 import { useConfirm } from '../components/ui/ConfirmProvider';
@@ -11,13 +10,13 @@ import {
   bulkUploadParties,
   deleteParty,
   getIndianCountries,
-  getPartiesForRole,
+  getPartiesTablePage,
+  getPartyFilterOptions,
   takeEditParty,
   getPartyDetails,
 } from '../services/apiService';
 import { getUser, getUserRole, getUserRoles } from '../services/authService';
 import { showError, showSuccess, showWarning } from '../services/notificationService';
-import { captureCurrentPosition } from '../utils/geolocation';
 import { downloadCsv } from '../utils/exportCsv';
 import '../styles/redesign-n-party.css';
 import '../styles/redesign-n-headings.css';
@@ -82,98 +81,75 @@ const DashboardClients = () => {
     }
   };
 
-  const fetchPartiesForCountry = useCallback(async (countryId) => {
-    // No country = "All Countries": the API supports it with a single
-    // unfiltered request (getParties with no country_id).
-    const allCountries = !countryId;
+  // The list tools. The server does the tab, search, filters, sort and paging: one page of rows per request.
+  const [partySearch, setPartySearch] = useState('');
+  const [partyQuery, setPartyQuery] = useState(''); // debounced copy of partySearch
+  const [stateFilter, setStateFilter] = useState(''); // state id
+  const [salesmanFilter, setSalesmanFilter] = useState(''); // salesman id
+  const [sortBy, setSortBy] = useState(null);
+  const [sortDir, setSortDir] = useState('asc');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [total, setTotal] = useState(0);
+  const [serverCounts, setServerCounts] = useState(null);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [filterOptions, setFilterOptions] = useState({ states: [], salesmen: [] });
+  const [moreFor, setMoreFor] = useState(null); // { row, top, left }
+  const reqIdRef = useRef(0); // only the newest request may write its result
+  const queryRef = useRef({});
+  queryRef.current = { page, pageSize, partyQuery, activeTab, stateFilter, salesmanFilter, sortBy, sortDir, country: selectedCountryFilter };
 
-    setLoading(true);
+  const TAB_STATUS = { All: '', Active: 'active', 'No location': 'no_location', Inactive: 'inactive' };
+  const decorateParty = (party) => {
+    const partyId = party.id || party.party_id || party._id;
+    const hasPoint = party.latitude != null && party.longitude != null && Number.isFinite(Number(party.latitude)) && Number.isFinite(Number(party.longitude));
+    return {
+      ...party,
+      id: partyId,
+      state_id: party.state_id || null,
+      city_id: party.city_id || null,
+      zone_id: party.zone_id || null,
+      isActive: party.is_active !== false,
+      stateLabel: (typeof party.state === 'string' ? party.state : party.state?.name) || party.state_name || '',
+      cityLabel: (typeof party.city === 'string' ? party.city : party.city?.name) || party.city_name || '—',
+      salesmanLabel: party.salesman?.full_name || party.salesman?.salesman_name || party.salesman_name || '—',
+      locationState: party.location_source === 'verified' ? 'ok' : (hasPoint ? 'warn' : 'idle'),
+      locationLabel: party.location_source === 'verified' ? 'Exact spot saved' : (hasPoint ? 'From address' : 'Not set'),
+      creditLabel: `${Number(party.credit_days) || 0} days`,
+    };
+  };
+  const listParams = (q, pg, limit) => ({
+    page: pg,
+    limit,
+    search: q.partyQuery,
+    status: TAB_STATUS[q.activeTab] || '',
+    state_id: q.stateFilter,
+    salesman_id: q.salesmanFilter,
+    country_id: q.country || '',
+    sort: q.sortBy || '',
+    dir: q.sortDir,
+  });
+
+  // Loads the CURRENT page (page, tab, search, filters and sort are read from queryRef). Called by the effect
+  // below on every change, and after a create, edit or delete to refresh what is on screen.
+  const fetchPartiesForCountry = useCallback(async () => {
+    const q = queryRef.current;
+    const reqId = ++reqIdRef.current;
+    setPageLoading(true);
     setError(null);
     try {
-      // Validate countryId before making API call
-      const cleanCountryId = allCountries ? '' : String(countryId).trim();
-      if (!allCountries && (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null')) {
-        console.error('[fetchPartiesForCountry] Invalid country ID:', countryId);
-        setParties([]);
-        setLoading(false);
-        return;
-      }
-
-      console.log('[fetchPartiesForCountry] Fetching parties for country:', cleanCountryId);
-      // Role-aware: salesman/distributor/party get their own scoped parties;
-      // admin & *_manager roles get the full country-filtered list.
-      const partiesData = await getPartiesForRole(userRole, allCountries ? null : cleanCountryId);
-
-      console.log('[fetchPartiesForCountry] Received', partiesData?.length || 0, 'parties from API');
-
-      // CRITICAL: Backend returns wrong data, so we MUST filter strictly
-      // Filter out ALL parties that don't match the requested country
-      const validParties = (partiesData || []).filter(p => {
-        if (!p) {
-          console.warn('[fetchPartiesForCountry] Skipping null/undefined party');
-          return false;
-        }
-
-        const partyCountryId = String(p.country_id || p.countryId || '').trim();
-        // Parties without a country_id (e.g. newly added) stay visible under any selection.
-        const matches = allCountries || !partyCountryId || partyCountryId === cleanCountryId;
-
-        if (!matches) {
-          console.warn('[fetchPartiesForCountry] ❌ REJECTING party - country mismatch:', {
-            party_id: p.id || p.party_id,
-            party_name: p.party_name,
-            party_country_id: partyCountryId,
-            requested_country_id: cleanCountryId,
-            match: false
-          });
-        } else {
-          console.log('[fetchPartiesForCountry] ✅ ACCEPTING party - country matches:', {
-            party_id: p.id || p.party_id,
-            party_name: p.party_name,
-            country_id: partyCountryId
-          });
-        }
-        return matches;
-      });
-
-      const filteredOut = partiesData.length - validParties.length;
-      if (filteredOut > 0) {
-        console.warn('[fetchPartiesForCountry] ⚠️ Backend returned', filteredOut, 'parties with WRONG country_id!');
-        console.warn('[fetchPartiesForCountry] This is a backend issue - it should filter by country_id');
-      }
-
-      if (validParties.length > 0) {
-        console.log('[fetchPartiesForCountry] ✅ Found', validParties.length, 'valid parties for country:', cleanCountryId);
-      } else {
-        console.log('[fetchPartiesForCountry] ℹ️ No parties found for country:', cleanCountryId);
-        if (partiesData.length > 0) {
-          console.warn('[fetchPartiesForCountry] ⚠️ Backend returned', partiesData.length, 'parties but none matched the requested country');
-        }
-      }
-
-      // Which parties a user sees is decided by the server from the working state (salesman)
-      // or the assigned distributor, so parties without a zone are still shown.
-      const filteredParties = validParties;
-
-      // Ensure all parties have consistent ID field and preserve all fields including state/city/zone
-      const normalizedParties = filteredParties.map(party => {
-        const partyId = party.id || party.party_id || party._id;
-        return {
-          ...party,
-          id: partyId,
-          // Ensure state/city/zone are preserved (they might be null)
-          state_id: party.state_id || null,
-          city_id: party.city_id || null,
-          zone_id: party.zone_id || null,
-        };
-      });
-
-      // Force update by creating a new array reference
-      const newParties = Array.isArray(normalizedParties) ? [...normalizedParties] : [];
-      console.log('[fetchPartiesForCountry] Setting', newParties.length, 'parties for country:', cleanCountryId);
-      setParties(newParties);
+      const res = await getPartiesTablePage(userRole, listParams(q, q.page, q.pageSize));
+      if (reqId !== reqIdRef.current) return;
+      const data = (res.data || []).filter(Boolean);
+      const totalRows = Number(res.pagination?.total ?? data.length) || 0;
+      setParties(data.map(decorateParty));
+      setTotal(totalRows);
+      if (res.counts) setServerCounts(res.counts);
+      // The last row of the last page was removed: step back to the new last page.
+      if (data.length === 0 && q.page > 1 && totalRows > 0) setPage(Math.max(1, Math.ceil(totalRows / q.pageSize)));
     } catch (error) {
-      console.error('[fetchPartiesForCountry] Error:', error);
+      if (reqId !== reqIdRef.current) return;
+      console.error('[fetchParties] Error:', error);
       const errorMessage = error.message?.toLowerCase() || '';
       const isNotFound = errorMessage.includes('parties not found') ||
         errorMessage.includes('no parties found') ||
@@ -187,10 +163,12 @@ const DashboardClients = () => {
         showError(`Failed to load parties: ${error.message}`);
       }
       setParties([]);
+      setTotal(0);
     } finally {
-      setLoading(false);
+      if (reqId === reqIdRef.current) setPageLoading(false);
     }
-  }, [isSalesman, isDistributor]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userRole]);
 
   // Default the country filter once countries have loaded: India if present,
   // otherwise the first country, so the list is not empty on first load.
@@ -209,72 +187,25 @@ const DashboardClients = () => {
     setDefaultCountryResolved(true);
   }, [countries, countriesReady, defaultCountryResolved, selectedCountryFilter]);
 
-  // Fetch parties when country filter changes (empty = All Countries)
+  // Fetch the page whenever the page, tab, search, filters, sort or country change (empty country = all countries)
   useEffect(() => {
     if (!defaultCountryResolved) return;
-    fetchPartiesForCountry(selectedCountryFilter);
-  }, [selectedCountryFilter, defaultCountryResolved, fetchPartiesForCountry]);
+    fetchPartiesForCountry();
+  }, [selectedCountryFilter, defaultCountryResolved, page, pageSize, partyQuery, activeTab, stateFilter, salesmanFilter, sortBy, sortDir, fetchPartiesForCountry]);
 
-  const rows = useMemo(() => {
-    // CRITICAL: Backend returns wrong data, so we MUST filter strictly by country_id
-    let filteredParties = [];
-
-    if (selectedCountryFilter) {
-      const cleanFilterId = String(selectedCountryFilter).trim();
-      // Show parties matching the selected country, plus parties with no country_id
-      filteredParties = parties.filter(party => {
-        if (!party) return false;
-        const partyCountryId = String(party.country_id || party.countryId || '').trim();
-        const matches = !partyCountryId || partyCountryId === cleanFilterId;
-
-        if (!matches && party.party_name) {
-          console.warn('[rows] ❌ Filtering out party with wrong country:', {
-            name: party.party_name,
-            party_country_id: partyCountryId,
-            selected_country_id: cleanFilterId
-          });
-        }
-        return matches;
-      });
-      console.log('[rows] ✅ Displaying', filteredParties.length, 'parties for country:', cleanFilterId, 'out of', parties.length, 'total');
-    } else {
-      // All Countries: show everything that was loaded
-      filteredParties = parties.filter(Boolean);
-    }
-
-
-
-    return filteredParties.map(party => {
-      // Ensure ID is preserved - check multiple possible field names
-      const partyId = party.id || party.party_id || party._id;
-      return {
-        ...party,
-        id: partyId, // Ensure ID is preserved with consistent field name
-        isActive: party.is_active !== false,
-        stateLabel: (typeof party.state === 'string' ? party.state : party.state?.name) || party.state_name || '',
-        cityLabel: (typeof party.city === 'string' ? party.city : party.city?.name) || party.city_name || '—',
-        salesmanLabel: party.salesman?.full_name || party.salesman?.salesman_name || party.salesman_name || '—',
-        locationState: party.location_source === 'verified' ? 'ok'
-          : (Number.isFinite(Number(party.latitude)) && party.latitude !== null && Number.isFinite(Number(party.longitude)) && party.longitude !== null ? 'warn' : 'idle'),
-        locationLabel: party.location_source === 'verified' ? 'Exact spot saved'
-          : (Number.isFinite(Number(party.latitude)) && party.latitude !== null && Number.isFinite(Number(party.longitude)) && party.longitude !== null ? 'From address' : 'Not set'),
-        creditLabel: `${Number(party.credit_days) || 0} days`,
-      };
-    });
-  }, [parties, selectedCountryFilter, isSalesman, isDistributor]);
-
-  // List tools (display only): tabs, search, filters, sort and paging over the loaded rows.
-  const [partySearch, setPartySearch] = useState('');
-  const [partyQuery, setPartyQuery] = useState(''); // debounced copy of partySearch
-  const [stateFilter, setStateFilter] = useState('');
-  const [salesmanFilter, setSalesmanFilter] = useState('');
-  const [sortBy, setSortBy] = useState(null);
-  const [sortDir, setSortDir] = useState('asc');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
-  const [moreFor, setMoreFor] = useState(null); // { row, top, left }
+  // Options of the State and Salesman dropdowns come from the server, not from the rows on this page.
   useEffect(() => {
-    const t = setTimeout(() => setPartyQuery(partySearch), 250);
+    if (!defaultCountryResolved) return undefined;
+    let live = true;
+    getPartyFilterOptions(selectedCountryFilter)
+      .then((o) => { if (live) setFilterOptions(o); })
+      .catch(() => { if (live) setFilterOptions({ states: [], salesmen: [] }); });
+    return () => { live = false; };
+  }, [selectedCountryFilter, defaultCountryResolved]);
+
+  const rows = parties; // already decorated, one page
+  useEffect(() => {
+    const t = setTimeout(() => { setPartyQuery((prev) => { if (prev !== partySearch) setPage(1); return partySearch; }); }, 300);
     return () => clearTimeout(t);
   }, [partySearch]);
   // The search box in the top bar (global search) also searches this list.
@@ -284,47 +215,18 @@ const DashboardClients = () => {
     return () => window.removeEventListener('globalSearchChanged', handler);
   }, []);
 
-  const rowsByTab = useMemo(() => {
-    if (activeTab === 'Active') return rows.filter(r => r.isActive);
-    if (activeTab === 'No location') return rows.filter(r => r.locationState === 'idle');
-    if (activeTab === 'Inactive') return rows.filter(r => !r.isActive);
-    return rows;
-  }, [rows, activeTab]);
-  const tabCounts = useMemo(() => ({
-    All: rows.length,
-    Active: rows.filter(r => r.isActive).length,
-    'No location': rows.filter(r => r.locationState === 'idle').length,
-    Inactive: rows.filter(r => !r.isActive).length,
-  }), [rows]);
-  const stateOptions = useMemo(() => [...new Set(rows.map(r => r.stateLabel).filter(Boolean))].sort((a, b) => a.localeCompare(b)), [rows]);
-  const salesmanOptions = useMemo(() => [...new Set(rows.flatMap(r => splitNames(r.salesmanLabel)))].sort((a, b) => a.localeCompare(b)), [rows]);
-
-  // The list endpoints return every page of the user's parties, so search runs over the loaded rows.
-  const searchedRows = useMemo(() => searchRows(
-    rowsByTab,
-    partyQuery,
-    (r) => [r.party_name, r.trade_name, r.contact_person, r.phone, r.cityLabel, r.state_name, r.salesmanLabel, r.gstin, r.pincode],
-  ), [rowsByTab, partyQuery]);
-  const filteredRowsByTab = useMemo(() => {
-    let out = searchedRows;
-    if (stateFilter) out = out.filter(r => r.stateLabel === stateFilter);
-    if (salesmanFilter) out = out.filter(r => splitNames(r.salesmanLabel).includes(salesmanFilter));
-    if (sortBy) {
-      const val = (r) => (sortBy === 'credit_days' ? Number(r.credit_days) || 0 : String(r[sortBy] ?? '').toLowerCase());
-      out = [...out].sort((x, y) => {
-        const a = val(x); const b = val(y);
-        const c = typeof a === 'number' ? a - b : String(a).localeCompare(String(b));
-        return sortDir === 'asc' ? c : -c;
-      });
-    }
-    return out;
-  }, [searchedRows, stateFilter, salesmanFilter, sortBy, sortDir]);
-  const pageCount = Math.max(1, Math.ceil(filteredRowsByTab.length / pageSize));
+  const tabCounts = {
+    All: serverCounts?.all ?? 0,
+    Active: serverCounts?.active ?? 0,
+    'No location': serverCounts?.no_location ?? 0,
+    Inactive: serverCounts?.inactive ?? 0,
+  };
+  const stateOptions = filterOptions.states.map((x) => ({ value: x.id, label: x.name }));
+  const salesmanOptions = filterOptions.salesmen.map((x) => ({ value: x.id, label: x.name }));
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
   const safePage = Math.min(page, pageCount);
-  const pageRows = useMemo(
-    () => filteredRowsByTab.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [filteredRowsByTab, safePage, pageSize],
-  );
+  const pageRows = rows;
+  const hasFilters = !!(partyQuery || stateFilter || salesmanFilter || activeTab !== 'All');
   const toggleSort = (key) => {
     if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
     else { setSortBy(key); setSortDir('asc'); }
@@ -348,7 +250,20 @@ const DashboardClients = () => {
       window.removeEventListener('keydown', onKey);
     };
   }, [moreFor]);
-  const handleExportParties = () => {
+  const handleExportParties = async () => {
+    // The table only holds one page, so the export asks the server for every row that matches the current view.
+    let all = [];
+    try {
+      const q = queryRef.current;
+      for (let pg = 1; pg <= 200; pg += 1) {
+        const res = await getPartiesTablePage(userRole, listParams(q, pg, 100));
+        all = all.concat((res.data || []).filter(Boolean).map(decorateParty));
+        if (pg >= (res.pagination?.totalPages || 1)) break;
+      }
+    } catch (err) {
+      showError(err?.message || 'Could not export the parties.');
+      return;
+    }
     downloadCsv('parties', [
       { label: 'Party name', value: r => r.party_name },
       { label: 'City', value: r => r.cityLabel },
@@ -357,7 +272,7 @@ const DashboardClients = () => {
       { label: 'Credit days', value: r => Number(r.credit_days) || 0 },
       { label: 'Phone', value: r => r.phone },
       { label: 'GST', value: r => r.gstin },
-    ], filteredRowsByTab);
+    ], all);
   };
 
   const handleAdd = () => {
@@ -408,7 +323,7 @@ const DashboardClients = () => {
       else showSuccess(`Bulk upload complete. Created: ${created}, Updated: ${updated}.`);
       setOpenBulkUpload(false);
       setBulkFile(null);
-      fetchPartiesForCountry(selectedCountryFilter);
+      fetchPartiesForCountry();
     } catch (err) {
       showError(`Bulk upload failed: ${err.message}`);
     } finally {
@@ -467,8 +382,8 @@ const DashboardClients = () => {
     try {
       setLoading(true);
       await deleteParty(partyId.trim());
-      setParties(prev => prev.filter(party => (party.id || party.party_id || party._id) !== partyId.trim()));
       showSuccess('Party deleted');
+      fetchPartiesForCountry();
       setError(null);
     } catch (err) {
       const msg = err?.errorData?.error || err?.message || 'Could not delete the party.';
@@ -486,42 +401,10 @@ const DashboardClients = () => {
 
   const isPartyFormOpen = openAdd || !!editRow;
 
-  // The shared party form saved a party: bring the list up to date.
+  // The shared party form saved a party. The table shows one server page, so bring that page up to date
+  // (a new or edited party can change which rows, tab counts and filters apply).
   const handlePartySaved = async (saved, meta = {}) => {
-    if (meta.refetch) {
-      await fetchPartiesForCountry(selectedCountryFilter);
-      return;
-    }
-    if (meta.mode === 'edit') {
-      const partyId = meta.partyId;
-      const dataToSend = meta.payload;
-      setParties(prev => prev.map(p => {
-        const id = p.id || p.party_id || p._id;
-        if (id === partyId) {
-          return {
-            ...p,
-            ...saved,
-            party_name: dataToSend.party_name,
-            trade_name: dataToSend.trade_name,
-            contact_person: dataToSend.contact_person,
-            email: dataToSend.email,
-            phone: dataToSend.phone,
-            address: dataToSend.address,
-            country_id: dataToSend.country_id,
-            state_id: dataToSend.state_id || saved?.state_id || null,
-            city_id: dataToSend.city_id || saved?.city_id || null,
-            zone_id: dataToSend.zone_id || saved?.zone_id || null,
-            pincode: dataToSend.pincode,
-            gstin: dataToSend.gstin,
-            pan: dataToSend.pan,
-            credit_days: dataToSend.credit_days,
-            prefered_courier: dataToSend.prefered_courier,
-            ...(isAdmin ? { is_active: dataToSend.is_active } : {}),
-            id: id
-          };
-        }
-        return p;
-      }));
+    if (meta.mode === 'edit' && !meta.refetch) {
       // Opened from the cart or from the check-in on Home: after a successful save go back to
       // where the salesman was (the cart with the same order type and party, or the check-in
       // with the same party chosen). Opened from the Parties page: stay here.
@@ -538,25 +421,11 @@ const DashboardClients = () => {
         window.location.href = back.to;
         return;
       }
-      await fetchPartiesForCountry(selectedCountryFilter);
-      return;
     }
-    // A new party: add it to the table if it matches the current filter, otherwise reload.
-    const newParty = saved;
-    if (newParty && (!selectedCountryFilter || !newParty.country_id || String(newParty.country_id) === String(selectedCountryFilter))) {
-      setParties(prev => [...prev, {
-        ...newParty,
-        id: newParty.id || newParty.party_id,
-        isActive: newParty.is_active !== false,
-      }]);
-    } else {
-      await fetchPartiesForCountry(selectedCountryFilter);
-    }
+    await fetchPartiesForCountry();
   };
 
-  const handleLocationRemoved = (partyId, cleared) => {
-    setParties(prev => prev.map(p => ((p.id || p.party_id) === partyId ? { ...p, ...cleared } : p)));
-  };
+  const handleLocationRemoved = () => { fetchPartiesForCountry(); };
 
 
   const partyMapHref = (row) => (
@@ -608,8 +477,9 @@ const DashboardClients = () => {
       </button>
     </th>
   );
-  const refresh = () => { setError(null); fetchPartiesForCountry(selectedCountryFilter); };
-  const listVisible = loading || (!error && filteredRowsByTab.length > 0);
+  const refresh = () => { setError(null); fetchPartiesForCountry(); };
+  const firstLoad = pageLoading && rows.length === 0;
+  const listVisible = firstLoad || (!error && total > 0) || (pageLoading && !error);
 
   return (
     <div className="dash-page">
@@ -617,7 +487,7 @@ const DashboardClients = () => {
         <div className="pg-head pp-head">
           <div><h1>Parties</h1><p>A shop&apos;s location comes from the address you pick. The first visit saves the exact spot.</p></div>
           <div className="pp-actions">
-            <button type="button" className="gbtn" onClick={refresh} disabled={loading}>
+            <button type="button" className="gbtn" onClick={refresh} disabled={loading || pageLoading}>
               <HugeiconsIcon icon={RefreshIcon} size={17} strokeWidth={1.8} /><span>Refresh</span>
             </button>
             {isPartyManager && (
@@ -675,26 +545,26 @@ const DashboardClients = () => {
               className="pp-dd"
             />
             <DropdownSelector
-              options={[{ value: '', label: 'All states' }, ...stateOptions.map(n => ({ value: n, label: n }))]}
+              options={[{ value: '', label: 'All states' }, ...stateOptions]}
               value={stateFilter}
               onChange={(v) => { setStateFilter(v || ''); setPage(1); }}
               placeholder="State"
               className="pp-dd"
             />
             <DropdownSelector
-              options={[{ value: '', label: 'All salesmen' }, ...salesmanOptions.map(n => ({ value: n, label: n }))]}
+              options={[{ value: '', label: 'All salesmen' }, ...salesmanOptions]}
               value={salesmanFilter}
               onChange={(v) => { setSalesmanFilter(v || ''); setPage(1); }}
               placeholder="Salesman"
               className="pp-dd"
             />
-            <button type="button" className="gbtn pp-export" onClick={handleExportParties} disabled={loading || filteredRowsByTab.length === 0}>
+            <button type="button" className="gbtn pp-export" onClick={handleExportParties} disabled={loading || pageLoading || total === 0}>
               <HugeiconsIcon icon={Download01Icon} size={17} strokeWidth={1.8} /><span>Export CSV</span>
             </button>
           </div>
         </div>
 
-        {!loading && error ? (
+        {!pageLoading && error ? (
           <div className="dash-row">
             <div className="dash-card full">
               <div className="ui-state ui-state--error">
@@ -711,7 +581,7 @@ const DashboardClients = () => {
               </div>
             </div>
           </div>
-        ) : !loading && filteredRowsByTab.length === 0 ? (
+        ) : !pageLoading && total === 0 ? (
           <div className="dash-row">
             <div className="dash-card full">
               <div className="ui-state ui-state--empty">
@@ -723,9 +593,9 @@ const DashboardClients = () => {
                     <line x1="22" y1="11" x2="16" y2="11" />
                   </svg>
                 </div>
-                <p className="ui-state__title">{rows.length > 0 ? 'No matching parties' : 'No parties yet'}</p>
+                <p className="ui-state__title">{hasFilters ? 'No matching parties' : 'No parties yet'}</p>
                 <p className="ui-state__desc">
-                  {rows.length > 0
+                  {hasFilters
                     ? 'Nothing matches the search or filters. Clear them to see all parties.'
                     : selectedCountryFilter
                     ? `No parties found for ${countries.find(c => String(c.id) === String(selectedCountryFilter))?.name || 'the selected country'}. Pick another country above, or add a new party.`
@@ -745,8 +615,8 @@ const DashboardClients = () => {
         {listVisible && (
           <div className="dash-card full party-n-table pp-list">
             {/* Phone: one card per party */}
-            <ul className="pp-cards" aria-busy={loading}>
-              {loading
+            <ul className="pp-cards" aria-busy={pageLoading} style={pageLoading && !firstLoad ? { opacity: 0.55 } : undefined}>
+              {firstLoad
                 ? Array.from({ length: 5 }, (_, i) => <li key={i} className="pp-card pp-card--sk" aria-hidden="true" />)
                 : pageRows.map((row, i) => (
                   <li key={row.id || i} className="pp-card">
@@ -764,7 +634,7 @@ const DashboardClients = () => {
             </ul>
 
             {/* Tablet and desktop: table */}
-            <div className="pp-table">
+            <div className="pp-table" aria-busy={pageLoading} style={pageLoading && !firstLoad ? { opacity: 0.55 } : undefined}>
               <table>
                 <thead>
                   <tr>
@@ -777,7 +647,7 @@ const DashboardClients = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {loading
+                  {firstLoad
                     ? Array.from({ length: 6 }, (_, i) => (
                       <tr key={i} aria-hidden="true"><td colSpan={6}><span className="pp-sk" /></td></tr>
                     ))
@@ -796,7 +666,7 @@ const DashboardClients = () => {
             </div>
 
             <div className="pp-foot">
-              <span className="pp-count">Showing {pageRows.length} of {filteredRowsByTab.length} parties</span>
+              <span className="pp-count">Showing {pageRows.length} of {total} parties</span>
               <Pagination page={safePage} pageCount={pageCount} onPageChange={setPage} />
               <DropdownSelector
                 options={[20, 40, 60].map(n => ({ value: n, label: `${n} per page` }))}

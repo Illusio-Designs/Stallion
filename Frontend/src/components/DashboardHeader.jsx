@@ -38,6 +38,7 @@ const DashboardHeader = ({ onPageChange, currentPage, isCollapsed, onMobileMenuT
     if (onPageChange) onPageChange(homeForSide(next, getUserRoles()));
   };
 
+
   // Notification bell: unread count, a dropdown with the latest ones, polled every 60 s and on focus.
   const [notes, setNotes] = useState([]);
   const [unread, setUnread] = useState(0);

@@ -374,6 +374,46 @@ export const getOrdersPageForRole = (role, page = 1, limit = 20, search = '', st
   SELF_SCOPED_ORDER_ROLES.has((role || '').toLowerCase().trim())
     ? getMyOrdersPage(page, limit, search, status)
     : getOrdersPage(page, limit, search, status);
+/**
+ * One page of orders for the Orders table (role-aware), plus the tab `counts` and the scope-wide
+ * `summary` totals. Status tab, search, dates, type, salesman and sort are all applied by the server.
+ * @returns {Promise<{data:Array, pagination:Object|null, counts:Object|null, summary:Object|null}>}
+ */
+export const getOrdersListPage = async (role, opts = {}) => {
+  const {
+    page = 1, limit = 20, search = '', status = '', startDate = '', endDate = '',
+    orderType = '', salesmanId = '', sort = '', dir = '', counts = false, summary = false,
+  } = opts;
+  const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
+  const add = (k, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') qs.set(k, String(v).trim()); };
+  add('search', search); add('status', status); add('start_date', startDate); add('end_date', endDate);
+  add('order_type', orderType); add('salesman_id', salesmanId); add('sort', sort); add('dir', dir);
+  if (counts) qs.set('counts', '1');
+  if (summary) qs.set('summary', '1');
+  const base = SELF_SCOPED_ORDER_ROLES.has((role || '').toLowerCase().trim()) ? '/orders/my' : '/orders';
+  try {
+    const res = await apiRequest(`${base}?${qs.toString()}`, { method: 'GET', includeAuth: true });
+    return {
+      data: Array.isArray(res) ? res : (res?.data || []),
+      pagination: res?.pagination || null,
+      counts: res?.counts || null,
+      summary: res?.summary || null,
+    };
+  } catch (error) {
+    // "Orders not found" (404) is a valid empty state, not an error.
+    if (error.statusCode === 404) return { data: [], pagination: null, counts: null, summary: null };
+    throw error;
+  }
+};
+/** Dropdown values for the Orders page: { types: string[], salesmen: [{salesman_id, full_name}] } within the caller's scope. */
+export const getOrderFilterOptions = async () => {
+  try {
+    const res = await apiRequest('/orders/filter-options', { method: 'GET', includeAuth: true });
+    return { types: res?.types || [], salesmen: res?.salesmen || [] };
+  } catch {
+    return { types: [], salesmen: [] };
+  }
+};
 /** One page of trays -> { data, pagination }. */
 export const getTraysPage = (page = 1, limit = 20, search = '', { activeOnly = false } = {}) =>
   fetchPage('/trays', { page, limit, search, params: activeOnly ? { active: 'true' } : {} }, { method: 'GET', includeAuth: true });

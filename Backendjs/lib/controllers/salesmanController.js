@@ -4,6 +4,8 @@ const Tray = require('../models/Tray');
 const { TrayStatus } = require('../constants/enums');
 const { syncSalesmanTrays } = require('../utils/trayLifecycle');
 const SalesmanTray = require('../models/SalesmanTray');
+const SalesmanCheckIns = require('../models/SalesmanCheckIns');
+const SalesmanTargets = require('../models/SalesmanTargets');
 const SalesmanZones = require('../models/SalesmanZones');
 const Zone = require('../models/Zone');
 const SalesmanStates = require('../models/SalesmanStates');
@@ -45,6 +47,110 @@ const { Op } = require('sequelize');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 const { SALESMAN_UPLOAD_DIR } = require('../constants/multer');
 const fs = require('fs');
+
+// One page of the Salesmen table (POST /salesmen/get with page/limit). Extra params (body or query):
+//   status     all | active | inactive  (default all: the table shows inactive salesmen too)
+//   country_id only salesmen of that country
+//   state_id   only salesmen who work in that state
+//   sort / dir name | code | status | created  /  asc | desc  (default: created, asc)
+// Returns { data, pagination, counts: { all, active, inactive } }. The counts ignore the status
+// filter (they are the tab badges) but respect search / country / state.
+// Each row also carries state names, visits_today (IST) and target_pct for the page's salesmen only.
+async function getSalesmenPage(req, res, pagination, searchFilter) {
+    const param = (k) => {
+        const v = (req.body && req.body[k] !== undefined) ? req.body[k] : (req.query || {})[k];
+        return v === undefined || v === null ? '' : String(v).trim();
+    };
+    const baseParts = [];
+    const countryId = param('country_id');
+    if (countryId) baseParts.push({ country_id: countryId });
+    const stateId = param('state_id');
+    if (stateId) {
+        baseParts.push({
+            salesman_id: {
+                [Op.in]: sequelize.literal(`(SELECT salesman_id FROM salesman_states WHERE state_id = ${sequelize.escape(stateId)})`),
+            },
+        });
+    }
+    const baseWhere = mergeWhere(baseParts.length ? { [Op.and]: baseParts } : {}, searchFilter);
+    const status = param('status').toLowerCase();
+    const statusWhere = status === 'active' ? { is_active: true } : status === 'inactive' ? { is_active: false } : {};
+    const where = mergeWhere(baseWhere, statusWhere);
+
+    const SORTS = { name: 'full_name', code: 'employee_code', status: 'is_active', created: 'created_at' };
+    const sortCol = SORTS[param('sort').toLowerCase()] || 'created_at';
+    const dir = param('dir').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const order = [[sortCol, dir], ['salesman_id', 'ASC']];
+
+    const [count, salesmen, groups] = await Promise.all([
+        Salesman.count({ where }),
+        Salesman.findAll({ where, order, limit: pagination.limit, offset: pagination.offset }),
+        Salesman.findAll({
+            where: baseWhere,
+            attributes: ['is_active', [sequelize.fn('COUNT', sequelize.col('salesman_id')), 'n']],
+            group: ['is_active'],
+            raw: true,
+        }),
+    ]);
+    const counts = { all: 0, active: 0, inactive: 0 };
+    groups.forEach((g) => {
+        const n = Number(g.n) || 0;
+        counts.all += n;
+        if (g.is_active === true || g.is_active === 1 || g.is_active === '1') counts.active += n; else counts.inactive += n;
+    });
+
+    const ids = salesmen.map((s) => s.salesman_id);
+    const istDay = new Date(Date.now() + 330 * 60 * 1000).toISOString().slice(0, 10);
+    const dayStart = new Date(new Date(`${istDay}T00:00:00.000Z`).getTime() - 330 * 60 * 1000);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    const [allZones, allStates, visitRows, targetRows] = ids.length
+        ? await Promise.all([
+            SalesmanZones.findAll({ where: { salesman_id: ids } }),
+            SalesmanStates.findAll({ where: { salesman_id: ids } }),
+            SalesmanCheckIns.findAll({
+                where: { salesman_id: ids, type: { [Op.ne]: 'ordered' }, check_in_date: { [Op.gte]: dayStart, [Op.lt]: dayEnd } },
+                attributes: ['salesman_id', [sequelize.fn('COUNT', sequelize.col('id')), 'n']],
+                group: ['salesman_id'],
+                raw: true,
+            }),
+            SalesmanTargets.findAll({
+                where: { salesman_id: ids },
+                attributes: [
+                    'salesman_id',
+                    [sequelize.fn('SUM', sequelize.col('completed_amount')), 'done'],
+                    [sequelize.fn('SUM', sequelize.col('target_amount')), 'goal'],
+                ],
+                group: ['salesman_id'],
+                raw: true,
+            }),
+        ])
+        : [[], [], [], []];
+    const stateIds = [...new Set(allStates.map((x) => x.state_id).filter(Boolean))];
+    const stateRows = stateIds.length ? await State.findAll({ where: { id: stateIds }, attributes: ['id', 'name'], raw: true }) : [];
+    const stateName = {};
+    stateRows.forEach((st) => { stateName[st.id] = st.name; });
+    const zonesBy = {};
+    const statesBy = {};
+    allZones.forEach((z) => { (zonesBy[z.salesman_id] = zonesBy[z.salesman_id] || []).push(z.toJSON()); });
+    allStates.forEach((st) => {
+        (statesBy[st.salesman_id] = statesBy[st.salesman_id] || []).push({ ...st.toJSON(), state_name: stateName[st.state_id] || null });
+    });
+    const visitsBy = {};
+    visitRows.forEach((v) => { visitsBy[v.salesman_id] = Number(v.n) || 0; });
+    const pctBy = {};
+    targetRows.forEach((t) => {
+        const goal = Number(t.goal) || 0;
+        if (goal > 0) pctBy[t.salesman_id] = Math.round(((Number(t.done) || 0) / goal) * 100);
+    });
+    const response = salesmen.map((salesman) => forViewer(req, {
+        ...salesman.toJSON(),
+        zones: zonesBy[salesman.salesman_id] || [],
+        states: statesBy[salesman.salesman_id] || [],
+        visits_today: visitsBy[salesman.salesman_id] || 0,
+        target_pct: pctBy[salesman.salesman_id] != null ? pctBy[salesman.salesman_id] : null,
+    }));
+    res.status(200).json({ ...buildPaginatedResponse(response, pagination, count), counts });
+}
 
 class SalesmanController {
 
@@ -94,20 +200,18 @@ class SalesmanController {
                 nameFields: ['full_name', 'employee_code'],
                 phoneFields: ['phone', 'alternate_phone'],
             });
-            const where = mergeWhere({ is_active: true }, searchFilter);
-            // Optional pagination: with page/limit -> { data, pagination }; without -> plain
+            // Optional pagination: with page/limit -> { data, pagination, counts }; without -> plain
             // array (legacy shape) hard-capped so the response is never unbounded.
             const pagination = parseOptionalPagination(req);
-            const order = [['created_at', 'ASC'], ['salesman_id', 'ASC']];
-            let salesmen;
-            let count = 0;
             if (pagination) {
-                ({ count, rows: salesmen } = await Salesman.findAndCountAll({
-                    where, order, limit: pagination.limit, offset: pagination.offset,
-                }));
-            } else {
-                salesmen = await Salesman.findAll({ where, order, limit: UNPAGINATED_CAP });
+                if (pagination.error) {
+                    return res.status(pagination.status).json({ error: pagination.error });
+                }
+                return await getSalesmenPage(req, res, pagination, searchFilter);
             }
+            const where = mergeWhere({ is_active: true }, searchFilter);
+            const order = [['created_at', 'ASC'], ['salesman_id', 'ASC']];
+            const salesmen = await Salesman.findAll({ where, order, limit: UNPAGINATED_CAP });
             // Two batched queries (zones + states for all salesmen) instead of 2 per row.
             const ids = salesmen.map((s) => s.salesman_id);
             const [allZones, allStates] = ids.length
@@ -125,7 +229,7 @@ class SalesmanController {
                 zones: zonesBy[salesman.salesman_id] || [],
                 states: statesBy[salesman.salesman_id] || [],
             }));
-            res.status(200).json(pagination ? buildPaginatedResponse(response, pagination, count) : response);
+            res.status(200).json(response);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }

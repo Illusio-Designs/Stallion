@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import TableWithControls from '../components/ui/TableWithControls';
+import Pagination from '../components/ui/Pagination';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
@@ -7,7 +8,7 @@ import { useConfirm } from '../components/ui/ConfirmProvider';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import {
-  getDistributors,
+  getDistributorsListPage,
   createDistributor,
   updateDistributor,
   deleteDistributor,
@@ -289,7 +290,29 @@ const DashboardDistributor = () => {
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
-  
+
+  // List view: everything below is applied by the server, one page at a time.
+  const [query, setQuery] = usePeopleQuery();
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('All');
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [serverCounts, setServerCounts] = useState({ All: 0, Active: 0, Inactive: 0 });
+  const [listLoading, setListLoading] = useState(false);
+  const [stateList, setStateList] = useState([]); // lookup for the state filter dropdown
+  const listParamsRef = useRef({});
+  listParamsRef.current = { page, statusTab, stateFilter, query: debouncedQuery };
+  const listReqRef = useRef(0); // only the latest response may update the table
+
+  // Debounce typing; a new search always starts from page 1 (one batched update, one fetch).
+  useEffect(() => {
+    if (query === debouncedQuery) return undefined;
+    const t = setTimeout(() => { setDebouncedQuery(query); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [query, debouncedQuery]);
+
   const [formData, setFormData] = useState({
     distributor_name: '',
     trade_name: '',
@@ -334,106 +357,58 @@ const DashboardDistributor = () => {
 
   const fetchDistributorsForCountry = useCallback(async (countryId) => {
     if (!countryId) {
-      console.log('[fetchDistributorsForCountry] No country ID provided, clearing distributors');
       setDistributors([]);
       setHasSearched(false);
       return;
     }
-    
-    setLoading(true);
+    const cleanCountryId = String(countryId).trim();
+    if (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null') {
+      setDistributors([]);
+      setHasSearched(true);
+      return;
+    }
+
+    const reqId = ++listReqRef.current;
+    const { page: pg, statusTab: tab, stateFilter: st, query: q } = listParamsRef.current;
+    setListLoading(true);
     setError(null);
-    setHasSearched(false);
     try {
-      // Validate countryId before making API call
-      const cleanCountryId = String(countryId).trim();
-      if (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null') {
-        console.error('[fetchDistributorsForCountry] Invalid country ID:', countryId);
-        setDistributors([]);
-        setHasSearched(true);
-        return;
-      }
-      
-      console.log('[fetchDistributorsForCountry] ====== FETCHING ======');
-      console.log('[fetchDistributorsForCountry] Requested country ID:', cleanCountryId);
-      console.log('[fetchDistributorsForCountry] Current selectedCountryFilter:', selectedCountryFilter);
-      
-      const distributorsData = await getDistributors(cleanCountryId);
-      
-      console.log('[fetchDistributorsForCountry] Received', distributorsData?.length || 0, 'distributors from API');
-      
-      // CRITICAL: Backend returns wrong data, so we MUST filter strictly
-      // Filter out ALL distributors that don't match the requested country
-      const validDistributors = (distributorsData || []).filter(d => {
-        if (!d) {
-          console.warn('[fetchDistributorsForCountry] Skipping null/undefined distributor');
-          return false;
-        }
-        
-        const distributorCountryId = String(d.country_id || d.countryId || '').trim();
-        const matches = distributorCountryId === cleanCountryId;
-        
-        if (!matches) {
-          console.warn('[fetchDistributorsForCountry] ❌ REJECTING distributor - country mismatch:', {
-            distributor_id: d.distributor_id || d.id,
-            distributor_name: d.distributor_name,
-            distributor_country_id: distributorCountryId,
-            requested_country_id: cleanCountryId,
-            match: false
-          });
-        } else {
-          console.log('[fetchDistributorsForCountry] ✅ ACCEPTING distributor - country matches:', {
-            distributor_id: d.distributor_id || d.id,
-            distributor_name: d.distributor_name,
-            country_id: distributorCountryId
-          });
-        }
-        return matches;
+      const res = await getDistributorsListPage(cleanCountryId, {
+        page: pg, limit: PAGE_STEP, search: q, status: tab.toLowerCase(), stateId: st,
       });
-      
-      const filteredOut = distributorsData.length - validDistributors.length;
-      if (filteredOut > 0) {
-        console.warn('[fetchDistributorsForCountry] ⚠️ Backend returned', filteredOut, 'distributors with WRONG country_id!');
-        console.warn('[fetchDistributorsForCountry] This is a backend issue - it should filter by country_id');
-      }
-      
-      if (validDistributors.length > 0) {
-        console.log('[fetchDistributorsForCountry] ✅ Found', validDistributors.length, 'valid distributors for country:', cleanCountryId);
-      } else {
-        console.log('[fetchDistributorsForCountry] ℹ️ No distributors found for country:', cleanCountryId);
-        console.log('[fetchDistributorsForCountry] Backend returned', distributorsData.length, 'distributors but none matched the requested country');
-      }
-      
-      // Force update by creating a new array reference
-      const newDistributors = Array.isArray(validDistributors) ? [...validDistributors] : [];
-      console.log('[fetchDistributorsForCountry] Setting', newDistributors.length, 'distributors for country:', cleanCountryId);
-      console.log('[fetchDistributorsForCountry] ====== END FETCH ======');
-      setDistributors(newDistributors);
-      setHasSearched(true); // Mark that we've completed a search - even if empty
+      if (reqId !== listReqRef.current) return; // a newer request is in flight
+      const pagination = res.pagination || {};
+      setDistributors(Array.isArray(res.data) ? res.data.filter(Boolean) : []);
+      setTotal(Number(pagination.total) || 0);
+      setPageCount(Math.max(1, Number(pagination.totalPages) || 1));
+      if (res.counts) setServerCounts(res.counts);
+      // Deleting the last row of the last page leaves an empty page: step back one.
+      if (pg > 1 && Number(pagination.totalPages) > 0 && pg > Number(pagination.totalPages)) setPage(Number(pagination.totalPages));
+      setHasSearched(true);
     } catch (error) {
+      if (reqId !== listReqRef.current) return;
       console.error('[fetchDistributorsForCountry] Error:', error);
-      // "Distributors not found" is handled by getDistributors and returns empty array
-      // Only show error for actual failures, not "not found" cases
       const errorMessage = error.message?.toLowerCase() || '';
-      const isNotFound = errorMessage.includes('distributors not found') || 
+      const isNotFound = errorMessage.includes('distributors not found') ||
                         errorMessage.includes('no distributors found') ||
                         errorMessage.includes('distributor not found') ||
                         error.statusCode === 404;
-      const isDbError = errorMessage.includes('distributor_zones') || 
+      const isDbError = errorMessage.includes('distributor_zones') ||
                         errorMessage.includes("doesn't exist") ||
                         errorMessage.includes('table') ||
                         error.statusCode === 500;
-      
       if (!isNotFound && !isDbError &&
-          !errorMessage.includes('token expired') && 
+          !errorMessage.includes('token expired') &&
           !errorMessage.includes('unauthorized')) {
         setError(`Failed to load distributors: ${error.message}`);
         showError(`Failed to load distributors: ${error.message}`);
       }
-      // Always set empty array on error
       setDistributors([]);
+      setTotal(0);
+      setPageCount(1);
       setHasSearched(true);
     } finally {
-      setLoading(false);
+      if (reqId === listReqRef.current) setListLoading(false);
     }
   }, []);
 
@@ -453,21 +428,30 @@ const DashboardDistributor = () => {
     }
   }, [countries, selectedCountryFilter]);
 
-  // Fetch distributors and zones when country filter changes
+  // Fetch one page whenever the country, page, tab, state filter or (debounced) search changes.
   useEffect(() => {
     if (selectedCountryFilter) {
-      console.log('[Filter] Country changed, fetching distributors for:', selectedCountryFilter);
       fetchDistributorsForCountry(selectedCountryFilter);
       // Zones are only needed in the Add/Edit form, and loading them walks
       // states -> cities -> zones (100+ requests). Defer to when the form opens.
     } else {
-      // If no country selected (All Countries), clear distributors
-      console.log('[Filter] No country selected (All Countries), clearing distributors');
+      listReqRef.current += 1;
       setDistributors([]);
       setLoading(false);
+      setListLoading(false);
       setHasSearched(false);
     }
-  }, [selectedCountryFilter, fetchDistributorsForCountry]);
+  }, [selectedCountryFilter, page, statusTab, stateFilter, debouncedQuery, fetchDistributorsForCountry]);
+
+  // State filter options come from a small lookup, not from the loaded rows.
+  useEffect(() => {
+    if (!selectedCountryFilter) { setStateList([]); return undefined; }
+    let cancelled = false;
+    getStates(selectedCountryFilter)
+      .then(list => { if (!cancelled) setStateList(Array.isArray(list) ? list : []); })
+      .catch(() => { if (!cancelled) setStateList([]); });
+    return () => { cancelled = true; };
+  }, [selectedCountryFilter]);
 
   const fetchStates = async (countryId) => {
     if (!countryId) {
@@ -813,6 +797,7 @@ const DashboardDistributor = () => {
       }
       
       setError(null);
+      if (selectedCountryFilter) fetchDistributorsForCountry(selectedCountryFilter);
     } catch (error) {
       console.error('[Delete Distributor] Delete distributor error:', error);
       
@@ -931,6 +916,7 @@ const DashboardDistributor = () => {
           
           // Show success notification
           showSuccess('Distributor updated successfully');
+          if (selectedCountryFilter) fetchDistributorsForCountry(selectedCountryFilter);
           setError(null);
           setOpenAdd(false);
           setEditRow(null);
@@ -963,18 +949,10 @@ const DashboardDistributor = () => {
         // retry with "user already exists".
         try {
           const phoneNumber = dataToSend.phone;
-          const newDistributor = await createDistributor(dataToSend);
+          await createDistributor(dataToSend);
 
-          // Optimistically add to table if it matches the current filter
-          if (selectedCountryFilter && newDistributor && newDistributor.country_id === selectedCountryFilter) {
-            setDistributors(prev => [...prev, {
-              ...newDistributor,
-              id: newDistributor.id || newDistributor.distributor_id,
-              isActive: newDistributor.is_active !== false,
-            }]);
-          } else if (selectedCountryFilter) {
-            await fetchDistributorsForCountry(selectedCountryFilter);
-          }
+          // Refetch the current page (the server decides where the new row lands).
+          if (selectedCountryFilter) await fetchDistributorsForCountry(selectedCountryFilter);
 
           showSuccess(`Distributor created successfully! The distributor can now login with phone: ${phoneNumber}.`);
       setError(null);
@@ -1020,44 +998,22 @@ const DashboardDistributor = () => {
       window.location.reload();
     }
   };
-  const showError_ = !loading && !!error;
-  const showEmpty = !loading && !error && rows.length === 0;
+  const showError_ = !listLoading && !!error;
+  const showEmpty = !listLoading && !error && hasSearched && rows.length === 0 && !anyFilter;
 
 
 
-  // List view: search, state filter and Active / Inactive chips (client side, rows are already loaded)
-  const [query, setQuery] = usePeopleQuery();
-  const [stateFilter, setStateFilter] = useState('');
-  const [statusTab, setStatusTab] = useState('All');
-  const [shown, setShown] = useState(PAGE_STEP);
+  const stateOptions = useMemo(() => ([
+    { value: '', label: 'All states' },
+    ...stateList
+      .map(st => ({ value: st.id || st.state_id, label: st.name || st.state_name || '' }))
+      .filter(o => o.value && o.label)
+      .sort((x, y) => x.label.localeCompare(y.label)),
+  ]), [stateList]);
 
-  const stateOptions = useMemo(() => {
-    const set = new Set();
-    rows.forEach(r => stateNamesOf(r).forEach(n => set.add(n)));
-    return [{ value: '', label: 'All states' }, ...[...set].sort().map(n => ({ value: n, label: n }))];
-  }, [rows]);
-
-  const counts = useMemo(() => ({
-    All: rows.length,
-    Active: rows.filter(r => r.isActive).length,
-    Inactive: rows.filter(r => !r.isActive).length,
-  }), [rows]);
-
-  const listRows = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return rows.filter(r => {
-      if (statusTab === 'Active' && !r.isActive) return false;
-      if (statusTab === 'Inactive' && r.isActive) return false;
-      if (stateFilter && !stateNamesOf(r).includes(stateFilter)) return false;
-      if (!q) return true;
-      const hay = [r.distributor_name, r.trade_name, r.contact_person, r.phone, r.email, ...stateNamesOf(r)]
-        .filter(Boolean).join(' ').toLowerCase();
-      return hay.includes(q);
-    });
-  }, [rows, query, stateFilter, statusTab]);
-
-  useEffect(() => { setShown(PAGE_STEP); }, [query, stateFilter, statusTab, selectedCountryFilter]);
-
+  const counts = serverCounts;
+  const listRows = rows;
+  const anyFilter = !!(debouncedQuery || stateFilter || statusTab !== 'All');
 
   const closeForm = () => {
     setOpenAdd(false);
@@ -1239,6 +1195,7 @@ const DashboardDistributor = () => {
                 if (!value) return;
                 setDistributors([]);
                 setStateFilter('');
+                setPage(1);
                 setSelectedCountryFilter(value);
               }}
               onOpen={fetchCountries}
@@ -1250,7 +1207,7 @@ const DashboardDistributor = () => {
             <DropdownSelector
               options={stateOptions}
               value={stateFilter}
-              onChange={(value) => setStateFilter(value || '')}
+              onChange={(value) => { setStateFilter(value || ''); setPage(1); }}
               placeholder="All states"
               className="ui-dropdown-custom--full-width"
             />
@@ -1266,7 +1223,7 @@ const DashboardDistributor = () => {
 
         <div className="pp-chips" role="group" aria-label="Filter by status">
           {['All', 'Active', 'Inactive'].map(t => (
-            <button key={t} type="button" className="pp-chip" aria-pressed={statusTab === t} onClick={() => setStatusTab(t)}>
+            <button key={t} type="button" className="pp-chip" aria-pressed={statusTab === t} onClick={() => { setStatusTab(t); setPage(1); }}>
               {t} <b>{counts[t]}</b>
             </button>
           ))}
@@ -1308,7 +1265,7 @@ const DashboardDistributor = () => {
             </button>
           </div>
         ) : (
-          <>
+          <div style={{ opacity: listLoading && hasSearched ? 0.55 : 1, transition: 'opacity 120ms' }}>
             <div className="pp-list pp-desk">
               <TableWithControls
                 title="Distributors"
@@ -1317,17 +1274,24 @@ const DashboardDistributor = () => {
                 showFilter={false}
                 showSerialNumber={false}
                 selectable={false}
-                loading={loading}
+                loading={listLoading && !hasSearched}
+                serverPagination
+                serverPage={page}
+                serverPageCount={pageCount}
+                serverPageSize={PAGE_STEP}
+                serverTotal={total}
+                onServerPageChange={(p) => setPage(p)}
+                onServerSearch={() => {}}
               />
             </div>
-            <div className="pp-mob" aria-busy={loading}>
-              {loading ? (
+            <div className="pp-mob" aria-busy={listLoading}>
+              {listLoading && !hasSearched ? (
                 <div className="pp-empty">Loading distributors...</div>
               ) : listRows.length === 0 ? (
                 <div className="pp-empty">No distributors match.</div>
               ) : (
                 <>
-                  {listRows.slice(0, shown).map((row) => (
+                  {listRows.map((row) => (
                     <article className="pp-card" key={row.id || row.distributor_id || row.distributor_name}>
                       <div className="pp-card__top">
                         <div className="pp-who">
@@ -1350,15 +1314,13 @@ const DashboardDistributor = () => {
                       </div>
                     </article>
                   ))}
-                  {listRows.length > shown && (
-                    <button type="button" className="pp-btn pp-more" onClick={() => setShown(n => n + PAGE_STEP)}>
-                      Show more ({listRows.length - shown} left)
-                    </button>
+                  {pageCount > 1 && (
+                    <Pagination page={page} pageCount={pageCount} onPageChange={(p) => setPage(p)} />
                   )}
                 </>
               )}
             </div>
-          </>
+          </div>
         )}
       </div>
 

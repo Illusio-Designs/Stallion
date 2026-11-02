@@ -1,5 +1,5 @@
 import DropdownSelector from '../components/ui/DropdownSelector';
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
 import DateRangePicker from '../components/ui/DateRangePicker';
@@ -7,11 +7,13 @@ import { FiSearch } from '../components/icons/hugeicons';
 import { addressRows } from '../utils/addressParts';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
+import Pagination from '../components/ui/Pagination';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
-  getOrdersForRole,
+  getOrdersListPage,
+  getOrderFilterOptions,
   updateOrderStatus,
   dispatchOrder,
   markTrayTaskReceived,
@@ -51,6 +53,14 @@ import { isUpcoming } from '../utils/upcoming';
 const mapApiStatusToUI = (apiStatus) => (apiStatus ? orderStatusLabel(apiStatus) : 'PENDING');
 const mapUITabToApiStatus = (tab) => ORDER_TAB_TO_STATUS[tab];
 const UI_TO_API_STATUS = ORDER_LABEL_TO_STATUS;
+// order_type "party_order" -> "Party Order"
+const formatOrderType = (type) => {
+  if (!type) return 'N/A';
+  return type
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+};
 const COURIER_SUGGESTIONS = ['Blue Dart', 'DTDC', 'Delhivery', 'India Post', 'Professional Couriers', 'Gati'];
 const CANCEL_REASONS = ['Party asked to cancel', 'Stock not available', 'Wrong order', 'Other'];
 const OFFICE_STATUS_TITLE = ORDER_STATUS_TITLE;
@@ -76,7 +86,14 @@ const DashboardOrders = () => {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [salesmanFilter, setSalesmanFilter] = useState('');
-  const [cardLimit, setCardLimit] = useState(20);
+  const [page, setPage] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [pagination, setPagination] = useState(null); // { page, limit, total, totalPages } of the loaded page
+  const [serverCounts, setServerCounts] = useState(null); // status -> count, from the server
+  const [serverSummary, setServerSummary] = useState(null); // scope-wide totals for the KPI row
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [filterOptions, setFilterOptions] = useState({ types: [], salesmen: [] });
+  const [exporting, setExporting] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -134,66 +151,62 @@ const DashboardOrders = () => {
     });
   }, [orders]);
 
+  // Load ONE page (20 rows) from the server with the current tab, search, dates and filters. A request
+  // counter drops answers that arrive after a newer request, so a slow old one cannot overwrite a new one.
+  const requestSeq = useRef(0);
+  const partyLookupTried = useRef(false);
+  const paramsRef = useRef({});
+  paramsRef.current = { page, activeTab, debouncedSearch, dateFrom, dateTo, typeFilter, salesmanFilter };
+  const PAGE_SIZE = 20;
+
   const fetchOrders = async (suppressError = false) => {
+    const seq = ++requestSeq.current;
+    const q = paramsRef.current;
     try {
       setLoading(true);
       setError(null);
-      const response = await getOrdersForRole(userRole);
-      let allOrders = Array.isArray(response) ? response : [];
-      
-      // Filter orders based on role - only show orders created by the logged-in user
-      if (isDistributor && user?.distributor_id) {
-        // Filter orders for this distributor
-        const distributorId = String(user.distributor_id).trim();
-        allOrders = allOrders.filter(order => {
-          const orderDistributorId = order.distributor_id || order.distributor?.distributor_id || order.distributor?.id;
-          return orderDistributorId && String(orderDistributorId).trim() === distributorId;
-        });
-        console.log('[fetchOrders] Filtered orders for distributor:', distributorId, 'Total:', allOrders.length);
-      } else if (isParty && user?.party_id) {
-        // Filter orders for this party
-        const partyId = String(user.party_id).trim();
-        allOrders = allOrders.filter(order => {
-          const orderPartyId = order.party_id || order.party?.party_id || order.party?.id;
-          return orderPartyId && String(orderPartyId).trim() === partyId;
-        });
-        console.log('[fetchOrders] Filtered orders for party:', partyId, 'Total:', allOrders.length);
-      } else if (isSalesman && user?.salesman_id) {
-        // Filter orders for this salesman
-        const salesmanId = String(user.salesman_id).trim();
-        allOrders = allOrders.filter(order => {
-          const orderSalesmanId = order.salesman_id || order.salesman?.salesman_id || order.salesman?.id;
-          return orderSalesmanId && String(orderSalesmanId).trim() === salesmanId;
-        });
-        console.log('[fetchOrders] Filtered orders for salesman:', salesmanId, 'Total:', allOrders.length);
+      const response = await getOrdersListPage(userRole, {
+        page: q.page,
+        limit: PAGE_SIZE,
+        search: q.debouncedSearch,
+        status: q.activeTab !== 'All' ? (mapUITabToApiStatus(q.activeTab) || '') : '',
+        startDate: q.dateFrom || '',
+        endDate: q.dateTo || '',
+        orderType: q.typeFilter,
+        salesmanId: q.salesmanFilter,
+        counts: true,
+        summary: true,
+      });
+      if (seq !== requestSeq.current) return;
+      const pageOrders = Array.isArray(response.data) ? response.data : [];
+      const lastPage = Math.max(1, response.pagination?.totalPages || 1);
+      // A delete or a filter may have emptied this page: step back to the last page that has rows.
+      if (pageOrders.length === 0 && q.page > lastPage) {
+        setPage(lastPage);
+        return;
       }
-      // Admin sees all orders (no filtering)
-      
-      setOrders(allOrders);
-      
-      // Fetch party details (name + address) for the orders' parties. We need
-      // the address for the View/Download "From" block even when the name is
-      // already embedded, so key off any party_id present.
-      const uniquePartyIds = [...new Set(allOrders
-        .filter(order => order.party_id)
-        .map(order => order.party_id)
-      )];
+      setOrders(pageOrders);
+      setPagination(response.pagination);
+      if (response.counts) setServerCounts(response.counts);
+      if (response.summary) setServerSummary(response.summary);
+      setLoadedOnce(true);
 
       // The server already puts the party name and address on every order. The whole party list
       // is only fetched when some order lacks one of them (for example the party was removed).
-      const needsPartyLookup = allOrders.some((order) => order.party_id && (
+      const needsPartyLookup = pageOrders.some((order) => order.party_id && (
         !(order.party?.party_name || order.party_name) ||
         !(order.party_address || [order.party?.address, order.party?.pincode].filter(Boolean).join(' - '))
       ));
 
-      if (uniquePartyIds.length > 0 && needsPartyLookup) {
+      if (needsPartyLookup && !partyLookupTried.current) {
+        partyLookupTried.current = true;
         try {
           // One call for all parties instead of one getPartyById per order (N+1).
           // Role-scoped: field roles (salesman/distributor/party) get /parties/my;
           // managers get the full list. Avoids a 403 on POST /parties/get.
           const allParties = await getPartiesForRole(userRole);
-          const newPartyNamesMap = { ...partyNamesMap };
-          const newPartyAddressMap = { ...partyAddressMap };
+          const newPartyNamesMap = {};
+          const newPartyAddressMap = {};
           (allParties || []).forEach((p) => {
             const id = p.id || p.party_id;
             if (!id) return;
@@ -201,43 +214,63 @@ const DashboardOrders = () => {
             const addr = [p.address, p.pincode].filter(Boolean).join(' - ');
             if (addr) newPartyAddressMap[id] = addr;
           });
-          setPartyNamesMap(newPartyNamesMap);
-          setPartyAddressMap(newPartyAddressMap);
+          setPartyNamesMap((prev) => ({ ...prev, ...newPartyNamesMap }));
+          setPartyAddressMap((prev) => ({ ...prev, ...newPartyAddressMap }));
         } catch (err) {
           console.error('Failed to fetch party details:', err);
         }
       }
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       const message = err?.response?.data?.message || err?.message || 'Failed to fetch orders';
       const errorMessage = (message || '').toLowerCase();
-      
+
       // Don't show error for "not found" cases - it's a valid empty state
       const isNotFoundError = errorMessage.includes('orders not found') ||
                              errorMessage.includes('no orders found') ||
                              errorMessage.includes('order not found') ||
                              err.statusCode === 404;
-      
+
       if (isNotFoundError) {
-        // Just set empty array, don't show error
         setOrders([]);
         setError(null);
       } else {
-        // Only show error if not suppressed and not a "not found" error
         setError(message);
         if (!suppressError) {
           showError(message);
         }
         setOrders([]);
       }
+      setLoadedOnce(true);
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   };
 
-  // Fetch orders on mount. Product names are resolved on-demand in the View
-  // modal (per order), so we don't bulk-load the catalog here.
+  // Search waits 300 ms after typing stops before asking the server.
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Fetch when the page or any filter changes. A filter change goes back to page 1 first (the page
+  // change then triggers the fetch), so there is no wasted request for the old page number.
+  const filtersKey = JSON.stringify([activeTab, debouncedSearch, dateFrom, dateTo, typeFilter, salesmanFilter]);
+  const lastFiltersKey = useRef(filtersKey);
+  useEffect(() => {
+    if (lastFiltersKey.current !== filtersKey) {
+      lastFiltersKey.current = filtersKey;
+      if (page !== 1) { setPage(1); return; }
+    }
     fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey, page]);
+
+  // Dropdown options come from a small lookup, not from the loaded rows.
+  useEffect(() => {
+    let cancelled = false;
+    getOrderFilterOptions().then((o) => { if (!cancelled) setFilterOptions(o); });
+    return () => { cancelled = true; };
   }, []);
 
   // Resolve salesman names for the SALESMAN column (orders only carry salesman_id).
@@ -348,11 +381,11 @@ const DashboardOrders = () => {
   }, [viewRow]);
 
   // Transform orders data to table rows
-  const rows = useMemo(() => {
-    if (!orders || orders.length === 0) return [];
+  const buildRows = (list) => {
+    if (!list || list.length === 0) return [];
 
     const tableRows = [];
-    orders.forEach(order => {
+    list.forEach(order => {
       const orderId = order.order_id || order.id;
       const orderNumber = order.order_number || `#${orderId?.toString().slice(-6) || 'N/A'}`;
       // Get party name from order object, or from partyNamesMap if not available
@@ -372,14 +405,6 @@ const DashboardOrders = () => {
       // Parse order_items (can be JSON string or array)
       const orderItems = parseOrderItems(order.order_items);
 
-      // Format order type for display
-      const formatOrderType = (type) => {
-        if (!type) return 'N/A';
-        return type
-          .split('_')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-      };
       const orderTypeDisplay = formatOrderType(order.order_type);
 
       // Calculate totals for the order
@@ -417,80 +442,30 @@ const DashboardOrders = () => {
     });
 
     return tableRows;
-  }, [orders, partyNamesMap, partyAddressMap, salesmanNamesMap]);
+  };
+  const rows = useMemo(() => buildRows(orders), [orders, partyNamesMap, partyAddressMap, salesmanNamesMap]);
 
-  // Filter rows by active tab + selected date range
-  const filteredRowsByTab = useMemo(() => {
-    let result = rows;
+  // The server already applied the tab, dates, search and filters: these rows are the current page.
+  const filteredRowsByTab = rows;
 
-    if (activeTab !== 'All') {
-      const apiStatus = mapUITabToApiStatus(activeTab);
-      if (apiStatus) {
-        result = result.filter(row => row.originalOrder?.order_status?.toLowerCase() === apiStatus);
-      }
-    }
+  const typeOptions = useMemo(() => [{ value: '', label: 'All types' }, ...filterOptions.types.map(t => ({ value: t, label: formatOrderType(t) }))], [filterOptions]);
+  const salesmanOptions = useMemo(() => [{ value: '', label: 'All salesmen' }, ...filterOptions.salesmen.map(sm => ({ value: sm.salesman_id, label: sm.full_name }))], [filterOptions]);
 
-    if (dateFrom || dateTo) {
-      const fromTs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : -Infinity;
-      const toTs = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : Infinity;
-      result = result.filter(row => {
-        const raw = row.originalOrder?.order_date || row.originalOrder?.created_at;
-        if (!raw) return false;
-        const ts = new Date(raw).getTime();
-        return !Number.isNaN(ts) && ts >= fromTs && ts <= toTs;
-      });
-    }
-
-    if (typeFilter) result = result.filter(row => row.orderType === typeFilter);
-    if (salesmanFilter) result = result.filter(row => row.salesman === salesmanFilter);
-    const q = search.trim().toLowerCase();
-    if (q) {
-      result = result.filter(row => [row.orderId, row.client, row.salesman, row.partyCity, row.orderType]
-        .some(v => String(v ?? '').toLowerCase().includes(q)));
-    }
-
-    return result;
-  }, [rows, activeTab, dateFrom, dateTo, typeFilter, salesmanFilter, search]);
-
-  const typeOptions = useMemo(() => [{ value: '', label: 'All types' }, ...[...new Set(rows.map(r => r.orderType).filter(t => t && t !== 'N/A'))].sort().map(t => ({ value: t, label: t }))], [rows]);
-  const salesmanOptions = useMemo(() => [{ value: '', label: 'All salesmen' }, ...[...new Set(rows.map(r => r.salesman).filter(t => t && t !== '—'))].sort().map(t => ({ value: t, label: t }))], [rows]);
-  useEffect(() => { setCardLimit(20); }, [activeTab, dateFrom, dateTo, typeFilter, salesmanFilter, search]);
-
-  // Counts shown on the status chips
+  // Counts shown on the status chips (from the server, for the current search, dates and filters)
   const tabCounts = useMemo(() => {
-    const out = { All: orders.length };
+    const out = { All: serverCounts?.all ?? 0 };
     ORDER_FILTER_TABS_WITH_LEGACY.forEach((t) => {
-      const api = mapUITabToApiStatus(t);
-      out[t] = orders.filter((o) => o.order_status?.toLowerCase() === api).length;
+      out[t] = serverCounts?.[mapUITabToApiStatus(t)] ?? 0;
     });
     return out;
-  }, [orders]);
+  }, [serverCounts]);
 
-  // Calculate summary statistics
-  const summaryStats = useMemo(() => {
-    const totalOrders = orders.length;
-    const pendingOrders = orders.filter(o => o.order_status?.toLowerCase() === 'pending').length;
-    const completedOrders = orders.filter(o => o.order_status?.toLowerCase() === 'completed');
-    const completedValue = completedOrders.reduce((sum, o) => {
-      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
-    }, 0);
-    const totalRevenue = orders.reduce((sum, o) => {
-      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
-    }, 0);
-
-    // Count by order type
-    const retailOrders = orders.filter(o => o.order_type?.includes('retail') || o.order_type === 'retail_order').length;
-    const bulkOrders = orders.filter(o => o.order_type?.includes('bulk') || o.order_type === 'bulk_order').length;
-
-    return {
-      totalOrders,
-      pendingOrders,
-      completedValue,
-      totalRevenue,
-      retailOrders,
-      bulkOrders
-    };
-  }, [orders]);
+  // Summary numbers for the KPI row (the whole scope, from the server)
+  const summaryStats = serverSummary || { totalOrders: 0, pendingOrders: 0, completedValue: 0, totalRevenue: 0, retailOrders: 0, bulkOrders: 0 };
+  const initialLoading = loading && !loadedOnce;
+  const noFilters = activeTab === 'All' && !debouncedSearch && !dateFrom && !dateTo && !typeFilter && !salesmanFilter;
+  const totalRows = pagination?.total ?? rows.length;
+  const pageCount = Math.max(1, pagination?.totalPages || 1);
 
   // Handle delete order
   const handleDelete = async (row) => {
@@ -640,17 +615,39 @@ const DashboardOrders = () => {
     if (ok) setReceivedBy('');
   };
 
-  const handleExportOrders = () => {
-    downloadCsv('orders', [
-      { label: 'Order', value: r => r.orderId },
-      { label: 'Type', value: r => r.orderType },
-      { label: 'Party', value: r => r.client },
-      { label: 'Salesman', value: r => r.salesman },
-      { label: 'Date', value: r => r.date },
-      { label: 'Quantity', value: r => r.qty },
-      { label: 'Status', value: r => r.status },
-      { label: 'Total', value: r => Number(r.originalOrder?.order_total ?? 0) || 0 },
-    ], filteredRowsByTab);
+  // Export every order that matches the current tab, search and filters (not just this page):
+  // fetch the matching pages from the server, 100 at a time.
+  const handleExportOrders = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const q = paramsRef.current;
+      const all = [];
+      for (let p = 1; p <= 200; p++) {
+        const res = await getOrdersListPage(userRole, {
+          page: p, limit: 100, search: q.debouncedSearch,
+          status: q.activeTab !== 'All' ? (mapUITabToApiStatus(q.activeTab) || '') : '',
+          startDate: q.dateFrom || '', endDate: q.dateTo || '',
+          orderType: q.typeFilter, salesmanId: q.salesmanFilter,
+        });
+        all.push(...(res.data || []));
+        if (p >= (res.pagination?.totalPages || 1)) break;
+      }
+      downloadCsv('orders', [
+        { label: 'Order', value: r => r.orderId },
+        { label: 'Type', value: r => r.orderType },
+        { label: 'Party', value: r => r.client },
+        { label: 'Salesman', value: r => r.salesman },
+        { label: 'Date', value: r => r.date },
+        { label: 'Quantity', value: r => r.qty },
+        { label: 'Status', value: r => r.status },
+        { label: 'Total', value: r => Number(r.originalOrder?.order_total ?? 0) || 0 },
+      ], buildRows(all));
+    } catch (err) {
+      showError(err?.message || 'Could not export orders');
+    } finally {
+      setExporting(false);
+    }
   };
 
   // Download the order as a branded PDF (shared generator — see utils/orderPdf).
@@ -691,15 +688,15 @@ const DashboardOrders = () => {
         <div className="pg-head">
           <div><h1>Orders</h1><p>Stock is taken when an order is placed and returned when it is cancelled.</p></div>
           <div className="pg-head__tools">
-            <button type="button" className="gbtn" onClick={handleExportOrders} disabled={loading || filteredRowsByTab.length === 0}>Export CSV</button>
+            <button type="button" className="gbtn" onClick={handleExportOrders} disabled={initialLoading || exporting || totalRows === 0}>{exporting ? 'Exporting…' : 'Export CSV'}</button>
           </div>
         </div>
         {/* Summary numbers: one slim row */}
         <div className="orp-kpis" role="list" aria-label="Order totals">
-          <div className="orp-kpi" role="listitem"><small>Orders</small><b>{loading ? <Skeleton width={50} height={18} /> : summaryStats.totalOrders}</b><span>Retail {summaryStats.retailOrders} | Bulk {summaryStats.bulkOrders}</span></div>
-          <div className="orp-kpi" role="listitem"><small>Pending</small><b>{loading ? <Skeleton width={50} height={18} /> : summaryStats.pendingOrders}</b></div>
-          <div className="orp-kpi" role="listitem"><small>Completed</small><b>{loading ? <Skeleton width={70} height={18} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</b></div>
-          <div className="orp-kpi" role="listitem"><small>Revenue</small><b>{loading ? <Skeleton width={70} height={18} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</b></div>
+          <div className="orp-kpi" role="listitem"><small>Orders</small><b>{initialLoading ? <Skeleton width={50} height={18} /> : summaryStats.totalOrders}</b><span>Retail {summaryStats.retailOrders} | Bulk {summaryStats.bulkOrders}</span></div>
+          <div className="orp-kpi" role="listitem"><small>Pending</small><b>{initialLoading ? <Skeleton width={50} height={18} /> : summaryStats.pendingOrders}</b></div>
+          <div className="orp-kpi" role="listitem"><small>Completed</small><b>{initialLoading ? <Skeleton width={70} height={18} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</b></div>
+          <div className="orp-kpi" role="listitem"><small>Revenue</small><b>{initialLoading ? <Skeleton width={70} height={18} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</b></div>
         </div>
 
         {/* Order Status Tabs */}
@@ -709,7 +706,7 @@ const DashboardOrders = () => {
               <button
                 key={tab}
                 className={`order-tab inline-flex min-h-10 flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-4 py-2 text-[length:var(--text-base)] font-semibold leading-[var(--leading-snug)] transition-[background,color,box-shadow] duration-[0.12s] ease-out focus-visible:outline-none active:scale-[0.98] ${activeTab === tab ? 'active bg-primary text-text-on-primary' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => { setActiveTab(tab); }}
               >
                 {tab}
                 <b className="order-tab__count">{tabCounts[tab] ?? 0}</b>
@@ -741,11 +738,11 @@ const DashboardOrders = () => {
                     <path d="M12 8V12M12 16H12.01M12 3L2 20H22L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
-                <p className="ui-state__title">Couldn't load orders</p>
+                <p className="ui-state__title">Couldn&apos;t load orders</p>
                 <p className="ui-state__desc">{error}</p>
                 <button className="ui-btn ui-btn--secondary" onClick={() => fetchOrders()}>Try again</button>
               </div>
-            ) : !loading && orders.length === 0 ? (
+            ) : !loading && loadedOnce && noFilters && totalRows === 0 ? (
               <div className="ui-state ui-state--empty">
                 <div className="ui-state__icon">
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -757,6 +754,7 @@ const DashboardOrders = () => {
               </div>
             ) : (
               <>
+                <div style={loading && loadedOnce ? { opacity: 0.55, transition: 'opacity .15s' } : undefined} aria-busy={loading}>
                 <div className="orp-table">
                   <TableWithControls
                     title="Order Overview"
@@ -764,14 +762,21 @@ const DashboardOrders = () => {
                     columns={columns}
                     rows={filteredRowsByTab}
                     itemName="Order"
-                    loading={loading}
+                    loading={initialLoading}
+                    serverPagination
+                    serverPage={pagination?.page || page}
+                    serverPageCount={pageCount}
+                    serverPageSize={PAGE_SIZE}
+                    serverTotal={totalRows}
+                    onServerPageChange={setPage}
+                    onServerSearch={setSearch}
                   />
                 </div>
                 <div className="orp-cards">
-                  {loading ? <p className="orp-empty">Loading orders…</p> : filteredRowsByTab.length === 0 ? <p className="orp-empty">No orders match these filters.</p> : (
+                  {initialLoading ? <p className="orp-empty">Loading orders…</p> : filteredRowsByTab.length === 0 ? <p className="orp-empty">No orders match these filters.</p> : (
                     <>
                       <ul className="orp-list">
-                        {filteredRowsByTab.slice(0, cardLimit).map((row) => {
+                        {filteredRowsByTab.map((row) => {
                           const held = heldNote(row?.originalOrder);
                           return (
                             <li key={row.id} className="orp-card">
@@ -794,12 +799,13 @@ const DashboardOrders = () => {
                           );
                         })}
                       </ul>
-                      <p className="orp-count">Showing {Math.min(cardLimit, filteredRowsByTab.length)} of {filteredRowsByTab.length} orders</p>
-                      {filteredRowsByTab.length > cardLimit && (
-                        <button type="button" className="orp-more" onClick={() => setCardLimit(n => n + 20)}>Show more</button>
+                      <p className="orp-count">Showing {filteredRowsByTab.length} of {totalRows} orders</p>
+                      {pageCount > 1 && (
+                        <Pagination page={pagination?.page || page} pageCount={pageCount} onPageChange={setPage} className="justify-center" />
                       )}
                     </>
                   )}
+                </div>
                 </div>
               </>
             )}
