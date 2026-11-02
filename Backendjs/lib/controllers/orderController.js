@@ -215,12 +215,14 @@ async function mapOrdersWithPartyName(orders) {
     // salesman by id.
     const salesmanIds = [...new Set(orders.map((o) => o.salesman_id).filter(Boolean))];
     const salesmanMap = {};
-    if (salesmanIds.length) {
-        const salesmen = await Salesman.findAll({ where: { salesman_id: salesmanIds }, attributes: ['salesman_id', 'full_name'] });
-        salesmen.forEach((s) => { salesmanMap[s.salesman_id] = s.full_name; });
-    }
-    const decorated = await decorateOrders(orders.map((o) => o.get({ plain: true })));
-    const addressNames = await loadAddressNames(decorated);
+    const plainOrders = orders.map((o) => o.get({ plain: true }));
+    // Salesman names, tray/shipment details and address names do not depend on each other: fetch together.
+    const [salesmen, decorated, addressNames] = await Promise.all([
+        salesmanIds.length ? Salesman.findAll({ where: { salesman_id: salesmanIds }, attributes: ['salesman_id', 'full_name'] }) : [],
+        decorateOrders(plainOrders),
+        loadAddressNames(plainOrders),
+    ]);
+    salesmen.forEach((s) => { salesmanMap[s.salesman_id] = s.full_name; });
     return decorated.map((plain) => {
         const { party, ...rest } = plain;
         return {
@@ -586,13 +588,17 @@ class OrderController {
             if (pagination.error) {
                 return res.status(pagination.status).json({ error: pagination.error });
             }
-            const { count, rows: orders } = await Order.findAndCountAll({
-                where,
-                include: [orderPartyInclude],
-                limit: pagination.limit,
-                offset: pagination.offset,
-                order: [['order_date', 'DESC']],
-            });
+            // Count without the party join (the filters use only order columns) and in parallel with the page.
+            const [count, orders] = await Promise.all([
+                Order.count({ where }),
+                Order.findAll({
+                    where,
+                    include: [orderPartyInclude],
+                    limit: pagination.limit,
+                    offset: pagination.offset,
+                    order: [['order_date', 'DESC']],
+                }),
+            ]);
             res.status(200).json(buildPaginatedResponse(await mapOrdersWithPartyName(orders), pagination, count));
         } catch (error) {
             console.error('Error fetching orders:', error);
@@ -628,13 +634,17 @@ class OrderController {
                 ...(dateResult.filter ?? {}),
             };
             const where = mergeWhere(baseFilter, searchFilter);
-            const { count, rows: orders } = await Order.findAndCountAll({
-                where,
-                include: [orderPartyInclude],
-                limit: pagination.limit,
-                offset: pagination.offset,
-                order: [['order_date', 'DESC']],
-            });
+            // Count without the party join (the filters use only order columns) and in parallel with the page.
+            const [count, orders] = await Promise.all([
+                Order.count({ where }),
+                Order.findAll({
+                    where,
+                    include: [orderPartyInclude],
+                    limit: pagination.limit,
+                    offset: pagination.offset,
+                    order: [['order_date', 'DESC']],
+                }),
+            ]);
             res.status(200).json(buildPaginatedResponse(await mapOrdersWithPartyName(orders), pagination, count));
         } catch (error) {
             console.error('Error fetching orders:', error);
