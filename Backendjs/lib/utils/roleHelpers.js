@@ -43,7 +43,8 @@ function normalizeRole(roleName) {
 // A member can hold several roles. hasRole accepts EITHER a single role name or
 // an array of role names, and returns true if ANY of them is allowed.
 function hasRole(roleOrRoles, allowedRoles) {
-    const allowed = allowedRoles.map(normalizeRole);
+    // Callers pass either a list of roles or one role name; a bare string used to throw "allowedRoles.map is not a function".
+    const allowed = (Array.isArray(allowedRoles) ? allowedRoles : [allowedRoles]).map(normalizeRole);
     const roles = Array.isArray(roleOrRoles) ? roleOrRoles : [roleOrRoles];
     return roles.map(normalizeRole).some((r) => r != null && allowed.includes(r));
 }
