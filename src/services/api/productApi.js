@@ -131,6 +131,11 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
       filterBody.in_stock = true;
     }
 
+    // warehouse_in_stock: true -> only frames with warehouse stock (the tray assign picker)
+    if (filters.warehouse_in_stock === true) {
+      filterBody.warehouse_in_stock = true;
+    }
+
     // active: true -> only products that are switched on (shop and pickers)
     if (filters.active === true) {
       filterBody.active = true;
@@ -205,11 +210,11 @@ export const getProducts = async (page = 1, limit = 20, filters = {}) => {
  * @param {number} [page=1]
  * @param {number} [limit=20]
  * @param {string} [search=''] - text matched against model_no/size/status
- * @param {{activeOnly?: boolean}} [options] - activeOnly: true hides products switched off (pickers)
+ * @param {{activeOnly?: boolean, warehouseInStock?: boolean}} [options] - activeOnly: true hides products switched off (pickers); warehouseInStock: true hides frames with no warehouse stock (tray assign)
  */
-export const getProductsPage = async (page = 1, limit = 20, search = '', { activeOnly = false } = {}) => {
+export const getProductsPage = async (page = 1, limit = 20, search = '', { activeOnly = false, warehouseInStock = false } = {}) => {
   const term = String(search || '').trim();
-  const filters = { ...(term ? { search: term } : {}), ...(activeOnly ? { active: true } : {}) };
+  const filters = { ...(term ? { search: term } : {}), ...(activeOnly ? { active: true } : {}), ...(warehouseInStock ? { warehouse_in_stock: true } : {}) };
   return getProducts(page, limit, Object.keys(filters).length ? filters : null);
 };
 

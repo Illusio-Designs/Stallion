@@ -189,7 +189,7 @@ const DashboardTray = () => {
   const fetchAllProducts = async (search = '') => {
     setLoadingProducts(true);
     try {
-      const result = await getProductsPage(1, 20, search, { activeOnly: true });
+      const result = await getProductsPage(1, 20, search, { activeOnly: true, warehouseInStock: true });
       setAllProducts(Array.isArray(result) ? result : (result?.data || []));
     } catch (err) {
       console.error('Failed to load products:', err);
