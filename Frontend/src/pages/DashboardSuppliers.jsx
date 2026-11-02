@@ -5,6 +5,7 @@ import AsidePanel from '../components/ui/AsidePanel';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import { istNow } from '../utils/istTime';
 import DatePicker from '../components/ui/DatePicker';
+import PartyFormPanel from '../components/party/PartyFormPanel';
 import DateTimePicker from '../components/ui/DateTimePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
 import DropdownSelector from '../components/ui/DropdownSelector';
@@ -296,6 +297,7 @@ const DashboardSuppliers = () => {
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
   const [zoneParties, setZoneParties] = useState([]); // parties for salesman's zones
+  const [visitPartyPanel, setVisitPartyPanel] = useState({ open: false, party: null }); // Add / Edit party from the visit form
   const [mySalesmanId, setMySalesmanId] = useState(''); // current salesman's own salesman_id
   const [allPartiesLookup, setAllPartiesLookup] = useState([]); // all parties for name lookup in tables
 
@@ -1613,6 +1615,17 @@ const DashboardSuppliers = () => {
     }
   };
 
+  // After a party is added or edited from the visit form: reload the list, keep a brand-new party in it
+  // even if its zone is outside the salesman's zones, and pick it for this visit.
+  const handleVisitPartySaved = async (saved, meta) => {
+    const id = saved?.party_id || saved?.id;
+    await fetchZoneParties();
+    if (id && saved) {
+      setZoneParties((prev) => (prev.some((p) => (p.party_id || p.id) === id) ? prev : [...prev, saved]));
+    }
+    if (id && meta?.mode !== 'edit') setCheckinForm((prev) => ({ ...prev, party_id: id }));
+  };
+
   // The salesman home's "Add visit" shortcut lands here with ?addVisit=1: open the form once, then clean the address.
   useEffect(() => {
     if (!isSalesman || typeof window === 'undefined') return;
@@ -2148,6 +2161,26 @@ const DashboardSuppliers = () => {
                 className="ui-dropdown-custom--full-width"
                 disabled={!!editCheckin}
               />
+              {isSalesman && (
+                <div className="mt-2 flex gap-2">
+                  {!editCheckin && (
+                    <button type="button" className="ui-btn ui-btn--secondary" onClick={() => setVisitPartyPanel({ open: true, party: null })}>
+                      Add party
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn--secondary"
+                    disabled={!checkinForm.party_id}
+                    onClick={() => {
+                      const row = zoneParties.find((p) => (p.party_id || p.id) === checkinForm.party_id);
+                      if (row) setVisitPartyPanel({ open: true, party: row });
+                    }}
+                  >
+                    Edit party
+                  </button>
+                </div>
+              )}
               {isSalesman && checkinForm.party_id && (() => {
                 const sp = zoneParties.find(p => (p.party_id || p.id) === checkinForm.party_id);
                 const verified = sp && sp.location_source === 'verified';
@@ -2265,6 +2298,16 @@ const DashboardSuppliers = () => {
           </div>
         </form>
       </AsidePanel>
+      {isSalesman && (
+        <PartyFormPanel
+          open={visitPartyPanel.open}
+          onClose={() => setVisitPartyPanel({ open: false, party: null })}
+          party={visitPartyPanel.party}
+          mode={visitPartyPanel.party ? 'edit' : 'add'}
+          defaultToIndia
+          onSaved={handleVisitPartySaved}
+        />
+      )}
     </div>
   );
 };
