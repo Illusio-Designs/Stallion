@@ -116,6 +116,8 @@
   color: var(--t-ink); font-size: 14px; font-weight: 600; text-decoration: none;
 }
 :root .pp-more__item:hover { background: var(--b-soft); }
+:root button.pp-more__item { width: 100%; border: 0; background: transparent; cursor: pointer; font-family: inherit; text-align: left; }
+:root .pp-more__item--danger { color: var(--c-bad); }
 
 /* ---------- Add / Edit party form ---------- */
 :root .pf { display: flex; flex-direction: column; gap: 18px; }
