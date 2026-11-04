@@ -33,6 +33,7 @@ export const parseProductsResponse = (response) => {
  * @param {number|Array<number>} [filters.frame_type_id] - Frame type ID(s)
  * @param {number|Array<number>} [filters.lens_material_id] - Lens material ID(s)
  * @param {number|Array<number>} [filters.frame_material_id] - Frame material ID(s)
+ * @param {string|Array<string>} [filters.collection_id] - Collection ID(s)
  * @param {string|Array<string>} [filters.brand_id] - Brand ID(s)
  * @param {Object} [filters.price] - Price range filter
  * @param {number} [filters.price.min] - Minimum price
@@ -119,6 +120,10 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
     // brand_id (optional, but include if provided)
     if (filters.brand_id !== undefined && filters.brand_id !== null) {
       filterBody.brand_id = filters.brand_id;
+    }
+
+    if (filters.collection_id !== undefined && filters.collection_id !== null) {
+      filterBody.collection_id = filters.collection_id;
     }
 
     // status (optional, include if provided to filter by status, or null to get all including drafts)
