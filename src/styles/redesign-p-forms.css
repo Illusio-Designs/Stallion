@@ -24,7 +24,7 @@
   color: var(--t-mute);
   display: none;
 }
-:root .ui-aside-panel:has(.pf.rf-form) .ui-aside-panel__footer::before { content: 'The shop location comes from the address you pick.'; }
+:root .ui-aside-panel:has(.pf.rf-form) .ui-aside-panel__footer::before { content: 'Capture at the shop and confirm its shipping address.'; }
 :root .ui-aside-panel:has(.exp-form.rf-form) .ui-aside-panel__footer::before { content: 'Nothing is sent until you press Submit claim.'; }
 @media (min-width: 640px) {
   :root .ui-aside-panel:has(.rf-form):not(:has(.pp-form)) .ui-aside-panel__footer::before { display: block; }

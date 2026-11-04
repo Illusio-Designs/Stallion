@@ -847,6 +847,15 @@ const getCityId = () => {
     requestBody.address_lng = Number(partyData.address_lng);
   }
 
+  // Preserve the explicit on-site capture through payload normalization.
+  if (partyData.latitude != null && partyData.longitude != null) {
+    requestBody.latitude = partyData.latitude;
+    requestBody.longitude = partyData.longitude;
+    requestBody.accuracy = partyData.accuracy ?? partyData.location_accuracy_m;
+    requestBody.shipping_address_confirmed = partyData.shipping_address_confirmed === true;
+    requestBody.confirm_address_mismatch = partyData.confirm_address_mismatch === true;
+  }
+
   // Validate that all required fields are present (no undefined)
   const requiredFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'country_id', 'pincode', 'gstin', 'pan'];
   for (const field of requiredFields) {
@@ -1083,6 +1092,7 @@ export const verifyPartyLocation = async (partyId, pos) => {
       latitude: pos.latitude,
       longitude: pos.longitude,
       accuracy: pos.accuracy,
+      ...(pos.shipping_address ? { shipping_address: pos.shipping_address } : {}),
       ...(pos.confirmMismatch ? { confirm_address_mismatch: true } : {}),
     },
     includeAuth: true,
