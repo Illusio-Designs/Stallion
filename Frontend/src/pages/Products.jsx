@@ -4,6 +4,7 @@ import ProductCard from '../components/ProductCard';
 import Skeleton from '../components/ui/Skeleton';
 import {
   getBrands,
+  getCollections,
   getFrameColors,
   getFrameMaterials,
   getFrameTypes,
@@ -85,6 +86,7 @@ const Products = ({ onPageChange }) => {
     };
   }, []);
 
+  const [selectedCollections, setSelectedCollections] = useState([]);
   const [selectedBrands, setSelectedBrands] = useState([]); // Array of brand IDs
   const [selectedFrameMaterials, setSelectedFrameMaterials] = useState([]); // Array of frame_material_id
   const [selectedShapes, setSelectedShapes] = useState([]); // Array of shape_id
@@ -108,6 +110,7 @@ const Products = ({ onPageChange }) => {
   const limit = 20; // Products per page (server-side pagination)
 
   // Filter options from API
+  const [collectionsData, setCollectionsData] = useState([]);
   const [brandsData, setBrandsData] = useState([]);
   const [gendersData, setGendersData] = useState([]);
   const [shapesData, setShapesData] = useState([]);
@@ -120,6 +123,7 @@ const Products = ({ onPageChange }) => {
   // Dropdown states for collapsible sections
   const [expandedSections, setExpandedSections] = useState({
     brands: false,
+    collections: false,
     frameMaterial: false,
     shape: false,
     type: false,
@@ -153,6 +157,7 @@ const Products = ({ onPageChange }) => {
   // its sidebar section is expanded - not all at once on page load.
   const filterLoaded = useRef({});
   const filterLoaders = {
+    collections: [() => getCollections({ activeOnly: true }), setCollectionsData],
     brands: [() => getBrands({ activeOnly: true }), setBrandsData],
     frameMaterial: [() => getFrameMaterials({ activeOnly: true }), setFrameMaterialsData],
     shape: [() => getShapes({ activeOnly: true }), setShapesData],
@@ -242,6 +247,10 @@ const Products = ({ onPageChange }) => {
       filters.brand_id = selectedBrands.length === 1 ? selectedBrands[0] : selectedBrands;
     }
 
+    if (selectedCollections.length > 0) {
+      filters.collection_id = selectedCollections.length === 1 ? selectedCollections[0] : selectedCollections;
+    }
+
     // "On offer": only the products an active offer touches.
     if (onlyOffers && Object.keys(offerMap).length > 0) {
       filters.product_ids = Object.keys(offerMap);
@@ -262,7 +271,8 @@ const Products = ({ onPageChange }) => {
     selectedType,
     selectedLensMaterial,
     selectedFrameMaterials,
-    selectedBrands
+    selectedBrands,
+    selectedCollections
   ]);
 
   // Stable string key for the active filters so the fetch effect only re-runs
@@ -280,6 +290,7 @@ const Products = ({ onPageChange }) => {
     const multi = [
       { ids: selectedGender, data: gendersData, idKeys: ['gender_id', 'id'], labelKeys: ['gender_name', 'name'], setter: setSelectedGender, prefix: 'gender' },
       { ids: selectedShapes, data: shapesData, idKeys: ['shape_id', 'id'], labelKeys: ['shape_name', 'name'], setter: setSelectedShapes, prefix: 'shape' },
+      { ids: selectedCollections, data: collectionsData, idKeys: ['collection_id', 'id'], labelKeys: ['collection_name', 'name'], setter: setSelectedCollections, prefix: 'collection' },
       { ids: selectedBrands, data: brandsData, idKeys: ['brand_id', 'id'], labelKeys: ['brand_name', 'name'], setter: setSelectedBrands, prefix: 'brand' },
       { ids: selectedLensMaterial, data: lensMaterialsData, idKeys: ['lens_material_id', 'id'], labelKeys: ['lens_material', 'name'], setter: setSelectedLensMaterial, prefix: 'lensmat' },
       { ids: selectedFrameMaterials, data: frameMaterialsData, idKeys: ['frame_material_id', 'id'], labelKeys: ['frame_material', 'name'], setter: setSelectedFrameMaterials, prefix: 'framemat' },
@@ -309,7 +320,7 @@ const Products = ({ onPageChange }) => {
       }
     });
     return chips;
-  }, [selectedGender, selectedShapes, selectedBrands, selectedLensMaterial, selectedFrameMaterials, selectedType, selectedLensColor, selectedFrameColor, gendersData, shapesData, brandsData, lensMaterialsData, frameMaterialsData, frameTypesData, lensColorsData, frameColorsData]);
+  }, [selectedCollections, collectionsData, selectedGender, selectedShapes, selectedBrands, selectedLensMaterial, selectedFrameMaterials, selectedType, selectedLensColor, selectedFrameColor, gendersData, shapesData, brandsData, lensMaterialsData, frameMaterialsData, frameTypesData, lensColorsData, frameColorsData]);
 
   // Debounce the search text (~300 ms) so typing doesn't fire a request per key.
   // Clearing the search applies immediately.
@@ -371,6 +382,7 @@ const Products = ({ onPageChange }) => {
 
   const handleReset = () => {
     setSelectedBrands([]);
+    setSelectedCollections([]);
     setSelectedFrameMaterials([]);
     setSelectedShapes([]);
     setSelectedType(null);
@@ -395,7 +407,8 @@ const Products = ({ onPageChange }) => {
     selectedType,
     selectedLensMaterial,
     selectedFrameMaterials,
-    selectedBrands
+    selectedBrands,
+    selectedCollections
   ]);
 
   const toggleSelection = (item, selectedItems, setSelectedItems) => {
@@ -549,6 +562,7 @@ const Products = ({ onPageChange }) => {
   // Filter groups, in the same order and with the same ids as before.
   const filterGroups = [
     { key: 'brands', title: 'Brand', kind: 'check', data: brandsData, idKeys: ['brand_id', 'id'], nameKeys: ['brand_name', 'name'], selected: selectedBrands, set: setSelectedBrands },
+    { key: 'collections', title: 'Collection', kind: 'check', data: collectionsData, idKeys: ['collection_id', 'id'], nameKeys: ['collection_name', 'name'], selected: selectedCollections, set: setSelectedCollections },
     { key: 'frameMaterial', title: 'Frame material', kind: 'check', data: frameMaterialsData, idKeys: ['frame_material_id', 'id'], nameKeys: ['frame_material', 'frame_material_name', 'name'], selected: selectedFrameMaterials, set: setSelectedFrameMaterials },
     { key: 'shape', title: 'Shape', kind: 'check', data: shapesData, idKeys: ['shape_id', 'id'], nameKeys: ['shape_name', 'name'], selected: selectedShapes, set: setSelectedShapes },
     { key: 'type', title: 'Frame type', kind: 'radio', data: frameTypesData, idKeys: ['frame_type_id', 'id'], nameKeys: ['frame_type', 'frame_type_name', 'name'], selected: selectedType, set: setSelectedType },
