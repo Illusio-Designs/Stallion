@@ -131,6 +131,8 @@ async function reverseGeocode(latitude, longitude) {
   url.searchParams.set('format', 'jsonv2');
   url.searchParams.set('zoom', '18');
   url.searchParams.set('addressdetails', '1');
+  // Match the English country/state/city names used by the app’s lookup lists.
+  url.searchParams.set('accept-language', 'en');
   if (GEOCODER_KEY) url.searchParams.set('key', GEOCODER_KEY);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 6000);
@@ -149,6 +151,8 @@ async function reverseGeocode(latitude, longitude) {
       address: String(data.display_name).slice(0, 500),
       street,
       city,
+      country: a.country || '',
+      country_code: (a.country_code || '').toUpperCase(),
       state: a.state || '',
       pincode,
     };
