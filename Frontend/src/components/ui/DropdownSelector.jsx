@@ -4,6 +4,7 @@ import '../../styles/components/ui.css';
 
 export default function DropdownSelector({
   options = [],
+  ariaLabel,
   value,
   onChange,
   placeholder = 'Select',
@@ -112,6 +113,7 @@ export default function DropdownSelector({
         onClick={handleToggle}
         role="button"
         tabIndex={disabled ? -1 : 0}
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-disabled={disabled || undefined}

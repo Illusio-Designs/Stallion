@@ -105,7 +105,7 @@ const CAPTURE_MAX_PINCODE_DISTANCE_M = Number(process.env.CAPTURE_MAX_PINCODE_DI
  */
 function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng, refPrecision, allowFarFromAddress = false }) {
   const lat = Number(deviceLat), lng = Number(deviceLng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+  if (deviceLat == null || deviceLng == null || deviceLat === '' || deviceLng === '' || !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
     return { ok: false, distance: null, reason: 'A valid current location is required. Please enable GPS and try again.' };
   }
   const acc = Number(accuracy);
@@ -193,7 +193,7 @@ function checkVisitLocation({ deviceLat, deviceLng, accuracy, party, action = 'p
   const pLat = party && (party.latitude ?? party.lat);
   const pLng = party && (party.longitude ?? party.lng);
   if (pLat == null || pLng == null || pLat === '' || pLng === '') {
-    return { ok: false, distance: null, code: 'no_location', reason: "This party has no location yet. Edit the party and pick its address, then try again." };
+    return { ok: false, distance: null, code: 'no_location', reason: "This party has no location yet. Use I’m at the shop to capture and confirm its shipping address, then try again." };
   }
   const distance = distanceMeters(lat, lng, pLat, pLng);
   if (distance == null) {
@@ -214,7 +214,8 @@ function checkVisitLocation({ deviceLat, deviceLng, accuracy, party, action = 'p
         : `You are about ${Math.round(distance)}m from this party's address (limit ${ROUGH_RADIUS_M}m). Move closer to the shop, or check the party's address.`,
     };
   }
-  return { ok: true, distance, mode: precise ? 'precise' : 'rough', learn: !precise && hasAcc };
+  // A visit validates proximity; only the explicit address-confirmation flow saves a shop anchor.
+  return { ok: true, distance, mode: precise ? 'precise' : 'rough', learn: false };
 }
 
 module.exports = {

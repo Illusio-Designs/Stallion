@@ -33,6 +33,7 @@ import '../styles/redesign-p-party.css';
 import '../styles/redesign-p-forms.css';
 import { FormProgress } from '../components/forms/FormBits';
 import AddressAutocomplete from '../components/ui/AddressAutocomplete';
+import ShopLocationCapture from '../components/ui/ShopLocationCapture';
 
 const splitNames = (v) => String(v || '').split(',').map((n) => n.trim()).filter((n) => n && n !== '—');
 
@@ -56,6 +57,7 @@ const DashboardClients = () => {
   const canEditParty = isPartyManager || isSalesman;
   // Admin-only party-location capture (geofence anchor).
   const [savingLoc, setSavingLoc] = useState(false);
+  const [capturePending, setCapturePending] = useState(false);
   // Where to go after saving, when Edit party was opened from the cart or Home for a party with no location.
   const editReturnRef = useRef(null);
   const [activeTab, setActiveTab] = useState('All');
@@ -560,7 +562,7 @@ const DashboardClients = () => {
   const handleRemoveLocation = async () => {
     const partyId = editRow?.id || editRow?.party_id;
     if (!partyId) return;
-    if (!(await confirm('Remove this party\'s saved location? Visit orders and check-ins stay blocked until its address is picked again in Edit party.'))) {
+    if (!(await confirm('Remove this party\'s saved location? The I’m at the shop button will become available for a new capture.'))) {
       return;
     }
     try {
@@ -570,7 +572,7 @@ const DashboardClients = () => {
       fetchPartiesForCountry();
       setEditRow(prev => (prev ? { ...prev, ...cleared } : prev));
       setFormData(prev => ({ ...prev, ...cleared }));
-      showSuccess('Location removed. Pick the address again in Edit party to set it.');
+      showSuccess('Location removed. Use I’m at the shop to capture it again.');
     } catch (err) {
       showError(err?.message || 'Could not remove the location. Please try again.');
     } finally {
@@ -701,6 +703,7 @@ const DashboardClients = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (capturePending) { showWarning('Confirm or cancel the location capture before saving the party.'); return; }
 
     // Helper function to validate UUID format
     const isValidUUID = (str) => {
@@ -863,6 +866,14 @@ const DashboardClients = () => {
         && Number.isFinite(Number(formData.address_lat)) && Number.isFinite(Number(formData.address_lng))) {
         dataToSend.address_lat = Number(formData.address_lat);
         dataToSend.address_lng = Number(formData.address_lng);
+      }
+
+      if (!editRow && formData.shipping_address_confirmed && formData.location_source === 'verified') {
+        Object.assign(dataToSend, {
+          latitude: formData.latitude, longitude: formData.longitude,
+          accuracy: formData.location_accuracy_m, shipping_address_confirmed: true,
+          confirm_address_mismatch: true,
+        });
       }
 
       if (editRow) {
@@ -1183,8 +1194,23 @@ const DashboardClients = () => {
 
       <section className="pf-sec" aria-labelledby="pf-h-ship">
         <h3 id="pf-h-ship" className="pf-sec__h">Shipping address</h3>
-        <p className="pf-sec__d">Search once and the rest fills in.</p>
+        <p className="pf-sec__d">Capture at the shop, or search to fill in the address.</p>
         <div className="pf-grid">
+          <div className="pf-field pf-field--full">
+            <ShopLocationCapture key={editRow?.id || editRow?.party_id || 'new-party'}
+              party={editRow ? { ...formData, ...editRow } : formData} disabled={loading || savingLoc} onPendingChange={setCapturePending}
+              onConfirmed={async (captured) => {
+                await handleAddressPick(captured);
+                setFormData(prev => ({ ...prev, ...captured }));
+              }}
+              onSaved={async (saved) => {
+                await handleAddressPick(saved);
+                setFormData(prev => ({ ...prev, ...saved }));
+                setEditRow(prev => prev ? ({ ...prev, ...saved }) : prev);
+                fetchPartiesForCountry();
+                showSuccess('Shop location and shipping address saved.');
+              }} />
+          </div>
           <div className="pf-field pf-field--full">
             <label className="ui-label">Address *</label>
             <AddressAutocomplete
@@ -1274,24 +1300,23 @@ const DashboardClients = () => {
           && Number.isFinite(Number(locLat)) && Number.isFinite(Number(locLng));
         const isVerified = locSource === 'verified';
         const pickedNow = Number.isFinite(Number(formData.address_lat)) && formData.address_lat !== null && formData.address_lat !== '';
-        const canRemoveLocation = !!editRow && hasLocationSet
-          && (isAdmin || userRole === 'party_manager' || userRole === 'sales_manager');
+        const canRemoveLocation = !!editRow && hasLocationSet && isPartyManager;
         return (
           <div className="pf-field pf-field--full party-loc">
-            <label className="ui-label">Shop location</label>
-            <div className="party-loc__chip">
+            <label className="ui-label">Location details</label>
+            <div className="party-loc__chip" hidden={isVerified}>
               <span className={`loc-pill loc-pill--${isVerified || pickedNow ? 'ok' : hasLocationSet ? 'warn' : 'idle'}`}>
                 {isVerified ? 'Exact spot saved' : pickedNow ? 'From the picked address' : hasLocationSet ? 'From the address' : 'Not set'}
               </span>
             </div>
             <p className="mt-0 mb-2 text-[length:var(--text-xs)] text-text-muted">
               {isVerified
-                ? 'The exact shop spot was saved on a visit. Visit orders and check-ins must be within 50 m of it.'
+                ? 'The exact shop spot is saved. Visit orders and check-ins must be within 50 m of it.'
                 : pickedNow
-                  ? 'The location comes from the picked address and is saved with the party. The first visit order or check-in saves the exact spot.'
+                  ? 'The picked address gives an approximate location. Use I’m at the shop to confirm the exact spot.'
                   : hasLocationSet
-                    ? 'The location comes from the address. Until the first visit saves the exact spot, a visit can be within 150 m.'
-                    : 'Pick the address from the suggestions above. That sets the shop location.'}
+                    ? 'The location comes from the address. Use I’m at the shop to confirm the exact spot.'
+                    : 'Use I’m at the shop to capture the exact location, or pick an address for an approximate location.'}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {canRemoveLocation && (
@@ -1299,7 +1324,7 @@ const DashboardClients = () => {
                   {savingLoc ? 'Removing…' : 'Remove location'}
                 </button>
               )}
-              {hasLocationSet && (
+              {hasLocationSet && !isVerified && (
                 <a
                   className="ui-btn ui-btn--secondary inline-flex items-center gap-1"
                   href={`https://www.google.com/maps/search/?api=1&query=${Number(locLat)},${Number(locLng)}`}
@@ -1662,7 +1687,7 @@ const DashboardClients = () => {
               type="button"
               className="ui-btn ui-btn--primary"
               onClick={handleSubmit}
-              disabled={loading}
+              disabled={loading || capturePending}
             >
               {loading ? (editRow ? 'Updating...' : 'Saving...') : (editRow ? 'Update party' : 'Save party')}
             </button>

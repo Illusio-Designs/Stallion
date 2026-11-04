@@ -194,7 +194,7 @@ export function FieldCard({ summary, loading, error, onRetry }) {
 
 // ---------- Salesman: "I'm at the shop" ----------
 // Check in at a party's shop. The shop's point comes from its address (picked from Google in
-// Edit party); the first visit saves the salesman's own position as the precise spot.
+// Edit party); the explicit location capture confirms the precise spot and shipping address.
 export function ShopCheckInCard({ parties, salesmanId, loading }) {
   const router = useRouter();
   const [partyId, setPartyId] = useState('');
@@ -357,7 +357,7 @@ export function ShopCheckInCard({ parties, salesmanId, loading }) {
               <FiMapPin size={16} aria-hidden="true" />
               {measuring ? 'Checking your distance...'
                 : dist?.error ? dist.error
-                : dist ? `${distText(dist.meters)} from the shop. ${within ? 'You can check in.' : `You need to be within ${Math.round(dist.allowed)} m.`}${!precise && within ? ' This visit saves the exact shop spot.' : ''}`
+                : dist ? `${distText(dist.meters)} from the shop. ${within ? 'You can check in.' : `You need to be within ${Math.round(dist.allowed)} m.`}${!precise && within ? ' Capture the exact shop location in the Party form, Cart or Visit report.' : ''}`
                 : 'Shop location saved.'}
               {!measuring && <button type="button" className="rdn-linkbtn" onClick={() => measure(party)}>Check again</button>}
             </p>

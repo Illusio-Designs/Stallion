@@ -21,13 +21,58 @@ async function findOrCreate(req, Model, label, lookup, values) {
   await logAudit({
     req,
     action: 'create',
-    description: `${label} added from a Google address`,
+    description: `${label} added from an address lookup`,
     tableName: Model.getTableName(),
     recordId: row.id,
     oldValues: null,
     newValues: row,
   });
   return { row, created: true, inactive: false };
+}
+
+async function resolveAddressParts(req, d) {
+    const out = { configured: true, address: d.address, pincode: d.pincode, latitude: d.latitude, longitude: d.longitude, added: [] };
+    let country = null, state = null, city = null;
+
+    if (d.country) {
+        const r = await findOrCreate(req, Country, 'Country',
+            { [Op.or]: [ci('name', d.country), ...(d.country_code ? [ci('code', d.country_code)] : [])] },
+            { name: d.country, code: d.country_code || null });
+        if (r.inactive) return ({ ...out, blocked: { what: 'country', name: d.country } });
+        country = r.row; if (r.created) out.added.push(`country ${d.country}`);
+    }
+    // A salesman only works in his allotted states: nothing is added for another state.
+    let allowedStateIds = null;
+    if (!isOfficeRole(req.userRoleNames || []) && String(req.userRoleName || '').toLowerCase() === 'salesman') {
+        const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+        allowedStateIds = await salesmanStateIds(scope && scope.salesmanId);
+        const existing = d.state ? await State.findOne({ where: ci('name', d.state) }) : null;
+        if (!existing || !allowedStateIds.includes(String(existing.id))) {
+            return ({ ...out, blocked: { what: 'state_not_allotted', name: d.state || '' }, names: { state: d.state } });
+        }
+    }
+    if (country && d.state) {
+        // State names are unique across the table, so match by name only.
+        let code = d.state_code && d.state_code.length <= 10 ? d.state_code.toUpperCase() : null;
+        if (code && await State.findOne({ where: { code } })) code = null;
+        const r = await findOrCreate(req, State, 'State',
+            ci('name', d.state),
+            { name: d.state, code, country_id: country.id });
+        if (r.inactive) return ({ ...out, blocked: { what: 'state', name: d.state } });
+        state = r.row; if (r.created) out.added.push(`state ${d.state}`);
+    }
+    if (state && d.city) {
+        const r = await findOrCreate(req, City, 'City',
+            { [Op.and]: [ci('name', d.city), { state_id: state.id }] },
+            { name: d.city, state_id: state.id });
+        if (r.inactive) return ({ ...out, blocked: { what: 'city', name: d.city } });
+        city = r.row; if (r.created) out.added.push(`city ${d.city}`);
+    }
+    out.country_id = country ? country.id : null;
+    out.state_id = state ? state.id : null;
+    out.city_id = city ? city.id : null;
+    out.names = { country: d.country, state: d.state, city: d.city };
+    return out;
 }
 
 class AddressController {
@@ -55,47 +100,7 @@ class AddressController {
             if (!placeId) return res.status(400).json({ error: 'place_id is required' });
             const d = await places.details(placeId, req.body && req.body.session);
 
-            const out = { configured: true, address: d.address, pincode: d.pincode, latitude: d.latitude, longitude: d.longitude, added: [] };
-            let country = null, state = null, city = null;
-
-            if (d.country) {
-                const r = await findOrCreate(req, Country, 'Country',
-                    { [Op.or]: [ci('name', d.country), ...(d.country_code ? [ci('code', d.country_code)] : [])] },
-                    { name: d.country, code: d.country_code || null });
-                if (r.inactive) return res.status(200).json({ ...out, blocked: { what: 'country', name: d.country } });
-                country = r.row; if (r.created) out.added.push(`country ${d.country}`);
-            }
-            // A salesman only works in his allotted states: nothing is added for another state.
-            let allowedStateIds = null;
-            if (!isOfficeRole(req.userRoleNames || []) && String(req.userRoleName || '').toLowerCase() === 'salesman') {
-                const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
-                allowedStateIds = await salesmanStateIds(scope && scope.salesmanId);
-                const existing = d.state ? await State.findOne({ where: ci('name', d.state) }) : null;
-                if (!existing || !allowedStateIds.includes(String(existing.id))) {
-                    return res.status(200).json({ ...out, blocked: { what: 'state_not_allotted', name: d.state || '' }, names: { state: d.state } });
-                }
-            }
-            if (country && d.state) {
-                // State names are unique across the table, so match by name only.
-                let code = d.state_code && d.state_code.length <= 10 ? d.state_code.toUpperCase() : null;
-                if (code && await State.findOne({ where: { code } })) code = null;
-                const r = await findOrCreate(req, State, 'State',
-                    ci('name', d.state),
-                    { name: d.state, code, country_id: country.id });
-                if (r.inactive) return res.status(200).json({ ...out, blocked: { what: 'state', name: d.state } });
-                state = r.row; if (r.created) out.added.push(`state ${d.state}`);
-            }
-            if (state && d.city) {
-                const r = await findOrCreate(req, City, 'City',
-                    { [Op.and]: [ci('name', d.city), { state_id: state.id }] },
-                    { name: d.city, state_id: state.id });
-                if (r.inactive) return res.status(200).json({ ...out, blocked: { what: 'city', name: d.city } });
-                city = r.row; if (r.created) out.added.push(`city ${d.city}`);
-            }
-            out.country_id = country ? country.id : null;
-            out.state_id = state ? state.id : null;
-            out.city_id = city ? city.id : null;
-            out.names = { country: d.country, state: d.state, city: d.city };
+            const out = await resolveAddressParts(req, d);
             return res.status(200).json(out);
         } catch (error) {
             console.warn('[address-details]', error.message);
@@ -105,3 +110,5 @@ class AddressController {
 }
 
 module.exports = new AddressController();
+
+module.exports.resolveAddressParts = resolveAddressParts;

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
 import "../styles/pages/Cart.css";
 import "../styles/redesign-p-cart.css";
@@ -18,12 +19,14 @@ import { getUserRole, getUser } from "../services/authService";
 import { encodeUploadName } from "../utils/imageUrl";
 import DropdownSelector from "../components/ui/DropdownSelector";
 import AsidePanel from "../components/ui/AsidePanel";
+import ShopLocationCapture from "../components/ui/ShopLocationCapture";
 import {
   getMyParties,
   getPartyById,
   getEvents,
   getIndianCountries,
   getStates,
+  getCities,
   getDistributors,
   createOrder,
   createParty,
@@ -94,7 +97,10 @@ const Cart = ({ onPageChange = null }) => {
   // Inline "Add Party" (salesman + distributor can create a party from here)
   const [addPartyOpen, setAddPartyOpen] = useState(false);
   const [addPartySaving, setAddPartySaving] = useState(false);
+  const [addLocationPending, setAddLocationPending] = useState(false);
+  const [partyLocationPending, setPartyLocationPending] = useState(false);
   const [addPartyStates, setAddPartyStates] = useState([]);
+  const [addPartyCities, setAddPartyCities] = useState([]);
   const [addPartyForm, setAddPartyForm] = useState({
     party_name: "",
     phone: "",
@@ -224,6 +230,7 @@ const Cart = ({ onPageChange = null }) => {
         c.name?.toLowerCase() === 'india' || c.code?.toLowerCase() === 'in'
       ) || (list || [])[0];
       if (india) {
+        setAddPartyForm(prev => ({ ...prev, country_id: prev.country_id || india.id }));
         const states = await getStates(india.id).catch(() => []);
         setAddPartyStates((states || []).map(s => ({ value: s.id, label: s.name })));
       }
@@ -236,14 +243,24 @@ const Cart = ({ onPageChange = null }) => {
   const openAddParty = () => {
     setAddPartyForm({ party_name: '', phone: '', address: '', state_id: '', pincode: '', contact_person: '' });
     setAddPartyOpen(true);
-    if (addPartyStates.length === 0) loadAddPartyStates();
+    loadAddPartyStates();
   };
 
   const handleAddPartyField = (field, value) => {
-    setAddPartyForm(prev => ({ ...prev, [field]: value }));
+    setAddPartyForm(prev => ({ ...prev, [field]: value, ...(field === 'state_id' ? { city_id: '' } : {}) }));
   };
 
+  useEffect(() => {
+    let current = true;
+    setAddPartyCities([]);
+    if (addPartyForm.state_id) getCities(addPartyForm.state_id).then(rows => {
+      if (current) setAddPartyCities(rows);
+    }).catch(() => { if (current) showError('Could not load cities. Select the state again to retry.'); });
+    return () => { current = false; };
+  }, [addPartyForm.state_id]);
+
   const handleCreateParty = async () => {
+    if (addLocationPending) return;
     const name = addPartyForm.party_name.trim();
     const phone = addPartyForm.phone.trim();
     const address = addPartyForm.address.trim();
@@ -251,8 +268,8 @@ const Cart = ({ onPageChange = null }) => {
       showError('Party name, phone and address are required.');
       return;
     }
-    if (!addPartyForm.state_id) {
-      showError('Please select a state.');
+    if (!addPartyForm.state_id || !addPartyForm.city_id || !/^\d{6}$/.test(addPartyForm.pincode.trim())) {
+      showError('Please select a state, city and a valid 6-digit PIN code, or capture the shop location.');
       return;
     }
     try {
@@ -261,6 +278,13 @@ const Cart = ({ onPageChange = null }) => {
         party_name: name,
         phone,
         address,
+        country_id: addPartyForm.country_id,
+        city_id: addPartyForm.city_id,
+        ...(addPartyForm.shipping_address_confirmed ? {
+          latitude: addPartyForm.latitude, longitude: addPartyForm.longitude,
+          accuracy: addPartyForm.location_accuracy_m, shipping_address_confirmed: true,
+          confirm_address_mismatch: true,
+        } : {}),
         state_id: addPartyForm.state_id,
         pincode: addPartyForm.pincode.trim(),
         contact_person: addPartyForm.contact_person.trim(),
@@ -342,7 +366,7 @@ const Cart = ({ onPageChange = null }) => {
   };
 
   // The selected party's saved (verified) shop point, if it has one.
-  const selectedPartyRecord = parties.find((p) => (p.id || p.party_id) === selectedParty) || null;
+  const selectedPartyRecord = parties.find((p) => String(p.id || p.party_id) === String(selectedParty)) || null;
   const selectedPartyHasPoint = hasPartyPoint(selectedPartyRecord);
 
   // Read the GPS now and measure the distance to the shop. Used when a party is
@@ -377,7 +401,7 @@ const Cart = ({ onPageChange = null }) => {
       setVisitDistance(null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [orderType, selectedParty, selectedPartyHasPoint, isSalesman]);
+  }, [orderType, selectedParty, selectedPartyHasPoint, isSalesman, selectedPartyRecord?.latitude, selectedPartyRecord?.longitude, selectedPartyRecord?.location_source]);
 
   // Fetch parties based on order type for salesman
   useEffect(() => {
@@ -677,6 +701,7 @@ const Cart = ({ onPageChange = null }) => {
   };
 
   const handleCheckout = async () => {
+    if (partyLocationPending) { showError('Confirm or cancel the location capture before placing the order.'); return; }
     if (isOfficeOnly) {
       showError('Admin and office accounts cannot place orders from the cart. Use Dashboard > Orders to create an order.');
       return;
@@ -714,8 +739,7 @@ const Cart = ({ onPageChange = null }) => {
           return;
         }
         if (!selectedPartyHasPoint) {
-          showError('This party has no location yet. Edit the party and pick its address. You come back to this cart after saving.');
-          handleEditPartyLocation();
+          showError('Capture the shop location above before placing a visit order.');
           return;
         }
         // Read the GPS again right now: the order must carry where the salesman
@@ -1555,20 +1579,33 @@ const Cart = ({ onPageChange = null }) => {
                       setSelectedParty(value);
                     }}
                   />
+                  {selectedParty && !(isSalesman && orderType === 'visit_order') && (
+                    <ShopLocationCapture key={selectedParty} party={parties.find(p => String(p.party_id || p.id) === String(selectedParty)) || {}} disabled={loading} onPendingChange={setPartyLocationPending}
+                      onSaved={async saved => {
+                        setParties(prev => prev.map(p => String(p.party_id || p.id) === String(selectedParty) ? { ...p, ...saved } : p));
+                        showSuccess('Shop location and shipping address saved.');
+                      }} />
+                  )}
                   {isSalesman && orderType === 'visit_order' && selectedParty && (() => {
-                    const sp = parties.find(p => (p.id || p.party_id) === selectedParty);
+                    const sp = parties.find(p => String(p.id || p.party_id) === String(selectedParty));
                     const hasPoint = hasPartyPoint(sp);
                     const precise = hasPoint && sp.location_source === 'verified';
                     const allowed = visitDistance && visitDistance.allowed != null ? visitDistance.allowed : visitRadius(sp, 0);
                     const farAway = hasPoint && ((visitDistance && visitDistance.error) || (visitDistance && visitDistance.meters != null && visitDistance.meters > allowed));
                     return (
-                      <div className={`flex flex-col gap-1.5 cart-notice ${(!hasPoint || farAway) ? 'cart-notice--bad' : ''}`}>
+                      <div className="flex flex-col gap-2">
+                        <ShopLocationCapture key={selectedParty} party={sp} disabled={loading} onPendingChange={setPartyLocationPending}
+                          onSaved={async saved => {
+                            setParties(prev => prev.map(p => String(p.party_id || p.id) === String(selectedParty) ? { ...p, ...saved } : p));
+                            showSuccess('Shop location and shipping address saved.');
+                          }} />
+                        <div className={`flex flex-col gap-1.5 cart-notice ${(!hasPoint || farAway) ? 'cart-notice--bad' : ''}`}>
                         <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
                           {!hasPoint
-                            ? 'This party has no location yet. Edit the party and pick its address. You come back to this cart after saving.'
+                            ? 'Capture the shop location above before placing a visit order.'
                             : precise
                               ? 'Shop spot saved. You must be within 50 m of it.'
-                              : 'Location from the address. You can be within 150 m, and this order saves the exact shop spot.'}
+                              : 'Location from the address. Use I’m at the shop above to confirm its exact spot.'}
                         </p>
                         {hasPoint && (
                           <p className={`m-0 text-[length:var(--text-xs)] ${visitDistance && visitDistance.meters != null && visitDistance.meters > allowed ? 'text-error' : 'text-text-muted'}`} role="status">
@@ -1592,6 +1629,7 @@ const Cart = ({ onPageChange = null }) => {
                             Edit party
                           </button>
                         )}
+                        </div>
                       </div>
                     );
                   })()}
@@ -1684,14 +1722,14 @@ const Cart = ({ onPageChange = null }) => {
             {isOfficeOnly && (
               <p className="cart-notice mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-text-muted" role="note">
                 Your account type cannot place orders from the cart. To create an order, go to{' '}
-                <a href="/dashboard/orders" className="font-semibold text-primary underline">Dashboard &gt; Orders</a>.
+                <Link href="/dashboard/orders" className="font-semibold text-primary underline">Dashboard &gt; Orders</Link>.
               </p>
             )}
             <button
               type="button"
               className="checkout-btn cart-place-desktop mt-6 w-full min-h-[52px] bg-primary text-text-on-primary border border-primary px-6 py-3.5 rounded-xl text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_-8px_var(--color-primary)] hover:enabled:bg-primary-hover hover:enabled:border-primary-hover hover:enabled:-translate-y-px focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:translate-y-0 active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
               onClick={handleCheckout}
-              disabled={loading || isOfficeOnly || outOfStockItems.length > 0}
+              disabled={loading || partyLocationPending || isOfficeOnly || outOfStockItems.length > 0}
               aria-busy={loading}
             >
               {loading && <span className="checkout-btn__spinner w-4 h-4 rounded-pill border-2 border-[rgba(255,255,255,0.4)] border-t-[var(--color-text-on-primary)] animate-spin motion-reduce:animate-none flex-shrink-0" aria-hidden="true" />}
@@ -1711,7 +1749,7 @@ const Cart = ({ onPageChange = null }) => {
             type="button"
             className="checkout-btn cart-bar__btn"
             onClick={handleCheckout}
-            disabled={loading || isOfficeOnly || outOfStockItems.length > 0}
+            disabled={loading || partyLocationPending || isOfficeOnly || outOfStockItems.length > 0}
             aria-busy={loading}
           >
             {loading ? 'Placing order...' : 'Place order'}
@@ -1726,7 +1764,7 @@ const Cart = ({ onPageChange = null }) => {
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => setAddPartyOpen(false)} disabled={addPartySaving}>Cancel</button>
-            <button className="ui-btn ui-btn--primary" onClick={handleCreateParty} disabled={addPartySaving}>
+            <button className="ui-btn ui-btn--primary" onClick={handleCreateParty} disabled={addPartySaving || addLocationPending}>
               {addPartySaving ? 'Saving...' : 'Add Party'}
             </button>
           </>
@@ -1740,6 +1778,13 @@ const Cart = ({ onPageChange = null }) => {
           <div className="form-group">
             <label className="ui-label">Phone *</label>
             <input className="ui-input" placeholder="Enter phone number" value={addPartyForm.phone} onChange={(e) => handleAddPartyField('phone', e.target.value)} />
+          </div>
+          <div className="form-group form-group--full">
+            <ShopLocationCapture party={addPartyForm} disabled={addPartySaving} onPendingChange={setAddLocationPending} onConfirmed={async captured => {
+              const rows = await getStates(captured.country_id);
+              setAddPartyStates(rows.map(r => ({ value: r.id, label: r.name })));
+              setAddPartyForm(prev => ({ ...prev, ...captured }));
+            }} />
           </div>
           <div className="form-group">
             <label className="ui-label">Address *</label>
@@ -1755,7 +1800,13 @@ const Cart = ({ onPageChange = null }) => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Pincode</label>
+            <label className="ui-label">City *</label>
+            <DropdownSelector options={addPartyCities.map(c => ({ value: c.id, label: c.name }))}
+              value={addPartyForm.city_id || ''} onChange={value => handleAddPartyField('city_id', value)}
+              placeholder="Select city" disabled={!addPartyForm.state_id} className="ui-dropdown-custom--full-width" />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">PIN code *</label>
             <input className="ui-input" placeholder="Enter pincode" value={addPartyForm.pincode} onChange={(e) => handleAddPartyField('pincode', e.target.value)} />
           </div>
           <div className="form-group">

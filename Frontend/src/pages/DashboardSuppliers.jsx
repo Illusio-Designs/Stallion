@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import AsidePanel from '../components/ui/AsidePanel';
+import ShopLocationCapture from '../components/ui/ShopLocationCapture';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import { istNow } from '../utils/istTime';
 import DatePicker from '../components/ui/DatePicker';
@@ -304,6 +305,7 @@ const DashboardSuppliers = () => {
   const [filterStates, setFilterStates] = useState([]); // states of the chosen country, for the state filter dropdown
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
+  const [capturePending, setCapturePending] = useState(false);
   const [zoneParties, setZoneParties] = useState([]); // parties for salesman's zones
   const [mySalesmanId, setMySalesmanId] = useState(''); // current salesman's own salesman_id
   const [allPartiesLookup, setAllPartiesLookup] = useState([]); // all parties for name lookup in tables
@@ -1341,6 +1343,7 @@ const DashboardSuppliers = () => {
 
   const handleCheckinSubmit = async (e) => {
     e.preventDefault();
+    if (capturePending) { showError('Confirm or cancel the location capture before saving the visit.'); return; }
     if (!checkinForm.party_id) {
       showError('Please select a party before saving.');
       return;
@@ -2029,7 +2032,7 @@ const DashboardSuppliers = () => {
           footer={(
             <>
               <button className="ui-btn ui-btn--secondary" onClick={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}>Cancel</button>
-              <button className="ui-btn ui-btn--primary" onClick={handleCheckinSubmit} disabled={checkinsLoading}>
+              <button className="ui-btn ui-btn--primary" onClick={handleCheckinSubmit} disabled={checkinsLoading || capturePending}>
                 {checkinsLoading ? 'Saving...' : 'Save'}
               </button>
             </>
@@ -2058,6 +2061,14 @@ const DashboardSuppliers = () => {
                 className="ui-dropdown-custom--full-width"
                 disabled={!!editCheckin}
               />
+              {isSalesman && checkinForm.party_id && !editCheckin && (
+                <ShopLocationCapture key={checkinForm.party_id}
+                  party={zoneParties.find(p => String(p.party_id || p.id) === String(checkinForm.party_id)) || {}}
+                  disabled={checkinsLoading} onPendingChange={setCapturePending} onSaved={async saved => {
+                    setZoneParties(prev => prev.map(p => String(p.party_id || p.id) === String(checkinForm.party_id) ? { ...p, ...saved } : p));
+                    showSuccess('Shop location and shipping address saved.');
+                  }} />
+              )}
               {isSalesman && checkinForm.party_id && (() => {
                 const sp = zoneParties.find(p => (p.party_id || p.id) === checkinForm.party_id);
                 const verified = sp && sp.location_source === 'verified';
@@ -2067,8 +2078,8 @@ const DashboardSuppliers = () => {
                     {verified
                       ? 'Shop spot saved: you must be within 50 m to check in.'
                       : hasPoint
-                        ? 'Location from the address: you can be within 150 m, and this check-in saves the exact shop spot.'
-                        : 'This party has no location yet. Pick its address in Party → Edit before checking in.'}
+                        ? 'Location from the address. Use I’m at the shop to confirm the exact spot.'
+                        : 'Capture this party’s shop location above before checking in.'}
                   </p>
                 );
               })()}

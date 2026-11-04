@@ -91,16 +91,6 @@ function hidePartySecrets(req, data) {
     return strip(data);
 }
 
-// How alike two address texts are (0 to 1): the share of words they have in common.
-function addressSimilarity(a, b) {
-    const words = (v) => new Set(String(v || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(' ').filter(Boolean));
-    const x = words(a), y = words(b);
-    if (!x.size && !y.size) return 1;
-    let common = 0;
-    x.forEach((w) => { if (y.has(w)) common += 1; });
-    return common / (x.size + y.size - common);
-}
-
 // A latitude/longitude pair from the client, or null when it is missing or out of range.
 function validPoint(lat, lng) {
     if (lat == null || lat === '' || lng == null || lng === '') return null;
@@ -109,7 +99,48 @@ function validPoint(lat, lng) {
     return { latitude: la, longitude: lo };
 }
 
-// ---- Party list: server-side tab / filters / sort / counts (all optional, so old callers are unchanged) ----
+// Capture and removal share the same party scope as field workflows.
+async function canAccessPartyLocation(req, party) {
+    if (canManageParties(req.userRoleNames)) return true;
+    const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+    if (hasRole(req.userRoleNames, 'salesman') && scope.salesmanId) {
+        return party.salesman_id === scope.salesmanId || await salesmanCoversState(scope.salesmanId, party.state_id);
+    }
+    if (hasRole(req.userRoleNames, 'distributor') && scope.distributorId) {
+        return party.distributor_id === scope.distributorId || await distributorCoversState(scope.distributorId, party.state_id);
+    }
+    return false;
+}
+
+async function confirmedShipping(req, data) {
+    const address = String(data.address || '').trim();
+    const pincode = String(data.pincode || '').trim();
+    if (!address || address.length > 500 || !/^\d{6}$/.test(pincode)) {
+        const error = new Error('Confirm the shipping address and a valid 6-digit PIN code.');
+        error.status = 400; throw error;
+    }
+    const [country, state, city] = await Promise.all([
+        data.country_id ? Country.findByPk(data.country_id) : null,
+        data.state_id ? State.findByPk(data.state_id) : null,
+        data.city_id ? Cities.findByPk(data.city_id) : null,
+    ]);
+    if (!country || !state || !city || country.is_active === false || state.is_active === false || city.is_active === false
+        || String(state.country_id) !== String(country.id) || String(city.state_id) !== String(state.id)) {
+        const error = new Error('Select a valid country, state and city for the shipping address.');
+        error.status = 400; throw error;
+    }
+    if (!canManageParties(req.userRoleNames)) {
+        const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+        const allowed = hasRole(req.userRoleNames, 'salesman') && scope.salesmanId
+            ? await salesmanCoversState(scope.salesmanId, state.id)
+            : hasRole(req.userRoleNames, 'distributor') && scope.distributorId
+                ? await distributorCoversState(scope.distributorId, state.id) : false;
+        if (!allowed) { const error = new Error('This shipping address is outside your working states.'); error.status = 403; throw error; }
+    }
+    return { address, pincode, country_id: country.id, state_id: state.id, city_id: city.id };
+}
+
+// ---- Party list: server-side tab / filters / sort / counts ----
 const PARTY_TABS = new Set(['active', 'inactive', 'no_location']);
 const PARTY_SORT_SQL = {
     party_name: null, // plain column
@@ -562,6 +593,7 @@ class PartyController {
             }
             const user = req.user;
             const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, latitude, longitude, accuracy, location_accuracy_m, confirm_address_mismatch, address_lat, address_lng } = req.body;
+            if (req.body.shipping_address_confirmed === true) await confirmedShipping(req, req.body);
             const addressPoint = validPoint(address_lat, address_lng);
             const confirmMismatch = confirm_address_mismatch === true || confirm_address_mismatch === 'true';
             // address, city, state and pincode are required so the party can be
@@ -646,7 +678,8 @@ class PartyController {
             const hasDeviceLoc = latitude != null && latitude !== '' && longitude != null && longitude !== '';
             // Geocode once; it is both the validation reference and the fallback.
             // The point of the picked Google address when there is one; otherwise geocode the text.
-            const geo = addressPoint ? { ...addressPoint, precision: 'address' } : await geocodeAddress(address, { pincode });
+            const geo = req.body.shipping_address_confirmed === true ? null
+                : addressPoint ? { ...addressPoint, precision: 'address' } : await geocodeAddress(address, { pincode });
             let captured = false;
             let createFarFromAddress = false;
             if (hasDeviceLoc) {
@@ -672,8 +705,8 @@ class PartyController {
             // Written address of the captured spot (best-effort, never blocks the save).
             let capturedAddress = null;
             if (captured) {
-                const rev = await reverseGeocode(finalLat, finalLng);
-                capturedAddress = rev ? rev.address : null;
+                const rev = req.body.shipping_address_confirmed === true ? null : await reverseGeocode(finalLat, finalLng);
+                capturedAddress = req.body.shipping_address_confirmed === true ? address : (rev ? rev.address : null);
             }
             if (!captured && geo) {
                 finalLat = geo.latitude;
@@ -766,6 +799,10 @@ class PartyController {
                 return res.status(404).json({ error: 'Party not found' });
             }
 
+            if (party.location_source === 'verified') {
+                return res.status(409).json({ error: 'Remove the verified location before setting a new one.' });
+            }
+
             const { latitude, longitude } = req.body || {};
             const hasCoords = latitude != null && latitude !== '' && longitude != null && longitude !== '';
 
@@ -803,7 +840,10 @@ class PartyController {
             party.longitude = finalLng;
             party.location_source = source;
             party.updated_at = new Date();
-            await party.save();
+            const [saved] = await Party.update({ latitude: finalLat, longitude: finalLng, location_source: source, updated_at: party.updated_at }, {
+                where: { party_id: id, [Op.or]: [{ location_source: null }, { location_source: { [Op.ne]: 'verified' } }] },
+            });
+            if (!saved) return res.status(409).json({ error: 'Remove the verified location before setting a new one.' });
             await logAudit({
                 req,
                 action: 'update',
@@ -834,69 +874,47 @@ class PartyController {
                 return res.status(404).json({ error: 'Party not found' });
             }
 
-            const adminOverride = isAdmin(req.userRoleNames);
-
-            // Capture works once for everyone. To fix a wrong location, a manager
-            // first removes it (DELETE /parties/:id/location), then captures again.
+            if (denyInactiveParty(party, req.userRoleNames)) return res.status(404).json({ error: 'Party not found' });
+            if (!(await canAccessPartyLocation(req, party))) return res.status(403).json({ error: 'Access denied' });
             if (party.location_source === 'verified' && party.latitude != null && party.longitude != null) {
-                return res.status(409).json({
-                    error: 'This party already has a verified location. Ask a manager to remove it first if it is wrong.',
-                });
+                return res.status(409).json({ error: 'This party already has a verified location. Ask an authorized office manager to remove it first.' });
             }
-
-            const { latitude, longitude, accuracy } = req.body || {};
-
-            let check;
-            if (adminOverride) {
-                // Admin sets the party's location to the device's current GPS
-                // without requiring on-site proximity to the address.
-                const lat = Number(latitude), lng = Number(longitude);
-                if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                    return res.status(400).json({
-                        error: 'A valid current location is required. Please enable GPS and try again.',
-                    });
-                }
-                check = { ok: true, distance: null };
-            } else {
-                // Geocode the party's address as the reference to validate against.
-                let refLat = null, refLng = null, refPrecision = null;
-                try {
-                    let city, state;
-                    if (party.city_id) { const c = await Cities.findByPk(party.city_id); city = c && c.name; }
-                    if (party.state_id) { const s = await State.findByPk(party.state_id); state = s && s.name; }
-                    const ref = party.address
-                        ? await geocodeAddress(party.address, { city, state, pincode: party.pincode })
-                        : null;
-                    if (ref) { refLat = ref.latitude; refLng = ref.longitude; refPrecision = ref.precision; }
-                } catch (_) { /* no reference: validateOnsiteCapture rejects with a clear message */ }
-
-                const confirmMismatch = req.body && (req.body.confirm_address_mismatch === true || req.body.confirm_address_mismatch === 'true');
+            const { latitude, longitude, accuracy, shipping_address } = req.body || {};
+            // All roles must supply a good GPS fix, including admins.
+            let check = validateOnsiteCapture({ deviceLat: latitude, deviceLng: longitude, accuracy });
+            if (!check.ok) return res.status(422).json({ error: check.reason });
+            const shipping = shipping_address ? await confirmedShipping(req, shipping_address) : null;
+            if (!shipping) {
+                const ref = party.address ? await geocodeAddress(party.address, { pincode: party.pincode }) : null;
                 check = validateOnsiteCapture({
-                    deviceLat: latitude, deviceLng: longitude, accuracy, refLat, refLng, refPrecision,
-                    allowFarFromAddress: confirmMismatch,
+                    deviceLat: latitude, deviceLng: longitude, accuracy,
+                    refLat: ref?.latitude, refLng: ref?.longitude, refPrecision: ref?.precision,
+                    allowFarFromAddress: req.body.confirm_address_mismatch === true,
                 });
-                if (!check.ok) {
-                    return res.status(422).json({ error: check.reason, code: check.farFromAddress ? 'address_far' : undefined });
-                }
+                if (!check.ok) return res.status(422).json({ error: check.reason, code: check.farFromAddress ? 'address_far' : undefined });
             }
-
             const acc = Number(accuracy);
             const oldSnapshot = party.toJSON();
-            party.latitude = Number(latitude);
-            party.longitude = Number(longitude);
-            party.location_source = 'verified';
-            party.location_accuracy_m = Number.isFinite(acc) ? acc : null;
-            const capturedRev = await reverseGeocode(party.latitude, party.longitude);
-            party.location_address = capturedRev ? capturedRev.address : null;
-            party.updated_at = new Date();
-            await party.save();
-
+            const capturedRev = shipping ? null : await reverseGeocode(Number(latitude), Number(longitude));
+            const payload = {
+                ...(shipping || {}),
+                ...(shipping && String(shipping.city_id) !== String(party.city_id) ? { zone_id: null } : {}),
+                latitude: Number(latitude), longitude: Number(longitude),
+                location_source: 'verified', location_accuracy_m: acc,
+                location_address: shipping ? shipping.address : (capturedRev?.address || null),
+                updated_at: new Date(),
+            };
+            // Conditional write prevents two simultaneous captures overwriting each other.
+            const [saved] = await Party.update(payload, { where: {
+                party_id: id,
+                [Op.or]: [{ location_source: null }, { location_source: { [Op.ne]: 'verified' } }, { latitude: null }, { longitude: null }],
+            } });
+            if (!saved) return res.status(409).json({ error: 'Location was already captured. Refresh this party.' });
+            Object.assign(party, payload);
             await logAudit({
                 req,
                 action: 'update',
-                description: adminOverride
-                    ? `Party location set by admin (±${Number.isFinite(acc) ? Math.round(acc) : '?'}m)`
-                    : `Party location verified on-site (±${Math.round(acc)}m)${check.farFromAddress ? ', salesman confirmed the written address is wrong' : ''}`,
+                description: `Party location verified on-site (±${Math.round(acc)}m)${shipping ? ' and shipping address confirmed' : ''}`,
                 tableName: 'parties',
                 recordId: party.party_id,
                 oldValues: oldSnapshot,
@@ -904,11 +922,8 @@ class PartyController {
             });
 
             return res.status(200).json({
-                message: adminOverride
-                    ? 'Party location set from your current position.'
-                    : (check.farFromAddress
-                        ? 'Location saved. It is far from the written address, so please correct the address.'
-                        : 'On-site location verified and saved.'),
+                message: shipping ? 'Shop location and confirmed shipping address saved.' : 'Shop location saved.',
+                ...(shipping || {}),
                 address_mismatch: !!check.farFromAddress,
                 location_address: party.location_address,
                 location_address_parts: capturedRev || null,
@@ -919,7 +934,7 @@ class PartyController {
                 distance_from_address_m: check.distance,
             });
         } catch (error) {
-            return res.status(500).json({ error: error.message });
+            return res.status(error.status || 500).json({ error: error.message });
         }
     }
 
@@ -936,7 +951,8 @@ class PartyController {
             if (!rev) {
                 return res.status(200).json({ found: false });
             }
-            return res.status(200).json({ found: true, ...rev });
+            const resolved = await require('./addressController').resolveAddressParts(req, rev);
+            return res.status(200).json({ found: true, ...rev, ...resolved });
         } catch (error) {
             return res.status(500).json({ error: error.message });
         }
@@ -948,6 +964,7 @@ class PartyController {
     // the old coordinates.
     async removePartyLocation(req, res) {
         try {
+            if (!canManageParties(req.userRoleNames)) return res.status(403).json({ error: 'Only authorized office managers can remove a location.' });
             const id = req.params.id;
             if (!id) {
                 return res.status(400).json({ error: 'Party ID is required' });
@@ -1072,12 +1089,8 @@ class PartyController {
             if (nextIsActive !== undefined) {
                 payload.is_active = nextIsActive;
             }
-            // Re-derive the location when the address OR the pincode really changes
-            // (a spacing/case-only edit does not count). If the party had a
-            // verified on-site location, the shop may have moved, so that point is
-            // no longer trusted: it is replaced by the new address's geocode (or
-            // cleared if the address can't be located), and "I'm at shop" is
-            // available again to capture the new spot.
+            // Refresh approximate coordinates on address changes. A verified point
+            // stays locked until an authorized office manager explicitly removes it.
             const normText = (v) => String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
             const normPin = (v) => String(v || '').replace(/\D/g, '');
             const updatePoint = validPoint(req.body.address_lat, req.body.address_lng);
@@ -1085,43 +1098,26 @@ class PartyController {
             const pincodeChanged = pincode !== undefined && normPin(pincode) !== normPin(party.pincode);
             const stateChanged = state_id !== undefined && String(state_id || '') !== String(party.state_id || '');
             const cityChanged = city_id !== undefined && String(city_id || '') !== String(party.city_id || '');
-            // A verified point stays when only the wording changed (a spelling fix, a
-            // flat number, punctuation). It is cleared only when the shop really moved:
-            // new pincode, state or city, or an address that mostly differs.
-            const movedShop = pincodeChanged || stateChanged || cityChanged
-                || (addressChanged && addressSimilarity(address, party.address) < 0.6);
-            // Fixing the written address from the shop's GPS spot (Edit party after "I'm at
-            // shop" did not match): the verified spot is the truth, so it stays.
-            const fixedFromGps = party.location_source === 'verified' && !!party.location_address
-                && address !== undefined && addressSimilarity(address, party.location_address) >= 0.6;
-            let locationReset = false;
+            // Only explicit manager removal unlocks a verified location.
+            const locationReset = false;
             const hasNoPoint = party.latitude == null || party.longitude == null;
-            if (addressChanged || pincodeChanged || stateChanged || cityChanged || (hasNoPoint && updatePoint)) {
-                const wasVerified = party.location_source === 'verified';
-                if (wasVerified && (!movedShop || fixedFromGps)) {
-                    // Wording-only edit, or the address was corrected from the GPS spot:
-                    // keep the verified shop point as it is.
-                } else {
-                    const geo = updatePoint ? { ...updatePoint, precision: 'address' } : await geocodeAddress(
-                        address !== undefined ? address : party.address,
-                        { pincode: pincode !== undefined ? pincode : party.pincode }
-                    );
-                    if (geo) {
-                        payload.latitude = geo.latitude;
-                        payload.longitude = geo.longitude;
-                        payload.location_source = 'geocoded';
-                        payload.location_accuracy_m = null;
-                    } else if (wasVerified) {
-                        // Never keep a verified point that belonged to the old address.
-                        payload.latitude = null;
-                        payload.longitude = null;
-                        payload.location_source = null;
-                        payload.location_accuracy_m = null;
-                    }
-                    locationReset = wasVerified;
-                }
+            if (party.location_source !== 'verified' &&
+                (addressChanged || pincodeChanged || stateChanged || cityChanged || (hasNoPoint && updatePoint))) {
+                const geo = updatePoint ? { ...updatePoint, precision: 'address' } : await geocodeAddress(
+                    address !== undefined ? address : party.address,
+                    { pincode: pincode !== undefined ? pincode : party.pincode }
+                );
+                payload.latitude = geo ? geo.latitude : null;
+                payload.longitude = geo ? geo.longitude : null;
+                payload.location_source = geo ? 'geocoded' : null;
+                payload.location_accuracy_m = null;
             }
-            await Party.update(payload, { where: { party_id: id } });
+            const updateWhere = { party_id: id };
+            if (payload.latitude !== undefined || payload.longitude !== undefined) {
+                updateWhere[Op.or] = [{ location_source: null }, { location_source: { [Op.ne]: 'verified' } }];
+            }
+            const [updated] = await Party.update(payload, { where: updateWhere });
+            if (!updated) return res.status(409).json({ error: 'This party’s location changed. Refresh before editing.' });
 
             if (nextIsActive !== undefined) {
                 await User.update(
