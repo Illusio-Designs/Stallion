@@ -19,3 +19,7 @@
   :root .trn-slot { font-size: 11px; aspect-ratio: 1.4; }
 }
 :root .tray-card__pills{display:inline-flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+
+.tray-product-result { min-width: 0; padding: 20px; overflow-wrap: anywhere; }
+.tray-product-result h3 { margin: 0 0 8px; }
+.tray-product-result__status { font-weight: 600; }

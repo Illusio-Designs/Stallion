@@ -15,6 +15,7 @@ import {
   getProductsInTray,
   getTrayTasks,
   getTraysPage,
+  searchTrayProducts,
   updateProductInTray,
   updateTray,
 } from '../services/apiService';
@@ -182,7 +183,7 @@ const DashboardTray = () => {
   };
 
   // Refresh the current page (used after add/update/delete).
-  const fetchTrays = () => fetchTraysPage(trayPage, traySearch);
+  const fetchTrays = () => fetchTraysPage(trayPage, '');
 
   // Assign-to-tray picker: 20 per page with server-side search (model_no/size).
   // Opening the picker / picking a tray loads page 1; typing re-queries the server.
@@ -553,11 +554,35 @@ const DashboardTray = () => {
     () => (trayFilter === 'all' ? trays : trays.filter((t) => trayState(t) === trayFilter)),
     [trays, trayFilter],
   );
-  const traySearchTimer = useRef(null);
+  const [productResults, setProductResults] = useState([]);
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchPages, setSearchPages] = useState(1);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [searchRevision, setSearchRevision] = useState(0);
+  const searching = Boolean(traySearch.trim());
+  useEffect(() => {
+    if (!traySearch.trim()) return undefined;
+    let alive = true;
+    setSearchLoading(true);
+    setSearchError('');
+    const timer = setTimeout(() => {
+      searchTrayProducts(searchPage, traySearch.trim())
+        .then((res) => {
+          if (!alive) return;
+          setProductResults(res?.data || []);
+          setSearchPages(Math.max(1, res?.pagination?.totalPages || 1));
+        })
+        .catch((err) => { if (alive) setSearchError(err.message || 'Failed to search products'); })
+        .finally(() => { if (alive) setSearchLoading(false); });
+    }, 350);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [traySearch, searchPage, searchRevision]);
   const handleTraySearch = (term) => {
     setTraySearch(term);
-    if (traySearchTimer.current) clearTimeout(traySearchTimer.current);
-    traySearchTimer.current = setTimeout(() => fetchTraysPage(1, term), 350);
+    setSearchPage(1);
+    setProductResults([]);
+    setSearchLoading(Boolean(term.trim()));
   };
 
   // Reset selected tray when switching tabs
@@ -690,7 +715,7 @@ const DashboardTray = () => {
                   type="button"
                   aria-pressed={showInactive}
                   className={`chip${showInactive ? ' on' : ''}`}
-                  onClick={() => { const next = !showInactive; setShowInactive(next); fetchTraysPage(1, traySearch, next); }}
+                  onClick={() => { const next = !showInactive; setShowInactive(next); fetchTraysPage(1, '', next); }}
                 >
                   Show inactive
                 </button>}
@@ -698,14 +723,38 @@ const DashboardTray = () => {
               <GooeySearch
                 value={traySearch}
                 onChange={handleTraySearch}
-                placeholder="Search trays"
-                label="Search trays"
+                placeholder="Search products by name/model"
+                label="Search products by name or model"
                 openWidth={260}
                 rowOnPhone
               />
             </div>
 
-            {error && !loading ? (
+            {searching ? (
+              <section aria-label="Product search results" aria-live="polite">
+                {searchLoading ? <p role="status">Searching products…</p>
+                  : searchError ? <div className="ui-state ui-state--error" role="alert">
+                    <p>{searchError}</p>
+                    <button className="ui-btn ui-btn--secondary" onClick={() => setSearchRevision((v) => v + 1)}>Try again</button>
+                  </div>
+                  : productResults.length === 0 ? <div className="ui-state ui-state--empty"><p>No products match "{traySearch.trim()}"</p></div>
+                  : <div className="tray-grid">{productResults.map((p) => (
+                    <article className="tray-card tray-product-result" key={p.product_id}>
+                      <h3>{p.model_no}</h3>
+                      <p className="tray-product-result__status">{p.assignments.length ? 'Assigned' : 'Not assigned'}</p>
+                      {p.assignments.map((a) => <p key={a.tray_id}>
+                        <strong>{a.tray_name || 'Unnamed tray'}</strong>
+                        <span className="tra-block">{a.holder_name ? `With ${a.holder_name}` : 'At office · No holder'}</span>
+                      </p>)}
+                    </article>
+                  ))}</div>}
+                {!searchLoading && !searchError && searchPages > 1 && <div className="tray-pager">
+                  <button className="ui-btn ui-btn--secondary" disabled={searchPage <= 1} onClick={() => setSearchPage((v) => v - 1)}>Previous</button>
+                  <span>Page {searchPage} of {searchPages}</span>
+                  <button className="ui-btn ui-btn--secondary" disabled={searchPage >= searchPages} onClick={() => setSearchPage((v) => v + 1)}>Next</button>
+                </div>}
+              </section>
+            ) : error && !loading ? (
               <div className="ui-state ui-state--error">
                 <div className="ui-state__icon">
                   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -795,11 +844,11 @@ const DashboardTray = () => {
               </div>
             )}
 
-            {trayPageCount > 1 && (
+            {!searching && trayPageCount > 1 && (
               <div className="tray-pager">
-                <button className="ui-btn ui-btn--secondary" disabled={loading || trayPage <= 1} onClick={() => fetchTraysPage(trayPage - 1, traySearch)}>Previous</button>
+                <button className="ui-btn ui-btn--secondary" disabled={loading || trayPage <= 1} onClick={() => fetchTraysPage(trayPage - 1, '')}>Previous</button>
                 <span>Page {trayPage} of {trayPageCount} · {trayTotal} trays</span>
-                <button className="ui-btn ui-btn--secondary" disabled={loading || trayPage >= trayPageCount} onClick={() => fetchTraysPage(trayPage + 1, traySearch)}>Next</button>
+                <button className="ui-btn ui-btn--secondary" disabled={loading || trayPage >= trayPageCount} onClick={() => fetchTraysPage(trayPage + 1, '')}>Next</button>
               </div>
             )}
           </div>

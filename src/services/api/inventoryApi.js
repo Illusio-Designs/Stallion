@@ -677,3 +677,7 @@ export const getFeaturedProducts = async (collectionId = "all") => {
 };
 
 
+
+/** Catalog search with current tray and holder assignments. */
+export const searchTrayProducts = (page = 1, search = '') =>
+  fetchPage('/trays/products/search', { page, limit: 20, search }, { method: 'GET', includeAuth: true });
