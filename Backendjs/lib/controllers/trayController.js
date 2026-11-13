@@ -7,10 +7,10 @@ const Salesman = require('../models/Salesman');
 const TrayReturnTask = require('../models/TrayReturnTask');
 const { trayPieceCount } = require('../utils/trayLifecycle');
 const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
-const { Op } = require('sequelize');
+const { Op, fn, col, where: sqlWhere } = require('sequelize');
 const { hasRole } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
-const { parsePaginationParams, buildPaginatedResponse, getListSearchParams, buildNamePhoneFilter } = require('../utils/listSearchHelpers');
+const { parsePaginationParams, buildPaginatedResponse, getListSearchParams, buildNamePhoneFilter, likeContains } = require('../utils/listSearchHelpers');
 
 // Adds what the tray cards show: the frames inside (model_no + status), a piece count and the
 // salesman who holds the tray. Three extra queries per page, no matter how many trays.
@@ -55,6 +55,40 @@ async function withTrayDetails(rows) {
 }
 
 class TrayController {
+    // Search the catalog, including products without stock or a tray assignment.
+    async searchProducts(req, res) {
+        try {
+            const pagination = parsePaginationParams(req);
+            const { name } = getListSearchParams(req);
+            if (!name) return res.status(200).json(buildPaginatedResponse([], pagination, 0));
+            const { count, rows } = await Product.findAndCountAll({
+                where: sqlWhere(fn('LOWER', col('model_no')), { [Op.like]: likeContains(name.toLowerCase()) }),
+                attributes: ['product_id', 'model_no'],
+                order: [['model_no', 'ASC'], ['product_id', 'ASC']],
+                limit: pagination.limit,
+                offset: pagination.offset,
+            });
+            const ids = rows.map((p) => p.product_id);
+            const items = ids.length ? await TrayProducts.findAll({
+                where: { product_id: { [Op.in]: ids }, qty: { [Op.gt]: 0 }, status: { [Op.ne]: 'returned' } },
+            }) : [];
+            const trayIds = [...new Set(items.map((i) => i.tray_id))];
+            const trays = trayIds.length ? await withTrayDetails(await Tray.findAll({
+                where: { tray_id: { [Op.in]: trayIds } },
+                order: [['tray_name', 'ASC']],
+            })) : [];
+            const data = rows.map((p) => ({
+                product_id: p.product_id,
+                model_no: p.model_no,
+                assignments: trays.filter((t) => items.some((i) => i.product_id === p.product_id && i.tray_id === t.tray_id))
+                    .map((t) => ({ tray_id: t.tray_id, tray_name: t.tray_name, holder_name: t.salesman_name })),
+            }));
+            return res.status(200).json(buildPaginatedResponse(data, pagination, count));
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
     async getTrays(req, res) {
         try {
             const pagination = parsePaginationParams(req);
