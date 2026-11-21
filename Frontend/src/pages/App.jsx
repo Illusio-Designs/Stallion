@@ -35,6 +35,7 @@ import Cart from './Cart';
 import Products from './Products';
 import ProductDetail from './ProductDetail';
 import PrivacyPolicy from './PrivacyPolicy';
+import DeleteAccount from './DeleteAccount';
 
 // Dashboard Pages - lazy loaded
 const Dashboard = lazy(() => import('./Dashboard'));
@@ -183,6 +184,8 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
         return <About />;
       case 'privacy-policy':
         return <PrivacyPolicy />;
+      case 'delete-account':
+        return <DeleteAccount />;
       case 'cart':
         return <Cart onPageChange={handlePageChange} />;
       
