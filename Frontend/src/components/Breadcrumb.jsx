@@ -55,6 +55,10 @@ const Breadcrumb = ({ currentPage, onPageChange }) => {
         { id: 'home', text: 'Home' },
         { id: 'privacy-policy', text: 'Privacy Policy' }
       ],
+      'delete-account': [
+        { id: 'home', text: 'Home' },
+        { id: 'delete-account', text: 'Delete Account' }
+      ],
       'contact': [
         { id: 'home', text: 'Home' },
         { id: 'contact', text: 'Contact' }
