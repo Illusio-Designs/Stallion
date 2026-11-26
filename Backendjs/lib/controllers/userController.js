@@ -15,20 +15,15 @@ const { listWithOptionalPagination } = require('../utils/listSearchHelpers');
 class UserController {
     async getUsers(req, res) {
         try {
-            const roles = await Role.findAll(
-                {
-                    where: {
-                        is_office_role: true
-                    }
-                }
-            );
-            const roleIds = roles.map(role => role.role_id);
+            const multiple = req.query?.scope === 'multiple-roles';
+            const roles = multiple ? [] : await Role.findAll({ where: { is_office_role: true } });
+            const where = multiple
+                ? { user_id: { [Op.in]: sequelize.literal(
+                    '(SELECT user_id FROM user_roles GROUP BY user_id HAVING COUNT(DISTINCT role_id) >= 2)'
+                ) } }
+                : { role_id: { [Op.in]: roles.map(role => role.role_id) } };
             const body = await listWithOptionalPagination(User, req, {
-                where: {
-                    role_id: {
-                        [Op.in]: roleIds
-                    }
-                },
+                where,
                 // Include every assigned role (multi-role) so the office-team
                 // UI can show/edit all of a member's roles, not just primary.
                 include: [{
@@ -289,6 +284,11 @@ class UserController {
                 if (foundRoles.length !== roleIdList.length) {
                     return res.status(404).json({ error: 'One or more roles not found' });
                 }
+                const protectedAccount = user.email?.toLowerCase() === 'illusiodesigns@gmail.com'
+                    || String(req.user?.user_id) === String(id);
+                if (protectedAccount && !foundRoles.some(role => role.role_name.toLowerCase() === 'admin')) {
+                    return res.status(403).json({ error: 'You cannot remove the Admin role from this account.' });
+                }
             }
 
             const updates = {
@@ -303,7 +303,8 @@ class UserController {
                 updated_at: new Date(),
             };
 
-            if (!updates.address) {
+            const rolesOnly = roleIdList && Object.keys(req.body).every(key => key === 'role_ids');
+            if (!rolesOnly && !updates.address) {
                 return res.status(400).json({ error: 'Address is required' });
             }
             if (is_active !== undefined) {
@@ -314,16 +315,17 @@ class UserController {
             }
 
             const oldSnapshot = user.toJSON();
-            await user.update(updates);
-
-            // Replace the role mapping table with the new set when roles change.
-            if (roleIdList) {
-                await UserRole.destroy({ where: { user_id: user.user_id } });
-                await UserRole.bulkCreate(roleIdList.map((rid) => ({
-                    user_id: user.user_id,
-                    role_id: rid,
-                })));
-            }
+            const changes = rolesOnly ? { role_id: updates.role_id, updated_at: updates.updated_at } : updates;
+            await sequelize.transaction(async (transaction) => {
+                await user.update(changes, { transaction });
+                if (roleIdList) {
+                    await UserRole.destroy({ where: { user_id: user.user_id }, transaction });
+                    await UserRole.bulkCreate(roleIdList.map(role_id => ({
+                        user_id: user.user_id,
+                        role_id,
+                    })), { transaction });
+                }
+            });
 
             await logAudit({
                 req,
@@ -332,7 +334,7 @@ class UserController {
                 tableName: 'users',
                 recordId: user.user_id,
                 oldValues: oldSnapshot,
-                newValues: { ...oldSnapshot, ...updates },
+                newValues: { ...oldSnapshot, ...changes, ...(roleIdList && { role_ids: roleIdList }) },
             });
             const updatedUser = await User.findByPk(id);
             res.status(200).json(updatedUser);
