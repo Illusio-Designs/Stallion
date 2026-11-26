@@ -54,7 +54,7 @@ const DashboardSettings = lazy(() => import('./DashboardSettings'));
 const DashboardExpenses = lazy(() => import('./DashboardExpenses'));
 
 // Pages a logged-out visitor may open.
-const PUBLIC_PAGES = ['login', 'privacy-policy'];
+const PUBLIC_PAGES = ['login', 'privacy-policy', 'delete-account'];
 
 const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   const router = useRouter();
@@ -128,7 +128,7 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
     }
   }, [initialPage, initialProductId]);
 
-  // Everything except the sign-in page and the privacy policy needs a login.
+  // The sign-in and legal pages are available without a login.
   // Logged-out visitors are sent to the sign-in page and brought back to the
   // same page afterwards (?returnUrl=).
   const needsLogin = !PUBLIC_PAGES.includes(currentPage);
