@@ -11,6 +11,11 @@ const Brand = sequelize.define('Brand', {
         type: DataTypes.STRING(255),
         allowNull: false
     },
+    is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    }
 }, {
     tableName: 'brand',
     timestamps: true,

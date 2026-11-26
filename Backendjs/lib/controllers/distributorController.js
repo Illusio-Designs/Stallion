@@ -4,13 +4,15 @@ const User = require('../models/User');
 const { Op } = require('sequelize');
 const Party = require('../models/Party');
 const Zone = require('../models/Zone');
+const Salesman = require('../models/Salesman');
 const DistributorZones = require('../models/DistributorZones');
 const DistributorStates = require('../models/DistributorStates');
 const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
-const { findOrCreateRoleUser } = require('../utils/userFactory');
+const { findOrCreateRoleUser, ensureUserRole } = require('../utils/userFactory');
+const Role = require('../models/Role');
 const sequelize = require('../constants/database');
-const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse, listWithOptionalPagination } = require('../utils/listSearchHelpers');
 const { partyActiveFilter } = require('../utils/roleHelpers');
 
 class DistributorController {
@@ -43,13 +45,26 @@ class DistributorController {
             if (!distributor) {
                 return res.status(404).json({ error: 'Distributor not found' });
             }
-            const parties = await Party.findAll({
+            const body = await listWithOptionalPagination(Party, req, {
                 where: mergeWhere(
                     { distributor_id: distributor.distributor_id },
                     partyActiveFilter(req.userRoleNames)
                 ),
+                order: [['created_at', 'ASC'], ['party_id', 'ASC']],
+            }, async (rows) => {
+                // One Salesman lookup per page so the Party page can show the salesman's name.
+                const salesmanIds = [...new Set(rows.map((r) => r.salesman_id).filter(Boolean))];
+                const salesmen = salesmanIds.length
+                    ? await Salesman.findAll({ where: { salesman_id: salesmanIds }, attributes: ['salesman_id', 'full_name'] })
+                    : [];
+                const nameById = {};
+                salesmen.forEach((s) => { nameById[s.salesman_id] = s.full_name; });
+                return rows.map((r) => ({
+                    ...(typeof r.toJSON === 'function' ? r.toJSON() : r),
+                    salesman_name: nameById[r.salesman_id] || null,
+                }));
             });
-            res.status(200).json(parties);
+            res.status(200).json(body);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -87,12 +102,53 @@ class DistributorController {
                 nameFields: ['distributor_name', 'trade_name', 'contact_person'],
                 phoneFields: ['phone'],
             });
-            const where = mergeWhere({ is_active: true, country_id }, searchFilter);
-            const { count, rows: distributors } = await Distributor.findAndCountAll({
-                where,
-                limit: pagination.limit,
-                offset: pagination.offset,
-            });
+            // Optional list-page params. Without `status` the call behaves as before (active only);
+            // with it the tab filter, state filter, sort and tab `counts` are applied in SQL.
+            const q = req.query || {};
+            const hasStatus = q.status !== undefined && String(q.status).trim() !== '';
+            const status = String(q.status || '').trim().toLowerCase();
+            const stateId = String(q.state_id ?? '').trim();
+            const base = { country_id };
+            if (stateId) {
+                const sid = sequelize.escape(stateId);
+                base[Op.and] = [{
+                    [Op.or]: [
+                        { state_id: stateId },
+                        sequelize.literal(`distributor_id IN (SELECT distributor_id FROM distributor_states WHERE state_id = ${sid})`),
+                    ],
+                }];
+            }
+            const baseWhere = mergeWhere(base, searchFilter);
+            let tabWhere = { is_active: true };
+            if (hasStatus) {
+                tabWhere = status === 'active' ? { is_active: true } : status === 'inactive' ? { is_active: false } : {};
+            }
+            const where = mergeWhere(tabWhere, baseWhere);
+            const sortCols = {
+                name: 'distributor_name',
+                contact: 'contact_person',
+                status: 'is_active',
+                created: 'created_at',
+            };
+            const dir = String(q.dir || '').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+            const order = [];
+            if (Object.prototype.hasOwnProperty.call(sortCols, q.sort)) order.push([sortCols[q.sort], dir]);
+            order.push(['created_at', 'DESC'], ['distributor_id', 'DESC']);
+            const countsPromise = hasStatus
+                ? Distributor.findOne({
+                    attributes: [
+                        [sequelize.fn('COUNT', sequelize.col('distributor_id')), 'total'],
+                        [sequelize.fn('SUM', sequelize.literal('CASE WHEN is_active = 1 THEN 1 ELSE 0 END')), 'active'],
+                    ],
+                    where: baseWhere,
+                    raw: true,
+                })
+                : Promise.resolve(null);
+            const [count, distributors, countRow] = await Promise.all([
+                Distributor.count({ where }),
+                Distributor.findAll({ where, order, limit: pagination.limit, offset: pagination.offset }),
+                countsPromise,
+            ]);
             const distributorIds = distributors.map(distributor => distributor.distributor_id);
             const distributorZones = distributorIds.length
                 ? await DistributorZones.findAll({ where: { distributor_id: distributorIds } })
@@ -105,14 +161,29 @@ class DistributorController {
                     console.warn('distributor_states read skipped:', e.message);
                 }
             }
+            let stateNameById = {};
+            if (hasStatus && distributorStates.length) {
+                try {
+                    const names = await State.findAll({ where: { id: [...new Set(distributorStates.map(s => s.state_id))] }, attributes: ['id', 'name'] });
+                    stateNameById = Object.fromEntries(names.map(n => [n.id, n.name]));
+                } catch (e) {
+                    console.warn('state names read skipped:', e.message);
+                }
+            }
             const response = distributors.map(distributor => ({
                 ...distributor.toJSON(),
                 zones: distributorZones.filter(zone => zone.distributor_id === distributor.distributor_id).map(zone => zone.toJSON()),
-                states: distributorStates.filter(s => s.distributor_id === distributor.distributor_id).map(s => s.toJSON()),
+                states: distributorStates.filter(s => s.distributor_id === distributor.distributor_id).map(s => (hasStatus ? { ...s.toJSON(), state_name: stateNameById[s.state_id] || undefined } : s.toJSON())),
             }));
-            res.status(200).json(buildPaginatedResponse(response, pagination, count));
+            const body = buildPaginatedResponse(response, pagination, count);
+            if (countRow) {
+                const total = Number(countRow.total) || 0;
+                const active = Number(countRow.active) || 0;
+                body.counts = { All: total, Active: active, Inactive: total - active };
+            }
+            res.status(200).json(body);
         } catch (error) {
-            console.log("error", error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }
@@ -147,11 +218,27 @@ class DistributorController {
             // Resolve state ids up front (may 400) before opening the transaction.
             const resolvedStateIds = await resolveStateIds(state_ids);
 
+            // Coerce optional UUID FK fields: '' -> null (Sequelize UUID columns
+            // reject an empty string with a generic "Validation error").
+            const uuidOrNull = (v) => {
+                const s = v === null || v === undefined ? '' : String(v).trim();
+                return s === '' ? null : s;
+            };
+            const countryIdVal = uuidOrNull(country_id);
+            const stateIdVal = uuidOrNull(state_id);
+            const cityIdVal = uuidOrNull(city_id);
+
             // Create login user + distributor + zones/states ATOMICALLY, so a
             // failed create never leaves an orphaned user that blocks retry.
             const distributor = await sequelize.transaction(async (t) => {
                 let distributorUser = existingUser;
-                if (!distributorUser) {
+                if (distributorUser) {
+                    // A user found by phone / email must also hold the distributor role, or the
+                    // distributor signs in as "User not found" / without distributor access.
+                    const role = await Role.findOne({ where: { role_name: 'distributor' }, transaction: t });
+                    if (!role) throw new Error("Role 'distributor' not found");
+                    distributorUser = await ensureUserRole(distributorUser, role, t);
+                } else {
                     distributorUser = await findOrCreateRoleUser({
                         phone,
                         email,
@@ -168,9 +255,9 @@ class DistributorController {
                     email,
                     phone,
                     address,
-                    country_id,
-                    state_id,
-                    city_id,
+                    country_id: countryIdVal,
+                    state_id: stateIdVal,
+                    city_id: cityIdVal,
                     pincode,
                     gstin,
                     pan,
@@ -218,6 +305,9 @@ class DistributorController {
             if (error && error.status) {
                 return res.status(error.status).json({ error: error.message });
             }
+            if (error && Array.isArray(error.errors) && error.errors.length) {
+                return res.status(400).json({ error: error.errors.map((e) => e.message).join('; ') });
+            }
             res.status(500).json({ error: error.message });
         }
     }
@@ -248,8 +338,8 @@ class DistributorController {
                 gstin: gstin || distributor.gstin,
                 pan: pan || distributor.pan,
                 territory: territory || distributor.territory,
-                commission_rate: commission_rate || distributor.commission_rate,
-                is_active: is_active || distributor.is_active,
+                commission_rate: (commission_rate !== undefined && commission_rate !== null && commission_rate !== '') ? commission_rate : distributor.commission_rate,
+                is_active: (is_active !== undefined && is_active !== null) ? is_active : distributor.is_active,
                 updated_at: new Date(),
                 updated_by: user.user_id
             };

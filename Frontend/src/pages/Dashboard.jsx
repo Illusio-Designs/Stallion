@@ -1,48 +1,43 @@
 import React, { useMemo, useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Skeleton from '../components/ui/Skeleton';
 import StatusBadge from '../components/ui/StatusBadge';
 import TableWithControls from '../components/ui/TableWithControls';
-import { showError, showInfo } from '../services/notificationService';
+import { showError } from '../services/notificationService';
 import '../styles/pages/dashboard.css';
-import SalesRevenueChart from '../components/charts/SalesRevenueChart';
-import DropdownSelector from '../components/ui/DropdownSelector';
-import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole } from '../services/apiService';
-import { getUserRole, getUser } from '../services/authService';
-import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight } from 'react-icons/fi';
+import '../styles/redesign-p-dashboard.css';
+import OrdersPerDayChart from '../components/charts/OrdersPerDayChart';
+import { getOrdersForRole, getProducts, getProductsByIds, getSalesmanTargets, getSalesmanProfile, getPartiesForRole, getAllSalesmanTargets, getTrays } from '../services/apiService';
+import { getDashboardSummary } from '../services/api/dashboardApi';
+import SalesmanHome from '../components/home/SalesmanHome';
+import { SalesRevenueCard, QuickActionsCard, OrderOverviewCard, FieldCard, ShopCheckInCard, MySalesmanCard, MyTrayTasksCard } from '../components/home/HomeBlocks';
+import { getUserRole, getUserRoles, getUser } from '../services/authService';
+import { FiMapPin, FiShoppingBag, FiBarChart2, FiShoppingCart, FiTag, FiChevronRight, FiUsers, FiUser, FiAlertTriangle, FiClock, FiPackage, FiInbox } from '../components/icons/hugeicons';
+import RupeeIcon from '../components/icons/RupeeIcon';
+import { orderStatusLabel, orderStatusBadgeKey, heldNote } from '../utils/orderStatus';
+import { isUpcoming } from '../utils/upcoming';
 
-// Quick Action button — pure Tailwind (no legacy ui-btn / .btn-col CSS, no
-// inline styles). Colours are set explicitly on the children because the
-// unlayered global `button { color: inherit }` reset outranks any layered
-// text-* utility placed on the <button> itself.
-const QuickActionCard = ({ icon: Icon, label, desc, onClick, primary }) => (
-  <button
-    type="button"
-    onClick={onClick}
-    className={`group flex h-full w-full items-center gap-4 rounded-2xl border p-4 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 outline-none focus-visible:shadow-[0_0_0_3px_var(--color-primary-soft),0_0_0_4px_var(--color-primary)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.99] motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
-      primary
-        ? 'border-transparent bg-primary shadow-[0_10px_28px_-14px_var(--color-primary)] hover:shadow-[0_16px_32px_-12px_var(--color-primary)]'
-        : 'border-border-strong bg-surface shadow-[0_1px_3px_rgba(16,18,38,0.06)] hover:border-primary/40 hover:shadow-[0_12px_26px_-12px_rgba(16,18,38,0.22)]'
-    }`}
-  >
-    <span className={`inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl transition-colors duration-200 ${
-      primary ? 'bg-white/15 text-white' : 'bg-primary-soft text-primary group-hover:bg-primary group-hover:text-white'
-    }`}>
-      <Icon size={20} aria-hidden="true" />
-    </span>
-    <span className="min-w-0 flex-1">
-      <span className={`block font-semibold leading-snug tracking-[-0.01em] text-[var(--text-base)] ${primary ? 'text-white' : 'text-text'}`}>{label}</span>
-      {desc && <span className={`mt-0.5 block text-[var(--text-sm)] leading-snug ${primary ? 'text-white/70' : 'text-text-muted'}`}>{desc}</span>}
-    </span>
-    <FiChevronRight
-      size={18}
-      aria-hidden="true"
-      className={`flex-shrink-0 transition-[transform,color] duration-200 group-hover:translate-x-0.5 motion-reduce:transition-none ${primary ? 'text-white/80' : 'text-text-subtle group-hover:text-primary'}`}
-    />
-  </button>
-);
+// A link that switches pages inside the app instead of reloading the whole page.
+const AppLink = ({ href, children, ...rest }) => {
+  const router = useRouter();
+  return (
+    <a
+      href={href}
+      {...rest}
+      onClick={(e) => {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return; // let "open in new tab" work
+        e.preventDefault();
+        router.push(href);
+      }}
+    >
+      {children}
+    </a>
+  );
+};
 
 const Dashboard = () => {
-  const [period, setPeriod] = useState('Monthly');
+  const router = useRouter();
+  const [range, setRange] = useState('30d'); // orders chart: today | 7d | 30d | year
   const [orders, setOrders] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -51,10 +46,19 @@ const Dashboard = () => {
   const [targetsLoading, setTargetsLoading] = useState(true);
   const [mySalesmanId, setMySalesmanId] = useState(null);
   const [partyNamesMap, setPartyNamesMap] = useState({});
+  const [myPartyCount, setMyPartyCount] = useState(null); // distributor: parties assigned to them
+  const [partiesNoLocation, setPartiesNoLocation] = useState(null); // office view: parties without a saved shop location
+  const [ownParties, setOwnParties] = useState([]); // salesman / distributor / party: their own parties (server scoped)
+  const [allTargets, setAllTargets] = useState([]); // office view: every salesman's targets
 
   // Read once — these don't change during a session
   const [userRole] = useState(() => getUserRole());
   const [user] = useState(() => getUser());
+  const [userRoles] = useState(() => getUserRoles());
+  const [summary, setSummary] = useState(null); // office: GET /dashboard/summary
+  const [summaryLoading, setSummaryLoading] = useState(true);
+  const [summaryError, setSummaryError] = useState(false);
+  const [traysOut, setTraysOut] = useState(null); // office: sample trays still with a salesman
 
   // The role comes from localStorage, which doesn't exist during SSR, so the
   // server renders with no role (admin-default blocks) while the client renders
@@ -70,19 +74,21 @@ const Dashboard = () => {
 
   // Fetch orders and products — runs once on mount
   useEffect(() => {
+    let cancelled = false;
     const fetchData = async () => {
       try {
         setLoading(true);
         setLoadError(false);
+        // The salesman's page shows no stock or top-product card, so it skips the product call.
         const [ordersData, productsData] = await Promise.all([
           getOrdersForRole(userRole),
-          getProducts()
+          userRole === 'salesman' ? Promise.resolve([]) : getProducts()
         ]);
 
         setProducts(Array.isArray(productsData) ? productsData : (productsData?.data || []));
 
         let filteredOrders = Array.isArray(ordersData) ? ordersData : [];
-        
+
         if (isDistributor && user?.distributor_id) {
           filteredOrders = filteredOrders.filter(o =>
             String(o.distributor_id || o.distributor?.id || '').trim() === String(user.distributor_id).trim()
@@ -93,26 +99,27 @@ const Dashboard = () => {
           );
         }
         // salesman filtering done in recentOrders once mySalesmanId resolves
-        
+
         setOrders(filteredOrders);
 
-        // Resolve party names for orders missing them
+        // Resolve party names for orders missing them. The numbers do not wait for this: the
+        // names fill in when the party list arrives (only a deleted party's orders lack one).
         const missingPartyIds = [...new Set(
           filteredOrders
             .filter(o => o.party_id && !o.party?.party_name && !o.party_name && !o.party?.name)
             .map(o => o.party_id)
         )];
         if (missingPartyIds.length > 0) {
-          try {
-            // One call for all parties instead of one getPartyById per order (N+1)
-            const allParties = await getPartiesForRole(userRole);
+          // One call for all parties instead of one getPartyById per order (N+1)
+          getPartiesForRole(userRole).then((allParties) => {
+            if (cancelled) return;
             const map = {};
             (allParties || []).forEach(p => {
               const id = p.id || p.party_id;
               if (id) map[id] = p.party_name || p.name || id;
             });
             setPartyNamesMap(map);
-          } catch { /* leave party ids unresolved */ }
+          }).catch(() => { /* leave party ids unresolved */ });
         }
       } catch (error) {
         console.error('Failed to fetch orders:', error);
@@ -124,7 +131,97 @@ const Dashboard = () => {
       }
     };
     fetchData();
+    return () => { cancelled = true; };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The role's own parties (the server scopes this list to them): a distributor's count and
+  // table, a salesman's party table, a party's own record (credit days).
+  useEffect(() => {
+    if (!['distributor', 'salesman', 'party'].includes(userRole)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getPartiesForRole(userRole);
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        if (cancelled) return;
+        setOwnParties(list);
+        if (userRole === 'distributor') setMyPartyCount(list.length);
+      } catch { /* fall back to parties seen in orders */ }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Office view: how many parties still have no saved shop location (salesmen cannot
+  // place visit orders for them). Only managers need this, so field roles skip the call.
+  // The summary carries the number; a server that does not send it yet is asked for the list.
+  useEffect(() => {
+    if (['salesman', 'party', 'distributor'].includes(userRole)) return;
+    if (summaryLoading) return;
+    const fromSummary = summary ? summary.parties_without_location : undefined;
+    if (typeof fromSummary === 'number') { setPartiesNoLocation(fromSummary); return; }
+    if (fromSummary === null) return; // the server says this person may not see it: the line is omitted
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getPartiesForRole(userRole);
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        const missing = list.filter((p) => p.is_active !== false && !(p.latitude != null && p.longitude != null)).length;
+        if (!cancelled) setPartiesNoLocation(missing);
+      } catch { /* the panel just omits this line */ }
+    })();
+    return () => { cancelled = true; };
+  }, [summaryLoading, summary]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Office view: every salesman's target, for the "Salesmen against target" table.
+  useEffect(() => {
+    if (['salesman', 'party', 'distributor'].includes(userRole)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getAllSalesmanTargets();
+        const list = Array.isArray(res) ? res : (res?.data || []);
+        if (!cancelled) setAllTargets(list);
+      } catch { /* the table is simply not shown */ }
+    })();
+    return () => { cancelled = true; };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Office view: one server call for the field numbers, weekly sales, pending expenses and unused trays.
+  const loadSummary = async () => {
+    setSummaryLoading(true);
+    setSummaryError(false);
+    try {
+      const res = await getDashboardSummary();
+      setSummary(res && typeof res === 'object' ? res : null);
+    } catch {
+      setSummaryError(true);
+    } finally {
+      setSummaryLoading(false);
+    }
+  };
+  useEffect(() => {
+    if (['salesman', 'party', 'distributor'].includes(userRole)) { setSummaryLoading(false); return; }
+    loadSummary();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Office view: sample trays still with a salesman (only roles that can open the Tray page).
+  // The summary carries the number; a server that does not send it yet is asked for the tray list.
+  useEffect(() => {
+    if (['salesman', 'party', 'distributor'].includes(userRole)) return;
+    if (!userRoles.some((r) => ['admin', 'tray_manager'].includes(r))) return;
+    if (summaryLoading) return;
+    const fromSummary = summary ? summary.trays_out : undefined;
+    if (typeof fromSummary === 'number') { setTraysOut(fromSummary); return; }
+    if (fromSummary === null) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = await getTrays();
+        if (!cancelled) setTraysOut((list || []).filter((t) => String(t.tray_status || '').toLowerCase() === 'assigned').length);
+      } catch { /* item omitted */ }
+    })();
+    return () => { cancelled = true; };
+  }, [summaryLoading, summary]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Fetch salesman targets — runs once on mount if salesman.
   // Key off the RAW userRole, not the mounted-gated `isSalesman`: this effect
@@ -161,99 +258,95 @@ const Dashboard = () => {
     fetchTargets();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Calculate dashboard statistics
+  const statusOf = (o) => String(o.order_status || 'pending').toLowerCase();
+  const amountOf = (o) => Number(o.order_total) || Number(o.total_value) || Number(o.total_amount) || 0;
+
+  // Calculate dashboard statistics. Cancelled orders never count towards money.
   const stats = useMemo(() => {
     const baseOrders = [...orders];
+    const live = baseOrders.filter((o) => statusOf(o) !== 'cancelled');
     const currentMonth = new Date().getMonth();
     const currentYear = new Date().getFullYear();
-    
-    // Filter orders for current month
-    const currentMonthOrders = baseOrders.filter(order => {
+
+    const currentMonthOrders = live.filter((order) => {
       if (!order.order_date) return false;
       const orderDate = new Date(order.order_date);
       return orderDate.getMonth() === currentMonth && orderDate.getFullYear() === currentYear;
     });
-    
-    // Calculate total sales for current month
-    const totalSales = currentMonthOrders.reduce((sum, order) => {
-      return sum + (Number(order.order_total) || order.total_value || order.total_amount || 0);
-    }, 0);
-    
-    // Calculate total orders
-    const totalOrders = baseOrders.length;
-    
-    // Count by order type
-    const retailOrders = baseOrders.filter(o => 
-      o.order_type?.includes('retail') || o.order_type === 'retail_order'
-    ).length;
-    const bulkOrders = baseOrders.filter(o => 
-      o.order_type?.includes('bulk') || o.order_type === 'bulk_order'
-    ).length;
-    
-    // Calculate completed orders value
-    const completedOrders = baseOrders.filter(o => 
-      o.order_status?.toLowerCase() === 'completed'
-    );
-    const completedValue = completedOrders.reduce((sum, o) => {
-      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
-    }, 0);
-    
-    // Calculate pending payments (orders that are not completed)
-    const pendingOrders = baseOrders.filter(o => 
-      o.order_status?.toLowerCase() !== 'completed' && 
-      o.order_status?.toLowerCase() !== 'cancelled'
-    );
-    const pendingPayments = pendingOrders.reduce((sum, o) => {
-      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
-    }, 0);
-    
-    // Calculate total revenue across ALL orders
-    const totalRevenue = baseOrders.reduce((sum, o) => {
-      return sum + (Number(o.order_total) || 0);
-    }, 0);
+    const totalSales = currentMonthOrders.reduce((sum, o) => sum + amountOf(o), 0);
+    const prevMonth = new Date(currentYear, currentMonth - 1, 1);
+    const lastMonthSales = live
+      .filter((o) => {
+        if (!o.order_date) return false;
+        const d = new Date(o.order_date);
+        return d.getMonth() === prevMonth.getMonth() && d.getFullYear() === prevMonth.getFullYear();
+      })
+      .reduce((sum, o) => sum + amountOf(o), 0);
+    const totalRevenue = live.reduce((sum, o) => sum + amountOf(o), 0);
 
-    // Get unique clients count
+    const completedCount = live.filter((o) => statusOf(o) === 'completed').length;
+    const openOrders = live.filter((o) => statusOf(o) !== 'completed');
+
     const uniqueClients = new Set();
-    baseOrders.forEach(order => {
+    live.forEach((order) => {
       if (order.party_id) uniqueClients.add(order.party_id);
       if (order.party?.party_id) uniqueClients.add(order.party.party_id);
       if (order.party?.id) uniqueClients.add(order.party.id);
     });
-    
+
     return {
       totalSales,
-      totalOrders,
-      retailOrders,
-      bulkOrders,
-      completedValue,
-      pendingPayments,
+      lastMonthSales,
+      totalOrders: baseOrders.length,
+      completedCount,
+      openCount: openOrders.length,
+      openOrders,
       totalRevenue,
-      activeClients: uniqueClients.size
+      activeClients: uniqueClients.size,
     };
   }, [orders]);
 
-  // Monthly aggregation for the Sales & Revenue chart — real data from orders
-  const chartData = useMemo(() => {
-    if (!orders.length) return [];
-    const currentYear = new Date().getFullYear();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const buckets = months.map(label => ({ label, sales: 0, revenue: 0 }));
-    orders.forEach(o => {
-      const raw = o.order_date || o.created_at;
-      if (!raw) return;
-      const d = new Date(raw);
-      if (isNaN(d.getTime()) || d.getFullYear() !== currentYear) return;
-      const m = d.getMonth();
-      const amount = Number(o.order_total) || 0;
-      // Both series in ₹ so they share the axis sensibly:
-      // Sales = gross order value (all orders); Revenue = realized (completed).
-      buckets[m].sales += amount;
-      if ((o.order_status || '').toLowerCase() === 'completed') {
-        buckets[m].revenue += amount;
+  // Orders per day (or hour / month) for the chosen range. Cancelled orders are left out.
+  const ordersChart = useMemo(() => {
+    const live = orders.filter((o) => statusOf(o) !== 'cancelled');
+    const dateOf = (o) => {
+      const d = new Date(o.created_at || o.order_date);
+      return isNaN(d.getTime()) ? null : d;
+    };
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const now = new Date();
+    const dayStart = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    let buckets = [];
+    let place;
+    let sub;
+    if (range === 'today') {
+      sub = 'Today, by hour';
+      buckets = Array.from({ length: 24 }, (_, h) => ({ label: String(h), value: 0, current: h === now.getHours(), title: `${h}:00` }));
+      place = (d) => (dayStart(d) === dayStart(now) ? buckets[d.getHours()] : null);
+    } else if (range === 'year') {
+      sub = 'This year, by month';
+      buckets = monthNames.map((m, i) => ({ label: m, value: 0, current: i === now.getMonth(), title: `${m} ${now.getFullYear()}` }));
+      place = (d) => (d.getFullYear() === now.getFullYear() ? buckets[d.getMonth()] : null);
+    } else {
+      const days = range === '7d' ? 7 : 30;
+      sub = `Last ${days} days`;
+      const today = dayStart(now);
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        buckets.push({ key: d.getTime(), label: String(d.getDate()), value: 0, current: i === 0, title: `${d.getDate()} ${monthNames[d.getMonth()]}` });
       }
+      place = (d) => buckets.find((b) => b.key === dayStart(d)) || null;
+    }
+    live.forEach((o) => {
+      const d = dateOf(o);
+      const b = d && place(d);
+      if (b) b.value += 1;
     });
-    return buckets;
-  }, [orders]);
+    buckets.forEach((b) => { b.title = `${b.title}: ${b.value} order${b.value === 1 ? '' : 's'}`; });
+    const total = buckets.reduce((n, b) => n + b.value, 0);
+    return { buckets, sub, total };
+  }, [orders, range]);
 
   // Top selling products — aggregate order_items by product_id across all orders
   const topProductRaw = useMemo(() => {
@@ -293,6 +386,7 @@ const Dashboard = () => {
   // likely to time out, and no big payloads.
   const [extraNames, setExtraNames] = useState({});
   useEffect(() => {
+    if (userRole === 'salesman') return undefined; // the top-products card is not on the salesman's page
     const missing = topProductRaw
       .filter(t => !t.name) // already labelled from the order_items snapshot
       .map(t => t.pid)
@@ -331,6 +425,8 @@ const Dashboard = () => {
     const outOfStock = [];
     const lowStock = [];
     products.forEach(p => {
+      // Upcoming (pre-order) frames keep no stock, so they are never out of stock or low.
+      if (isUpcoming(p)) return;
       const stock = Number(p.total_qty ?? p.warehouse_qty ?? 0);
       const entry = {
         name: p.model_no || p.product_name || `Product ${p.product_id ?? p.id}`,
@@ -371,80 +467,463 @@ const Dashboard = () => {
     </div>
   );
 
+  const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+  // Short money for the big numbers: 18.4L, 1.2Cr (the full value stays in the title).
+  const shortMoney = (n) => {
+    const v = Number(n || 0);
+    if (v >= 1e7) return { sym: '₹', num: `${(v / 1e7).toFixed(2).replace(/\.?0+$/, '')}Cr` };
+    if (v >= 1e5) return { sym: '₹', num: `${(v / 1e5).toFixed(2).replace(/\.?0+$/, '')}L` };
+    return { sym: '₹', num: v.toLocaleString('en-IN') };
+  };
+  const partiesCount = isDistributor && myPartyCount != null ? myPartyCount : stats.activeClients;
+  const noLocation = ownParties.filter((p) => p.is_active !== false && !(p.latitude != null && p.longitude != null)).length;
+  const ownParty = isParty ? (ownParties[0] || null) : null;
+
+  // Role-aware targets: a salesman's own, for the ring and for the first number card.
+  const targetTotal = targets.reduce((n, t) => n + Number(t.target_amount || 0), 0);
+  const targetDone = targets.reduce((n, t) => n + Number(t.completed_amount || 0), 0);
+  const targetPct = targetTotal > 0 ? Math.round((targetDone / targetTotal) * 100) : 0;
+  const RING_C = 2 * Math.PI * 34;
+
+  // The four headline numbers, worded for whoever is looking at the page.
+  // money: true => shown as a short rupee value (₹ 18.4L); icon is display only.
+  let monthDelta = null;
+  if (stats.lastMonthSales > 0) {
+    const pct = ((stats.totalSales - stats.lastMonthSales) / stats.lastMonthSales) * 100;
+    monthDelta = { text: `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%`, dir: pct >= 0 ? 'up' : 'dn' };
+  }
+  const kpis = isParty
+    ? [
+        { icon: RupeeIcon, label: 'Ordered this month', money: stats.totalSales, sub: "This month's orders, cancelled excluded" },
+        { icon: FiShoppingBag, label: 'Open orders', value: stats.openCount, sub: 'Waiting to be completed' },
+        ownParty && ownParty.credit_days != null
+          ? { icon: FiClock, label: 'Credit days', value: ownParty.credit_days, sub: 'Set by your manager' }
+          : { icon: FiShoppingBag, label: 'My orders', value: stats.totalOrders, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
+        { icon: RupeeIcon, label: 'Total spent', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
+      ]
+    : isDistributor
+    ? [
+        { icon: RupeeIcon, label: 'Sales this month', money: stats.totalSales, sub: "Your parties' orders this month" },
+        { icon: FiUsers, label: 'My parties', value: partiesCount, sub: 'Parties assigned to you' },
+        { icon: FiShoppingBag, label: 'Open orders', value: stats.openCount, sub: `Of ${stats.totalOrders} orders` },
+        { icon: RupeeIcon, label: 'Total value', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
+      ]
+    : isSalesman
+    ? [
+        { icon: RupeeIcon, label: 'My sales', money: stats.totalSales, sub: targetTotal > 0 ? `${targetPct}% of ${money(targetTotal)} target` : "This month's orders", subTone: targetTotal > 0 ? 'up' : null },
+        { icon: FiShoppingBag, label: 'My orders', value: stats.totalOrders, sub: `${stats.openCount} open | ${stats.completedCount} completed` },
+        { icon: FiUsers, label: 'My parties', value: ownParties.length || stats.activeClients, sub: ownParties.length ? (noLocation > 0 ? `${noLocation} without a shop location` : 'All have a shop location') : 'Parties you ordered for' },
+        { icon: RupeeIcon, label: 'Total value', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders` },
+      ]
+    : [
+        { icon: RupeeIcon, label: 'Sales this month', money: stats.totalSales, sub: "This month's confirmed sales", delta: monthDelta, deltaText: 'than last month' },
+        { icon: FiShoppingBag, label: 'Total orders', value: stats.totalOrders, sub: `Open ${stats.openCount} | Completed ${stats.completedCount}` },
+        { icon: FiUsers, label: 'Active clients', value: stats.activeClients, sub: 'Optical Stores + Enterprises' },
+        { icon: RupeeIcon, label: 'Total revenue', money: stats.totalRevenue, sub: `Across ${stats.totalOrders} orders (cancelled excluded)` },
+      ];
+
+  // Only pages the role can really open.
+  // Switch pages inside the app (no full page reload).
+  const go = (path) => () => { router.push(path); };
+
+  // "Needs attention": things only a person can decide. Office view only.
+  const isOfficeView = !isSalesman && !isParty && !isDistributor;
+  const attention = [];
+  if (isOfficeView) {
+    const outOfStockCount = products.filter((p) => !isUpcoming(p) && Number(p.total_qty ?? p.warehouse_qty ?? 0) === 0).length;
+    if (outOfStockCount > 0) {
+      attention.push({ icon: FiAlertTriangle, tone: 'bad', title: `${outOfStockCount} item${outOfStockCount > 1 ? 's' : ''} out of stock`, desc: inventoryAlerts.filter((a) => a.type === 'danger').slice(0, 3).map((a) => a.name || a.model_no).filter(Boolean).join(', ') || 'Check the product list', onClick: go('/dashboard/products') });
+    }
+    if (partiesNoLocation > 0) {
+      attention.push({ icon: FiMapPin, tone: 'warn', title: `${partiesNoLocation} part${partiesNoLocation > 1 ? 'ies have' : 'y has'} no shop location`, desc: 'Salesmen cannot place visit orders for them', onClick: go('/dashboard/party') });
+    }
+    const pendingExpenses = userRoles.some((r) => ['admin', 'expense_manager', 'sales_manager'].includes(r)) ? summary?.pending_expenses : 0;
+    if (pendingExpenses > 0) {
+      attention.push({ icon: RupeeIcon, tone: 'warn', title: `${pendingExpenses} expense claim${pendingExpenses > 1 ? 's' : ''} to approve`, desc: 'Waiting for approval or rejection', onClick: go('/dashboard/expenses') });
+    }
+    if (traysOut > 0) {
+      attention.push({ icon: FiInbox, tone: 'warn', title: `${traysOut} sample tray${traysOut > 1 ? 's' : ''} not returned`, desc: 'Still with a salesman', onClick: go('/dashboard/tray') });
+    }
+    const unusedTrays = userRoles.some((r) => ['admin', 'tray_manager'].includes(r)) ? summary?.unused_trays : 0;
+    if (unusedTrays > 0) {
+      attention.push({ icon: FiPackage, tone: 'warn', title: `${unusedTrays} unused tray${unusedTrays > 1 ? 's' : ''}`, desc: 'Empty and untouched for 30 days or more', onClick: go('/dashboard/tray') });
+    }
+    if (stats.openCount > 0) {
+      attention.push({ icon: FiClock, tone: 'info', title: `${stats.openCount} open order${stats.openCount > 1 ? 's' : ''} waiting`, desc: 'Pending, processing or ready to dispatch', onClick: go('/dashboard/orders') });
+    }
+  }
+  // Shortcuts that sit in the greeting header (first one is the black button).
+  const quickActions = isParty
+    ? [
+        { icon: FiShoppingCart, label: 'Order frames', primary: true, onClick: go('/products') },
+        { icon: FiShoppingBag, label: 'My orders', onClick: go('/dashboard/orders') },
+      ]
+    : isDistributor
+    ? [
+        { icon: FiShoppingCart, label: 'Place an order', primary: true, onClick: go('/products') },
+        { icon: FiUsers, label: 'My parties', onClick: go('/dashboard/party') },
+      ]
+    : isSalesman
+    ? [
+        { icon: FiMapPin, label: 'Add visit', primary: true, onClick: go('/dashboard/salesmen') },
+        { icon: FiShoppingBag, label: 'My orders', onClick: go('/dashboard/orders') },
+        { icon: FiBarChart2, label: 'Report', onClick: go('/dashboard/analytics') },
+      ]
+    : [];
+  const ownData = isParty || isDistributor; // their own orders only: no warehouse stock
+
+  // Greeting header
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const todayText = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+  // localStorage and the clock only exist in the browser: keep the first render identical to the server's.
+  const viewer = mounted ? user : null;
+  const fullName = String(viewer?.full_name || viewer?.name || '').trim();
+  const firstName = fullName.split(/\s+/)[0] || '';
+  const companyName = (ownParty && (ownParty.party_name || ownParty.name)) || viewer?.party_name || viewer?.distributor_name || fullName;
+  const heading = isSalesman
+    ? `Hi ${firstName || 'there'}`
+    : (isParty || isDistributor)
+    ? (companyName || 'Welcome')
+    : mounted ? `${greeting}${firstName ? `, ${firstName}` : ''}` : 'Welcome';
+  const subline = isSalesman
+    ? 'Only your own parties, orders and visits are shown here.'
+    : isParty
+    ? 'Your own orders and account only.'
+    : isDistributor
+    ? 'Only your own parties and their orders are shown.'
+    : !mounted ? '' : `${todayText}.${stats.openCount > 0 ? ` ${stats.openCount} order${stats.openCount > 1 ? 's are' : ' is'} still open.` : ''}`;
+
+  const RANGES = [['today', 'Today'], ['7d', '7 days'], ['30d', '30 days'], ['year', 'Year']];
+  const partyOf = (row) => row.party?.party_name || row.party_name || row.party?.name || partyNamesMap[row.party_id] || '-';
+  const orderRef = (row) => row.order_number || `#${String(row.order_id || row.id || '').slice(-6)}`;
+  const statusPill = (v, order) => {
+    const held = heldNote(order);
+    return (
+      <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+        <StatusBadge status={orderStatusBadgeKey(v)}>{orderStatusLabel(v)}</StatusBadge>
+        {held && <small className="text-text-muted">{held}</small>}
+      </span>
+    );
+  };
+  const initialsOf = (name) => String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+
+  // Salesmen against target (office view): this month's targets, one row per salesman.
+  const targetRows = (() => {
+    const by = {};
+    allTargets.forEach((t) => {
+      const id = t.salesman_id || t.salesman_name;
+      if (!id) return;
+      const row = by[id] || (by[id] = { id, name: t.salesman_name || 'Salesman', target: 0, done: 0 });
+      row.target += Number(t.target_amount || 0);
+      row.done += Number(t.completed_amount || 0);
+    });
+    return Object.values(by).filter((r) => r.target > 0).sort((a, b) => (b.done / b.target) - (a.done / a.target)).slice(0, 6);
+  })();
+
+  const latestOrders = recentOrders.slice(0, 6);
+  const ordersCard = (title, sub, linkLabel, cols) => (
+    <section className="rda-card" aria-label={title}>
+      <div className="rda-card__head">
+        <div><h2>{title}</h2>{sub && <p>{sub}</p>}</div>
+        <AppLink href="/dashboard/orders" className="rda-link">{linkLabel}</AppLink>
+      </div>
+      <div className="rda-tw">
+        <table className="rda-table">
+          <thead><tr>{cols.map((c) => <th key={c.h} className={c.r ? 'r' : ''}>{c.h}</th>)}</tr></thead>
+          <tbody>
+            {loading ? (
+              [0, 1, 2, 3].map((i) => <tr key={i}>{cols.map((c) => <td key={c.h}><Skeleton width="70%" height={14} /></td>)}</tr>)
+            ) : latestOrders.length === 0 ? (
+              <tr><td colSpan={cols.length} className="rda-empty">{loadError ? 'Could not load orders.' : 'No orders yet.'}</td></tr>
+            ) : latestOrders.map((o) => (
+              <tr key={o.order_id || o.id || o.order_number}>
+                {cols.map((c) => <td key={c.h} className={`${c.r ? 'r' : ''} ${c.mono ? 'mono' : ''}`}>{c.cell(o)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+
+  // The salesman has his own, shorter home.
+  if (isSalesman) {
+    return (
+      <div className="dash-page w-full rda-page">
+        <div className="dash-container flex flex-col gap-4">
+          <SalesmanHome
+            heading={heading}
+            subline={mounted ? todayText : ''}
+            loading={loading && recentOrders.length === 0}
+            hasTarget={targets.length > 0 && targetTotal > 0}
+            targetTotal={targetTotal}
+            targetDone={targetDone}
+            targetPct={targetPct}
+            monthLabel={mounted ? now.toLocaleDateString('en-GB', { month: 'long' }) : ''}
+            sales={stats.totalSales}
+            orderCount={stats.totalOrders}
+            openCount={stats.openCount}
+            orders={latestOrders}
+            partyOf={partyOf}
+            orderRef={orderRef}
+            amountOf={amountOf}
+            money={money}
+            statusLabel={orderStatusLabel}
+            parties={ownParties}
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="dash-page w-full">
+    <div className="dash-page w-full rda-page">
       <div className="dash-container flex flex-col gap-4">
-        <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
-          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Sales (This Month)</h4>
-            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
-              {loading ? <Skeleton width={90} height={24} /> : `₹${stats.totalSales.toLocaleString('en-IN')}`}
-            </div>
-            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">This month's confirmed sales</div>
+        <div className="rda-head">
+          <div>
+            <h1>{heading}</h1>
+            <p>{subline}</p>
+            {isOfficeView && summary && (
+              <div className="rda-subnums rdp-field">
+                <span><b>{Number(summary.salesmen_in_field) || 0}</b> / {Number(summary.salesmen_total) || 0} salesmen in the field</span>
+                <span><b>{Number(summary.visits_today) || 0}</b> visit{Number(summary.visits_today) === 1 ? '' : 's'} today</span>
+              </div>
+            )}
           </div>
-          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Orders</h4>
-            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
-              {loading ? <Skeleton width={90} height={24} /> : `${stats.totalOrders} Orders`}
+          {isOfficeView && (
+            <div className="rda-seg" role="group" aria-label="Period">
+              {RANGES.map(([k, label]) => (
+                <button key={k} type="button" className={range === k ? 'on' : ''} aria-pressed={range === k} onClick={() => setRange(k)}>{label}</button>
+              ))}
             </div>
-            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">Retail {stats.retailOrders} | Bulk {stats.bulkOrders}</div>
-          </div>
-          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Active Clients</h4>
-            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
-              {loading ? <Skeleton width={90} height={24} /> : stats.activeClients}
+          )}
+          {quickActions.length > 0 && (
+            <div className="rda-actions">
+              {quickActions.map((q) => (
+                <button key={q.label} type="button" onClick={q.onClick} className={q.primary ? 'rda-btn' : 'rda-btn rda-btn--ghost'}>
+                  <q.icon size={16} aria-hidden="true" />{q.label}
+                </button>
+              ))}
             </div>
-            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">Optical Stores + Enterprises</div>
-          </div>
-          <div className="dash-card metric col-span-3 max-[900px]:col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="m-0 mb-2 text-[var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Revenue</h4>
-            <div className="metric-value text-[var(--text-xl)] font-semibold leading-tight tracking-[-0.02em] text-text [font-variant-numeric:tabular-nums]">
-              {loading ? <Skeleton width={90} height={24} /> : `₹${stats.totalRevenue.toLocaleString('en-IN')}`}
-            </div>
-            <div className="metric-sub text-[var(--text-xs)] font-medium text-text-muted [font-variant-numeric:tabular-nums]">Across {stats.totalOrders} orders</div>
-          </div>
+          )}
         </div>
 
-        {!isSalesman && (
-        <>
-          {/* Quick Actions — full-width row of 3 cards (2-up / 1-up on smaller screens) */}
-          <div className="dash-row grid grid-cols-12 gap-4">
-            <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5 max-md:p-4">
-              <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
-              <div className="grid grid-cols-3 items-stretch gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
-                <QuickActionCard icon={FiShoppingCart} label="View All Orders" desc="All orders" primary onClick={() => { window.location.href = '/dashboard/orders'; }} />
-                <QuickActionCard icon={FiBarChart2} label="View Report" desc="Sales analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
-                {/* Display only — offers feature not built yet. */}
-                <QuickActionCard icon={FiTag} label="Create Offer" desc="Coming soon" onClick={() => showInfo('Offers — coming soon')} />
+        {isSalesman && targets.length > 0 && (
+          <div className="dash-row">
+            <section className="target-ring col-span-full" aria-label="Target progress">
+              <svg className="target-ring__svg" width="88" height="88" viewBox="0 0 84 84" role="img" aria-label={`${targetPct} percent of target reached`}>
+                <circle cx="42" cy="42" r="34" fill="none" strokeWidth="9" style={{ stroke: 'var(--ring-track, #3b3b3b)' }} />
+                <circle cx="42" cy="42" r="34" fill="none" strokeWidth="9" strokeLinecap="round" style={{ stroke: 'var(--t-on-ink)' }}
+                  strokeDasharray={`${Math.min(1, targetDone / (targetTotal || 1)) * RING_C} ${RING_C}`} transform="rotate(-90 42 42)" />
+                <text x="42" y="47" textAnchor="middle" fontSize="16" fontWeight="700" style={{ fontFamily: 'var(--font-display)', fill: 'var(--t-on-ink)' }}>{targetPct}%</text>
+              </svg>
+              <div className="target-ring__text">
+                <span className="target-ring__label">Target</span>
+                <span className="target-ring__big">{money(targetDone)}</span>
+                <span className="target-ring__sub">of {money(targetTotal)}. Cancelled orders still count.</span>
               </div>
-            </div>
+            </section>
           </div>
-          {/* Sales & Revenue — full width, below Quick Actions */}
-          <div className="dash-row grid grid-cols-12 gap-4 mt-4">
-            <div className="col-span-full min-h-[320px] flex flex-col bg-surface border border-border rounded-lg shadow-sm p-5">
-              <div className="chart-header flex items-center justify-between mb-[10px]">
-                <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] m-0">Sales &amp; Revenue</h4>
-                <DropdownSelector
-                  options={[
-                    { value: 'Monthly', label: 'Monthly' },
-                    { value: 'Weekly', label: 'Weekly' },
-                    { value: 'Yearly', label: 'Yearly' },
-                  ]}
-                  value={period}
-                  onChange={(value) => setPeriod(value)}
-                  searchable={false}
-                />
+        )}
+
+        {isSalesman && <MyTrayTasksCard />}
+
+        {isSalesman && <ShopCheckInCard parties={ownParties} salesmanId={mySalesmanId || user?.salesman_id || null} loading={loading && ownParties.length === 0} />}
+
+        {isOfficeView && (
+          <section className="needs-attention rda-card rdp-attn" aria-label="Needs attention">
+            <div className="rda-card__head">
+              <div><h2>Needs attention</h2><p>Things only a person can decide</p></div>
+            </div>
+            <div className="needs-attention__list">
+              {attention.length === 0 && (loading
+                ? <div className="rda-skel-list" aria-busy="true">{[0, 1, 2].map((i) => <Skeleton key={i} width="100%" height={44} radius={10} />)}</div>
+                : <p className="rda-empty">Nothing needs your attention right now.</p>)}
+              {attention.map((a) => (
+                <button key={a.title} type="button" onClick={a.onClick} className={`needs-attention__item needs-attention__item--${a.tone}`}>
+                  <span className="needs-attention__icon" aria-hidden="true"><a.icon size={18} /></span>
+                  <span className="needs-attention__text">
+                    <span className="needs-attention__title">{a.title}</span>
+                    <span className="needs-attention__desc">{a.desc}</span>
+                  </span>
+                  <FiChevronRight size={16} aria-hidden="true" className="needs-attention__go" />
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="dash-row dash-kpis rda-kpis rdp-kpis" aria-label="Key figures">
+          {kpis.map((k) => {
+            const sm = k.money != null ? shortMoney(k.money) : null;
+            return (
+              <div key={k.label} className="dash-card metric rda-kpi">
+                <div className="rda-kpi__lab"><span>{k.label}</span><k.icon size={18} aria-hidden="true" /></div>
+                <div className="metric-value rda-kpi__num" title={k.money != null ? money(k.money) : undefined}>
+                  {loading ? <Skeleton width={90} height={28} /> : sm ? <><small>{sm.sym}</small>{sm.num}</> : k.value}
+                </div>
+                <div className="metric-sub rda-kpi__delta">
+                  {k.delta && <span className={k.delta.dir}>{k.delta.text}</span>}
+                  {k.subTone ? <span className={k.subTone}>{k.sub}</span> : (k.deltaText && k.delta ? k.deltaText : k.sub)}
+                </div>
               </div>
-              <SalesRevenueChart data={chartData} height={240} />
-            </div>
+            );
+          })}
+        </div>
+
+        {isOfficeView && (
+          <div className="rda-cols rdp-chart-row">
+            <section className="rda-card" aria-label="Orders per day">
+              <div className="rda-card__head">
+                <div><h2>Orders per day</h2><p>{ordersChart.sub}. Cancelled orders are not counted.</p></div>
+                <div className="rda-legend" aria-hidden="true">
+                  <span><i style={{ background: 'var(--chart-bar, #c2c2c2)' }} />Earlier</span>
+                  <span><i style={{ background: 'var(--t-ink)' }} />{range === 'today' ? 'Now' : range === 'year' ? 'This month' : 'Today'}</span>
+                </div>
+              </div>
+              <OrdersPerDayChart data={ordersChart.buckets} height={215} ariaLabel={`Bar chart of orders. ${ordersChart.total} orders. ${ordersChart.sub}.`} />
+            </section>
+            <OrderOverviewCard orders={orders} loading={loading} loadError={loadError} partyOf={partyOf} onAll={go('/dashboard/orders')} />
           </div>
-        </>
+        )}
+
+        {isOfficeView && (
+          <div className="rda-cols">
+            <SalesRevenueCard weekly={summary?.weekly_sales} loading={summaryLoading} error={summaryError} onRetry={loadSummary} />
+            <QuickActionsCard roles={userRoles} />
+          </div>
+        )}
+
+        {isOfficeView && (
+          <div className="rda-cols rda-cols--one">
+            <FieldCard summary={summary} loading={summaryLoading} error={summaryError} onRetry={loadSummary} />
+          </div>
+        )}
+
+        {isOfficeView && targetRows.length > 0 && (
+          <div className="rda-cols rda-cols--one">
+            <section className="rda-card" aria-label="Salesmen against target">
+              <div className="rda-card__head">
+                <div><h2>Salesmen against target</h2><p>By order value</p></div>
+                <AppLink href="/dashboard/salesmen" className="rda-link">All salesmen</AppLink>
+              </div>
+              <div className="rda-tw">
+                <table className="rda-table">
+                  <thead><tr><th>Salesman</th><th>Target</th><th>Progress</th><th className="r">Done</th></tr></thead>
+                  <tbody>
+                    {targetRows.map((r) => {
+                      const pct = Math.round((r.done / r.target) * 100);
+                      return (
+                        <tr key={r.id}>
+                          <td><div className="rda-who"><span className="rda-pic">{initialsOf(r.name)}</span>{r.name}</div></td>
+                          <td>{shortMoney(r.target).sym} {shortMoney(r.target).num}</td>
+                          <td><div className="rda-prog" role="img" aria-label={`${pct} percent`}><i className={pct >= 100 ? 'hit' : ''} style={{ width: `${Math.min(100, pct)}%` }} /></div></td>
+                          <td className="r">{pct}%</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {isSalesman && (
+          <div className="rda-cols rda-cols--even">
+            <section className="rda-card" aria-label="My parties">
+              <div className="rda-card__head">
+                <div><h2>My parties</h2><p>Open one to capture its shop location</p></div>
+                <AppLink href="/dashboard/party" className="rda-link">All parties</AppLink>
+              </div>
+              <div className="rda-tw">
+                <table className="rda-table">
+                  <thead><tr><th>Party</th><th>City</th><th>Location</th><th className="r">Action</th></tr></thead>
+                  <tbody>
+                    {ownParties.length === 0 ? (
+                      (loading ? [0, 1, 2].map((i) => <tr key={i}>{[0, 1, 2, 3].map((c) => <td key={c}><Skeleton width="70%" height={14} /></td>)}</tr>) : <tr><td colSpan={4} className="rda-empty">No parties yet.</td></tr>)
+                    ) : ownParties.slice(0, 5).map((p) => {
+                      const has = p.latitude != null && p.longitude != null;
+                      return (
+                        <tr key={p.party_id || p.id}>
+                          <td><b>{p.party_name || p.name}</b></td>
+                          <td>{p.city?.name || p.city_name || (typeof p.city === 'string' ? p.city : '') || '-'}</td>
+                          <td><span className={`rda-pill ${has ? 'ok' : 'idle'}`}>{has ? 'Saved' : 'Missing'}</span></td>
+                          <td className="r"><AppLink href="/dashboard/party" className="rda-btn rda-btn--sm rda-btn--ghost">{has ? 'View' : 'Add'}</AppLink></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            {ordersCard('My latest orders', null, 'All orders', [
+              { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
+              { h: 'Party', cell: partyOf },
+              { h: 'Status', cell: (o) => statusPill(o.order_status, o) },
+              { h: 'Amount', r: true, cell: (o) => money(amountOf(o)) },
+            ])}
+          </div>
+        )}
+
+        {isDistributor && (
+          <div className="rda-cols rda-cols--even">
+            <section className="rda-card" aria-label="My parties">
+              <div className="rda-card__head">
+                <div><h2>My parties</h2></div>
+                <AppLink href="/dashboard/party" className="rda-link">All parties</AppLink>
+              </div>
+              <div className="rda-tw">
+                <table className="rda-table">
+                  <thead><tr><th>Party</th><th>City</th><th className="r">Orders</th></tr></thead>
+                  <tbody>
+                    {ownParties.length === 0 ? (
+                      (loading ? [0, 1, 2].map((i) => <tr key={i}>{[0, 1, 2].map((c) => <td key={c}><Skeleton width="70%" height={14} /></td>)}</tr>) : <tr><td colSpan={3} className="rda-empty">No parties yet.</td></tr>)
+                    ) : ownParties.slice(0, 6).map((p) => {
+                      const pid = p.party_id || p.id;
+                      return (
+                        <tr key={pid}>
+                          <td><b>{p.party_name || p.name}</b></td>
+                          <td>{p.city?.name || p.city_name || (typeof p.city === 'string' ? p.city : '') || '-'}</td>
+                          <td className="r">{orders.filter((o) => String(o.party_id || o.party?.id || '') === String(pid)).length}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+            {ordersCard('Orders from my parties', null, 'All orders', [
+              { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
+              { h: 'Party', cell: partyOf },
+              { h: 'Status', cell: (o) => statusPill(o.order_status, o) },
+            ])}
+          </div>
+        )}
+        {isDistributor && <MySalesmanCard plural />}
+
+        {isParty && (
+          <>
+            <MySalesmanCard />
+            {ordersCard('My orders', null, 'All orders', [
+              { h: 'Order', cell: (o) => <b>{orderRef(o)}</b>, mono: true },
+              { h: 'Placed', cell: (o) => { const d = o.created_at || o.order_date; return d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '-'; } },
+              { h: 'Status', cell: (o) => statusPill(o.order_status, o) },
+              { h: 'Amount', r: true, cell: (o) => <b>{money(amountOf(o))}</b> },
+            ])}
+            <div className="rda-lock">
+              <FiClock size={16} aria-hidden="true" />
+              <span>Credit days, GSTIN and PAN are changed by your manager. Contact your salesman to update them.</span>
+            </div>
+          </>
         )}
 
         {!isSalesman && (
         <div className="dash-row grid grid-cols-12 gap-4 max-[560px]:grid-cols-1 max-[560px]:gap-3">
           <div className="dash-card col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
-            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Top Selling Products</h4>
+            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">{ownData ? 'Most Ordered by You' : 'Top Selling Products'}</h4>
             <div className="mini-list">
               {topProducts.length === 0 ? (
                 loadError ? backendDownState : (
@@ -467,6 +946,32 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
+          {ownData ? (
+          <div className="dash-card col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
+            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Open Orders</h4>
+            <div className="mini-list">
+              {stats.openOrders.length === 0 ? (
+                loadError ? backendDownState : (
+                <div className="ui-state ui-state--empty">
+                  <p className="ui-state__title">No open orders</p>
+                  <p className="ui-state__desc">Orders that are not completed yet will show here.</p>
+                </div>
+                )
+              ) : [...stats.openOrders]
+                  .sort((a, b) => new Date(b.created_at || b.order_date || 0) - new Date(a.created_at || a.order_date || 0))
+                  .slice(0, 5)
+                  .map((o) => (
+                <div key={o.order_id || o.id || o.order_number} className="row grid grid-cols-[1fr_auto] items-center gap-3 py-3 border-b border-border last:border-b-0">
+                  <div className="name text-text font-medium text-[var(--text-sm)] leading-snug">
+                    {o.order_number || `#${String(o.order_id || o.id || '').slice(-6)}`}
+                    <span className="ml-2 text-text-muted text-[var(--text-xs)]">{orderStatusLabel(o.order_status)}</span>
+                  </div>
+                  <div className="units text-text-muted text-[var(--text-xs)] [font-variant-numeric:tabular-nums]">{money(amountOf(o))}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+          ) : (
           <div className="dash-card col-span-6 max-[560px]:col-span-full bg-surface border border-border rounded-lg shadow-sm p-5">
             <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-3">Inventory Alerts</h4>
             <div className="inv-list">
@@ -493,68 +998,54 @@ const Dashboard = () => {
               ))}
             </div>
           </div>
+          )}
         </div>
         )}
 
-      </div>
-
-      {/* Quick Actions (salesman) */}
-      {isSalesman && (
-        <div className="dash-row mt-4">
-          <div className="col-span-full bg-surface border border-border rounded-2xl shadow-sm p-5 max-md:p-4">
-            <h4 className="card-title text-text text-[var(--text-md)] font-semibold leading-tight tracking-[-0.01em] mb-4">Quick Actions</h4>
-            <div className="grid grid-cols-3 items-stretch gap-3 max-[900px]:grid-cols-2 max-[560px]:grid-cols-1">
-              <QuickActionCard icon={FiMapPin} label="Add Visit" desc="Log a party visit" primary onClick={() => { window.location.href = '/dashboard/salesmen'; }} />
-              <QuickActionCard icon={FiShoppingBag} label="My Orders" desc="View your orders" onClick={() => { window.location.href = '/dashboard/orders'; }} />
-              <QuickActionCard icon={FiBarChart2} label="View Report" desc="Targets & analytics" onClick={() => { window.location.href = '/dashboard/analytics'; }} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Salesman Targets - before Order Overview */}
-      {isSalesman && (
-        <div className="dash-row mt-4">
+        {/* Order Overview: the full table with search, sort and paging */}
+        <div className="dash-row rda-overview">
           <div className="dash-card full">
             <TableWithControls
-              title="My Targets"
-              itemName="Target"
-              rows={targets}
-              loading={targetsLoading}
+              title="All orders"
+              itemName="Order"
+              rows={recentOrders}
+              loading={loading}
               selectable={false}
               columns={[
-                { key: 'target_amount', label: 'TARGET AMOUNT', render: (v) => `₹${parseFloat(v || 0).toLocaleString('en-IN')}` },
-                { key: 'start_date', label: 'START DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
-                { key: 'end_date', label: 'END DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
-                { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
-                { key: 'target_status', label: 'STATUS', render: (v) => <StatusBadge status={(v || 'pending') === 'pending' ? 'pending' : 'completed'}>{v || 'pending'}</StatusBadge> },
-                { key: 'target_description', label: 'DESCRIPTION', render: (v) => v || '-' },
-                { key: 'target_remarks', label: 'REMARKS', render: (v) => v || '-' },
+                { key: 'order_number', label: 'ORDER ID', render: (v, row) => v || `#${String(row.order_id || row.id || '').slice(-6)}` },
+                { key: 'order_type', label: 'ORDER TYPE', render: (v) => (v || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'N/A' },
+                { key: 'party', label: 'PARTY', render: (_, row) => row.party?.party_name || row.party_name || row.party?.name || partyNamesMap[row.party_id] || '-' },
+                { key: 'order_status', label: 'STATUS', render: (v, row) => statusPill(v, row) },
+                { key: 'order_total', label: 'VALUE', render: (v, row) => `₹${parseFloat(v || row.total_value || row.total_amount || 0).toLocaleString('en-IN')}` },
+                { key: 'created_at', label: 'DATE', render: (v, row) => { const d = v || row.order_date; return d ? new Date(d).toLocaleDateString('en-GB') : '-'; } },
               ]}
             />
           </div>
         </div>
-      )}
 
-      {/* Order Overview */}
-      <div className="dash-row mt-4">
-        <div className="dash-card full">
-          <TableWithControls
-            title="Order Overview"
-            itemName="Order"
-            rows={recentOrders}
-            loading={loading}
-            selectable={false}
-            columns={[
-              { key: 'order_number', label: 'ORDER ID', render: (v, row) => v || `#${String(row.order_id || row.id || '').slice(-6)}` },
-              { key: 'order_type', label: 'ORDER TYPE', render: (v) => (v || '').split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || 'N/A' },
-              { key: 'party', label: 'PARTY', render: (_, row) => row.party?.party_name || row.party_name || row.party?.name || partyNamesMap[row.party_id] || '-' },
-              { key: 'order_status', label: 'STATUS', render: (v) => { const s = v || 'pending'; return <StatusBadge status={String(s).toLowerCase().replace(/\s+/g, '-')}>{String(s).toUpperCase()}</StatusBadge>; } },
-              { key: 'order_total', label: 'VALUE', render: (v, row) => `₹${parseFloat(v || row.total_value || row.total_amount || 0).toLocaleString('en-IN')}` },
-              { key: 'created_at', label: 'DATE', render: (v, row) => { const d = v || row.order_date; return d ? new Date(d).toLocaleDateString('en-GB') : '-'; } },
-            ]}
-          />
-        </div>
+        {/* Salesman targets */}
+        {isSalesman && (
+          <div className="dash-row">
+            <div className="dash-card full">
+              <TableWithControls
+                title="My Targets"
+                itemName="Target"
+                rows={targets}
+                loading={targetsLoading}
+                selectable={false}
+                columns={[
+                  { key: 'target_amount', label: 'TARGET AMOUNT', render: (v) => `₹${parseFloat(v || 0).toLocaleString('en-IN')}` },
+                  { key: 'start_date', label: 'START DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                  { key: 'end_date', label: 'END DATE', render: (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-' },
+                  { key: 'order_type', label: 'ORDER TYPE', render: (v) => v || 'Overall' },
+                  { key: 'target_status', label: 'STATUS', render: (v) => <StatusBadge status={(v || 'pending') === 'pending' ? 'pending' : 'completed'}>{v || 'pending'}</StatusBadge> },
+                  { key: 'target_description', label: 'DESCRIPTION', render: (v) => v || '-' },
+                  { key: 'target_remarks', label: 'REMARKS', render: (v) => v || '-' },
+                ]}
+              />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

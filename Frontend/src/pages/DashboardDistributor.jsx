@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import TableWithControls from '../components/ui/TableWithControls';
+import Pagination from '../components/ui/Pagination';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
@@ -7,16 +8,20 @@ import { useConfirm } from '../components/ui/ConfirmProvider';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import {
-  getDistributors,
+  getDistributorsListPage,
   createDistributor,
   updateDistributor,
   deleteDistributor,
-  getCountries,
+  getIndianCountries,
   getStates,
   getCities,
   getAllZones,
 } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
+import { FiSearch } from '../components/icons/hugeicons';
+import { Avatar, FormSection, usePeopleQuery } from '../components/people/PeopleBits';
+import '../styles/redesign-p-people.css';
+import '../styles/redesign-p-forms.css';
 
 // Multi-select zones dropdown matching the existing DropdownSelector design
 const ZonesMultiDropdown = ({ zones = [], selectedZones = [], onChange, disabled = false, onOpen }) => {
@@ -237,6 +242,40 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
   );
 };
 
+const PAGE_STEP = 20;
+
+// State names for a distributor row (a distributor can work in several states).
+const stateNamesOf = (row) => {
+  const names = (Array.isArray(row.states) ? row.states : [])
+    .map(st => (st && typeof st === 'object') ? (st.state_name || st.name || '') : '')
+    .filter(Boolean);
+  if (names.length) return names;
+  const single = row.state_name || row.state?.name;
+  return single ? [single] : [];
+};
+
+// Parties and this month's orders come from the list API when it sends them; otherwise a dash.
+const partyCountOf = (row) => {
+  const v = row.party_count ?? row.parties_count ?? row.total_parties ?? (Array.isArray(row.parties) ? row.parties.length : null);
+  return v === null || v === undefined || v === '' ? '-' : Number(v).toLocaleString('en-IN');
+};
+const monthOrdersOf = (row) => {
+  const v = row.orders_this_month ?? row.month_orders ?? row.month_order_total;
+  const n = Number(v);
+  return v === null || v === undefined || v === '' || Number.isNaN(n) ? '-' : `₹${Math.round(n).toLocaleString('en-IN')}`;
+};
+
+const StatePills = ({ names = [] }) => {
+  if (!names.length) return <span className="pp-sub">-</span>;
+  const first = names.slice(0, 3);
+  return (
+    <span className="pp-pills">
+      {first.map(n => <span key={n} className="pp-pill">{n}</span>)}
+      {names.length > first.length && <span className="pp-pill" title={names.slice(3).join(', ')}>+{names.length - first.length}</span>}
+    </span>
+  );
+};
+
 const DashboardDistributor = () => {
   const confirm = useConfirm();
 
@@ -251,7 +290,29 @@ const DashboardDistributor = () => {
   const [states, setStates] = useState([]);
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
-  
+
+  // List view: everything below is applied by the server, one page at a time.
+  const [query, setQuery] = usePeopleQuery();
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [statusTab, setStatusTab] = useState('All');
+  const [page, setPage] = useState(1);
+  const [pageCount, setPageCount] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [serverCounts, setServerCounts] = useState({ All: 0, Active: 0, Inactive: 0 });
+  const [listLoading, setListLoading] = useState(false);
+  const [stateList, setStateList] = useState([]); // lookup for the state filter dropdown
+  const listParamsRef = useRef({});
+  listParamsRef.current = { page, statusTab, stateFilter, query: debouncedQuery };
+  const listReqRef = useRef(0); // only the latest response may update the table
+
+  // Debounce typing; a new search always starts from page 1 (one batched update, one fetch).
+  useEffect(() => {
+    if (query === debouncedQuery) return undefined;
+    const t = setTimeout(() => { setDebouncedQuery(query); setPage(1); }, 300);
+    return () => clearTimeout(t);
+  }, [query, debouncedQuery]);
+
   const [formData, setFormData] = useState({
     distributor_name: '',
     trade_name: '',
@@ -284,7 +345,7 @@ const DashboardDistributor = () => {
   const fetchCountries = async () => {
     if (countries.length > 0) return;
     try {
-      const countriesData = await getCountries();
+      const countriesData = await getIndianCountries();
       setCountries(countriesData || []);
     } catch (error) {
       if (!error.message?.toLowerCase().includes('token expired') &&
@@ -296,106 +357,58 @@ const DashboardDistributor = () => {
 
   const fetchDistributorsForCountry = useCallback(async (countryId) => {
     if (!countryId) {
-      console.log('[fetchDistributorsForCountry] No country ID provided, clearing distributors');
       setDistributors([]);
       setHasSearched(false);
       return;
     }
-    
-    setLoading(true);
+    const cleanCountryId = String(countryId).trim();
+    if (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null') {
+      setDistributors([]);
+      setHasSearched(true);
+      return;
+    }
+
+    const reqId = ++listReqRef.current;
+    const { page: pg, statusTab: tab, stateFilter: st, query: q } = listParamsRef.current;
+    setListLoading(true);
     setError(null);
-    setHasSearched(false);
     try {
-      // Validate countryId before making API call
-      const cleanCountryId = String(countryId).trim();
-      if (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null') {
-        console.error('[fetchDistributorsForCountry] Invalid country ID:', countryId);
-        setDistributors([]);
-        setHasSearched(true);
-        return;
-      }
-      
-      console.log('[fetchDistributorsForCountry] ====== FETCHING ======');
-      console.log('[fetchDistributorsForCountry] Requested country ID:', cleanCountryId);
-      console.log('[fetchDistributorsForCountry] Current selectedCountryFilter:', selectedCountryFilter);
-      
-      const distributorsData = await getDistributors(cleanCountryId);
-      
-      console.log('[fetchDistributorsForCountry] Received', distributorsData?.length || 0, 'distributors from API');
-      
-      // CRITICAL: Backend returns wrong data, so we MUST filter strictly
-      // Filter out ALL distributors that don't match the requested country
-      const validDistributors = (distributorsData || []).filter(d => {
-        if (!d) {
-          console.warn('[fetchDistributorsForCountry] Skipping null/undefined distributor');
-          return false;
-        }
-        
-        const distributorCountryId = String(d.country_id || d.countryId || '').trim();
-        const matches = distributorCountryId === cleanCountryId;
-        
-        if (!matches) {
-          console.warn('[fetchDistributorsForCountry] ❌ REJECTING distributor - country mismatch:', {
-            distributor_id: d.distributor_id || d.id,
-            distributor_name: d.distributor_name,
-            distributor_country_id: distributorCountryId,
-            requested_country_id: cleanCountryId,
-            match: false
-          });
-        } else {
-          console.log('[fetchDistributorsForCountry] ✅ ACCEPTING distributor - country matches:', {
-            distributor_id: d.distributor_id || d.id,
-            distributor_name: d.distributor_name,
-            country_id: distributorCountryId
-          });
-        }
-        return matches;
+      const res = await getDistributorsListPage(cleanCountryId, {
+        page: pg, limit: PAGE_STEP, search: q, status: tab.toLowerCase(), stateId: st,
       });
-      
-      const filteredOut = distributorsData.length - validDistributors.length;
-      if (filteredOut > 0) {
-        console.warn('[fetchDistributorsForCountry] ⚠️ Backend returned', filteredOut, 'distributors with WRONG country_id!');
-        console.warn('[fetchDistributorsForCountry] This is a backend issue - it should filter by country_id');
-      }
-      
-      if (validDistributors.length > 0) {
-        console.log('[fetchDistributorsForCountry] ✅ Found', validDistributors.length, 'valid distributors for country:', cleanCountryId);
-      } else {
-        console.log('[fetchDistributorsForCountry] ℹ️ No distributors found for country:', cleanCountryId);
-        console.log('[fetchDistributorsForCountry] Backend returned', distributorsData.length, 'distributors but none matched the requested country');
-      }
-      
-      // Force update by creating a new array reference
-      const newDistributors = Array.isArray(validDistributors) ? [...validDistributors] : [];
-      console.log('[fetchDistributorsForCountry] Setting', newDistributors.length, 'distributors for country:', cleanCountryId);
-      console.log('[fetchDistributorsForCountry] ====== END FETCH ======');
-      setDistributors(newDistributors);
-      setHasSearched(true); // Mark that we've completed a search - even if empty
+      if (reqId !== listReqRef.current) return; // a newer request is in flight
+      const pagination = res.pagination || {};
+      setDistributors(Array.isArray(res.data) ? res.data.filter(Boolean) : []);
+      setTotal(Number(pagination.total) || 0);
+      setPageCount(Math.max(1, Number(pagination.totalPages) || 1));
+      if (res.counts) setServerCounts(res.counts);
+      // Deleting the last row of the last page leaves an empty page: step back one.
+      if (pg > 1 && Number(pagination.totalPages) > 0 && pg > Number(pagination.totalPages)) setPage(Number(pagination.totalPages));
+      setHasSearched(true);
     } catch (error) {
+      if (reqId !== listReqRef.current) return;
       console.error('[fetchDistributorsForCountry] Error:', error);
-      // "Distributors not found" is handled by getDistributors and returns empty array
-      // Only show error for actual failures, not "not found" cases
       const errorMessage = error.message?.toLowerCase() || '';
-      const isNotFound = errorMessage.includes('distributors not found') || 
+      const isNotFound = errorMessage.includes('distributors not found') ||
                         errorMessage.includes('no distributors found') ||
                         errorMessage.includes('distributor not found') ||
                         error.statusCode === 404;
-      const isDbError = errorMessage.includes('distributor_zones') || 
+      const isDbError = errorMessage.includes('distributor_zones') ||
                         errorMessage.includes("doesn't exist") ||
                         errorMessage.includes('table') ||
                         error.statusCode === 500;
-      
       if (!isNotFound && !isDbError &&
-          !errorMessage.includes('token expired') && 
+          !errorMessage.includes('token expired') &&
           !errorMessage.includes('unauthorized')) {
         setError(`Failed to load distributors: ${error.message}`);
         showError(`Failed to load distributors: ${error.message}`);
       }
-      // Always set empty array on error
       setDistributors([]);
+      setTotal(0);
+      setPageCount(1);
       setHasSearched(true);
     } finally {
-      setLoading(false);
+      if (reqId === listReqRef.current) setListLoading(false);
     }
   }, []);
 
@@ -407,29 +420,38 @@ const DashboardDistributor = () => {
         c.name?.toLowerCase() === 'india' || 
         c.code?.toLowerCase() === 'in'
       );
-      if (india) {
-        console.log('[Filter] Setting default country to India:', india.id);
-        setSelectedCountryFilter(india.id);
-        hasSetDefaultCountry.current = true;
-      }
+      // Fall back to the first country so the list is never empty on first load
+      const defaultCountry = india || countries[0];
+      console.log('[Filter] Setting default country:', defaultCountry.id);
+      setSelectedCountryFilter(defaultCountry.id);
+      hasSetDefaultCountry.current = true;
     }
   }, [countries, selectedCountryFilter]);
 
-  // Fetch distributors and zones when country filter changes
+  // Fetch one page whenever the country, page, tab, state filter or (debounced) search changes.
   useEffect(() => {
     if (selectedCountryFilter) {
-      console.log('[Filter] Country changed, fetching distributors for:', selectedCountryFilter);
       fetchDistributorsForCountry(selectedCountryFilter);
       // Zones are only needed in the Add/Edit form, and loading them walks
       // states -> cities -> zones (100+ requests). Defer to when the form opens.
     } else {
-      // If no country selected (All Countries), clear distributors
-      console.log('[Filter] No country selected (All Countries), clearing distributors');
+      listReqRef.current += 1;
       setDistributors([]);
       setLoading(false);
+      setListLoading(false);
       setHasSearched(false);
     }
-  }, [selectedCountryFilter, fetchDistributorsForCountry]);
+  }, [selectedCountryFilter, page, statusTab, stateFilter, debouncedQuery, fetchDistributorsForCountry]);
+
+  // State filter options come from a small lookup, not from the loaded rows.
+  useEffect(() => {
+    if (!selectedCountryFilter) { setStateList([]); return undefined; }
+    let cancelled = false;
+    getStates(selectedCountryFilter)
+      .then(list => { if (!cancelled) setStateList(Array.isArray(list) ? list : []); })
+      .catch(() => { if (!cancelled) setStateList([]); });
+    return () => { cancelled = true; };
+  }, [selectedCountryFilter]);
 
   const fetchStates = async (countryId) => {
     if (!countryId) {
@@ -500,18 +522,35 @@ const DashboardDistributor = () => {
     }
   }, [formData.state_id]);
 
+
   const columns = useMemo(() => ([
-    { key: 'distributor_name', label: 'DISTRIBUTOR NAME' },
-    { key: 'trade_name', label: 'TRADE NAME' },
-    { key: 'contact_person', label: 'CONTACT PERSON' },
-    { key: 'phone', label: 'PHONE' },
+    { key: 'distributor_name', label: 'DISTRIBUTOR', render: (_v, row) => (
+      <div className="pp-who">
+        <Avatar name={row.distributor_name} />
+        <div className="pp-who__t">
+          <span className="pp-who__n">{row.distributor_name}</span>
+          {row.trade_name ? <span className="pp-sub">{row.trade_name}</span> : null}
+          {row.isActive ? null : <span className="pp-pill pp-pill--off pp-inactive-tag">Inactive</span>}
+        </div>
+      </div>
+    ) },
+    { key: 'contact_person', label: 'CONTACT', render: (_v, row) => (
+      <div className="pp-who__t">
+        <span>{row.contact_person || '-'}</span>
+        {row.phone ? <span className="pp-sub">{row.phone}</span> : null}
+      </div>
+    ) },
+    { key: 'state', label: 'STATES', render: (_v, row) => <StatePills names={stateNamesOf(row)} /> },
+    { key: 'parties', label: 'PARTIES', render: (_v, row) => <span className="pp-num">{partyCountOf(row)}</span> },
+    { key: 'month_orders', label: 'ORDERS THIS MONTH', render: (_v, row) => <span className="pp-num">{monthOrdersOf(row)}</span> },
+    { key: 'status', label: 'STATUS', render: (_v, row) => (
+      <span className={`pp-pill ${row.isActive ? 'pp-pill--ok' : 'pp-pill--off'}`}>{row.isActive ? 'Active' : 'Inactive'}</span>
+    ) },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
-      <RowActions 
-        onEdit={() => handleEdit(row)} 
-        onDelete={() => handleDelete(row)} 
-      />
+      <RowActions onEdit={() => handleEdit(row)} />
     ) },
   ]), []);
+
 
   const rows = useMemo(() => {
     // CRITICAL: Backend returns wrong data, so we MUST filter strictly by country_id
@@ -758,6 +797,7 @@ const DashboardDistributor = () => {
       }
       
       setError(null);
+      if (selectedCountryFilter) fetchDistributorsForCountry(selectedCountryFilter);
     } catch (error) {
       console.error('[Delete Distributor] Delete distributor error:', error);
       
@@ -876,6 +916,7 @@ const DashboardDistributor = () => {
           
           // Show success notification
           showSuccess('Distributor updated successfully');
+          if (selectedCountryFilter) fetchDistributorsForCountry(selectedCountryFilter);
           setError(null);
           setOpenAdd(false);
           setEditRow(null);
@@ -908,18 +949,10 @@ const DashboardDistributor = () => {
         // retry with "user already exists".
         try {
           const phoneNumber = dataToSend.phone;
-          const newDistributor = await createDistributor(dataToSend);
+          await createDistributor(dataToSend);
 
-          // Optimistically add to table if it matches the current filter
-          if (selectedCountryFilter && newDistributor && newDistributor.country_id === selectedCountryFilter) {
-            setDistributors(prev => [...prev, {
-              ...newDistributor,
-              id: newDistributor.id || newDistributor.distributor_id,
-              isActive: newDistributor.is_active !== false,
-            }]);
-          } else if (selectedCountryFilter) {
-            await fetchDistributorsForCountry(selectedCountryFilter);
-          }
+          // Refetch the current page (the server decides where the new row lands).
+          if (selectedCountryFilter) await fetchDistributorsForCountry(selectedCountryFilter);
 
           showSuccess(`Distributor created successfully! The distributor can now login with phone: ${phoneNumber}.`);
       setError(null);
@@ -965,515 +998,349 @@ const DashboardDistributor = () => {
       window.location.reload();
     }
   };
-  const showError_ = !loading && !!error;
-  const showEmpty = !loading && !error && rows.length === 0;
+  const showError_ = !listLoading && !!error;
+  const showEmpty = !listLoading && !error && hasSearched && rows.length === 0 && !anyFilter;
 
-  return (
-    <div className="dash-page w-full">
-      <div className="dash-container flex flex-col gap-4">
-        <div className="dash-row grid grid-cols-1 gap-4 sm:grid-cols-12">
-          <div className="dash-card full col-span-1 p-0 sm:col-span-12">
-            {showError_ ? (
-              <div className="ui-state ui-state--error">
-                <div className="ui-state__icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="12" y1="8" x2="12" y2="12" />
-                    <line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                </div>
-                <p className="ui-state__title">Couldn&apos;t load distributors</p>
-                <p className="ui-state__desc">{error}</p>
-                <button className="ui-btn ui-btn--secondary" onClick={retryFetch}>
-                  Try again
-                </button>
-              </div>
-            ) : showEmpty ? (
-              <div className="ui-state ui-state--empty">
-                <div className="ui-state__icon">
-                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <line x1="19" y1="8" x2="19" y2="14" />
-                    <line x1="22" y1="11" x2="16" y2="11" />
-                  </svg>
-                </div>
-                <p className="ui-state__title">No distributors yet</p>
-                <p className="ui-state__desc">
-                  {selectedCountryFilter
-                    ? 'No distributors found for the selected country. Add one to get started.'
-                    : 'Select a country to view its distributors, or add a new one to get started.'}
-                </p>
-                <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
-                  Add New Distributor
-                </button>
-              </div>
-            ) : (
-              <TableWithControls
-                title="Distributors"
-                columns={columns}
-                rows={rows}
-                onAddNew={handleAdd}
-                addNewText="Add New Distributor"
-                onImport={() => {
-                  setError(null);
-                  if (selectedCountryFilter) {
-                    fetchDistributorsForCountry(selectedCountryFilter);
-                  }
-                }}
-                importText="Refresh Data"
-                showFilter={true}
-                filterContent={
-                  <div>
-                    <label className="mb-2 block text-[14px] font-medium">
-                      Filter by Country
-                    </label>
-                    <DropdownSelector
-                      options={[
-                        { value: '', label: 'All Countries' },
-                        ...countries.map(country => ({
-                          value: country.id,
-                          label: country.name
-                        }))
-                      ]}
-                      value={selectedCountryFilter || ''}
-                      onChange={(value) => {
-                        const newCountryId = value || null;
-                        const oldCountryId = selectedCountryFilter;
-                        console.log('[Filter] Country selection changed from', oldCountryId, 'to', newCountryId);
 
-                        // Clear distributors immediately when changing countries
-                        setDistributors([]);
 
-                        // Update state - useEffect will handle fetching or clearing
-                        setSelectedCountryFilter(newCountryId);
+  const stateOptions = useMemo(() => ([
+    { value: '', label: 'All states' },
+    ...stateList
+      .map(st => ({ value: st.id || st.state_id, label: st.name || st.state_name || '' }))
+      .filter(o => o.value && o.label)
+      .sort((x, y) => x.label.localeCompare(y.label)),
+  ]), [stateList]);
 
-                        // If "All Countries" is selected (empty), ensure distributors are cleared
-                        if (!newCountryId) {
-                          console.log('[Filter] All Countries selected - clearing distributors');
-                          setDistributors([]);
-                          setLoading(false);
-                        }
-                      }}
-                      onOpen={fetchCountries}
-                      placeholder="All Countries"
-                      className="ui-dropdown-custom--full-width"
-                    />
-                  </div>
-                }
-                loading={loading}
-              />
-            )}
-          </div>
+  const counts = serverCounts;
+  const listRows = rows;
+  const anyFilter = !!(debouncedQuery || stateFilter || statusTab !== 'All');
+
+  const closeForm = () => {
+    setOpenAdd(false);
+    setEditRow(null);
+    resetForm();
+  };
+
+  const footerFor = (isEdit) => (
+    <>
+      <span className="pp-foot-note">Nothing is saved until you press {isEdit ? 'Update' : 'Save'}.</span>
+      <button className="ui-btn ui-btn--secondary pp-btn" onClick={closeForm} disabled={loading}>
+        Cancel
+      </button>
+      <button className="ui-btn ui-btn--primary pp-btn pp-btn--pri" onClick={handleSubmit} disabled={loading}>
+        {loading ? (isEdit ? 'Updating...' : 'Saving...') : (isEdit ? 'Update' : 'Save')}
+      </button>
+    </>
+  );
+
+  // Same fields for Add and Edit; only the phone input differs (Edit uses the country-code picker).
+  const renderFields = (isEdit) => (
+    <form className="ui-form pp-form rf-form" onSubmit={handleSubmit}>
+      <FormSection title="Distributor" hint="Who they are and how to reach them.">
+        <div className="form-group">
+          <label className="ui-label">Distributor name *</label>
+          <input className="ui-input" placeholder="Distributor name" value={formData.distributor_name}
+            onChange={(e) => handleInputChange('distributor_name', e.target.value)} required />
         </div>
-      </div>
-      <AsidePanel
-        open={openAdd}
-        onClose={() => {
-          setOpenAdd(false);
-          resetForm();
-        }}
-        title="Add New Distributor"
-        footer={(
-          <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
-              onClick={() => {
-                setOpenAdd(false);
-                resetForm();
-              }}
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
-              onClick={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? 'Saving...' : 'Save'}
-            </button>
-          </>
-        )}
-      >
-        <form className="ui-form" onSubmit={handleSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Distributor Name *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Distributor name"
-              value={formData.distributor_name}
-              onChange={(e) => handleInputChange('distributor_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Trade Name *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Trade name"
-              value={formData.trade_name}
-              onChange={(e) => handleInputChange('trade_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Contact Person *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Contact person"
-              value={formData.contact_person}
-              onChange={(e) => handleInputChange('contact_person', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Email *</label>
-            <input 
-              className="ui-input" 
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Phone *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Phone"
-              value={formData.phone}
-              onChange={(e) => handleInputChange('phone', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address</label>
-            <input
-              className="ui-input"
-              placeholder="Address"
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Country *</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Country' },
-                ...countries.map(c => ({ value: c.id, label: c.name }))
-              ]}
-              value={formData.country_id || ''}
-              onChange={(value) => handleInputChange('country_id', value || '')}
-              onOpen={fetchCountries}
-              placeholder="Select Country"
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">State</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select State' },
-                ...states.map(s => ({ value: s.id, label: s.name }))
-              ]}
-              value={formData.state_id || ''}
-              onChange={(value) => handleInputChange('state_id', value || '')}
-              placeholder="Select State"
-              disabled={!formData.country_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">City</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select City' },
-                ...cities.map(c => ({ value: c.id, label: c.name }))
-              ]}
-              value={formData.city_id || ''}
-              onChange={(value) => handleInputChange('city_id', value || '')}
-              placeholder="Select City"
-              disabled={!formData.state_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Zones</label>
-            <ZonesMultiDropdown
-              zones={zones}
-              selectedZones={Array.isArray(formData.zones) ? formData.zones : []}
-              onChange={(updated) => handleInputChange('zones', updated)}
-              onOpen={() => fetchAllZones(formData.country_id || selectedCountryFilter)}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Working States <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this distributor)</span></label>
-            <StatesMultiDropdown
-              states={states}
-              selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
-              onChange={(updated) => handleInputChange('state_ids', updated)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Pincode</label>
-            <input 
-              className="ui-input" 
-              placeholder="Pincode"
-              value={formData.pincode}
-              onChange={(e) => handleInputChange('pincode', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">GSTIN</label>
-            <input 
-              className="ui-input" 
-              placeholder="GSTIN"
-              value={formData.gstin}
-              onChange={(e) => handleInputChange('gstin', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">PAN</label>
-            <input 
-              className="ui-input" 
-              placeholder="PAN"
-              value={formData.pan}
-              onChange={(e) => handleInputChange('pan', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Territory</label>
-            <input 
-              className="ui-input" 
-              placeholder="Territory"
-              value={formData.territory}
-              onChange={(e) => handleInputChange('territory', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Commission Rate</label>
-            <input 
-              className="ui-input" 
-              type="number"
-              step="0.01"
-              placeholder="Commission rate"
-              value={formData.commission_rate}
-              onChange={(e) => handleInputChange('commission_rate', e.target.value)}
-            />
-          </div>
-        </form>
-      </AsidePanel>
-      <AsidePanel
-        open={!!editRow}
-        onClose={() => {
-          setEditRow(null);
-          resetForm();
-        }}
-        title="Edit Distributor"
-        footer={(
-          <>
-            <button 
-              className="ui-btn ui-btn--secondary" 
-              onClick={() => {
-                setEditRow(null);
-                resetForm();
-              }}
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button 
-              className="ui-btn ui-btn--primary" 
-              onClick={handleSubmit}
-              disabled={loading}
-            >
-              {loading ? 'Updating...' : 'Update'}
-            </button>
-          </>
-        )}
-      >
-        <form className="ui-form" onSubmit={handleSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Distributor Name *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Distributor name"
-              value={formData.distributor_name}
-              onChange={(e) => handleInputChange('distributor_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Trade Name *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Trade name"
-              value={formData.trade_name}
-              onChange={(e) => handleInputChange('trade_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Contact Person *</label>
-            <input 
-              className="ui-input" 
-              placeholder="Contact person"
-              value={formData.contact_person}
-              onChange={(e) => handleInputChange('contact_person', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Email *</label>
-            <input 
-              className="ui-input" 
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Phone *</label>
+        <div className="form-group">
+          <label className="ui-label">Trade name *</label>
+          <input className="ui-input" placeholder="Trade name" value={formData.trade_name}
+            onChange={(e) => handleInputChange('trade_name', e.target.value)} required />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">Contact person *</label>
+          <input className="ui-input" placeholder="Contact person" value={formData.contact_person}
+            onChange={(e) => handleInputChange('contact_person', e.target.value)} required />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">Phone *</label>
+          {isEdit ? (
             <PhoneInput
               defaultCountry="in"
               value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
               onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
               className="phone-intl"
-              inputProps={{
-                required: true,
-                placeholder: 'Enter your phone number',
-              }}
+              inputProps={{ required: true, placeholder: 'Enter your phone number' }}
             />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address</label>
+          ) : (
+            <input className="ui-input" placeholder="Phone" value={formData.phone}
+              onChange={(e) => handleInputChange('phone', e.target.value)} required />
+          )}
+        </div>
+        <div className="form-group pp-full">
+          <label className="ui-label">Email *</label>
+          <input className="ui-input" type="email" placeholder="Email" value={formData.email}
+            onChange={(e) => handleInputChange('email', e.target.value)} required />
+        </div>
+      </FormSection>
+
+      <FormSection title="Address">
+        <div className="form-group pp-full">
+          <label className="ui-label">Address</label>
+          <input className="ui-input" placeholder="Address" value={formData.address}
+            onChange={(e) => handleInputChange('address', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">Country *</label>
+          <DropdownSelector
+            options={[{ value: '', label: 'Select Country' }, ...countries.map(c => ({ value: c.id, label: c.name }))]}
+            value={formData.country_id || ''}
+            onChange={(value) => handleInputChange('country_id', value || '')}
+            onOpen={fetchCountries}
+            placeholder="Select Country"
+            className="ui-dropdown-custom--full-width"
+          />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">State</label>
+          <DropdownSelector
+            options={[{ value: '', label: 'Select State' }, ...states.map(s => ({ value: s.id, label: s.name }))]}
+            value={formData.state_id || ''}
+            onChange={(value) => handleInputChange('state_id', value || '')}
+            placeholder="Select State"
+            disabled={!formData.country_id}
+            className="ui-dropdown-custom--full-width"
+          />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">City</label>
+          <DropdownSelector
+            options={[{ value: '', label: 'Select City' }, ...cities.map(c => ({ value: c.id, label: c.name }))]}
+            value={formData.city_id || ''}
+            onChange={(value) => handleInputChange('city_id', value || '')}
+            placeholder="Select City"
+            disabled={!formData.state_id}
+            className="ui-dropdown-custom--full-width"
+          />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">Pincode</label>
+          <input className="ui-input" placeholder="Pincode" value={formData.pincode}
+            onChange={(e) => handleInputChange('pincode', e.target.value)} />
+        </div>
+      </FormSection>
+
+      <FormSection title="Coverage" hint="Parties in the working states are auto-assigned to this distributor.">
+        <div className="form-group pp-full">
+          <label className="ui-label">Working states *</label>
+          <StatesMultiDropdown
+            states={states}
+            selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
+            onChange={(updated) => handleInputChange('state_ids', updated)}
+          />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">Zones</label>
+          <ZonesMultiDropdown
+            zones={zones}
+            selectedZones={Array.isArray(formData.zones) ? formData.zones : []}
+            onChange={(updated) => handleInputChange('zones', updated)}
+            onOpen={() => fetchAllZones(formData.country_id || selectedCountryFilter)}
+          />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">Territory</label>
+          <input className="ui-input" placeholder="Territory" value={formData.territory}
+            onChange={(e) => handleInputChange('territory', e.target.value)} />
+        </div>
+      </FormSection>
+
+      <FormSection title="Tax and commission">
+        <div className="form-group">
+          <label className="ui-label">GSTIN</label>
+          <input className="ui-input" placeholder="GSTIN" value={formData.gstin}
+            onChange={(e) => handleInputChange('gstin', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">PAN</label>
+          <input className="ui-input" placeholder="PAN" value={formData.pan}
+            onChange={(e) => handleInputChange('pan', e.target.value)} />
+        </div>
+        <div className="form-group">
+          <label className="ui-label">Commission rate (%)</label>
+          <input className="ui-input" type="number" step="0.01" placeholder="Commission rate" value={formData.commission_rate}
+            onChange={(e) => handleInputChange('commission_rate', e.target.value)} />
+        </div>
+      </FormSection>
+    </form>
+  );
+
+  const countryName = countries.find(c => String(c.id) === String(selectedCountryFilter))?.name;
+
+  return (
+    <div className="dash-page w-full">
+      <div className="dash-container flex flex-col gap-4 pp-dist">
+        <div className="pg-head">
+          <div><h1>Distributors</h1><p>Admin and distributor managers add and edit distributors. Each one serves its own parties.</p></div>
+          <button type="button" className="pp-btn pp-btn--pri" onClick={handleAdd}>Add distributor</button>
+        </div>
+
+        <div className="pp-bar">
+          <label className="pp-search">
+            <FiSearch size={18} />
             <input
-              className="ui-input"
-              placeholder="Address"
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
+              type="search"
+              placeholder="Search distributor, contact or state"
+              aria-label="Search distributors"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
             />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Country *</label>
+          </label>
+          <div className="pp-sel">
             <DropdownSelector
-              options={[
-                { value: '', label: 'Select Country' },
-                ...countries.map(country => ({
-                  value: country.id,
-                  label: country.name
-                }))
-              ]}
-              value={formData.country_id || ''}
-              onChange={(value) => handleInputChange('country_id', value || '')}
+              options={countries.map(country => ({ value: country.id, label: country.name }))}
+              value={selectedCountryFilter || ''}
+              onChange={(value) => {
+                // Distributors are always loaded per country, so there is no "All" option
+                if (!value) return;
+                setDistributors([]);
+                setStateFilter('');
+                setPage(1);
+                setSelectedCountryFilter(value);
+              }}
               onOpen={fetchCountries}
-              placeholder="Select Country"
+              placeholder="Country"
               className="ui-dropdown-custom--full-width"
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">State</label>
+          <div className="pp-sel">
             <DropdownSelector
-              options={[
-                { value: '', label: 'Select State' },
-                ...states.map(state => ({
-                  value: state.id,
-                  label: state.name
-                }))
-              ]}
-              value={formData.state_id || ''}
-              onChange={(value) => handleInputChange('state_id', value || '')}
-              placeholder="Select State"
-              disabled={!formData.country_id}
+              options={stateOptions}
+              value={stateFilter}
+              onChange={(value) => { setStateFilter(value || ''); setPage(1); }}
+              placeholder="All states"
               className="ui-dropdown-custom--full-width"
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">City</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select City' },
-                ...cities.map(city => ({
-                  value: city.id,
-                  label: city.name
-                }))
-              ]}
-              value={formData.city_id || ''}
-              onChange={(value) => handleInputChange('city_id', value || '')}
-              placeholder="Select City"
-              disabled={!formData.state_id}
-              className="ui-dropdown-custom--full-width"
-            />
+          <button
+            type="button"
+            className="pp-btn"
+            onClick={() => { setError(null); if (selectedCountryFilter) fetchDistributorsForCountry(selectedCountryFilter); }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        <div className="pp-chips" role="group" aria-label="Filter by status">
+          {['All', 'Active', 'Inactive'].map(t => (
+            <button key={t} type="button" className="pp-chip" aria-pressed={statusTab === t} onClick={() => { setStatusTab(t); setPage(1); }}>
+              {t} <b>{counts[t]}</b>
+            </button>
+          ))}
+        </div>
+
+        {showError_ ? (
+          <div className="ui-state ui-state--error">
+            <div className="ui-state__icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+            </div>
+            <p className="ui-state__title">Couldn&apos;t load distributors</p>
+            <p className="ui-state__desc">{error}</p>
+            <button className="ui-btn ui-btn--secondary pp-btn" onClick={retryFetch}>
+              Try again
+            </button>
           </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Zones</label>
-            <ZonesMultiDropdown
-              zones={zones}
-              selectedZones={Array.isArray(formData.zones) ? formData.zones : []}
-              onChange={(updated) => handleInputChange('zones', updated)}
-              onOpen={() => fetchAllZones(formData.country_id || selectedCountryFilter)}
-            />
+        ) : showEmpty ? (
+          <div className="ui-state ui-state--empty">
+            <div className="ui-state__icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                <circle cx="9" cy="7" r="4" />
+                <line x1="19" y1="8" x2="19" y2="14" />
+                <line x1="22" y1="11" x2="16" y2="11" />
+              </svg>
+            </div>
+            <p className="ui-state__title">No distributors yet</p>
+            <p className="ui-state__desc">
+              {selectedCountryFilter
+                ? `No distributors found for ${countryName || 'the selected country'}. Pick another country above, or add a new distributor.`
+                : 'Pick a country above to view its distributors, or add a new one to get started.'}
+            </p>
+            <button className="ui-btn ui-btn--primary pp-btn pp-btn--pri" onClick={handleAdd}>
+              Add distributor
+            </button>
           </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Working States <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this distributor)</span></label>
-            <StatesMultiDropdown
-              states={states}
-              selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
-              onChange={(updated) => handleInputChange('state_ids', updated)}
-            />
+        ) : (
+          <div style={{ opacity: listLoading && hasSearched ? 0.55 : 1, transition: 'opacity 120ms' }}>
+            <div className="pp-list pp-desk">
+              <TableWithControls
+                title="Distributors"
+                columns={columns}
+                rows={listRows}
+                showFilter={false}
+                showSerialNumber={false}
+                selectable={false}
+                loading={listLoading && !hasSearched}
+                serverPagination
+                serverPage={page}
+                serverPageCount={pageCount}
+                serverPageSize={PAGE_STEP}
+                serverTotal={total}
+                onServerPageChange={(p) => setPage(p)}
+                onServerSearch={() => {}}
+              />
+            </div>
+            <div className="pp-mob" aria-busy={listLoading}>
+              {listLoading && !hasSearched ? (
+                <div className="pp-empty">Loading distributors...</div>
+              ) : listRows.length === 0 ? (
+                <div className="pp-empty">No distributors match.</div>
+              ) : (
+                <>
+                  {listRows.map((row) => (
+                    <article className="pp-card" key={row.id || row.distributor_id || row.distributor_name}>
+                      <div className="pp-card__top">
+                        <div className="pp-who">
+                          <Avatar name={row.distributor_name} />
+                          <div className="pp-who__t">
+                            <span className="pp-who__n">{row.distributor_name}</span>
+                            {row.trade_name ? <span className="pp-sub">{row.trade_name}</span> : null}
+                          </div>
+                        </div>
+                        <span className={`pp-pill ${row.isActive ? 'pp-pill--ok' : 'pp-pill--off'}`}>{row.isActive ? 'Active' : 'Inactive'}</span>
+                      </div>
+                      <StatePills names={stateNamesOf(row)} />
+                      <div className="pp-card__nums">
+                        <div><b>{partyCountOf(row)}</b>Parties</div>
+                        <div><b>{monthOrdersOf(row)}</b>Orders this month</div>
+                      </div>
+                      <div className="pp-card__foot">
+                        {row.phone ? <a href={`tel:${String(row.phone).startsWith('+') ? row.phone : '+' + row.phone}`}>{row.contact_person ? `${row.contact_person}, ` : ''}{row.phone}</a> : <span className="pp-sub">{row.contact_person || ''}</span>}
+                        <button type="button" className="pp-btn" onClick={() => handleEdit(row)} aria-label={`Edit ${row.distributor_name}`}>Edit</button>
+                      </div>
+                    </article>
+                  ))}
+                  {pageCount > 1 && (
+                    <Pagination page={page} pageCount={pageCount} onPageChange={(p) => setPage(p)} />
+                  )}
+                </>
+              )}
+            </div>
           </div>
-          <div className="form-group">
-            <label className="ui-label">Pincode</label>
-            <input 
-              className="ui-input" 
-              placeholder="Pincode"
-              value={formData.pincode}
-              onChange={(e) => handleInputChange('pincode', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">GSTIN</label>
-            <input 
-              className="ui-input" 
-              placeholder="GSTIN"
-              value={formData.gstin}
-              onChange={(e) => handleInputChange('gstin', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">PAN</label>
-            <input 
-              className="ui-input" 
-              placeholder="PAN"
-              value={formData.pan}
-              onChange={(e) => handleInputChange('pan', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Territory</label>
-            <input 
-              className="ui-input" 
-              placeholder="Territory"
-              value={formData.territory}
-              onChange={(e) => handleInputChange('territory', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Commission Rate</label>
-            <input 
-              className="ui-input" 
-              type="number"
-              step="0.01"
-              placeholder="Commission rate"
-              value={formData.commission_rate}
-              onChange={(e) => handleInputChange('commission_rate', e.target.value)}
-            />
-          </div>
-        </form>
+        )}
+      </div>
+
+      <AsidePanel
+        open={openAdd}
+        onClose={closeForm}
+        title="Add new distributor"
+        width="lg"
+        footer={footerFor(false)}
+      >
+        {renderFields(false)}
+      </AsidePanel>
+      <AsidePanel
+        open={!!editRow}
+        onClose={closeForm}
+        title="Edit distributor"
+        width="lg"
+        footer={footerFor(true)}
+      >
+        {renderFields(true)}
       </AsidePanel>
     </div>
   );

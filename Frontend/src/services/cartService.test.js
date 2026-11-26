@@ -33,6 +33,16 @@ describe('cartService', () => {
     expect(cart.getCartCount()).toBe(5);
   });
 
+  it('keeps the upcoming flag on a line and follows it when the product is added again', () => {
+    cart.addToCart({ id: '1', quantity: 3000, is_upcoming: true });
+    expect(cart.getCartItems()[0].is_upcoming).toBe(true);
+    expect(cart.getCartItems()[0].quantity).toBe(3000);
+    cart.addToCart({ id: '2', quantity: 1, stock: 4 });
+    expect(cart.getCartItems()[1].is_upcoming).toBeUndefined();
+    cart.addToCart({ id: '1', quantity: 2, stock: 5 });
+    expect(cart.getCartItems()[0].is_upcoming).toBeUndefined();
+  });
+
   it('notifies registered listeners on change', () => {
     let calls = 0;
     const unsubscribe = cart.registerCartListener(() => { calls += 1; });

@@ -1,0 +1,19 @@
+.shop-capture { width: 100%; min-width: 0; padding: 14px; border: 1px solid var(--color-border, #e5e7eb); border-radius: 12px; background: var(--color-surface, #fff); color: var(--color-text, inherit); }
+.shop-capture__status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; font-size: var(--text-xs, 12px); }
+.shop-capture__note { margin: 8px 0; font-size: var(--text-xs, 12px); color: var(--color-text-muted, #64748b); line-height: 1.5; overflow-wrap: anywhere; }
+.shop-capture__trigger { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.shop-capture__confirmation { min-width: 0; }
+.shop-capture__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.shop-capture__field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.shop-capture__field .ui-input { width: 100%; min-width: 0; box-sizing: border-box; }
+.shop-capture__field textarea { resize: vertical; }
+.shop-capture__full { grid-column: 1 / -1; }
+.shop-capture__actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.shop-capture__actions .ui-btn { flex: 1 1 120px; min-height: 42px; white-space: normal; }
+.shop-capture__error { margin: 10px 0 0; color: var(--color-error, #b91c1c); font-size: var(--text-xs, 12px); overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .shop-capture { padding: 12px; }
+  .shop-capture__grid { grid-template-columns: minmax(0, 1fr); }
+  .shop-capture__trigger { width: 100%; min-height: 44px; }
+  .shop-capture__actions .ui-btn { flex-basis: 100%; }
+}

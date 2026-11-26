@@ -28,6 +28,7 @@ export default function AsidePanel({
   const [mounted, setMounted] = useState(open);
   const [entered, setEntered] = useState(false);
   const panelRef = useRef(null);
+  const backdropRef = useRef(null);
   const lastFocused = useRef(null);
 
   // Drive mount + enter/exit transitions off the `open` prop.
@@ -81,12 +82,65 @@ export default function AsidePanel({
     };
   }, [mounted]);
 
+  // On phones and tablets the on-screen keyboard covers the lower part of the page. Keep the panel inside
+  // the part that is still visible, so the footer (Save) sits right above the keyboard and the form
+  // scrolls. The field being typed in is scrolled into view.
+  useEffect(() => {
+    if (!mounted || typeof window === 'undefined' || !window.visualViewport) return undefined;
+    const vv = window.visualViewport;
+    const el = () => backdropRef.current;
+    const fit = () => {
+      const node = el();
+      if (!node) return;
+      const covered = window.innerHeight - vv.height - vv.offsetTop;
+      if (covered > 80) {
+        node.style.top = `${vv.offsetTop}px`;
+        node.style.height = `${vv.height}px`;
+        node.style.bottom = 'auto';
+      } else {
+        node.style.top = '';
+        node.style.height = '';
+        node.style.bottom = '';
+      }
+    };
+    const onFocusIn = (e) => {
+      const t = e.target;
+      if (!t || !/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      setTimeout(() => { fit(); t.scrollIntoView?.({ block: 'center', behavior: 'smooth' }); }, 250);
+    };
+    vv.addEventListener('resize', fit);
+    vv.addEventListener('scroll', fit);
+    document.addEventListener('focusin', onFocusIn);
+    fit();
+    return () => {
+      vv.removeEventListener('resize', fit);
+      vv.removeEventListener('scroll', fit);
+      document.removeEventListener('focusin', onFocusIn);
+    };
+  }, [mounted]);
+
   // Restore focus to whatever opened the panel once it is fully gone.
   useEffect(() => {
     if (mounted) return;
     lastFocused.current?.focus?.();
     lastFocused.current = null;
   }, [mounted]);
+
+  // Many forms put a <label> next to its field without linking them. Link each pair so a
+  // screen reader reads the label when the field gets focus.
+  useEffect(() => {
+    if (!mounted) return undefined;
+    const t = setTimeout(() => {
+      document.querySelectorAll('.ui-aside-panel__backdrop .form-group').forEach((g, gi) => {
+        const label = g.querySelector('label');
+        const field = g.querySelector('input:not([type=hidden]):not([type=checkbox]):not([type=radio]), textarea, select');
+        if (!label || !field || label.htmlFor || field.getAttribute('aria-label') || field.getAttribute('aria-labelledby')) return;
+        if (!field.id) field.id = `fld-${gi}-${Math.random().toString(36).slice(2, 7)}`;
+        label.htmlFor = field.id;
+      });
+    }, 50);
+    return () => clearTimeout(t);
+  }, [mounted, children]);
 
   if (!mounted || typeof document === 'undefined') return null;
 
@@ -95,6 +149,7 @@ export default function AsidePanel({
   // transforms (e.g. .page-enter on the dashboard content), which clips it.
   return createPortal(
     <div
+      ref={backdropRef}
       className={`ui-aside-panel__backdrop${entered ? ' is-open' : ''}`}
       onClick={onClose}
     >
@@ -108,7 +163,7 @@ export default function AsidePanel({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="ui-aside-panel__header">
-          <h4 className="ui-aside-panel__title">{title}</h4>
+          <h2 className="ui-aside-panel__title">{title}</h2>
           <button
             className="ui-aside-panel__close"
             onClick={onClose}

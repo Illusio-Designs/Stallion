@@ -1,4 +1,6 @@
 const Party = require('../models/Party');
+const Order = require('../models/Order');
+const SalesmanCheckIns = require('../models/SalesmanCheckIns');
 const { logAudit } = require('../utils/auditLogger');
 const Distributor = require('../models/distributor');
 const User = require('../models/User');
@@ -9,22 +11,263 @@ const Country = require('../models/Country');
 const State = require('../models/State');
 const Cities = require('../models/Cities');
 const Zone = require('../models/Zone');
-const { Op, fn, col, where } = require('sequelize');
+const { Op, fn, col, where, literal } = require('sequelize');
 
 // Case-insensitive exact match on a `name` column (LOWER(name) = lower(value)),
 // so "gujarat", "Gujarat" and "GUJARAT" all resolve to the same row and we never
 // create case-variant duplicates during bulk upload.
 const ciNameEq = (value) => where(fn('LOWER', col('name')), String(value || '').trim().toLowerCase());
-const { geocodeAddress, geocodeDiagnostic } = require('../utils/geocode');
+const { geocodeAddress, geocodeDiagnostic, reverseGeocode } = require('../utils/geocode');
 const { validateOnsiteCapture } = require('../utils/geo');
 const DistributorZones = require('../models/DistributorZones');
 const SalesmanStates = require('../models/SalesmanStates');
 const DistributorStates = require('../models/DistributorStates');
 const { resolveStateId } = require('../utils/stateResolver');
-const { findOrCreateRoleUser } = require('../utils/userFactory');
-const { canManageParties, canCreateParty, normalizeRole, partyActiveFilter, denyInactiveParty, isAdmin } = require('../utils/roleHelpers');
+const { findOrCreateRoleUser, acquireCreateLock, last10Of } = require('../utils/userFactory');
+const sequelize = require('../constants/database');
+const { hasRole, canManageParties, canCreateParty, normalizeRole, partyActiveFilter, denyInactiveParty, isAdmin } = require('../utils/roleHelpers');
 const { resolveUserScope } = require('../utils/scopeHelpers');
-const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse } = require('../utils/listSearchHelpers');
+const { salesmanCoversState, distributorCoversState, salesmanStateIds } = require('../utils/workingStates');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parsePaginationParams, buildPaginatedResponse, listWithOptionalPagination } = require('../utils/listSearchHelpers');
+
+// PAN and GSTIN are tax identifiers: only managers (and the party itself) see them. A salesman or
+// distributor still gets the name, phone and address they need for visits and orders.
+/** Adds `salesman_name` (via salesman_id) and `city_name` / `state_name` to party rows. Three small extra queries per page. */
+const withSalesmanNames = async (rows, ownSalesman = null) => {
+    const plain = (rows || []).map((r) => (typeof r.toJSON === 'function' ? r.toJSON() : { ...r }));
+    const uniq = (key) => [...new Set(plain.map((p) => p[key]).filter(Boolean))];
+    const salesmanIds = uniq('salesman_id');
+    const cityIds = uniq('city_id');
+    const stateIds = uniq('state_id');
+    const [sms, cities, states] = await Promise.all([
+        salesmanIds.length ? Salesman.findAll({ where: { salesman_id: { [Op.in]: salesmanIds } }, attributes: ['salesman_id', 'full_name'] }) : [],
+        cityIds.length ? Cities.findAll({ where: { id: { [Op.in]: cityIds } }, attributes: ['id', 'name'] }) : [],
+        stateIds.length ? State.findAll({ where: { id: { [Op.in]: stateIds } }, attributes: ['id', 'name'] }) : [],
+    ]);
+    const names = new Map(sms.map((m) => [m.salesman_id, m.full_name]));
+    // A party with no salesman of its own is served by the salesmen who work in its state.
+    const noOwnerStates = [...new Set(plain.filter((p) => !p.salesman_id && p.state_id).map((p) => p.state_id))];
+    const byState = new Map();
+    if (noOwnerStates.length) {
+        const links = await SalesmanStates.findAll({ where: { state_id: { [Op.in]: noOwnerStates } }, attributes: ['salesman_id', 'state_id'] });
+        const people = await Salesman.findAll({ where: { salesman_id: { [Op.in]: [...new Set(links.map((l) => l.salesman_id))] } }, attributes: ['salesman_id', 'full_name'] });
+        const nameOf = new Map(people.map((m) => [m.salesman_id, m.full_name]));
+        links.forEach((l) => {
+            const n = nameOf.get(l.salesman_id);
+            if (n) byState.set(l.state_id, [...(byState.get(l.state_id) || []), n]);
+        });
+    }
+    const cityNames = new Map(cities.map((c) => [c.id, c.name]));
+    const stateNames = new Map(states.map((x) => [x.id, x.name]));
+    // A salesman is only ever shown his own name, never the other salesmen of the same state.
+    if (ownSalesman) {
+        return plain.map((p) => ({
+            ...p,
+            salesman_name: ownSalesman.full_name || null,
+            city_name: cityNames.get(p.city_id) || null,
+            state_name: stateNames.get(p.state_id) || null,
+        }));
+    }
+    return plain.map((p) => ({
+        ...p,
+        salesman_name: names.get(p.salesman_id) || (byState.get(p.state_id) || []).join(', ') || null,
+        city_name: cityNames.get(p.city_id) || null,
+        state_name: stateNames.get(p.state_id) || null,
+    }));
+};
+
+const PARTY_SECRET_FIELDS = ['pan', 'gstin'];
+function hidePartySecrets(req, data) {
+    if (canManageParties(req.userRoleNames)) return data;
+    const strip = (row) => {
+        if (!row) return row;
+        const plain = typeof row.toJSON === 'function' ? row.toJSON() : { ...row };
+        if (String(plain.user_id || '') === String(req.user && req.user.user_id)) return plain; // the party's own record
+        PARTY_SECRET_FIELDS.forEach((f) => { delete plain[f]; });
+        return plain;
+    };
+    if (Array.isArray(data)) return data.map(strip);
+    if (data && Array.isArray(data.data)) return { ...data, data: data.data.map(strip) };
+    return strip(data);
+}
+
+// A latitude/longitude pair from the client, or null when it is missing or out of range.
+function validPoint(lat, lng) {
+    if (lat == null || lat === '' || lng == null || lng === '') return null;
+    const la = Number(lat), lo = Number(lng);
+    if (!Number.isFinite(la) || !Number.isFinite(lo) || la < -90 || la > 90 || lo < -180 || lo > 180) return null;
+    return { latitude: la, longitude: lo };
+}
+
+// Capture and removal share the same party scope as field workflows.
+async function canAccessPartyLocation(req, party) {
+    if (canManageParties(req.userRoleNames)) return true;
+    const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+    if (hasRole(req.userRoleNames, 'salesman') && scope.salesmanId) {
+        return party.salesman_id === scope.salesmanId || await salesmanCoversState(scope.salesmanId, party.state_id);
+    }
+    if (hasRole(req.userRoleNames, 'distributor') && scope.distributorId) {
+        return party.distributor_id === scope.distributorId || await distributorCoversState(scope.distributorId, party.state_id);
+    }
+    return false;
+}
+
+async function confirmedShipping(req, data) {
+    const address = String(data.address || '').trim();
+    const pincode = String(data.pincode || '').trim();
+    if (!address || address.length > 500 || !/^\d{6}$/.test(pincode)) {
+        const error = new Error('Confirm the shipping address and a valid 6-digit PIN code.');
+        error.status = 400; throw error;
+    }
+    const [country, state, city] = await Promise.all([
+        data.country_id ? Country.findByPk(data.country_id) : null,
+        data.state_id ? State.findByPk(data.state_id) : null,
+        data.city_id ? Cities.findByPk(data.city_id) : null,
+    ]);
+    if (!country || !state || !city || country.is_active === false || state.is_active === false || city.is_active === false
+        || String(state.country_id) !== String(country.id) || String(city.state_id) !== String(state.id)) {
+        const error = new Error('Select a valid country, state and city for the shipping address.');
+        error.status = 400; throw error;
+    }
+    if (!canManageParties(req.userRoleNames)) {
+        const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+        const allowed = hasRole(req.userRoleNames, 'salesman') && scope.salesmanId
+            ? await salesmanCoversState(scope.salesmanId, state.id)
+            : hasRole(req.userRoleNames, 'distributor') && scope.distributorId
+                ? await distributorCoversState(scope.distributorId, state.id) : false;
+        if (!allowed) { const error = new Error('This shipping address is outside your working states.'); error.status = 403; throw error; }
+    }
+    return { address, pincode, country_id: country.id, state_id: state.id, city_id: city.id };
+}
+
+// ---- Party list: server-side tab / filters / sort / counts ----
+const PARTY_TABS = new Set(['active', 'inactive', 'no_location']);
+const PARTY_SORT_SQL = {
+    party_name: null, // plain column
+    credit_days: null, // plain column
+    city: '(SELECT c.name FROM cities c WHERE c.id = Party.city_id)',
+    state: '(SELECT st.name FROM states st WHERE st.id = Party.state_id)',
+    salesman: '(SELECT sm.full_name FROM salesmen sm WHERE sm.salesman_id = Party.salesman_id)',
+    // Same three labels the page shows, in alphabetical order: Exact spot saved < From address < Not set.
+    location: "(CASE WHEN Party.location_source = 'verified' THEN 'a' WHEN Party.latitude IS NOT NULL AND Party.longitude IS NOT NULL THEN 'b' ELSE 'c' END)",
+};
+const PARTY_SORT_ALIASES = { cityLabel: 'city', stateLabel: 'state', salesmanLabel: 'salesman', locationLabel: 'location' };
+
+const tabWhere = (tab) => {
+    if (tab === 'active') return { [Op.or]: [{ is_active: true }, { is_active: null }] };
+    if (tab === 'inactive') return { is_active: false };
+    if (tab === 'no_location') return { [Op.or]: [{ latitude: null }, { longitude: null }] };
+    return null;
+};
+
+/** Safe ORDER BY: only whitelisted keys reach SQL; ties break on created_at then party_id so pages never shuffle. */
+function partyOrder(req) {
+    const q = req.query || {};
+    const key = PARTY_SORT_ALIASES[q.sort] || q.sort;
+    const dir = String(q.dir || '').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const tail = [['created_at', 'DESC'], ['party_id', 'ASC']];
+    if (!key || !Object.prototype.hasOwnProperty.call(PARTY_SORT_SQL, key)) return tail;
+    const head = PARTY_SORT_SQL[key] === null ? [key, dir] : [literal(PARTY_SORT_SQL[key]), dir];
+    return [head, ...tail];
+}
+
+/**
+ * Filters for the party list from query/body: status tab, state_id, salesman_id, country_id.
+ * Returns { base, tab }: `base` = every filter except the tab (used for the tab counts), `tab` = the tab fragment or null.
+ * A party with no salesman of its own counts as served by the salesmen working in its state (same as the name shown).
+ */
+async function partyListFilters(req) {
+    const q = req.query || {};
+    const b = (req.body && typeof req.body === 'object') ? req.body : {};
+    const pick = (k) => String(q[k] ?? b[k] ?? '').trim();
+    const parts = [];
+    const state = pick('state_id');
+    if (state) parts.push({ state_id: state });
+    const country = pick('country_id');
+    // Parties with no country stay visible under any country, as the page always did.
+    if (country) parts.push({ [Op.or]: [{ country_id: country }, { country_id: null }] });
+    const salesman = pick('salesman_id');
+    if (salesman) {
+        const links = await SalesmanStates.findAll({ where: { salesman_id: salesman }, attributes: ['state_id'] });
+        const ids = links.map((l) => l.state_id).filter(Boolean);
+        const own = [{ salesman_id: salesman }];
+        if (ids.length) own.push({ [Op.and]: [{ salesman_id: null }, { state_id: { [Op.in]: ids } }] });
+        parts.push({ [Op.or]: own });
+    }
+    const tabName = pick('status').toLowerCase().replace(/[\s-]+/g, '_');
+    return { base: parts.length ? { [Op.and]: parts } : null, tab: PARTY_TABS.has(tabName) ? tabWhere(tabName) : null };
+}
+
+/** { all, active, inactive, no_location } for the tab badges: ONE conditional-aggregate query. */
+async function partyTabCounts(where) {
+    const row = await Party.findOne({
+        where,
+        attributes: [
+            [fn('COUNT', literal('*')), 'all_count'],
+            [fn('SUM', literal('CASE WHEN is_active = 0 THEN 0 ELSE 1 END')), 'active_count'],
+            [fn('SUM', literal('CASE WHEN is_active = 0 THEN 1 ELSE 0 END')), 'inactive_count'],
+            [fn('SUM', literal('CASE WHEN latitude IS NULL OR longitude IS NULL THEN 1 ELSE 0 END')), 'no_location_count'],
+        ],
+        raw: true,
+    });
+    const n = (v) => Number(v) || 0;
+    return { all: n(row && row.all_count), active: n(row && row.active_count), inactive: n(row && row.inactive_count), no_location: n(row && row.no_location_count) };
+}
+
+/** One page + counts for a party list. `scopeWhere` = role scope + search; the tab only narrows the rows, not the counts. */
+async function listPartyPage(req, pagination, scopeWhere) {
+    const f = await partyListFilters(req);
+    const countWhere = mergeWhere(scopeWhere, f.base);
+    const rowsWhere = mergeWhere(countWhere, f.tab);
+    const [count, rows, counts] = await Promise.all([
+        Party.count({ where: rowsWhere }),
+        Party.findAll({ where: rowsWhere, order: partyOrder(req), limit: pagination.limit, offset: pagination.offset }),
+        partyTabCounts(countWhere),
+    ]);
+    return { count, rows, counts };
+}
+
+/** Role scope of GET /parties/my: { where, ownSalesman, roleName, empty } or { status, error }. */
+async function myPartiesScope(req) {
+    const user = req.user;
+    if (!user) return { status: 400, error: 'User is required' };
+    const userRole = await UserRole.findOne({ where: { user_id: user.user_id } });
+    if (!userRole) return { status: 404, error: 'User role not found' };
+    const role = await Role.findOne({ where: { role_id: userRole.role_id } });
+    if (!role) return { status: 404, error: 'Role not found' };
+    const roleName = role.role_name.toLowerCase();
+    let where;
+    let ownSalesman = null;
+
+    if (roleName === 'party') {
+        where = { user_id: user.user_id };
+    } else if (roleName === 'salesman') {
+        const salesman = await Salesman.findOne({ where: { user_id: user.user_id } });
+        if (!salesman) return { status: 404, error: 'Salesman not found' };
+        ownSalesman = salesman;
+        const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
+        const stateIds = salesmanStates.map((s) => s.state_id);
+        if (salesman.state_id && !stateIds.includes(salesman.state_id)) {
+            stateIds.push(salesman.state_id);
+        }
+        // Event orders: a salesman may take an order for ANY party (?scope=event). Every
+        // other use (visit, WhatsApp, check-in) is limited to his working states.
+        const forEvent = String((req.query && req.query.scope) || '').toLowerCase() === 'event';
+        if (forEvent) {
+            where = {};
+        } else {
+            if (stateIds.length === 0) return { empty: true, roleName, ownSalesman };
+            where = { state_id: { [Op.in]: stateIds } };
+        }
+    } else if (roleName === 'distributor') {
+        const distributor = await Distributor.findOne({ where: { user_id: user.user_id } });
+        if (!distributor) return { status: 404, error: 'Distributor not found' };
+        where = { distributor_id: distributor.distributor_id };
+    } else {
+        return { status: 400, error: `Role '${roleName}' is not supported for this operation` };
+    }
+    return { where, ownSalesman, roleName };
+}
 
 class PartyController {
     async getPartie(req, res) {
@@ -70,15 +313,12 @@ class PartyController {
                 name,
                 phone,
                 nameFields: ['party_name', 'trade_name', 'contact_person'],
+                ignoreSpaces: true,
                 phoneFields: ['phone'],
             });
             const where = mergeWhere(partyActiveFilter(req.userRoleNames), searchFilter);
-            const { count, rows: parties } = await Party.findAndCountAll({
-                where,
-                limit: pagination.limit,
-                offset: pagination.offset,
-            });
-            res.status(200).json(buildPaginatedResponse(parties, pagination, count));
+            const { count, rows: parties, counts } = await listPartyPage(req, pagination, where);
+            res.status(200).json({ ...buildPaginatedResponse(await withSalesmanNames(parties), pagination, count), counts });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -99,14 +339,14 @@ class PartyController {
                 const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
                 const role = normalizeRole(req.userRoleName);
                 const allowed = (role === 'party' && scope.partyId === id)
-                    || (role === 'salesman' && party.salesman_id === scope.salesmanId)
+                    || (role === 'salesman' && await salesmanCoversState(scope.salesmanId, party.state_id))
                     || (role === 'distributor' && party.distributor_id === scope.distributorId);
                 if (!allowed) {
                     return res.status(403).json({ error: 'Access denied' });
                 }
             }
 
-            res.status(200).json(party);
+            res.status(200).json(hidePartySecrets(req, party));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -114,67 +354,83 @@ class PartyController {
 
     async getMyParties(req, res) {
         try {
-            const user = req.user;
-            if (!user) {
-                return res.status(400).json({ error: 'User is required' });
-            }
             const pagination = parsePaginationParams(req);
             if (pagination.error) {
                 return res.status(pagination.status).json({ error: pagination.error });
             }
-            const userRole = await UserRole.findOne({ where: { user_id: user.user_id } });
-            if (!userRole) {
-                return res.status(404).json({ error: 'User role not found' });
+            const scope = await myPartiesScope(req);
+            if (scope.error) {
+                return res.status(scope.status).json({ error: scope.error });
             }
-            const role = await Role.findOne({ where: { role_id: userRole.role_id } });
-            if (!role) {
-                return res.status(404).json({ error: 'Role not found' });
+            if (scope.empty) {
+                return res.status(200).json({ ...buildPaginatedResponse([], pagination, 0), counts: { all: 0, active: 0, inactive: 0, no_location: 0 } });
             }
-            const roleName = role.role_name.toLowerCase();
-            let where;
-
-            if (roleName === 'party') {
-                where = { user_id: user.user_id };
-            } else if (roleName === 'salesman') {
-                const salesman = await Salesman.findOne({ where: { user_id: user.user_id } });
-                if (!salesman) {
-                    return res.status(404).json({ error: 'Salesman not found' });
-                }
-                const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
-                const stateIds = salesmanStates.map((s) => s.state_id);
-                if (salesman.state_id && !stateIds.includes(salesman.state_id)) {
-                    stateIds.push(salesman.state_id);
-                }
-                if (stateIds.length === 0) {
-                    return res.status(200).json(buildPaginatedResponse([], pagination, 0));
-                }
-                where = { state_id: { [Op.in]: stateIds } };
-            } else if (roleName === 'distributor') {
-                const distributor = await Distributor.findOne({ where: { user_id: user.user_id } });
-                if (!distributor) {
-                    return res.status(404).json({ error: 'Distributor not found' });
-                }
-                where = { distributor_id: distributor.distributor_id };
-            } else {
-                return res.status(400).json({ error: `Role '${roleName}' is not supported for this operation` });
-            }
+            const { roleName, ownSalesman } = scope;
 
             const { name, phone } = getListSearchParams(req);
             const searchFilter = buildNamePhoneFilter({
                 name,
                 phone,
                 nameFields: ['party_name', 'trade_name', 'contact_person'],
+                ignoreSpaces: true,
                 phoneFields: ['phone'],
             });
-            where = mergeWhere(where, searchFilter);
+            let where = mergeWhere(scope.where, searchFilter);
             where = mergeWhere(where, partyActiveFilter(roleName));
 
-            const { count, rows: parties } = await Party.findAndCountAll({
-                where,
-                limit: pagination.limit,
-                offset: pagination.offset,
-            });
-            res.status(200).json(buildPaginatedResponse(parties, pagination, count));
+            const { count, rows: parties, counts } = await listPartyPage(req, pagination, where);
+            const body = hidePartySecrets(req, buildPaginatedResponse(await withSalesmanNames(parties, ownSalesman), pagination, count));
+            res.status(200).json({ ...body, counts });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
+    /**
+     * GET /parties/filter-options: the states and salesmen the party list can be filtered by, for the
+     * dropdowns (not read off the loaded page). Same role scope as the list; ?country_id= narrows it.
+     */
+    async getPartyFilterOptions(req, res) {
+        try {
+            let where;
+            let ownSalesman = null;
+            if (canManageParties(req.userRoleNames)) {
+                where = partyActiveFilter(req.userRoleNames);
+            } else {
+                const scope = await myPartiesScope(req);
+                if (scope.error) return res.status(scope.status).json({ error: scope.error });
+                if (scope.empty) return res.status(200).json({ states: [], salesmen: [] });
+                where = mergeWhere(scope.where, partyActiveFilter(scope.roleName));
+                ownSalesman = scope.ownSalesman;
+            }
+            const country = String((req.query && req.query.country_id) || '').trim();
+            if (country) where = mergeWhere(where, { [Op.or]: [{ country_id: country }, { country_id: null }] });
+
+            const [stateRows, salesmanRows, noOwnerRows] = await Promise.all([
+                Party.findAll({ where: mergeWhere(where, { state_id: { [Op.ne]: null } }), attributes: ['state_id'], group: ['state_id'], raw: true }),
+                Party.findAll({ where: mergeWhere(where, { salesman_id: { [Op.ne]: null } }), attributes: ['salesman_id'], group: ['salesman_id'], raw: true }),
+                Party.findAll({ where: mergeWhere(where, { salesman_id: null, state_id: { [Op.ne]: null } }), attributes: ['state_id'], group: ['state_id'], raw: true }),
+            ]);
+            const stateIds = stateRows.map((r) => r.state_id);
+            const states = stateIds.length
+                ? await State.findAll({ where: { id: { [Op.in]: stateIds } }, attributes: ['id', 'name'], order: [['name', 'ASC']], raw: true })
+                : [];
+            let salesmen;
+            if (ownSalesman) {
+                salesmen = [{ id: ownSalesman.salesman_id, name: ownSalesman.full_name }];
+            } else {
+                const ids = new Set(salesmanRows.map((r) => r.salesman_id));
+                const orphanStates = noOwnerRows.map((r) => r.state_id);
+                if (orphanStates.length) {
+                    const links = await SalesmanStates.findAll({ where: { state_id: { [Op.in]: orphanStates } }, attributes: ['salesman_id'], raw: true });
+                    links.forEach((l) => ids.add(l.salesman_id));
+                }
+                const people = ids.size
+                    ? await Salesman.findAll({ where: { salesman_id: { [Op.in]: [...ids] } }, attributes: ['salesman_id', 'full_name'], order: [['full_name', 'ASC']], raw: true })
+                    : [];
+                salesmen = people.filter((p) => p.full_name).map((p) => ({ id: p.salesman_id, name: p.full_name }));
+            }
+            res.status(200).json({ states: states.map((x) => ({ id: x.id, name: x.name })), salesmen });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -189,10 +445,17 @@ class PartyController {
                     return res.status(403).json({ error: 'Access denied' });
                 }
             }
-            const parties = await Party.findAll({
-                where: mergeWhere({ salesman_id: salesman_id }, partyActiveFilter(req.userRoleNames)),
+            let ownWhere = mergeWhere({ salesman_id: salesman_id }, partyActiveFilter(req.userRoleNames));
+            // A salesman only gets the parties in the states he works in.
+            if (!canManageParties(req.userRoleNames)) {
+                const ids = await salesmanStateIds(salesman_id);
+                ownWhere = mergeWhere(ownWhere, { state_id: { [Op.in]: ids } });
+            }
+            const body = await listWithOptionalPagination(Party, req, {
+                where: ownWhere,
+                order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
-            res.status(200).json(parties);
+            res.status(200).json(hidePartySecrets(req, body));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -222,6 +485,11 @@ class PartyController {
             }
 
             const roleName = role.role_name.toLowerCase();
+
+            // A party must not see the other parties in its zone.
+            if (roleName === 'party') {
+                return res.status(403).json({ error: 'Access denied' });
+            }
 
             // Based on role, get zone_id from appropriate model
             if (roleName === 'party') {
@@ -300,24 +568,34 @@ class PartyController {
                 return res.status(400).json({ error: `No zone assigned for this ${roleName}` });
             }
 
-            // Find all parties in the zone
-            const parties = await Party.findAll({
-                where: mergeWhere({ zone_id: zone_id }, partyActiveFilter(roleName)),
+            // Find all parties in the zone (a salesman: only those in his working states)
+            let zoneWhere = mergeWhere({ zone_id: zone_id }, partyActiveFilter(roleName));
+            if (roleName === 'salesman') {
+                const me = await Salesman.findOne({ where: { user_id: user.user_id }, attributes: ['salesman_id'] });
+                const ids = await salesmanStateIds(me && me.salesman_id);
+                zoneWhere = mergeWhere(zoneWhere, { state_id: { [Op.in]: ids } });
+            }
+            const body = await listWithOptionalPagination(Party, req, {
+                where: zoneWhere,
+                order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
-
-            res.status(200).json(parties);
+            res.status(200).json(hidePartySecrets(req, body));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
     }
 
     async createParty(req, res) {
+        let releaseLock = () => {};
         try {
             if (!canCreateParty(req.userRoleNames)) {
                 return res.status(403).json({ error: 'Access denied' });
             }
             const user = req.user;
-            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, latitude, longitude, accuracy, location_accuracy_m } = req.body;
+            const { distributor_id, salesman_id, party_name, trade_name, contact_person, email, phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, latitude, longitude, accuracy, location_accuracy_m, confirm_address_mismatch, address_lat, address_lng } = req.body;
+            if (req.body.shipping_address_confirmed === true) await confirmedShipping(req, req.body);
+            const addressPoint = validPoint(address_lat, address_lng);
+            const confirmMismatch = confirm_address_mismatch === true || confirm_address_mismatch === 'true';
             // address, city, state and pincode are required so the party can be
             // geocoded accurately for the visit/check-in geofence.
             if (!party_name || !phone || !address) {
@@ -341,10 +619,30 @@ class PartyController {
                 return res.status(404).json({ error: `State not found: ${state_id}` });
             }
 
+            // A salesman or distributor can only add parties in the states they work in.
+            if (!canManageParties(req.userRoleNames)) {
+                const creatorScope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                if (creatorScope.salesmanId && hasRole(req.userRoleNames, 'salesman')) {
+                    if (!(await salesmanCoversState(creatorScope.salesmanId, resolvedStateId))) {
+                        return res.status(403).json({ error: 'You can only add parties in the states you work in.' });
+                    }
+                } else if (creatorScope.distributorId && hasRole(req.userRoleNames, 'distributor')) {
+                    if (!(await distributorCoversState(creatorScope.distributorId, resolvedStateId))) {
+                        return res.status(403).json({ error: 'You can only add parties in the states you work in.' });
+                    }
+                }
+            }
+
             // Auto-assign distributor & salesman from whoever covers this state.
             // A value explicitly passed in the body always wins (manual override).
             let finalDistributorId = distributor_id || null;
             let finalSalesmanId = salesman_id || null;
+            if (!canManageParties(req.userRoleNames)) {
+                // The person who adds the party is its default salesman / distributor.
+                const me = await resolveUserScope(req.user.user_id, req.userRoleName);
+                if (!finalSalesmanId && me.salesmanId && hasRole(req.userRoleNames, 'salesman')) finalSalesmanId = me.salesmanId;
+                if (!finalDistributorId && me.distributorId && hasRole(req.userRoleNames, 'distributor')) finalDistributorId = me.distributorId;
+            }
             if (!finalDistributorId) {
                 const ds = await DistributorStates.findOne({ where: { state_id: resolvedStateId } });
                 if (ds) finalDistributorId = ds.distributor_id;
@@ -354,42 +652,79 @@ class PartyController {
                 if (ss) finalSalesmanId = ss.salesman_id;
             }
 
-            const loginUser = await findOrCreateRoleUser({
-                phone,
-                email,
-                fullName: contact_person || party_name,
-                roleName: 'party',
-                address,
-            });
+            // One party per phone number: the phone is the party's login, so a second party with the
+            // same number would share that login and show up twice. Refuse it, and refuse a second
+            // request for the same number while the first is still being saved (double tap / two tabs).
+            releaseLock = acquireCreateLock('party', phone);
+            const phoneDigits = last10Of(phone);
+            if (phoneDigits.length >= 10) {
+                const dup = await Party.findOne({
+                    where: { phone: { [Op.like]: `%${phoneDigits}` } },
+                    attributes: ['party_id', 'party_name', 'is_active'],
+                });
+                if (dup) {
+                    return res.status(409).json({
+                        error: `A party with this phone number already exists: ${dup.party_name}.`,
+                        code: 'duplicate_party',
+                        party_id: dup.party_id,
+                    });
+                }
+            }
 
             // Prefer an on-site GPS capture from "I'm at shop" on create (trusted
             // verified anchor). Otherwise fall back to geocoding the address so the
             // party still has coordinates for the visit/check-in geofence.
             let finalLat = null, finalLng = null, locationSource = null, locationAccuracyM = null;
             const hasDeviceLoc = latitude != null && latitude !== '' && longitude != null && longitude !== '';
+            // Geocode once; it is both the validation reference and the fallback.
+            // The point of the picked Google address when there is one; otherwise geocode the text.
+            const geo = req.body.shipping_address_confirmed === true ? null
+                : addressPoint ? { ...addressPoint, precision: 'address' } : await geocodeAddress(address, { pincode });
+            let captured = false;
+            let createFarFromAddress = false;
             if (hasDeviceLoc) {
-                // Geocode address as a reference to validate the on-site capture.
-                let refLat = null, refLng = null;
-                const geo = await geocodeAddress(address, { pincode });
-                if (geo) { refLat = geo.latitude; refLng = geo.longitude; }
                 const acc = accuracy != null && accuracy !== '' ? accuracy : location_accuracy_m;
                 const check = validateOnsiteCapture({
-                    deviceLat: latitude, deviceLng: longitude, accuracy: acc, refLat, refLng,
+                    deviceLat: latitude, deviceLng: longitude, accuracy: acc,
+                    refLat: geo ? geo.latitude : null, refLng: geo ? geo.longitude : null,
+                    refPrecision: geo ? geo.precision : null,
+                    allowFarFromAddress: confirmMismatch,
                 });
-                if (!check.ok) {
-                    return res.status(422).json({ error: check.reason });
+                if (check.ok) {
+                    finalLat = Number(latitude);
+                    finalLng = Number(longitude);
+                    locationSource = 'verified';
+                    const accNum = Number(acc);
+                    locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
+                    captured = true;
+                    createFarFromAddress = !!check.farFromAddress;
+                } else {
+                    return res.status(422).json({ error: check.reason, code: check.farFromAddress ? 'address_far' : undefined });
                 }
-                finalLat = Number(latitude);
-                finalLng = Number(longitude);
-                locationSource = 'verified';
-                const accNum = Number(acc);
-                locationAccuracyM = Number.isFinite(accNum) ? accNum : null;
-            } else {
-                const geo = await geocodeAddress(address, { pincode });
-                if (geo) { finalLat = geo.latitude; finalLng = geo.longitude; locationSource = 'geocoded'; }
+            }
+            // Written address of the captured spot (best-effort, never blocks the save).
+            let capturedAddress = null;
+            if (captured) {
+                const rev = req.body.shipping_address_confirmed === true ? null : await reverseGeocode(finalLat, finalLng);
+                capturedAddress = req.body.shipping_address_confirmed === true ? address : (rev ? rev.address : null);
+            }
+            if (!captured && geo) {
+                finalLat = geo.latitude;
+                finalLng = geo.longitude;
+                locationSource = 'geocoded';
             }
 
-            const party = await Party.create({
+            // The login user and the party are saved together: if either fails neither is kept, so a
+            // failed create never leaves a login user with no party (or a party with no login).
+            const party = await sequelize.transaction(async (t) => {
+              const loginUser = await findOrCreateRoleUser({
+                phone,
+                email,
+                fullName: contact_person || party_name,
+                roleName: 'party',
+                address,
+              }, { transaction: t });
+              return Party.create({
                 distributor_id: finalDistributorId,
                 salesman_id: finalSalesmanId,
                 user_id: loginUser.user_id,
@@ -412,12 +747,14 @@ class PartyController {
                 longitude: finalLng,
                 location_source: locationSource,
                 location_accuracy_m: locationAccuracyM,
+                location_address: capturedAddress,
                 created_by: user.user_id,
                 created_at: new Date(),
                 updated_at: new Date(),
                 is_active: true,
-                credit_days,
+                credit_days: canManageParties(req.userRoleNames) ? credit_days : 0,
                 prefered_courier
+              }, { transaction: t });
             });
             await logAudit({
                 req,
@@ -428,9 +765,18 @@ class PartyController {
                 oldValues: null,
                 newValues: party,
             });
-            res.status(200).json(party);
+            // Tell the app what happened to the location so it never claims more than was saved.
+            const out = party.toJSON();
+            out.location_status = locationSource === 'verified'
+                ? 'verified'
+                : (locationSource === 'geocoded' ? 'address_only' : 'none');
+            out.location_capture_sent = hasDeviceLoc;
+            out.address_mismatch = createFarFromAddress;
+            res.status(200).json(out);
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            res.status(error && error.status ? error.status : 500).json({ error: error.message });
+        } finally {
+            releaseLock();
         }
     }
 
@@ -451,6 +797,10 @@ class PartyController {
             const party = await Party.findOne({ where: { party_id: id } });
             if (!party) {
                 return res.status(404).json({ error: 'Party not found' });
+            }
+
+            if (party.location_source === 'verified') {
+                return res.status(409).json({ error: 'Remove the verified location before setting a new one.' });
             }
 
             const { latitude, longitude } = req.body || {};
@@ -490,7 +840,10 @@ class PartyController {
             party.longitude = finalLng;
             party.location_source = source;
             party.updated_at = new Date();
-            await party.save();
+            const [saved] = await Party.update({ latitude: finalLat, longitude: finalLng, location_source: source, updated_at: party.updated_at }, {
+                where: { party_id: id, [Op.or]: [{ location_source: null }, { location_source: { [Op.ne]: 'verified' } }] },
+            });
+            if (!saved) return res.status(409).json({ error: 'Remove the verified location before setting a new one.' });
             await logAudit({
                 req,
                 action: 'update',
@@ -509,7 +862,7 @@ class PartyController {
     // On-site capture ("I'm at the shop — capture location"). Salesman/admin sends
     // the device GPS + accuracy while physically at the party. We validate the fix
     // (accuracy + proximity to the party's geocoded address) and, on pass, store it
-    // as the TRUSTED location_source='verified' anchor for the strict 250m geofence.
+    // as the TRUSTED location_source='verified' anchor for the strict 50m geofence.
     async verifyPartyLocation(req, res) {
         try {
             const id = req.params.id;
@@ -521,65 +874,47 @@ class PartyController {
                 return res.status(404).json({ error: 'Party not found' });
             }
 
-            const adminOverride = isAdmin(req.userRoleNames);
-
-            // Non-admins may only capture when a trusted on-site location is not
-            // set yet. Admin/superadmin may overwrite any party's location.
-            if (!adminOverride && party.location_source === 'verified' && party.latitude != null && party.longitude != null) {
-                return res.status(409).json({
-                    error: 'This party already has a verified location. It cannot be changed from here.',
-                });
+            if (denyInactiveParty(party, req.userRoleNames)) return res.status(404).json({ error: 'Party not found' });
+            if (!(await canAccessPartyLocation(req, party))) return res.status(403).json({ error: 'Access denied' });
+            if (party.location_source === 'verified' && party.latitude != null && party.longitude != null) {
+                return res.status(409).json({ error: 'This party already has a verified location. Ask an authorized office manager to remove it first.' });
             }
-
-            const { latitude, longitude, accuracy } = req.body || {};
-
-            let check;
-            if (adminOverride) {
-                // Admin sets the party's location to the device's current GPS
-                // without requiring on-site proximity to the address.
-                const lat = Number(latitude), lng = Number(longitude);
-                if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
-                    return res.status(400).json({
-                        error: 'A valid current location is required. Please enable GPS and try again.',
-                    });
-                }
-                check = { ok: true, distance: null };
-            } else {
-                // Geocode the party's address as the reference to validate against.
-                let refLat = null, refLng = null;
-                try {
-                    let city, state;
-                    if (party.city_id) { const c = await Cities.findByPk(party.city_id); city = c && c.name; }
-                    if (party.state_id) { const s = await State.findByPk(party.state_id); state = s && s.name; }
-                    const ref = party.address
-                        ? await geocodeAddress(party.address, { city, state, pincode: party.pincode })
-                        : null;
-                    if (ref) { refLat = ref.latitude; refLng = ref.longitude; }
-                } catch (_) { /* no reference — capture still allowed, validated on accuracy only */ }
-
+            const { latitude, longitude, accuracy, shipping_address } = req.body || {};
+            // All roles must supply a good GPS fix, including admins.
+            let check = validateOnsiteCapture({ deviceLat: latitude, deviceLng: longitude, accuracy });
+            if (!check.ok) return res.status(422).json({ error: check.reason });
+            const shipping = shipping_address ? await confirmedShipping(req, shipping_address) : null;
+            if (!shipping) {
+                const ref = party.address ? await geocodeAddress(party.address, { pincode: party.pincode }) : null;
                 check = validateOnsiteCapture({
-                    deviceLat: latitude, deviceLng: longitude, accuracy, refLat, refLng,
+                    deviceLat: latitude, deviceLng: longitude, accuracy,
+                    refLat: ref?.latitude, refLng: ref?.longitude, refPrecision: ref?.precision,
+                    allowFarFromAddress: req.body.confirm_address_mismatch === true,
                 });
-                if (!check.ok) {
-                    return res.status(422).json({ error: check.reason });
-                }
+                if (!check.ok) return res.status(422).json({ error: check.reason, code: check.farFromAddress ? 'address_far' : undefined });
             }
-
             const acc = Number(accuracy);
             const oldSnapshot = party.toJSON();
-            party.latitude = Number(latitude);
-            party.longitude = Number(longitude);
-            party.location_source = 'verified';
-            party.location_accuracy_m = Number.isFinite(acc) ? acc : null;
-            party.updated_at = new Date();
-            await party.save();
-
+            const capturedRev = shipping ? null : await reverseGeocode(Number(latitude), Number(longitude));
+            const payload = {
+                ...(shipping || {}),
+                ...(shipping && String(shipping.city_id) !== String(party.city_id) ? { zone_id: null } : {}),
+                latitude: Number(latitude), longitude: Number(longitude),
+                location_source: 'verified', location_accuracy_m: acc,
+                location_address: shipping ? shipping.address : (capturedRev?.address || null),
+                updated_at: new Date(),
+            };
+            // Conditional write prevents two simultaneous captures overwriting each other.
+            const [saved] = await Party.update(payload, { where: {
+                party_id: id,
+                [Op.or]: [{ location_source: null }, { location_source: { [Op.ne]: 'verified' } }, { latitude: null }, { longitude: null }],
+            } });
+            if (!saved) return res.status(409).json({ error: 'Location was already captured. Refresh this party.' });
+            Object.assign(party, payload);
             await logAudit({
                 req,
                 action: 'update',
-                description: adminOverride
-                    ? `Party location set by admin (±${Number.isFinite(acc) ? Math.round(acc) : '?'}m)`
-                    : `Party location verified on-site (±${Math.round(acc)}m)`,
+                description: `Party location verified on-site (±${Math.round(acc)}m)${shipping ? ' and shipping address confirmed' : ''}`,
                 tableName: 'parties',
                 recordId: party.party_id,
                 oldValues: oldSnapshot,
@@ -587,14 +922,85 @@ class PartyController {
             });
 
             return res.status(200).json({
-                message: adminOverride
-                    ? 'Party location set from your current position.'
-                    : 'On-site location verified and saved.',
+                message: shipping ? 'Shop location and confirmed shipping address saved.' : 'Shop location saved.',
+                ...(shipping || {}),
+                address_mismatch: !!check.farFromAddress,
+                location_address: party.location_address,
+                location_address_parts: capturedRev || null,
                 latitude: party.latitude,
                 longitude: party.longitude,
                 location_source: 'verified',
                 accuracy: party.location_accuracy_m,
                 distance_from_address_m: check.distance,
+            });
+        } catch (error) {
+            return res.status(error.status || 500).json({ error: error.message });
+        }
+    }
+
+    // GPS point -> written address, so the party form can be filled from where the
+    // salesman is standing (like delivery apps). Nothing is saved here.
+    async reverseGeocodeLocation(req, res) {
+        try {
+            const { latitude, longitude } = req.body || {};
+            const lat = Number(latitude), lng = Number(longitude);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+                return res.status(400).json({ error: 'A valid current location is required.' });
+            }
+            const rev = await reverseGeocode(lat, lng);
+            if (!rev) {
+                return res.status(200).json({ found: false });
+            }
+            const resolved = await require('./addressController').resolveAddressParts(req, rev);
+            return res.status(200).json({ found: true, ...rev, ...resolved });
+        } catch (error) {
+            return res.status(500).json({ error: error.message });
+        }
+    }
+
+    // Remove a party's saved location (used when the on-site capture was wrong).
+    // Clears the coordinates so "I'm at shop" is available again. Route is limited
+    // to admin / party manager / sales manager; every removal is audit-logged with
+    // the old coordinates.
+    async removePartyLocation(req, res) {
+        try {
+            if (!canManageParties(req.userRoleNames)) return res.status(403).json({ error: 'Only authorized office managers can remove a location.' });
+            const id = req.params.id;
+            if (!id) {
+                return res.status(400).json({ error: 'Party ID is required' });
+            }
+            const party = await Party.findOne({ where: { party_id: id } });
+            if (!party) {
+                return res.status(404).json({ error: 'Party not found' });
+            }
+            if (party.latitude == null && party.longitude == null && !party.location_source) {
+                return res.status(409).json({ error: 'This party has no saved location to remove.' });
+            }
+
+            const oldSnapshot = party.toJSON();
+            party.latitude = null;
+            party.longitude = null;
+            party.location_source = null;
+            party.location_accuracy_m = null;
+            party.location_address = null;
+            party.updated_at = new Date();
+            await party.save();
+
+            await logAudit({
+                req,
+                action: 'update',
+                description: 'Party location removed',
+                tableName: 'parties',
+                recordId: party.party_id,
+                oldValues: oldSnapshot,
+                newValues: party,
+            });
+
+            return res.status(200).json({
+                message: 'Location removed. Use "I\'m at shop" to set it again.',
+                latitude: null,
+                longitude: null,
+                location_source: null,
             });
         } catch (error) {
             return res.status(500).json({ error: error.message });
@@ -626,12 +1032,14 @@ class PartyController {
             const { distributor_id, salesman_id, party_name, trade_name, contact_person, email,
                 phone, address, billing_address, billing_same_as_shipping, country_id, state_id, city_id, zone_id, pincode, gstin, pan, credit_days, prefered_courier, is_active } = req.body;
 
-            // Active status is admin-only. Non-admins often still send the current
-            // is_active value from the edit form — ignore it instead of 403'ing the
-            // whole update (that was breaking salesman/party_manager edits).
+            // Login status (active/inactive) and the commercial terms (credit days,
+            // GSTIN, PAN) are managed by admin / party / sales managers only. A party,
+            // salesman or distributor often still sends the current values from the
+            // edit form — ignore them instead of 403'ing the whole update.
+            const isManager = canManageParties(req.userRoleNames);
             let nextIsActive;
             if (is_active !== undefined) {
-                if (isAdmin(req.userRoleNames)) {
+                if (isManager) {
                     if (typeof is_active !== 'boolean') {
                         return res.status(400).json({ error: 'is_active must be a boolean' });
                     }
@@ -652,9 +1060,12 @@ class PartyController {
                 billing = billing_address || null;
             }
 
+            // Who owns the party is a manager decision. A salesman can edit their
+            // party's details (including its address) but cannot reassign it.
+            const canReassign = canManageParties(req.userRoleNames);
             const payload = {
-                distributor_id: distributor_id !== undefined ? distributor_id : party.distributor_id,
-                salesman_id: salesman_id !== undefined ? salesman_id : party.salesman_id,
+                distributor_id: distributor_id !== undefined && canReassign ? distributor_id : party.distributor_id,
+                salesman_id: salesman_id !== undefined && canReassign ? salesman_id : party.salesman_id,
                 party_name: party_name !== undefined ? party_name : party.party_name,
                 trade_name: trade_name !== undefined ? trade_name : party.trade_name,
                 contact_person: contact_person !== undefined ? contact_person : party.contact_person,
@@ -668,9 +1079,9 @@ class PartyController {
                 city_id: city_id !== undefined ? city_id : party.city_id,
                 zone_id: zone_id !== undefined ? zone_id : party.zone_id,
                 pincode: pincode !== undefined ? pincode : party.pincode,
-                gstin: gstin !== undefined ? gstin : party.gstin,
-                pan: pan !== undefined ? pan : party.pan,
-                credit_days: credit_days !== undefined ? credit_days : party.credit_days,
+                gstin: gstin !== undefined && isManager ? gstin : party.gstin,
+                pan: pan !== undefined && isManager ? pan : party.pan,
+                credit_days: credit_days !== undefined && isManager ? credit_days : party.credit_days,
                 prefered_courier: prefered_courier !== undefined ? prefered_courier : party.prefered_courier,
                 updated_at: new Date(),
                 updated_by: user.user_id
@@ -678,36 +1089,49 @@ class PartyController {
             if (nextIsActive !== undefined) {
                 payload.is_active = nextIsActive;
             }
-            // Re-derive the geocode anchor when the address OR the pincode changes
-            // (editing the pincode to correct a party's location must actually move
-            // it). NOT for on-site 'verified' parties — their captured GPS is the
-            // source of truth and must never be overwritten by an address geocode.
-            // Best-effort; leaves coords as-is on geocoder failure.
-            const addressChanged = address !== undefined && address && address !== party.address;
-            const pincodeChanged = pincode !== undefined && String(pincode).trim() !== String(party.pincode || '').trim();
-            if ((addressChanged || pincodeChanged) && party.location_source !== 'verified') {
-                const geo = await geocodeAddress(
+            // Refresh approximate coordinates on address changes. A verified point
+            // stays locked until an authorized office manager explicitly removes it.
+            const normText = (v) => String(v || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            const normPin = (v) => String(v || '').replace(/\D/g, '');
+            const updatePoint = validPoint(req.body.address_lat, req.body.address_lng);
+            const addressChanged = address !== undefined && !!address && normText(address) !== normText(party.address);
+            const pincodeChanged = pincode !== undefined && normPin(pincode) !== normPin(party.pincode);
+            const stateChanged = state_id !== undefined && String(state_id || '') !== String(party.state_id || '');
+            const cityChanged = city_id !== undefined && String(city_id || '') !== String(party.city_id || '');
+            // Only explicit manager removal unlocks a verified location.
+            const locationReset = false;
+            const hasNoPoint = party.latitude == null || party.longitude == null;
+            if (party.location_source !== 'verified' &&
+                (addressChanged || pincodeChanged || stateChanged || cityChanged || (hasNoPoint && updatePoint))) {
+                const geo = updatePoint ? { ...updatePoint, precision: 'address' } : await geocodeAddress(
                     address !== undefined ? address : party.address,
                     { pincode: pincode !== undefined ? pincode : party.pincode }
                 );
-                if (geo) {
-                    payload.latitude = geo.latitude;
-                    payload.longitude = geo.longitude;
-                    payload.location_source = 'geocoded';
-                }
+                payload.latitude = geo ? geo.latitude : null;
+                payload.longitude = geo ? geo.longitude : null;
+                payload.location_source = geo ? 'geocoded' : null;
+                payload.location_accuracy_m = null;
             }
-            await Party.update(payload, { where: { party_id: id } });
+            const updateWhere = { party_id: id };
+            if (payload.latitude !== undefined || payload.longitude !== undefined) {
+                updateWhere[Op.or] = [{ location_source: null }, { location_source: { [Op.ne]: 'verified' } }];
+            }
+            const [updated] = await Party.update(payload, { where: updateWhere });
+            if (!updated) return res.status(409).json({ error: 'This party’s location changed. Refresh before editing.' });
 
-            if (is_active !== undefined) {
+            if (nextIsActive !== undefined) {
                 await User.update(
-                    { is_active, updated_at: new Date() },
+                    { is_active: nextIsActive, updated_at: new Date() },
                     { where: { user_id: party.user_id } }
                 );
             }
 
             let description = 'Party updated';
-            if (is_active !== undefined && is_active !== party.is_active) {
-                description = is_active ? 'Party reactivated' : 'Party deactivated';
+            if (nextIsActive !== undefined && nextIsActive !== party.is_active) {
+                description = nextIsActive ? 'Party reactivated' : 'Party deactivated';
+            }
+            if (locationReset) {
+                description += ' (address changed, verified location reset)';
             }
 
             await logAudit({
@@ -719,36 +1143,61 @@ class PartyController {
                 oldValues: oldSnapshot,
                 newValues: { ...oldSnapshot, ...payload },
             });
-            res.status(200).json({ message: 'Party updated successfully' });
+            res.status(200).json({
+                message: 'Party updated successfully',
+                location_reset: locationReset,
+                latitude: payload.latitude !== undefined ? payload.latitude : party.latitude,
+                longitude: payload.longitude !== undefined ? payload.longitude : party.longitude,
+                location_source: payload.location_source !== undefined ? payload.location_source : party.location_source,
+                location_accuracy_m: payload.location_accuracy_m !== undefined ? payload.location_accuracy_m : party.location_accuracy_m,
+            });
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
     }
 
+    // A party is never deleted: its orders, check-ins and login all refer to it.
+    // Make the party inactive instead (edit the party and switch it off).
+    /**
+     * Delete a party that was added by mistake (a duplicate, a typo). A party with history is never
+     * deleted, because its orders and visits must keep pointing at it: those stay and the party is made
+     * inactive instead. The login user is left alone, since another party can share it.
+     */
     async deleteParty(req, res) {
         try {
-            const id = req.params.id;
-            if (!id) {
-                return res.status(400).json({ error: 'Party ID is required' });
+            const { id } = req.params;
+            const party = await Party.findByPk(id);
+            if (!party) return res.status(404).json({ error: 'Party not found' });
+
+            const [orderCount, visitCount] = await Promise.all([
+                Order.count({ where: { party_id: id } }),
+                SalesmanCheckIns.count({ where: { party_id: id } }),
+            ]);
+            if (orderCount > 0 || visitCount > 0) {
+                const parts = [];
+                if (orderCount) parts.push(`${orderCount} order${orderCount === 1 ? '' : 's'}`);
+                if (visitCount) parts.push(`${visitCount} visit${visitCount === 1 ? '' : 's'}`);
+                return res.status(409).json({
+                    error: `This party has ${parts.join(' and ')}, so it cannot be deleted. Make it inactive instead.`,
+                    orders: orderCount,
+                    visits: visitCount,
+                });
             }
-            const party = await Party.findOne({ where: { party_id: id } });
-            if (!party) {
-                return res.status(404).json({ error: 'Party not found' });
-            }
-            const snapshot = party.toJSON();
+
+            const oldValues = party.toJSON();
             await party.destroy();
             await logAudit({
                 req,
                 action: 'delete',
-                description: 'Party deleted',
+                description: 'Party deleted (no orders or visits)',
                 tableName: 'parties',
                 recordId: id,
-                oldValues: snapshot,
+                oldValues,
                 newValues: null,
             });
-            res.status(200).json({ message: 'Party deleted successfully' });
+            return res.status(200).json({ message: 'Party deleted', party_id: id });
         } catch (error) {
-            res.status(500).json({ error: error.message });
+            return res.status(500).json({ error: error.message });
         }
     }
 
@@ -786,11 +1235,7 @@ class PartyController {
                     const country = await Country.findOne({ where: ciNameEq(countryName) });
                     if (country) { country_id = country.id; }
                     else {
-                        return {
-                            success: false,
-                            message: countryName + ' Country not found',
-                            data: null,
-                        };
+                        throw new Error(countryName + ' Country not found');
                     }
                 }
                 if (stateName) {
@@ -805,11 +1250,7 @@ class PartyController {
                     }
                     if (state) state_id = state.id;
                     else {
-                        return {
-                            success: false,
-                            message: `Cannot create state "${stateName}" without a Country. Add a Country value for this row.`,
-                            data: null,
-                        };
+                        throw new Error(`Cannot create state "${stateName}" without a Country. Add a Country value for this row.`);
                     }
                 }
                 if (cityName && state_id) {
@@ -826,11 +1267,7 @@ class PartyController {
                     const city = await Cities.findOne({ where: ciNameEq(cityName) });
                     if (city) city_id = city.id;
                     else {
-                        return {
-                            success: false,
-                            message: `Cannot create city "${cityName}" without a State. Add a State value for this row.`,
-                            data: null,
-                        };
+                        throw new Error(`Cannot create city "${cityName}" without a State. Add a State value for this row.`);
                     }
                 }
                 const zoneName = row.zone != null ? String(row.zone).trim() : '';
@@ -841,44 +1278,37 @@ class PartyController {
                     const zone = await Zone.findOne({ where: { [Op.and]: zoneAnd } });
                     if (zone) zone_id = zone.id;
                     else {
-                        return {
-                            success: false,
-                            message: zoneName + ' Zone not found',
-                            data: null,
-                        };
+                        throw new Error(zoneName + ' Zone not found');
                     }
                 }
                 if (row.distributor) {
                     const dist = await Distributor.findOne({ where: { distributor_name: { [Op.eq]: row.distributor } } });
                     if (dist) distributor_id = dist.distributor_id;
                     else {
-                        return {
-                            success: false,
-                            message: row.distributor + ' Distributor not found',
-                            data: null,
-                        };
+                        throw new Error(row.distributor + ' Distributor not found');
                     }
                 }
                 if (row.salesman) {
                     const sm = await Salesman.findOne({ where: { full_name: { [Op.eq]: row.salesman } } });
                     if (sm) salesman_id = sm.salesman_id;
                     else {
-                        return {
-                            success: false,
-                            message: row.salesman + ' Salesman not found',
-                            data: null,
-                        };
+                        throw new Error(row.salesman + ' Salesman not found');
                     }
                 }
 
-                const existing = await Party.findOne({
-                    where: {
-                        [Op.or]: [
-                            { party_name: row.party_name },
-                            ...(row.email ? [{ email: row.email }] : []),
-                        ],
-                    },
-                });
+                // A row is the same party when its GST number matches. With no GST
+                // number it is matched by PAN, and with no PAN by phone and email
+                // together (both must be present). Otherwise there is no match and the row creates a party. The name is never used, so two shops with one name stay apart.
+                const clean = (v) => (v != null && String(v).trim() !== '' ? String(v).trim() : null);
+                const gstin = clean(row.gstin) ? clean(row.gstin).toUpperCase() : null;
+                const pan = clean(row.pan) ? clean(row.pan).toUpperCase() : null;
+                const phone = clean(row.phone);
+                const email = clean(row.email);
+                let matchWhere = null;
+                if (gstin) matchWhere = { gstin };
+                else if (pan) matchWhere = { pan };
+                else if (phone && email) matchWhere = { phone, email };
+                const existing = matchWhere ? await Party.findOne({ where: matchWhere }) : null;
 
                 const billingSameAsShipping = row.billing_same_as_shipping !== false;
                 const billing = billingSameAsShipping ? null : (row.billing_address ?? null);
@@ -897,8 +1327,8 @@ class PartyController {
                     city_id: city_id ?? null,
                     zone_id: zone_id ?? null,
                     pincode: row.pincode ?? null,
-                    gstin: row.gstin ?? null,
-                    pan: row.pan ?? null,
+                    gstin,
+                    pan,
                     is_active: row.active !== false,
                     credit_days: row.credit_days ?? 0,
                     prefered_courier: row.prefered_courier ?? null,
@@ -907,9 +1337,30 @@ class PartyController {
                     updated_at: new Date(),
                 };
 
+                // On an update only the filled cells are written. A blank cell keeps
+                // the value already saved; it never erases it.
+                const updatePayload = { updated_at: new Date() };
+                const filled = {
+                    party_name: row.party_name, trade_name: row.trade_name, contact_person: row.contact_person,
+                    email: row.email, phone: row.phone, address: row.address,
+                    country_id, state_id, city_id, zone_id, pincode: row.pincode,
+                    gstin, pan, credit_days: row.credit_days, prefered_courier: row.prefered_courier,
+                    distributor_id, salesman_id,
+                };
+                for (const [k, v] of Object.entries(filled)) {
+                    if (v !== null && v !== undefined && v !== '') updatePayload[k] = v;
+                }
+                if (row.active !== null && row.active !== undefined) updatePayload.is_active = row.active;
+                if (row.billing_same_as_shipping !== null && row.billing_same_as_shipping !== undefined) {
+                    updatePayload.billing_same_as_shipping = row.billing_same_as_shipping;
+                    updatePayload.billing_address = row.billing_same_as_shipping ? null : (row.billing_address ?? existing?.billing_address ?? null);
+                } else if (row.billing_address) {
+                    updatePayload.billing_address = row.billing_address;
+                }
+
                 if (existing) {
                     const oldSnapshot = existing.toJSON();
-                    await Party.update(payload, { where: { party_id: existing.party_id } });
+                    await Party.update(updatePayload, { where: { party_id: existing.party_id } });
                     result.updated++;
                     await logAudit({
                         req,
@@ -919,22 +1370,14 @@ class PartyController {
                         tableName: 'parties',
                         recordId: existing.party_id,
                         oldValues: oldSnapshot,
-                        newValues: { ...oldSnapshot, ...payload },
+                        newValues: { ...oldSnapshot, ...updatePayload },
                     });
                 } else {
                     if (!row.phone) {
-                        return {
-                            success: false,
-                            message: `Row ${rowNum}: phone is required to create party login`,
-                            data: null,
-                        };
+                        throw new Error(`phone is required to create party login`);
                     }
                     if (!row.address) {
-                        return {
-                            success: false,
-                            message: `Row ${rowNum}: address is required to create party login`,
-                            data: null,
-                        };
+                        throw new Error(`address is required to create party login`);
                     }
                     const loginUser = await findOrCreateRoleUser({
                         phone: row.phone,
@@ -957,9 +1400,11 @@ class PartyController {
         }
 
         const total = result.created + result.updated;
-        const message = result.errors.length === 0
+        const skipped = result.errors.length;
+        const reasons = result.errors.slice(0, 3).map((e) => `Row ${e.row}: ${e.error}`).join('; ');
+        const message = skipped === 0
             ? `Bulk upload complete. Created: ${result.created}, Updated: ${result.updated}.`
-            : `Processed ${total} parties; ${result.errors.length} row(s) failed.`;
+            : `Saved ${total} (Created: ${result.created}, Updated: ${result.updated}). Skipped ${skipped} row(s). ${reasons}${skipped > 3 ? ' ...' : ''}`;
 
         return {
             success: result.errors.length < parties.length,
@@ -979,10 +1424,26 @@ class PartyController {
             if (!resolved) {
                 return res.status(404).json({ error: `State not found: ${state_id}` });
             }
-            const parties = await Party.findAll({
+            // Managers see every state. A salesman or distributor only sees the states they
+            // work in. Everyone else (a party, for example) gets nothing.
+            if (!canManageParties(req.userRoleNames)) {
+                const scope = await resolveUserScope(req.user.user_id, req.userRoleName);
+                let allowed = false;
+                if (hasRole(req.userRoleNames, 'salesman') && scope.salesmanId) {
+                    allowed = await salesmanCoversState(scope.salesmanId, resolved);
+                }
+                if (!allowed && hasRole(req.userRoleNames, 'distributor') && scope.distributorId) {
+                    allowed = await distributorCoversState(scope.distributorId, resolved);
+                }
+                if (!allowed) {
+                    return res.status(403).json({ error: 'Access denied' });
+                }
+            }
+            const body = await listWithOptionalPagination(Party, req, {
                 where: mergeWhere({ state_id: resolved }, partyActiveFilter(req.userRoleNames)),
+                order: [['created_at', 'ASC'], ['party_id', 'ASC']],
             });
-            res.status(200).json(parties);
+            res.status(200).json(hidePartySecrets(req, body));
         } catch (error) {
             res.status(error.statusCode || 500).json({ error: error.message });
         }
@@ -992,8 +1453,9 @@ class PartyController {
     //  - ?q=<address>        → geocode that free text.
     //  - ?party_id=<uuid>    → build the SAME query ensurePartyCoords builds for
     //    that real party (address + resolved city/state + pincode), geocode it,
-    //    and (if found) STORE the coordinates on the party. This shows exactly
-    //    what data we send for a party and whether it resolves.
+    //    and report the result. This shows exactly what data we send for a party
+    //    and whether it resolves. READ-ONLY: it never saves coordinates, so it
+    //    cannot disturb a party's verified location.
     async geocodeTest(req, res) {
         try {
             const partyId = req.query && req.query.party_id;
@@ -1005,11 +1467,6 @@ class PartyController {
                 if (party.state_id) { const s = await State.findByPk(party.state_id); state = s && s.name; }
                 // Full address + fallback (city/state) — the same path ensurePartyCoords uses.
                 const coords = await geocodeAddress(party.address, { city, state, pincode: party.pincode });
-                let stored = false;
-                if (coords) {
-                    await party.update({ latitude: coords.latitude, longitude: coords.longitude });
-                    stored = true;
-                }
                 // If it couldn't resolve, include the raw failure detail for the full query.
                 const detail = coords ? null : await geocodeDiagnostic(party.address, { city, state, pincode: party.pincode });
                 return res.status(200).json({
@@ -1020,7 +1477,7 @@ class PartyController {
                     pincode: party.pincode || null,
                     ok: !!coords,
                     coords: coords || null,
-                    stored,
+                    stored: false,
                     detail,
                 });
             }
@@ -1051,7 +1508,9 @@ class PartyController {
             for (const party of parties) {
                 const geo = await geocodeAddress(party.address, { pincode: party.pincode });
                 if (geo) {
-                    await party.update({ latitude: geo.latitude, longitude: geo.longitude });
+                    // Only parties with no coordinates are selected, so a verified
+                    // location is never touched. Mark the source as geocoded.
+                    await party.update({ latitude: geo.latitude, longitude: geo.longitude, location_source: 'geocoded' });
                     updated += 1;
                 } else {
                     failed.push(party.party_id);

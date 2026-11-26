@@ -11,6 +11,8 @@
  * fall back to in-memory only instead of throwing.
  */
 
+import { invalidateShared } from './requestShare';
+
 const STORAGE_PREFIX = 'cache:';
 
 // In-memory store: key -> { value, expiresAt }
@@ -92,6 +94,8 @@ export const getCached = async (key, fetcher, ttlMs) => {
  * @param {string} [prefix]
  */
 export const invalidateCache = (prefix = '') => {
+  // Lists that are shared between components (see requestShare) are dropped on any change too.
+  invalidateShared();
   // Memory
   for (const key of memory.keys()) {
     if (!prefix || key.startsWith(prefix)) memory.delete(key);

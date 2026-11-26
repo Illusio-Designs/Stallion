@@ -1,9 +1,10 @@
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const Gender = require('../models/Gender');
 const { logAudit } = require('../utils/auditLogger');
 class GenderController {
     async getGenders(req, res) {
         try {
-            const genders = await Gender.findAll();
+            const genders = await Gender.findAll({ where: activeOnlyWhere(req) });
             res.status(200).json(genders);
         } catch (error) {
             res.status(500).json({ error: error.message });
@@ -63,6 +64,7 @@ class GenderController {
             }
             const oldSnapshot = gender.toJSON();
             const payload = {
+                ...activeUpdate(req.body),
                 gender_name: gender_name,
                 updated_at: new Date(),
             };

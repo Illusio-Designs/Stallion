@@ -1,0 +1,13 @@
+:root .sn-trunc{display:block;max-width:220px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+:root .sn-who{max-width:260px}
+:root .sn-who .sn-trunc{max-width:190px}
+:root .sn-locked{opacity:.55;cursor:not-allowed}
+:root .sn-lock-note{margin:6px 0 0;font-size:12px;color:var(--t-mute)}
+@media (max-width:1400px){:root .sn-trunc{max-width:170px}:root .sn-who .sn-trunc{max-width:150px}}
+@media (max-width:767.98px){:root .sn-trunc,:root .sn-who,:root .sn-who .sn-trunc{max-width:100%;white-space:normal}}
+
+:root .sn-name{display:block;min-width:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:767.98px){:root .sn-name{white-space:normal;overflow-wrap:anywhere}}
+
+:root .sn-reason{display:inline-flex;flex-wrap:wrap;align-items:center;gap:6px}
+:root .sn-prog-pill{display:inline-flex;align-items:center;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;background:#fdf0d5;color:#8a5a00;white-space:nowrap}

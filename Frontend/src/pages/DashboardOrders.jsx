@@ -1,90 +1,99 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import DropdownSelector from '../components/ui/DropdownSelector';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import Skeleton from '../components/ui/Skeleton';
 import TableWithControls from '../components/ui/TableWithControls';
+import DateRangePicker from '../components/ui/DateRangePicker';
+import { FiSearch } from '../components/icons/hugeicons';
+import { addressRows } from '../utils/addressParts';
 import StatusBadge from '../components/ui/StatusBadge';
 import Button from '../components/ui/Button';
+import Pagination from '../components/ui/Pagination';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
-import DropdownSelector from '../components/ui/DropdownSelector';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
-  getOrdersForRole,
-  createOrder,
-  updateOrderStatus, 
+  getOrdersListPage,
+  getOrderFilterOptions,
+  updateOrderStatus,
+  dispatchOrder,
+  markTrayTaskReceived,
+  completeOrder,
   deleteOrder,
   getPartiesForRole,
-  getDistributors,
-  getSalesmen,
-  getEvents,
-  getProductsPage,
   getProductsByIds,
   getSalesmanById,
-  getCountries,
-  getAvailableOffers,
 } from '../services/apiService';
 import { downloadOrderPdf } from '../utils/orderPdf';
+import {
+  orderStatusLabel,
+  orderStatusBadgeKey,
+  orderPillLabel,
+  ORDER_STATUS_TITLE,
+  ORDER_TAB_TO_STATUS,
+  ORDER_LABEL_TO_STATUS,
+  ORDER_FILTER_TABS_WITH_LEGACY,
+  TASK_PILL,
+  toInt,
+  fmtDate,
+  fmtDateTime,
+  getTrayTasksOf,
+  getPieceCounts,
+  getShipments,
+  heldNote,
+} from '../utils/orderStatus';
+import { downloadCsv } from '../utils/exportCsv';
 import { showSuccess, showError } from '../services/notificationService';
-import { getUserRole, getUser } from '../services/authService';
+import { getUserRole, getUser, getUserRoles } from '../services/authService';
 import '../styles/pages/dashboard-orders.css';
+import '../styles/redesign-n-orders.css';
+import '../styles/redesign-p-orders.css';
+import { isUpcoming } from '../utils/upcoming';
 
-// Map API status to UI status
-const mapApiStatusToUI = (apiStatus) => {
-  const statusMap = {
-    'pending': 'PENDING',
-    'processed': 'PROCESSING',
-    'hold_by_tray': 'HOLD BY SAMPLE',
-    'partially_dispatched': 'PARTIALLY DISPATCH',
-    'dispatched': 'DISPATCH',
-    'completed': 'COMPLETED',
-    'cancelled': 'CANCEL'
-  };
-  return statusMap[apiStatus?.toLowerCase()] || apiStatus?.toUpperCase() || 'PENDING';
+// Status wording, tones and piece counts live in utils/orderStatus.js
+const mapApiStatusToUI = (apiStatus) => (apiStatus ? orderStatusLabel(apiStatus) : 'PENDING');
+const mapUITabToApiStatus = (tab) => ORDER_TAB_TO_STATUS[tab];
+const UI_TO_API_STATUS = ORDER_LABEL_TO_STATUS;
+// order_type "party_order" -> "Party Order"
+const formatOrderType = (type) => {
+  if (!type) return 'N/A';
+  return type
+    .split('_')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 };
-
-// Map UI tab to API status
-const mapUITabToApiStatus = (tab) => {
-  const tabMap = {
-    'Pending': 'pending',
-    'Processing': 'processed',
-    'Hold by Sample': 'hold_by_tray',
-    'Partially Dispatch': 'partially_dispatched',
-    'Dispatch': 'dispatched',
-    'Completed': 'completed',
-    'Cancel': 'cancelled'
-  };
-  return tabMap[tab];
-};
-
-// Canonical UI-status label <-> API status value (single source of truth for
-// the edit modal). Keep in sync with mapApiStatusToUI above.
-const UI_TO_API_STATUS = {
-  'PENDING': 'pending',
-  'PROCESSING': 'processed',
-  'HOLD BY SAMPLE': 'hold_by_tray',
-  'PARTIALLY DISPATCH': 'partially_dispatched',
-  'DISPATCH': 'dispatched',
-  'COMPLETED': 'completed',
-  'CANCEL': 'cancelled',
-};
-// Statuses that require courier name + tracking number (and, for partial,
-// a dispatch quantity) — mirrors the backend validation.
-const DISPATCH_STATUSES = ['dispatched', 'partially_dispatched'];
+const COURIER_SUGGESTIONS = ['Blue Dart', 'DTDC', 'Delhivery', 'India Post', 'Professional Couriers', 'Gati'];
+const CANCEL_REASONS = ['Party asked to cancel', 'Stock not available', 'Wrong order', 'Other'];
+const OFFICE_STATUS_TITLE = ORDER_STATUS_TITLE;
 
 const DashboardOrders = () => {
   const confirm = useConfirm();
-  const [editRow, setEditRow] = useState(null);
-  const [editStatus, setEditStatus] = useState('PENDING');
-  // Extra data captured for dispatch / partial-dispatch status changes
-  const [courierName, setCourierName] = useState('');
-  const [courierTracking, setCourierTracking] = useState('');
-  const [partialQty, setPartialQty] = useState('');
   const [viewRow, setViewRow] = useState(null);
+  const [dispatchCourier, setDispatchCourier] = useState('');
+  const [dispatchTracking, setDispatchTracking] = useState('');
+  const [dispatchQty, setDispatchQty] = useState('');
+  const [dispatchErrors, setDispatchErrors] = useState({});
+  const [cancelChoice, setCancelChoice] = useState('');
+  const [cancelOther, setCancelOther] = useState('');
+  const [cancelError, setCancelError] = useState('');
+  const [receivedBy, setReceivedBy] = useState('');
+  const [busyAction, setBusyAction] = useState(''); // '' | process | dispatch | recv:<taskId> | complete | cancel
+  const [actionError, setActionError] = useState('');
   const [viewItems, setViewItems] = useState([]);
   const [viewItemsLoading, setViewItemsLoading] = useState(false);
-  const [createModalOpen, setCreateModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
   const [dateFrom, setDateFrom] = useState(null); // 'YYYY-MM-DD' or null
   const [dateTo, setDateTo] = useState(null);     // 'YYYY-MM-DD' or null
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState('');
+  const [salesmanFilter, setSalesmanFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [pagination, setPagination] = useState(null); // { page, limit, total, totalPages } of the loaded page
+  const [serverCounts, setServerCounts] = useState(null); // status -> count, from the server
+  const [serverSummary, setServerSummary] = useState(null); // scope-wide totals for the KPI row
+  const [loadedOnce, setLoadedOnce] = useState(false);
+  const [filterOptions, setFilterOptions] = useState({ types: [], salesmen: [] });
+  const [exporting, setExporting] = useState(false);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -101,123 +110,103 @@ const DashboardOrders = () => {
   const isDistributor = userRole === 'distributor';
   const isParty = userRole === 'party';
   const isSalesman = userRole === 'salesman';
+  // The tray manager can open the order panel to follow the frames coming back from trays.
+  const canReturnTrays = useMemo(
+    () => getUserRoles().some((r) => ['admin', 'order_manager', 'tray_manager'].includes(r)),
+    []
+  );
+  // Changing an order's status is for admin and order manager only (the server
+  // answers "Access denied" to everyone else), so only they get the Edit button.
+  const canEditOrder = useMemo(
+    () => getUserRoles().some((r) => ['admin', 'order_manager'].includes(r)),
+    []
+  );
   
-  // Dropdown data
-  const [countries, setCountries] = useState([]);
-  const [selectedCountry, setSelectedCountry] = useState(null);
-  const [allParties, setAllParties] = useState([]); // Store all parties fetched from API
-  const [parties, setParties] = useState([]); // Filtered parties to display
-  const [distributors, setDistributors] = useState([]);
-  const [salesmen, setSalesmen] = useState([]);
-  const [events, setEvents] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [productLoading, setProductLoading] = useState(false);
-  // Geolocation for visit orders (the backend rejects a visit_order without lat/lng).
-  const [latitude, setLatitude] = useState(null);
-  const [longitude, setLongitude] = useState(null);
-  const [locationError, setLocationError] = useState(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-  
-  // Create order form data
-  // Auto-set order_type based on role
-  // Distributor can select order type, but defaults to distributor_order
-  const getInitialOrderType = () => {
-    if (isParty) return 'party_order';
-    // Distributor can select, but default is distributor_order
-    if (isDistributor) return 'distributor_order';
-    return '';
-  };
-
-  const [createFormData, setCreateFormData] = useState({
-    order_type: getInitialOrderType(),
-    party_id: '',
-    distributor_id: '',
-    salesman_id: '',
-    event_id: '',
-    order_items: [{ product_id: '', quantity: 1, price: 0 }],
-    order_notes: ''
-  });
-
-  // Offers the user can apply to this order (none auto-applied — user picks one).
-  const [availableOffers, setAvailableOffers] = useState([]);
-  const [selectedOffer, setSelectedOffer] = useState('');
-
-  // Load offers that apply to the current cart whenever the valid items change.
+  const viewOrderId = viewRow?.originalOrder?.order_id;
+  const viewOrderQtyKey = `${viewRow?.originalOrder?.order_status}:${viewRow?.originalOrder?.ready_qty}`;
   useEffect(() => {
-    const items = (createFormData.order_items || [])
-      .filter((it) => it.product_id && Number(it.quantity) > 0 && Number(it.price) >= 0)
-      .map((it) => ({ product_id: it.product_id, quantity: Number(it.quantity), price: Number(it.price) }));
-    if (items.length === 0) { setAvailableOffers([]); setSelectedOffer(''); return; }
-    let cancelled = false;
-    (async () => {
-      try {
-        const offers = await getAvailableOffers(items);
-        const list = Array.isArray(offers) ? offers : [];
-        if (cancelled) return;
-        setAvailableOffers(list);
-        // Drop the selection if it no longer applies.
-        setSelectedOffer((cur) => (cur && list.some((o) => o.offer_id === cur)) ? cur : '');
-      } catch (_e) {
-        if (!cancelled) setAvailableOffers([]);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [createFormData.order_items]);
+    setDispatchCourier('');
+    setDispatchTracking('');
+    setDispatchErrors({});
+    setCancelChoice('');
+    setCancelOther('');
+    setCancelError('');
+    setReceivedBy('');
+    setActionError('');
+    const ready = toInt(viewRow?.originalOrder?.ready_qty);
+    setDispatchQty(ready ? String(ready) : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewOrderId, viewOrderQtyKey]);
 
   // Fetch orders from API
+  // Keep the open panel in step with the refreshed list (e.g. after a tray task is received).
+  useEffect(() => {
+    setViewRow((cur) => {
+      const id = cur?.originalOrder?.order_id;
+      if (!id) return cur;
+      const fresh = orders.find((o) => o.order_id === id);
+      if (!fresh || fresh === cur.originalOrder) return cur;
+      const merged = { ...cur.originalOrder, ...fresh };
+      return { ...cur, status: mapApiStatusToUI(merged.order_status), originalOrder: merged };
+    });
+  }, [orders]);
+
+  // Load ONE page (20 rows) from the server with the current tab, search, dates and filters. A request
+  // counter drops answers that arrive after a newer request, so a slow old one cannot overwrite a new one.
+  const requestSeq = useRef(0);
+  const partyLookupTried = useRef(false);
+  const paramsRef = useRef({});
+  paramsRef.current = { page, activeTab, debouncedSearch, dateFrom, dateTo, typeFilter, salesmanFilter };
+  const PAGE_SIZE = 20;
+
   const fetchOrders = async (suppressError = false) => {
+    const seq = ++requestSeq.current;
+    const q = paramsRef.current;
     try {
       setLoading(true);
       setError(null);
-      const response = await getOrdersForRole(userRole);
-      let allOrders = Array.isArray(response) ? response : [];
-      
-      // Filter orders based on role - only show orders created by the logged-in user
-      if (isDistributor && user?.distributor_id) {
-        // Filter orders for this distributor
-        const distributorId = String(user.distributor_id).trim();
-        allOrders = allOrders.filter(order => {
-          const orderDistributorId = order.distributor_id || order.distributor?.distributor_id || order.distributor?.id;
-          return orderDistributorId && String(orderDistributorId).trim() === distributorId;
-        });
-        console.log('[fetchOrders] Filtered orders for distributor:', distributorId, 'Total:', allOrders.length);
-      } else if (isParty && user?.party_id) {
-        // Filter orders for this party
-        const partyId = String(user.party_id).trim();
-        allOrders = allOrders.filter(order => {
-          const orderPartyId = order.party_id || order.party?.party_id || order.party?.id;
-          return orderPartyId && String(orderPartyId).trim() === partyId;
-        });
-        console.log('[fetchOrders] Filtered orders for party:', partyId, 'Total:', allOrders.length);
-      } else if (isSalesman && user?.salesman_id) {
-        // Filter orders for this salesman
-        const salesmanId = String(user.salesman_id).trim();
-        allOrders = allOrders.filter(order => {
-          const orderSalesmanId = order.salesman_id || order.salesman?.salesman_id || order.salesman?.id;
-          return orderSalesmanId && String(orderSalesmanId).trim() === salesmanId;
-        });
-        console.log('[fetchOrders] Filtered orders for salesman:', salesmanId, 'Total:', allOrders.length);
+      const response = await getOrdersListPage(userRole, {
+        page: q.page,
+        limit: PAGE_SIZE,
+        search: q.debouncedSearch,
+        status: q.activeTab !== 'All' ? (mapUITabToApiStatus(q.activeTab) || '') : '',
+        startDate: q.dateFrom || '',
+        endDate: q.dateTo || '',
+        orderType: q.typeFilter,
+        salesmanId: q.salesmanFilter,
+        counts: true,
+        summary: true,
+      });
+      if (seq !== requestSeq.current) return;
+      const pageOrders = Array.isArray(response.data) ? response.data : [];
+      const lastPage = Math.max(1, response.pagination?.totalPages || 1);
+      // A delete or a filter may have emptied this page: step back to the last page that has rows.
+      if (pageOrders.length === 0 && q.page > lastPage) {
+        setPage(lastPage);
+        return;
       }
-      // Admin sees all orders (no filtering)
-      
-      setOrders(allOrders);
-      
-      // Fetch party details (name + address) for the orders' parties. We need
-      // the address for the View/Download "From" block even when the name is
-      // already embedded, so key off any party_id present.
-      const uniquePartyIds = [...new Set(allOrders
-        .filter(order => order.party_id)
-        .map(order => order.party_id)
-      )];
+      setOrders(pageOrders);
+      setPagination(response.pagination);
+      if (response.counts) setServerCounts(response.counts);
+      if (response.summary) setServerSummary(response.summary);
+      setLoadedOnce(true);
 
-      if (uniquePartyIds.length > 0) {
+      // The server already puts the party name and address on every order. The whole party list
+      // is only fetched when some order lacks one of them (for example the party was removed).
+      const needsPartyLookup = pageOrders.some((order) => order.party_id && (
+        !(order.party?.party_name || order.party_name) ||
+        !(order.party_address || [order.party?.address, order.party?.pincode].filter(Boolean).join(' - '))
+      ));
+
+      if (needsPartyLookup && !partyLookupTried.current) {
+        partyLookupTried.current = true;
         try {
           // One call for all parties instead of one getPartyById per order (N+1).
           // Role-scoped: field roles (salesman/distributor/party) get /parties/my;
           // managers get the full list. Avoids a 403 on POST /parties/get.
           const allParties = await getPartiesForRole(userRole);
-          const newPartyNamesMap = { ...partyNamesMap };
-          const newPartyAddressMap = { ...partyAddressMap };
+          const newPartyNamesMap = {};
+          const newPartyAddressMap = {};
           (allParties || []).forEach((p) => {
             const id = p.id || p.party_id;
             if (!id) return;
@@ -225,49 +214,73 @@ const DashboardOrders = () => {
             const addr = [p.address, p.pincode].filter(Boolean).join(' - ');
             if (addr) newPartyAddressMap[id] = addr;
           });
-          setPartyNamesMap(newPartyNamesMap);
-          setPartyAddressMap(newPartyAddressMap);
+          setPartyNamesMap((prev) => ({ ...prev, ...newPartyNamesMap }));
+          setPartyAddressMap((prev) => ({ ...prev, ...newPartyAddressMap }));
         } catch (err) {
           console.error('Failed to fetch party details:', err);
         }
       }
     } catch (err) {
+      if (seq !== requestSeq.current) return;
       const message = err?.response?.data?.message || err?.message || 'Failed to fetch orders';
       const errorMessage = (message || '').toLowerCase();
-      
+
       // Don't show error for "not found" cases - it's a valid empty state
       const isNotFoundError = errorMessage.includes('orders not found') ||
                              errorMessage.includes('no orders found') ||
                              errorMessage.includes('order not found') ||
                              err.statusCode === 404;
-      
+
       if (isNotFoundError) {
-        // Just set empty array, don't show error
         setOrders([]);
         setError(null);
       } else {
-        // Only show error if not suppressed and not a "not found" error
         setError(message);
         if (!suppressError) {
           showError(message);
         }
         setOrders([]);
       }
+      setLoadedOnce(true);
     } finally {
-      setLoading(false);
+      if (seq === requestSeq.current) setLoading(false);
     }
   };
 
-  // Fetch orders on mount. Product names are resolved on-demand in the View
-  // modal (per order), so we don't bulk-load the catalog here.
+  // Search waits 300 ms after typing stops before asking the server.
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Fetch when the page or any filter changes. A filter change goes back to page 1 first (the page
+  // change then triggers the fetch), so there is no wasted request for the old page number.
+  const filtersKey = JSON.stringify([activeTab, debouncedSearch, dateFrom, dateTo, typeFilter, salesmanFilter]);
+  const lastFiltersKey = useRef(filtersKey);
+  useEffect(() => {
+    if (lastFiltersKey.current !== filtersKey) {
+      lastFiltersKey.current = filtersKey;
+      if (page !== 1) { setPage(1); return; }
+    }
     fetchOrders();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filtersKey, page]);
+
+  // Dropdown options come from a small lookup, not from the loaded rows.
+  useEffect(() => {
+    let cancelled = false;
+    getOrderFilterOptions().then((o) => { if (!cancelled) setFilterOptions(o); });
+    return () => { cancelled = true; };
   }, []);
 
   // Resolve salesman names for the SALESMAN column (orders only carry salesman_id).
   useEffect(() => {
+    // Orders from the server carry salesman_name already; only an order without any name is looked up.
     const ids = [...new Set(
-      orders.map(o => o.salesman_id || o.salesman?.salesman_id || o.salesman?.id).filter(Boolean)
+      orders
+        .filter(o => !(o.salesman?.salesman_name || o.salesman?.full_name || o.salesman_name))
+        .map(o => o.salesman_id || o.salesman?.salesman_id || o.salesman?.id)
+        .filter(Boolean)
     )].filter(id => !salesmanNamesMap[id]);
     if (ids.length === 0) return;
     let cancelled = false;
@@ -285,234 +298,6 @@ const DashboardOrders = () => {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orders]);
-
-  // Lazy, load-once dropdown loaders: each list is fetched only when the user
-  // actually opens that field (wired to DropdownSelector's onOpen) — NOT all at
-  // once when the panel opens. The length guard makes the call fire once.
-  const loadCountries = useCallback(async () => {
-    if (countries.length > 0) return;
-    try {
-      const countriesData = await getCountries();
-      setCountries(countriesData || []);
-    } catch (err) {
-      console.error('Failed to load countries:', err);
-    }
-  }, [countries.length]);
-
-  // Request the browser location for visit orders (shows the native permission
-  // prompt). Resolves with {latitude, longitude}; rejects on denial/error.
-  const getCurrentLocation = useCallback(() => {
-    return new Promise((resolve, reject) => {
-      if (typeof navigator === 'undefined' || !navigator.geolocation) {
-        const msg = 'Geolocation is not supported by your browser';
-        setLocationError(msg);
-        reject(new Error(msg));
-        return;
-      }
-      setLocationError(null);
-      setLocationLoading(true);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = parseFloat(position.coords.latitude);
-          const lng = parseFloat(position.coords.longitude);
-          setLatitude(lat);
-          setLongitude(lng);
-          setLocationLoading(false);
-          resolve({ latitude: lat, longitude: lng });
-        },
-        (error) => {
-          const msg = error.message || 'Failed to get location';
-          setLocationError(msg);
-          setLatitude(null);
-          setLongitude(null);
-          setLocationLoading(false);
-          reject(error);
-        },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-      );
-    });
-  }, []);
-
-  // Product picker: server-paginated, 20 per page, with server-side search.
-  // Opening the field loads page 1; typing re-queries the server (debounced).
-  const loadProducts = useCallback(async (search = '') => {
-    setProductLoading(true);
-    try {
-      const result = await getProductsPage(1, 20, search);
-      setProducts(Array.isArray(result) ? result : (result?.data || []));
-    } catch (err) {
-      console.error('Failed to load products:', err);
-    } finally {
-      setProductLoading(false);
-    }
-  }, []);
-
-  // Fetch events only when event_order is selected
-  const fetchEvents = useCallback(async () => {
-    try {
-      const eventsData = await getEvents();
-      setEvents(eventsData || []);
-    } catch (err) {
-      console.error('Failed to fetch events:', err);
-      setEvents([]);
-    }
-  }, []);
-
-  // Fetch events when event_order is selected
-  useEffect(() => {
-    if (createFormData.order_type === 'event_order' && events.length === 0) {
-      fetchEvents();
-    }
-  }, [createFormData.order_type, events.length, fetchEvents]);
-
-  // Filter parties based on salesman zone and order type
-  const filterPartiesByZone = useCallback((partiesList, orderType) => {
-    if (!isSalesman || !user?.zone_preference) {
-      // Not a salesman or no zone preference, show all parties
-      setParties(partiesList);
-      return;
-    }
-
-    const salesmanZone = String(user.zone_preference).trim();
-    
-    // For event_order, show all parties regardless of zone
-    if (orderType === 'event_order') {
-      setParties(partiesList);
-      return;
-    }
-
-    // For visit_order and whatsapp_order, filter by zone
-    if (orderType === 'visit_order' || orderType === 'whatsapp_order') {
-      const filteredParties = partiesList.filter(party => {
-        const partyZoneId = party.zone_id || party.zoneId;
-        if (!partyZoneId) return false;
-        return String(partyZoneId).trim() === salesmanZone;
-      });
-      console.log('[filterPartiesByZone] Filtered parties for zone:', salesmanZone, 'Order type:', orderType, 'Total:', partiesList.length, 'Filtered:', filteredParties.length);
-      setParties(filteredParties);
-      return;
-    }
-
-    // For other order types, show all parties
-    setParties(partiesList);
-  }, [isSalesman, user]);
-
-  // Fetch parties when country is selected
-  const fetchPartiesForCountry = useCallback(async (countryId) => {
-    if (!countryId) {
-      setAllParties([]);
-      setParties([]);
-      return;
-    }
-    
-    try {
-      const cleanCountryId = String(countryId).trim();
-      if (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null') {
-        console.error('[fetchPartiesForCountry] Invalid country ID:', countryId);
-        setAllParties([]);
-        setParties([]);
-        return;
-      }
-      
-      console.log('[fetchPartiesForCountry] Fetching parties for country:', cleanCountryId);
-      // Role-scoped: salesman/distributor/party get /parties/my; managers get the
-      // country list. Prevents a 403 on POST /parties/get for field roles.
-      const partiesData = await getPartiesForRole(userRole, cleanCountryId);
-      console.log('[fetchPartiesForCountry] Received', partiesData?.length || 0, 'parties');
-      setAllParties(partiesData || []);
-      // Apply filtering based on order type and salesman zone
-      filterPartiesByZone(partiesData || [], createFormData.order_type);
-    } catch (err) {
-      console.error('Failed to fetch parties:', err);
-      setAllParties([]);
-      setParties([]);
-    }
-  }, [filterPartiesByZone, createFormData.order_type]);
-
-  // Fetch distributors when country is selected
-  const fetchDistributorsForCountry = useCallback(async (countryId) => {
-    if (!countryId) {
-      setDistributors([]);
-      return;
-    }
-    
-    try {
-      const cleanCountryId = String(countryId).trim();
-      if (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null') {
-        console.error('[fetchDistributorsForCountry] Invalid country ID:', countryId);
-        setDistributors([]);
-        return;
-      }
-      
-      console.log('[fetchDistributorsForCountry] Fetching distributors for country:', cleanCountryId);
-      const distributorsData = await getDistributors(cleanCountryId);
-      console.log('[fetchDistributorsForCountry] Received', distributorsData?.length || 0, 'distributors');
-      setDistributors(distributorsData || []);
-    } catch (err) {
-      console.error('Failed to fetch distributors:', err);
-      setDistributors([]);
-    }
-  }, []);
-
-  // Fetch salesmen when country is selected
-  const fetchSalesmenForCountry = useCallback(async (countryId) => {
-    if (!countryId) {
-      setSalesmen([]);
-      return;
-    }
-    
-    try {
-      const cleanCountryId = String(countryId).trim();
-      if (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null') {
-        console.error('[fetchSalesmenForCountry] Invalid country ID:', countryId);
-        setSalesmen([]);
-        return;
-      }
-      
-      console.log('[fetchSalesmenForCountry] Fetching salesmen for country:', cleanCountryId);
-      const salesmenData = await getSalesmen(cleanCountryId);
-      console.log('[fetchSalesmenForCountry] Received', salesmenData?.length || 0, 'salesmen');
-      setSalesmen(salesmenData || []);
-    } catch (err) {
-      console.error('Failed to fetch salesmen:', err);
-      setSalesmen([]);
-    }
-  }, []);
-
-  // Apply filtering when order type changes (for salesman)
-  useEffect(() => {
-    if (isSalesman && allParties.length > 0) {
-      filterPartiesByZone(allParties, createFormData.order_type);
-    }
-  }, [createFormData.order_type, isSalesman, allParties, filterPartiesByZone]);
-
-  // Fetch parties when country is selected
-  useEffect(() => {
-    if (selectedCountry) {
-      fetchPartiesForCountry(selectedCountry);
-    } else {
-      setAllParties([]);
-      setParties([]);
-    }
-  }, [selectedCountry, fetchPartiesForCountry]);
-
-  // Fetch distributors when country is selected
-  useEffect(() => {
-    if (selectedCountry) {
-      fetchDistributorsForCountry(selectedCountry);
-    } else {
-      setDistributors([]);
-    }
-  }, [selectedCountry, fetchDistributorsForCountry]);
-
-  // Fetch salesmen when country is selected
-  useEffect(() => {
-    if (selectedCountry) {
-      fetchSalesmenForCountry(selectedCountry);
-    } else {
-      setSalesmen([]);
-    }
-  }, [selectedCountry, fetchSalesmenForCountry]);
 
   // Helper function to parse order_items (can be JSON string or array)
   const parseOrderItems = (orderItems) => {
@@ -562,8 +347,6 @@ const DashboardOrders = () => {
       it.product_name ||
       it.product?.product_name ||
       lookup[String(it.product_id)] ||
-      products.find(p => String(p.product_id || p.id) === String(it.product_id))?.model_no ||
-      products.find(p => String(p.product_id || p.id) === String(it.product_id))?.product_name ||
       null;
 
     let cancelled = false;
@@ -595,14 +378,14 @@ const DashboardOrders = () => {
 
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewRow, products]);
+  }, [viewRow]);
 
   // Transform orders data to table rows
-  const rows = useMemo(() => {
-    if (!orders || orders.length === 0) return [];
+  const buildRows = (list) => {
+    if (!list || list.length === 0) return [];
 
     const tableRows = [];
-    orders.forEach(order => {
+    list.forEach(order => {
       const orderId = order.order_id || order.id;
       const orderNumber = order.order_number || `#${orderId?.toString().slice(-6) || 'N/A'}`;
       // Get party name from order object, or from partyNamesMap if not available
@@ -622,14 +405,6 @@ const DashboardOrders = () => {
       // Parse order_items (can be JSON string or array)
       const orderItems = parseOrderItems(order.order_items);
 
-      // Format order type for display
-      const formatOrderType = (type) => {
-        if (!type) return 'N/A';
-        return type
-          .split('_')
-          .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-          .join(' ');
-      };
       const orderTypeDisplay = formatOrderType(order.order_type);
 
       // Calculate totals for the order
@@ -653,7 +428,10 @@ const DashboardOrders = () => {
         orderType: orderTypeDisplay,
         client: partyName,
         clientAddress: partyAddress,
+        partyCity: (typeof order.party?.city === 'string' ? order.party.city : order.party?.city?.name) || order.party_city || '',
         clientBillingAddress: partyBillingAddress,
+        shipParts: order.party_address_parts || null,
+        billParts: order.party_billing_address_parts || null,
         salesman: salesmanLabel,
         date: orderDate,
         qty: totalQuantity,
@@ -664,58 +442,30 @@ const DashboardOrders = () => {
     });
 
     return tableRows;
-  }, [orders, partyNamesMap, partyAddressMap, salesmanNamesMap]);
+  };
+  const rows = useMemo(() => buildRows(orders), [orders, partyNamesMap, partyAddressMap, salesmanNamesMap]);
 
-  // Filter rows by active tab + selected date range
-  const filteredRowsByTab = useMemo(() => {
-    let result = rows;
+  // The server already applied the tab, dates, search and filters: these rows are the current page.
+  const filteredRowsByTab = rows;
 
-    if (activeTab !== 'All') {
-      const apiStatus = mapUITabToApiStatus(activeTab);
-      if (apiStatus) {
-        result = result.filter(row => row.originalOrder?.order_status?.toLowerCase() === apiStatus);
-      }
-    }
+  const typeOptions = useMemo(() => [{ value: '', label: 'All types' }, ...filterOptions.types.map(t => ({ value: t, label: formatOrderType(t) }))], [filterOptions]);
+  const salesmanOptions = useMemo(() => [{ value: '', label: 'All salesmen' }, ...filterOptions.salesmen.map(sm => ({ value: sm.salesman_id, label: sm.full_name }))], [filterOptions]);
 
-    if (dateFrom || dateTo) {
-      const fromTs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : -Infinity;
-      const toTs = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : Infinity;
-      result = result.filter(row => {
-        const raw = row.originalOrder?.order_date || row.originalOrder?.created_at;
-        if (!raw) return false;
-        const ts = new Date(raw).getTime();
-        return !Number.isNaN(ts) && ts >= fromTs && ts <= toTs;
-      });
-    }
+  // Counts shown on the status chips (from the server, for the current search, dates and filters)
+  const tabCounts = useMemo(() => {
+    const out = { All: serverCounts?.all ?? 0 };
+    ORDER_FILTER_TABS_WITH_LEGACY.forEach((t) => {
+      out[t] = serverCounts?.[mapUITabToApiStatus(t)] ?? 0;
+    });
+    return out;
+  }, [serverCounts]);
 
-    return result;
-  }, [rows, activeTab, dateFrom, dateTo]);
-
-  // Calculate summary statistics
-  const summaryStats = useMemo(() => {
-    const totalOrders = orders.length;
-    const pendingOrders = orders.filter(o => o.order_status?.toLowerCase() === 'pending').length;
-    const completedOrders = orders.filter(o => o.order_status?.toLowerCase() === 'completed');
-    const completedValue = completedOrders.reduce((sum, o) => {
-      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
-    }, 0);
-    const totalRevenue = orders.reduce((sum, o) => {
-      return sum + (Number(o.order_total) || o.total_value || o.total_amount || 0);
-    }, 0);
-
-    // Count by order type
-    const retailOrders = orders.filter(o => o.order_type?.includes('retail') || o.order_type === 'retail_order').length;
-    const bulkOrders = orders.filter(o => o.order_type?.includes('bulk') || o.order_type === 'bulk_order').length;
-
-    return {
-      totalOrders,
-      pendingOrders,
-      completedValue,
-      totalRevenue,
-      retailOrders,
-      bulkOrders
-    };
-  }, [orders]);
+  // Summary numbers for the KPI row (the whole scope, from the server)
+  const summaryStats = serverSummary || { totalOrders: 0, pendingOrders: 0, completedValue: 0, totalRevenue: 0, retailOrders: 0, bulkOrders: 0 };
+  const initialLoading = loading && !loadedOnce;
+  const noFilters = activeTab === 'All' && !debouncedSearch && !dateFrom && !dateTo && !typeFilter && !salesmanFilter;
+  const totalRows = pagination?.total ?? rows.length;
+  const pageCount = Math.max(1, pagination?.totalPages || 1);
 
   // Handle delete order
   const handleDelete = async (row) => {
@@ -740,351 +490,241 @@ const DashboardOrders = () => {
     }
   };
 
-  // Handle update order status
-  const handleUpdateStatus = async (row, newStatus) => {
-    const orderId = row.originalOrder?.order_id || row.originalOrder?.id;
-    if (!orderId) {
-      showError('Order ID not found');
-      return;
-    }
+  // Merge the order the server returned into the open panel, then refresh the list.
+  const applyUpdated = (updated, fallbackStatus) => {
+    const next = updated && typeof updated === 'object' ? (updated.data && updated.data.order_id ? updated.data : updated) : {};
+    setViewRow((cur) => {
+      if (!cur) return cur;
+      const merged = { ...cur.originalOrder, ...next };
+      if (!next.order_status && fallbackStatus) merged.order_status = fallbackStatus;
+      return { ...cur, status: mapApiStatusToUI(merged.order_status), originalOrder: merged };
+    });
+    fetchOrders(true);
+  };
 
-    const apiStatus = UI_TO_API_STATUS[newStatus] || newStatus.toLowerCase();
-    const payload = { order_status: apiStatus };
+  const errMessage = (err, fallback) => err?.response?.data?.message || err?.response?.data?.error || err?.message || fallback;
 
-    // Dispatch & partial-dispatch require courier details; partial also needs a
-    // dispatched quantity. Validate client-side (toast, panel stays open) so we
-    // don't bounce off the backend's 400.
-    if (DISPATCH_STATUSES.includes(apiStatus)) {
-      const name = courierName.trim();
-      const tracking = courierTracking.trim();
-      if (!name || !tracking) {
-        showError('Courier name and tracking number are required to dispatch this order.');
-        return;
-      }
-      payload.courier_name = name;
-      payload.courier_tracking_number = tracking;
-    }
-    if (apiStatus === 'partially_dispatched') {
-      const qty = Number(partialQty);
-      const totalQty = Number(row.qty) || 0;
-      if (!partialQty || !Number.isFinite(qty) || qty <= 0) {
-        showError('Enter a valid partial dispatch quantity (greater than 0).');
-        return;
-      }
-      if (totalQty > 0 && qty > totalQty) {
-        showError(`Partial dispatch quantity cannot exceed the order quantity (${totalQty}).`);
-        return;
-      }
-      payload.partial_dispatch_qty = qty;
-    }
-
-    // Confirm before committing — a status change can't be reversed. Uses the
-    // app ConfirmDialog (via useConfirm), same as the delete confirmations.
-    if (!(await confirm({
-      title: 'Update order status',
-      message: `Change this order's status to "${newStatus}"? This action cannot be undone.`,
-      confirmLabel: 'Update status',
-      danger: true,
-    }))) {
-      return;
-    }
-
+  // Run one order action with a busy flag, an inline error and a refresh.
+  const runAction = async (key, fn, okTitle, okText, fallbackStatus) => {
+    if (busyAction) return;
+    setBusyAction(key);
+    setActionError('');
     try {
-      setLoading(true);
-      await updateOrderStatus(orderId, payload);
-      showSuccess('Order status updated successfully');
-      await fetchOrders();
-      closeEditPanel();
+      const updated = await fn();
+      showSuccess(okTitle, null, okTitle, okText);
+      applyUpdated(updated, fallbackStatus);
+      return true;
     } catch (err) {
-      const message = err?.response?.data?.message || err?.message || 'Failed to update order status';
-      showError(message);
+      const message = errMessage(err, 'Could not update this order');
+      setActionError(message);
+      showError(message, null, 'Order not updated', message);
+      return false;
     } finally {
-      setLoading(false);
+      setBusyAction('');
     }
   };
 
-  // Open the edit panel for a row, pre-filling status + any existing courier
-  // details so an edit doesn't wipe them.
-  const openEditPanel = (row) => {
-    setEditRow(row);
-    setEditStatus(row?.status || 'PENDING');
-    setCourierName(row?.originalOrder?.courier_name || '');
-    setCourierTracking(row?.originalOrder?.courier_tracking_number || '');
-    setPartialQty(
-      row?.originalOrder?.partial_dispatch_qty != null
-        ? String(row.originalOrder.partial_dispatch_qty)
-        : ''
+  const orderIdOf = (row) => row?.originalOrder?.order_id || row?.originalOrder?.id;
+
+  const handleProcess = async (row) => {
+    const orderId = orderIdOf(row);
+    if (!orderId) { showError('Order ID not found'); return; }
+    if (!(await confirm({
+      title: 'Process order',
+      message: 'Start processing this order? Pieces booked from sample trays are sent after the salesmen send them back and the office receives them.',
+      confirmLabel: 'Process order',
+    }))) return;
+    await runAction('process', () => updateOrderStatus(orderId, { order_status: 'processed' }), 'Order processed', `${row.orderId || 'Order'} is now processing.`, 'processed');
+  };
+
+  const handleCancel = async (row) => {
+    const orderId = orderIdOf(row);
+    if (!orderId) { showError('Order ID not found'); return; }
+    if (!cancelChoice) { setCancelError('Choose a reason before cancelling.'); return; }
+    const reason = cancelChoice === 'Other' ? cancelOther.trim() : cancelChoice;
+    if (reason.length < 3 || reason.length > 500) {
+      setCancelError(cancelChoice === 'Other' ? 'Write the reason in 3 to 500 characters.' : 'Choose a reason before cancelling.');
+      return;
+    }
+    setCancelError('');
+    const pc = getPieceCounts(row.originalOrder);
+    const partly = pc.shipped > 0;
+    const unsentQty = Math.max(pc.total - pc.shipped, 0);
+    if (!(await confirm({
+      title: partly ? 'Cancel the unsent pieces' : 'Cancel order',
+      message: partly
+        ? `Cancel the ${unsentQty} unsent pieces? They return to stock. The ${pc.shipped} pieces already sent are not affected. This cannot be undone.`
+        : 'Cancel this order? Stock is returned and this cannot be undone.',
+      confirmLabel: partly ? 'Cancel unsent pieces' : 'Cancel order',
+      danger: true,
+    }))) return;
+    await runAction(
+      'cancel',
+      () => updateOrderStatus(orderId, { order_status: 'cancelled', cancel_reason: reason }),
+      partly ? 'Unsent pieces cancelled' : 'Order cancelled',
+      partly ? `${unsentQty} unsent pieces of ${row.orderId || 'the order'} were cancelled.` : `${row.orderId || 'Order'} was cancelled.`,
+      partly ? 'dispatched' : 'cancelled',
     );
   };
 
-  const closeEditPanel = () => {
-    setEditRow(null);
-    setEditStatus('PENDING');
-    setCourierName('');
-    setCourierTracking('');
-    setPartialQty('');
+  // Dispatch the ready pieces: courier + tracking + how many pieces go in this shipment.
+  const handleDispatch = async (row) => {
+    const orderId = orderIdOf(row);
+    if (!orderId) return;
+    const { ready, held } = getPieceCounts(row.originalOrder);
+    const name = dispatchCourier.trim();
+    const tracking = dispatchTracking.trim();
+    const qtyText = String(dispatchQty).trim();
+    const qty = Number(qtyText);
+    const errs = {};
+    if (!name) errs.courier = 'Enter the courier name.';
+    if (!tracking) errs.tracking = 'Enter the tracking number.';
+    if (!/^\d+$/.test(qtyText) || qty < 1) errs.qty = 'Pieces to send must be a whole number, 1 or more.';
+    else if (qty > ready) errs.qty = held > 0
+      ? `Only ${ready} pieces are ready. The other ${held} are still on their way from trays.`
+      : `Only ${ready} pieces are ready to send.`;
+    setDispatchErrors(errs);
+    if (Object.keys(errs).length) return;
+    const ok = await runAction('dispatch', () => dispatchOrder(orderId, { courier_name: name, courier_tracking_number: tracking, qty }), 'Shipment dispatched', `${qty} pieces sent with ${name}.`);
+    if (ok) { setDispatchCourier(''); setDispatchTracking(''); }
   };
 
-  // Handle create order
-  const handleCreateOrder = async () => {
+  // The office got the parcel from the salesman. The server answers with the task,
+  // so the list is refreshed and the open panel follows it (see the effect on `orders`).
+  const handleTrayReceived = async (task) => {
+    if (busyAction || !task?.task_id) return;
+    setBusyAction(`recv:${task.task_id}`);
+    setActionError('');
     try {
-      // Order type validation
-      // Admin doesn't need order type
-      // Distributor can select or defaults to distributor_order
-      // Party auto-sets to party_order
-      // Salesman must select order type
-      if (!isAdmin && !isDistributor && !isParty && !createFormData.order_type) {
-        showError('Order type is required');
-        return;
-      }
-      
-      // For distributor, if no order type selected, default to distributor_order
-      if (isDistributor && !createFormData.order_type) {
-        createFormData.order_type = 'distributor_order';
-      }
-      if (createFormData.order_items.length === 0 || 
-          createFormData.order_items.some(item => !item.product_id || !item.quantity || !item.price)) {
-        showError('Please add at least one valid order item');
-        return;
-      }
-
-      // Validate conditional fields based on order type
-      const orderType = createFormData.order_type;
-      
-      // Skip validation for distributor and party roles (they auto-set their IDs)
-      // Salesman auto-sets their ID, but still needs party and distributor for their order types
-      if (!isDistributor && !isParty) {
-        if (['event_order', 'party_order', 'visit_order', 'whatsapp_order'].includes(orderType) && !createFormData.party_id) {
-          showError('Party is required for this order type');
-          return;
-        }
-        if (['event_order', 'party_order', 'distributor_order', 'visit_order', 'whatsapp_order'].includes(orderType) && !createFormData.distributor_id) {
-          showError('Distributor is required for this order type');
-          return;
-        }
-        // Salesman ID is auto-set for salesman role, but still validate for other roles
-        if (!isSalesman && ['event_order', 'visit_order', 'whatsapp_order'].includes(orderType) && !createFormData.salesman_id) {
-          showError('Salesman is required for this order type');
-          return;
-        }
-        if (orderType === 'event_order' && !createFormData.event_id) {
-          showError('Event is required for event orders');
-          return;
-        }
-      }
-
-      setLoading(true);
-      
-      // Prepare order data - order_date is automatically set to current date/time
-      const orderData = {
-        order_date: new Date().toISOString(),
-        order_items: createFormData.order_items.map(item => ({
-          product_id: item.product_id,
-          quantity: Number(item.quantity),
-          price: Number(item.price)
-        }))
-      };
-      
-      // Include order_type
-      // For distributor, if not selected, default to distributor_order
-      const finalOrderType = createFormData.order_type || (isDistributor ? 'distributor_order' : '');
-      if (finalOrderType) {
-        orderData.order_type = finalOrderType;
-      }
-
-      // Auto-set distributor_id for distributor role
-      if (isDistributor && user?.distributor_id) {
-        orderData.distributor_id = user.distributor_id;
-      } else if (createFormData.distributor_id) {
-        orderData.distributor_id = createFormData.distributor_id;
-      }
-
-      // Auto-set party_id for party role
-      if (isParty && user?.party_id) {
-        orderData.party_id = user.party_id;
-      } else if (createFormData.party_id) {
-        orderData.party_id = createFormData.party_id;
-      }
-
-      // Auto-set salesman_id for salesman role
-      if (isSalesman && user?.salesman_id) {
-        orderData.salesman_id = user.salesman_id;
-      } else if (createFormData.salesman_id) {
-        orderData.salesman_id = createFormData.salesman_id;
-      }
-      if (createFormData.event_id) orderData.event_id = createFormData.event_id;
-      if (createFormData.order_notes) orderData.order_notes = createFormData.order_notes;
-      // User-selected offer (optional). The backend re-validates and applies it.
-      if (selectedOffer) orderData.offer_id = selectedOffer;
-
-      // Visit orders must carry the browser location. If we don't have it yet
-      // (permission not granted on selection), request it now and wait.
-      if (finalOrderType === 'visit_order') {
-        let lat = latitude;
-        let lng = longitude;
-        if (lat === null || lng === null) {
-          try {
-            const pos = await getCurrentLocation();
-            lat = pos.latitude;
-            lng = pos.longitude;
-          } catch (locErr) {
-            setLoading(false);
-            showError('Location access is required for visit orders. Please allow location and try again.');
-            return;
-          }
-        }
-        orderData.latitude = Number(lat);
-        orderData.longitude = Number(lng);
-      }
-
-      await createOrder(orderData);
-      showSuccess('Order created successfully');
-      setCreateModalOpen(false);
-      resetCreateForm();
-      // Suppress error notification when refreshing after create (in case of temporary "not found")
+      await markTrayTaskReceived(task.task_id);
+      showSuccess('Marked received', null, 'Marked received', `${task.qty} pieces from ${task.tray_name || 'the tray'} are now ready to send.`);
       await fetchOrders(true);
     } catch (err) {
-      const message = err?.response?.data?.message || err?.message || 'Failed to create order';
-      showError(message);
+      const message = errMessage(err, 'Could not mark this as received');
+      setActionError(message);
+      showError(message, null, 'Not updated', message);
     } finally {
-      setLoading(false);
+      setBusyAction('');
     }
   };
 
-  // Reset create form
-  const resetCreateForm = () => {
-    setCreateFormData({
-      order_type: getInitialOrderType(),
-      party_id: '',
-      distributor_id: '',
-      salesman_id: '',
-      event_id: '',
-      order_items: [{ product_id: '', quantity: 1, price: 0 }],
-      order_notes: ''
-    });
-    setSelectedOffer('');
-    setAvailableOffers([]);
-    setSelectedCountry(null);
+  const handleComplete = async (row) => {
+    const orderId = orderIdOf(row);
+    if (!orderId) return;
+    const ok = await runAction('complete', () => completeOrder(orderId, { received_by: receivedBy }), 'Order completed', `${row.orderId || 'Order'} is completed.`, 'completed');
+    if (ok) setReceivedBy('');
   };
 
-  // Add order item
-  const addOrderItem = () => {
-    setCreateFormData(prev => ({
-      ...prev,
-      order_items: [...prev.order_items, { product_id: '', quantity: 1, price: 0 }]
-    }));
-  };
-
-  // Remove order item
-  const removeOrderItem = (index) => {
-    setCreateFormData(prev => ({
-      ...prev,
-      order_items: prev.order_items.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Update order item
-  const updateOrderItem = (index, field, value) => {
-    setCreateFormData(prev => ({
-      ...prev,
-      order_items: prev.order_items.map((item, i) => 
-        i === index ? { ...item, [field]: value } : item
-      )
-    }));
-  };
-
-  // Get product price when product is selected
-  const handleProductSelect = (itemIndex, productId) => {
-    const product = products.find(p => (p.product_id || p.id) === productId);
-    if (product) {
-      const price = product.price || product.selling_price || 0;
-      // Remember the label so the picker still shows it after the 20-result
-      // list changes on a later server search.
-      const label = `${product.model_no || product.product_name || product.name}${price ? ` - ₹${price}` : ''}`;
-      updateOrderItem(itemIndex, 'product_id', productId);
-      updateOrderItem(itemIndex, 'price', price);
-      updateOrderItem(itemIndex, 'product_label', label);
-    } else {
-      updateOrderItem(itemIndex, 'product_id', productId);
-    }
-  };
-
-  // Check if field is required based on order type
-  const isFieldRequired = (field) => {
-    const orderType = createFormData.order_type;
-    switch (field) {
-      case 'party_id':
-        return ['event_order', 'party_order', 'visit_order', 'whatsapp_order'].includes(orderType);
-      case 'distributor_id':
-        return ['event_order', 'party_order', 'distributor_order', 'visit_order', 'whatsapp_order'].includes(orderType);
-      case 'salesman_id':
-        return ['event_order', 'visit_order', 'whatsapp_order'].includes(orderType);
-      case 'event_id':
-        return orderType === 'event_order';
-      default:
-        return false;
+  // Export every order that matches the current tab, search and filters (not just this page):
+  // fetch the matching pages from the server, 100 at a time.
+  const handleExportOrders = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const q = paramsRef.current;
+      const all = [];
+      for (let p = 1; p <= 200; p++) {
+        const res = await getOrdersListPage(userRole, {
+          page: p, limit: 100, search: q.debouncedSearch,
+          status: q.activeTab !== 'All' ? (mapUITabToApiStatus(q.activeTab) || '') : '',
+          startDate: q.dateFrom || '', endDate: q.dateTo || '',
+          orderType: q.typeFilter, salesmanId: q.salesmanFilter,
+        });
+        all.push(...(res.data || []));
+        if (p >= (res.pagination?.totalPages || 1)) break;
+      }
+      downloadCsv('orders', [
+        { label: 'Order', value: r => r.orderId },
+        { label: 'Type', value: r => r.orderType },
+        { label: 'Party', value: r => r.client },
+        { label: 'Salesman', value: r => r.salesman },
+        { label: 'Date', value: r => r.date },
+        { label: 'Quantity', value: r => r.qty },
+        { label: 'Status', value: r => r.status },
+        { label: 'Total', value: r => Number(r.originalOrder?.order_total ?? 0) || 0 },
+      ], buildRows(all));
+    } catch (err) {
+      showError(err?.message || 'Could not export orders');
+    } finally {
+      setExporting(false);
     }
   };
 
   // Download the order as a branded PDF (shared generator — see utils/orderPdf).
-  const handleDownload = (row) => downloadOrderPdf(row, products);
+  const handleDownload = (row) => downloadOrderPdf(row, []);
 
   const columns = useMemo(() => ([
-    { key: 'orderId', label: 'ORDER ID' },
-    { key: 'orderType', label: 'ORDER TYPE' },
-    { key: 'client', label: 'PARTY NAME' },
+    { key: 'orderId', label: 'ORDER', render: (v, row) => (
+      <span className="ord-cell"><b className="ord-cell__id">{v}</b>{row.orderType && row.orderType !== 'N/A' && <span className="ord-cell__sub">{row.orderType}</span>}</span>
+    ) },
+    { key: 'client', label: 'PARTY', render: (v, row) => (
+      <span className="ord-cell"><b>{v}</b>{row.partyCity && <span className="ord-cell__sub">{row.partyCity}</span>}</span>
+    ) },
     { key: 'salesman', label: 'SALESMAN' },
-    { key: 'date', label: 'DATE' },
-    { key: 'qty', label: 'QTY' },
-    { key: 'status', label: 'STATUS', render: (v) => <StatusBadge status={String(v).toLowerCase().replace(/\s+/g, '-')}>{v}</StatusBadge> },
-    { key: 'value', label: 'VALUE' },
+    { key: 'date', label: 'PLACED', render: (v) => <span className="ord-muted">{v}</span> },
+    { key: 'status', label: 'STATUS', render: (v, row) => {
+      const held = heldNote(row?.originalOrder);
+      return (
+        <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+          <StatusBadge status={orderStatusBadgeKey(UI_TO_API_STATUS[v])}>{orderPillLabel(row?.originalOrder, v)}</StatusBadge>
+          {held && <small className="text-text-muted">{held}</small>}
+        </span>
+      );
+    } },
+    { key: 'value', label: 'AMOUNT', render: (v) => <b className="ord-amount">{v}</b> },
     { key: 'action', label: 'ACTION', render: (_v, row) => (
       <RowActions
         onView={() => setViewRow(row)}
-        onEdit={() => openEditPanel(row)}
+        onEdit={(canEditOrder || canReturnTrays) ? () => setViewRow(row) : undefined}
         onDownload={() => handleDownload(row)}
         // Delete is admin-only (the backend also enforces canManageOrders).
-        onDelete={isAdmin ? () => handleDelete(row) : undefined}
       />
     ) },
-  ]), [isAdmin]);
+  ]), [isAdmin, canEditOrder, canReturnTrays]);
 
   return (
     <div className="dash-page">
       <div className="dash-container">
-        {/* Summary Cards */}
-        <div className="dash-row orders-summary mb-5">
-          <div className="dash-card metric orders-card p-5">
-            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Orders</h4>
-            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `${summaryStats.totalOrders} Orders`}</div>
-            <div className="metric-sub flex items-center gap-1 text-[length:var(--text-xs)] font-medium text-text-muted">Retail {summaryStats.retailOrders} | Bulk {summaryStats.bulkOrders}</div>
+        <div className="pg-head">
+          <div><h1>Orders</h1><p>Stock is taken when an order is placed and returned when it is cancelled.</p></div>
+          <div className="pg-head__tools">
+            <button type="button" className="gbtn" onClick={handleExportOrders} disabled={initialLoading || exporting || totalRows === 0}>{exporting ? 'Exporting…' : 'Export CSV'}</button>
           </div>
-          <div className="dash-card metric orders-card p-5">
-            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Pending Orders</h4>
-            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : summaryStats.pendingOrders}</div>
-          </div>
-          <div className="dash-card metric orders-card p-5">
-            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Completed Orders</h4>
-            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</div>
-          </div>
-          <div className="dash-card metric orders-card p-5">
-            <h4 className="mb-3 text-[length:var(--text-xs)] font-medium uppercase tracking-[var(--tracking-label)] text-text-subtle">Total Revenue</h4>
-            <div className="metric-value mb-2 text-[length:var(--text-lg)] font-semibold leading-[var(--leading-tight)] tracking-[-0.01em] text-text">{loading ? <Skeleton width={90} height={24} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</div>
-          </div>
+        </div>
+        {/* Summary numbers: one slim row */}
+        <div className="orp-kpis" role="list" aria-label="Order totals">
+          <div className="orp-kpi" role="listitem"><small>Orders</small><b>{initialLoading ? <Skeleton width={50} height={18} /> : summaryStats.totalOrders}</b><span>Retail {summaryStats.retailOrders} | Bulk {summaryStats.bulkOrders}</span></div>
+          <div className="orp-kpi" role="listitem"><small>Pending</small><b>{initialLoading ? <Skeleton width={50} height={18} /> : summaryStats.pendingOrders}</b></div>
+          <div className="orp-kpi" role="listitem"><small>Completed</small><b>{initialLoading ? <Skeleton width={70} height={18} /> : `₹${summaryStats.completedValue.toLocaleString('en-IN')}`}</b></div>
+          <div className="orp-kpi" role="listitem"><small>Revenue</small><b>{initialLoading ? <Skeleton width={70} height={18} /> : `₹${summaryStats.totalRevenue.toLocaleString('en-IN')}`}</b></div>
         </div>
 
         {/* Order Status Tabs */}
         <div className="dash-row">
           <div className="order-tabs-container col-[1/-1] flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm">
-            {['All', 'Pending', 'Processing', 'Hold by Sample', 'Partially Dispatch', 'Dispatch', 'Completed', 'Cancel'].map(tab => (
+            {['All', ...ORDER_FILTER_TABS_WITH_LEGACY].map(tab => (
               <button
                 key={tab}
                 className={`order-tab inline-flex min-h-10 flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-4 py-2 text-[length:var(--text-base)] font-semibold leading-[var(--leading-snug)] transition-[background,color,box-shadow] duration-[0.12s] ease-out focus-visible:outline-none active:scale-[0.98] ${activeTab === tab ? 'active bg-primary text-text-on-primary' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
-                onClick={() => setActiveTab(tab)}
+                onClick={() => { setActiveTab(tab); }}
               >
                 {tab}
+                <b className="order-tab__count">{tabCounts[tab] ?? 0}</b>
               </button>
             ))}
+          </div>
+        </div>
+
+        {/* Search and filters: one line */}
+        <div className="orp-toolbar">
+          <label className="orp-search">
+            <FiSearch aria-hidden="true" />
+            <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search order, party or salesman" aria-label="Search orders" />
+          </label>
+          <div className="orp-filters">
+            <DateRangePicker from={dateFrom} to={dateTo} onChange={({ from, to }) => { setDateFrom(from); setDateTo(to); }} />
+            <DropdownSelector options={typeOptions} value={typeFilter} onChange={setTypeFilter} placeholder="Order type" />
+            <DropdownSelector options={salesmanOptions} value={salesmanFilter} onChange={setSalesmanFilter} placeholder="Salesman" />
           </div>
         </div>
 
@@ -1098,11 +738,11 @@ const DashboardOrders = () => {
                     <path d="M12 8V12M12 16H12.01M12 3L2 20H22L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 </div>
-                <p className="ui-state__title">Couldn't load orders</p>
+                <p className="ui-state__title">Couldn&apos;t load orders</p>
                 <p className="ui-state__desc">{error}</p>
                 <button className="ui-btn ui-btn--secondary" onClick={() => fetchOrders()}>Try again</button>
               </div>
-            ) : !loading && orders.length === 0 ? (
+            ) : !loading && loadedOnce && noFilters && totalRows === 0 ? (
               <div className="ui-state ui-state--empty">
                 <div className="ui-state__icon">
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1110,22 +750,64 @@ const DashboardOrders = () => {
                   </svg>
                 </div>
                 <p className="ui-state__title">No orders yet</p>
-                <p className="ui-state__desc">Orders you create will show up here. Get started by creating your first order.</p>
-                <div className="ui-state__actions">
-                  <button className="ui-btn ui-btn--primary" onClick={() => setCreateModalOpen(true)}>Create Order</button>
-                </div>
+                <p className="ui-state__desc">Orders placed from the shop will show up here.</p>
               </div>
             ) : (
-              <TableWithControls
-                title="Order Overview"
-                columns={columns}
-                rows={filteredRowsByTab}
-                dateFrom={dateFrom}
-                dateTo={dateTo}
-                onDateRangeChange={({ from, to }) => { setDateFrom(from); setDateTo(to); }}
-                itemName="Order"
-                loading={loading}
-              />
+              <>
+                <div style={loading && loadedOnce ? { opacity: 0.55, transition: 'opacity .15s' } : undefined} aria-busy={loading}>
+                <div className="orp-table">
+                  <TableWithControls
+                    title="Order Overview"
+                    titleAs="h2"
+                    columns={columns}
+                    rows={filteredRowsByTab}
+                    itemName="Order"
+                    loading={initialLoading}
+                    serverPagination
+                    serverPage={pagination?.page || page}
+                    serverPageCount={pageCount}
+                    serverPageSize={PAGE_SIZE}
+                    serverTotal={totalRows}
+                    onServerPageChange={setPage}
+                    onServerSearch={setSearch}
+                  />
+                </div>
+                <div className="orp-cards">
+                  {initialLoading ? <p className="orp-empty">Loading orders…</p> : filteredRowsByTab.length === 0 ? <p className="orp-empty">No orders match these filters.</p> : (
+                    <>
+                      <ul className="orp-list">
+                        {filteredRowsByTab.map((row) => {
+                          const held = heldNote(row?.originalOrder);
+                          return (
+                            <li key={row.id} className="orp-card">
+                              <button type="button" className="orp-card__main" onClick={() => setViewRow(row)} aria-label={`View order ${row.orderId}`}>
+                                <span className="orp-card__top"><b className="orp-card__party">{row.client}</b><b className="orp-card__amt">{row.value}</b></span>
+                                <span className="orp-card__mid">
+                                  <StatusBadge status={orderStatusBadgeKey(UI_TO_API_STATUS[row.status])}>{orderPillLabel(row?.originalOrder, row.status)}</StatusBadge>
+                                  {held && <small>{held}</small>}
+                                </span>
+                                <span className="orp-card__foot">{[row.orderId, row.orderType !== 'N/A' ? row.orderType : '', row.date].filter(Boolean).join(' · ')}</span>
+                              </button>
+                              <div className="orp-card__act">
+                                <RowActions
+                                  onView={() => setViewRow(row)}
+                                  onEdit={(canEditOrder || canReturnTrays) ? () => setViewRow(row) : undefined}
+                                  onDownload={() => handleDownload(row)}
+                                />
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                      <p className="orp-count">Showing {filteredRowsByTab.length} of {totalRows} orders</p>
+                      {pageCount > 1 && (
+                        <Pagination page={pagination?.page || page} pageCount={pageCount} onPageChange={setPage} className="justify-center" />
+                      )}
+                    </>
+                  )}
+                </div>
+                </div>
+              </>
             )}
           </div>
         </div>
@@ -1133,7 +815,9 @@ const DashboardOrders = () => {
 
       {/* View Order Modal */}
       <AsidePanel open={!!viewRow} onClose={() => setViewRow(null)} title="Order Details" footer={(
-        <Button onClick={() => setViewRow(null)}>Close</Button>
+        <>
+          <Button onClick={() => setViewRow(null)}>Close</Button>
+        </>
       )}>
         {viewRow && (() => {
           const order = viewRow.originalOrder;
@@ -1141,6 +825,76 @@ const DashboardOrders = () => {
           const orderDate = rawDate
             ? new Date(rawDate).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
             : '—';
+          const apiStatus = String(order?.order_status || 'pending').toLowerCase();
+          const counts = getPieceCounts(order);
+          const shipments = getShipments(order);
+          const busy = !!busyAction;
+          const cancellable = canEditOrder && ['pending', 'processed', 'hold_by_tray', 'partially_dispatched', 'dispatched'].includes(apiStatus);
+          const unsentQty = Math.max(counts.total - counts.shipped - counts.cancelled, 0);
+          const partlyCancel = counts.shipped > 0;
+          const canCancel = cancellable && (counts.shipped === 0 || (unsentQty > 0 && counts.cancelled === 0));
+          const dispatchable = canEditOrder && ['processed', 'partially_dispatched'].includes(apiStatus);
+          const field = (label, value) => (value ? <div className="ordn-fl__row" key={label}><dt>{label}</dt><dd>{value}</dd></div> : null);
+          const shipmentList = shipments.length ? (
+            <ul className="ordn-ship">
+              {shipments.map((sh, n) => (
+                <li key={sh.shipment_id || n}>
+                  <b>#{n + 1}{sh.qty != null ? ` · ${sh.qty} pcs` : ''}</b>
+                  <span>{[sh.courier_name, sh.tracking_number].filter(Boolean).join(' · ') || '—'}</span>
+                  {sh.shipped_at && <small>{fmtDate(sh.shipped_at)}</small>}
+                </li>
+              ))}
+            </ul>
+          ) : null;
+          const sentLabel = `${counts.shipped} of ${counts.total} pieces`;
+          const waiting = counts.ready + counts.held;
+          const partCancelField = counts.cancelled > 0 && apiStatus !== 'cancelled'
+            ? field('Cancelled', `Cancelled ${counts.cancelled} pieces${order?.cancel_reason ? `: ${order.cancel_reason}` : ''}`)
+            : null;
+          const trayTasks = getTrayTasksOf(order);
+          const allTrayReceived = trayTasks.length > 0 && trayTasks.every((t) => t.status === 'received');
+          const trayLine = counts.held
+            ? `${counts.held} still on the way (${counts.held - counts.inTransit} booked, ${counts.inTransit} in transit)`
+            : (trayTasks.length ? 'all received' : '');
+          const receivedPieces = counts.receivedTray || trayTasks.reduce((sum, t) => sum + toInt(t.qty), 0);
+          const openOrder = ['processed', 'partially_dispatched', 'hold_by_tray'].includes(apiStatus);
+          const fieldsBody = (() => {
+            if (apiStatus === 'pending') return [
+              field('Pieces', counts.total ? `${counts.total} in total` : ''),
+              field('Stock source', counts.trayQty ? `${Math.max(counts.total - counts.trayQty, 0)} warehouse + ${counts.trayQty} sample trays` : (counts.total ? `${counts.total} warehouse` : '')),
+              field('Placed', fmtDateTime(order?.created_at || order?.order_date)),
+            ];
+            if (apiStatus === 'processed' || apiStatus === 'hold_by_tray') return [
+              field('Processed', fmtDateTime(order?.processed_at)),
+              field('Ready to send', `${counts.ready} pieces`),
+              field('Tray pieces', trayLine),
+            ];
+            if (apiStatus === 'partially_dispatched') return [
+              field('Shipments', shipmentList),
+              field('Sent so far', sentLabel),
+              field('Still waiting', waiting ? `${waiting} pieces${counts.held ? ' (' + counts.held + ' still on the way from trays)' : ' (ready to send)'}` : ''),
+              field('Tray pieces', trayLine),
+            ];
+            if (apiStatus === 'dispatched') return [
+              field('Shipments', shipmentList),
+              field('Sent', sentLabel),
+              field('Dispatched', fmtDateTime(order?.dispatched_at)),
+              partCancelField,
+            ];
+            if (apiStatus === 'completed') return [
+              field('Shipments', shipmentList),
+              field('Delivered', fmtDateTime(order?.delivered_at)),
+              field('Received by', order?.received_by),
+              partCancelField,
+            ];
+            return [
+              field('Reason', order?.cancel_reason),
+              field('Cancelled', fmtDateTime(order?.cancelled_at)),
+              field('Returned to stock', counts.cancelled ? `${counts.cancelled} pieces` : ''),
+              field('Already shipped', counts.shipped ? `${counts.shipped} pieces stay with the party` : 'none'),
+            ];
+          })();
+          const seg = (cls, n, label) => (n > 0 ? <div className={`ordn-seg ordn-seg--${cls}`} style={{ flex: `${n} 1 0` }} title={`${n} ${label}`}>{n}</div> : null);
           return (
             <div className="ord-view">
               <div className="ord-view__summary">
@@ -1157,13 +911,24 @@ const DashboardOrders = () => {
                   <span className="ord-field__value">{viewRow.client || '—'}</span>
                 </div>
                 <div className="ord-field">
+                  <span className="ord-field__label">Placed By</span>
+                  <span className="ord-field__value">{viewRow.salesman || '—'}</span>
+                </div>
+                {order?.distance_m != null && (
+                  <div className="ord-field">
+                    <span className="ord-field__label">Distance at checkout</span>
+                    <span className="ord-field__value">{Number(order.distance_m) >= 1000 ? `${(Number(order.distance_m) / 1000).toFixed(1)} km` : `${Math.round(Number(order.distance_m))} m`}</span>
+                  </div>
+                )}
+                <div className="ord-field">
                   <span className="ord-field__label">Order Date</span>
                   <span className="ord-field__value">{orderDate}</span>
                 </div>
                 <div className="ord-field">
                   <span className="ord-field__label">Status</span>
                   <span>
-                    <StatusBadge status={String(viewRow.status).toLowerCase().replace(/\s+/g, '-')}>{viewRow.status}</StatusBadge>
+                    <StatusBadge status={orderStatusBadgeKey(apiStatus)}>{orderPillLabel(order, viewRow.status)}</StatusBadge>
+                    {counts.held > 0 && <small className="ml-2 text-text-muted">{counts.held} held by sample tray</small>}
                   </span>
                 </div>
                 <div className="ord-field">
@@ -1172,10 +937,183 @@ const DashboardOrders = () => {
                 </div>
               </div>
 
-              {viewRow.clientAddress && (
+              {counts.total > 0 && (
+                <div className="ordn-flow">
+                  <div className="ordn-bar" role="img" aria-label={`Pieces: ${counts.shipped} sent, ${counts.ready} ready, ${counts.inTransit} in transit to office, ${counts.held - counts.inTransit} booked in trays${counts.cancelled ? `, ${counts.cancelled} cancelled` : ''}`}>
+                    {seg('sent', counts.shipped, 'sent')}
+                    {seg('ready', counts.ready, 'ready to send')}
+                    {seg('transit', counts.inTransit, 'in transit to office')}
+                    {seg('held', counts.held - counts.inTransit, 'booked in trays')}
+                    {seg('canc', counts.cancelled, 'cancelled')}
+                  </div>
+                  <div className="ordn-legend">
+                    <span><i className="ordn-dot ordn-dot--sent" />Sent {counts.shipped}</span>
+                    <span><i className="ordn-dot ordn-dot--ready" />Ready to send {counts.ready}</span>
+                    <span><i className="ordn-dot ordn-dot--transit" />In transit to office {counts.inTransit}</span>
+                    <span><i className="ordn-dot ordn-dot--held" />Booked in trays {counts.held - counts.inTransit}</span>
+                    {counts.cancelled > 0 && <span><i className="ordn-dot ordn-dot--canc" />{counts.cancelled} cancelled</span>}
+                  </div>
+                </div>
+              )}
+
+              <div className="ordn-fields">
+                <h5 className="ord-view__section-title">Fields in {OFFICE_STATUS_TITLE[apiStatus] || viewRow.status}</h5>
+                <dl className="ordn-fl">{fieldsBody}</dl>
+              </div>
+
+              {actionError && <p className="ordn-dispatch__err" role="alert">{actionError}</p>}
+
+              {openOrder && counts.held > 0 && (
+                <div className="ordn-banner ordn-banner--wait" role="status">
+                  {counts.held} pieces are still on their way from trays.{counts.ready > 0 ? ` You can dispatch the ${counts.ready} ready pieces now.` : ''}
+                </div>
+              )}
+              {openOrder && allTrayReceived && counts.held === 0 && counts.ready > 0 && (
+                <div className="ordn-banner ordn-banner--go" role="status">
+                  All {receivedPieces} tray pieces were received. The order is ready to dispatch.
+                </div>
+              )}
+
+              {trayTasks.length > 0 && !['cancelled', 'completed'].includes(apiStatus) && !(allTrayReceived && apiStatus === 'dispatched') && (
+                <div className="ordn-tasks">
+                  <h5 className="ord-view__section-title">Frames coming back from trays</h5>
+                  {trayTasks.map((t) => {
+                    const pill = t.status === 'booked' ? `Booked, waiting for ${t.salesman_name || 'salesman'}` : (TASK_PILL[t.status] || t.status);
+                    const courierLine = [t.courier_name, t.tracking_number].filter(Boolean).join(', ');
+                    return (
+                      <div className="ordn-task" key={t.task_id}>
+                        <div className="ordn-task__head">
+                          <b>{[t.tray_name, t.salesman_name].filter(Boolean).join(' · ') || 'Tray'}</b>
+                          <span className={`ordn-pill ordn-pill--${t.status}`}>{pill}</span>
+                        </div>
+                        <div className="ordn-task__meta">{toInt(t.qty)} pieces{courierLine ? ` · ${courierLine}` : ''}</div>
+                        {canEditOrder && t.status === 'in_transit' && (
+                          <Button variant="secondary" onClick={() => handleTrayReceived(t)} disabled={busy}>
+                            {busyAction === `recv:${t.task_id}` ? 'Saving…' : 'Mark received'}
+                          </Button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {canEditOrder && apiStatus === 'pending' && (
+                <div className="ordn-actions">
+                  <Button onClick={() => handleProcess(viewRow)} disabled={busy}>{busyAction === 'process' ? 'Processing…' : 'Process order'}</Button>
+                </div>
+              )}
+
+              {dispatchable && counts.ready > 0 && (
+                <form className="ordn-dispatch" noValidate onSubmit={(e) => { e.preventDefault(); handleDispatch(viewRow); }}>
+                  <h5 className="ord-view__section-title">Send ready pieces</h5>
+                  <div className="ordn-dispatch__grid ordn-dispatch__grid--3">
+                    <label className="ordn-dispatch__field">
+                      <span className="ui-label">Courier</span>
+                      <input
+                        className="ui-input"
+                        list="ordn-couriers"
+                        placeholder="e.g., Blue Dart"
+                        value={dispatchCourier}
+                        maxLength={255}
+                        disabled={busy}
+                        aria-invalid={!!dispatchErrors.courier}
+                        onChange={(e) => { setDispatchCourier(e.target.value); setDispatchErrors((x) => ({ ...x, courier: undefined })); setActionError(''); }}
+                      />
+                      <datalist id="ordn-couriers">
+                        {COURIER_SUGGESTIONS.map((c) => <option key={c} value={c} />)}
+                      </datalist>
+                      {dispatchErrors.courier && <span className="ordn-dispatch__err" role="alert">{dispatchErrors.courier}</span>}
+                    </label>
+                    <label className="ordn-dispatch__field">
+                      <span className="ui-label">Tracking number</span>
+                      <input
+                        className="ui-input"
+                        placeholder="Enter the number"
+                        value={dispatchTracking}
+                        maxLength={255}
+                        disabled={busy}
+                        aria-invalid={!!dispatchErrors.tracking}
+                        onChange={(e) => { setDispatchTracking(e.target.value); setDispatchErrors((x) => ({ ...x, tracking: undefined })); setActionError(''); }}
+                      />
+                      {dispatchErrors.tracking && <span className="ordn-dispatch__err" role="alert">{dispatchErrors.tracking}</span>}
+                    </label>
+                    <label className="ordn-dispatch__field">
+                      <span className="ui-label">Pieces to send</span>
+                      <input
+                        className="ui-input"
+                        type="text"
+                        inputMode="numeric"
+                        value={dispatchQty}
+                        disabled={busy}
+                        aria-invalid={!!dispatchErrors.qty}
+                        onChange={(e) => { setDispatchQty(e.target.value); setDispatchErrors((x) => ({ ...x, qty: undefined })); setActionError(''); }}
+                      />
+                      {dispatchErrors.qty && <span className="ordn-dispatch__err" role="alert">{dispatchErrors.qty}</span>}
+                    </label>
+                  </div>
+                  <Button type="submit" variant="secondary" disabled={busy}>{busyAction === 'dispatch' ? 'Dispatching…' : 'Dispatch ready pieces'}</Button>
+                </form>
+              )}
+
+              {canEditOrder && apiStatus === 'dispatched' && (
+                <div className="ordn-dispatch">
+                  <h5 className="ord-view__section-title">Mark completed</h5>
+                  <label className="ordn-dispatch__field">
+                    <span className="ui-label">Received by (optional)</span>
+                    <input className="ui-input" placeholder="Name of the person who received it" value={receivedBy} maxLength={255} disabled={busy} onChange={(e) => setReceivedBy(e.target.value)} />
+                  </label>
+                  <Button onClick={() => handleComplete(viewRow)} disabled={busy}>{busyAction === 'complete' ? 'Saving…' : 'Mark completed'}</Button>
+                </div>
+              )}
+
+              {apiStatus === 'completed' && <p className="ordn-note">This order is closed. No further changes.</p>}
+              {apiStatus === 'cancelled' && <p className="ordn-note">A cancelled order cannot be reopened. Place a new order instead.</p>}
+
+              {canCancel && (
+                <div className="ordn-dispatch ordn-cancel">
+                  <h5 className="ord-view__section-title">{partlyCancel ? 'Cancel the unsent pieces' : 'Cancel this order'}</h5>
+                  {partlyCancel && (
+                    <p className="ordn-note">{unsentQty} of {counts.total} pieces have not been sent. Cancelling returns them to stock. The {counts.shipped} pieces already sent are not affected.</p>
+                  )}
+                  <div className="ordn-dispatch__field">
+                    <span className="ui-label">Reason (required)</span>
+                    <DropdownSelector
+                      options={CANCEL_REASONS.map((r) => ({ value: r, label: r }))}
+                      value={cancelChoice}
+                      onChange={(v) => { setCancelChoice(v); setCancelError(''); }}
+                      placeholder="Choose a reason"
+                      disabled={busy}
+                      searchable={false}
+                      className="ui-dropdown-custom--full-width"
+                    />
+                  </div>
+                  {cancelChoice === 'Other' && (
+                    <label className="ordn-dispatch__field">
+                      <span className="ui-label">Write the reason</span>
+                      <input className="ui-input" value={cancelOther} maxLength={500} disabled={busy} onChange={(e) => { setCancelOther(e.target.value); setCancelError(''); }} />
+                    </label>
+                  )}
+                  {cancelError && <span className="ordn-dispatch__err" role="alert">{cancelError}</span>}
+                  <Button variant="secondary" onClick={() => handleCancel(viewRow)} disabled={busy || !cancelChoice}>{busyAction === 'cancel' ? 'Cancelling…' : (partlyCancel ? 'Cancel unsent pieces' : 'Cancel order')}</Button>
+                </div>
+              )}
+
+              {!canEditOrder && (
+                <p className="ord-view__lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Only admin and order managers can edit or cancel this order.</span></p>
+              )}
+
+              {addressRows(viewRow.shipParts, viewRow.clientAddress).length > 0 && (
                 <div>
                   <h5 className="ord-view__section-title">Shipping Address</h5>
-                  <div className="ord-notes">{viewRow.clientAddress}</div>
+                  <div className="ord-view__summary">
+                    {addressRows(viewRow.shipParts, viewRow.clientAddress).map(([label, value]) => (
+                      <div className="ord-field" key={label}>
+                        <span className="ord-field__label">{label}</span>
+                        <span className="ord-field__value">{value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -1208,7 +1146,7 @@ const DashboardOrders = () => {
                         viewItems.map((item, i) => (
                           <tr key={i}>
                             <td style={{ color: '#6b7280' }}>{i + 1}</td>
-                            <td className="font-medium">{item._name}</td>
+                            <td className="font-medium">{item._name}{isUpcoming(item) && <> <span className="upc-tag">Preorder</span></>}</td>
                             <td className="ta-r">{item.quantity}</td>
                             <td className="ta-r">₹{Number(item.price || 0).toLocaleString('en-IN')}</td>
                             <td className="ta-r font-medium">₹{Number(item._subtotal || 0).toLocaleString('en-IN')}</td>
@@ -1249,442 +1187,6 @@ const DashboardOrders = () => {
             </div>
           );
         })()}
-      </AsidePanel>
-
-      {/* Edit Order Status Modal */}
-      <AsidePanel open={!!editRow} onClose={closeEditPanel} title="Edit Order Status" footer={(
-        <>
-          <Button variant="secondary" onClick={closeEditPanel} disabled={loading}>Cancel</Button>
-          <Button
-            onClick={() => {
-              if (editStatus && editRow) {
-                handleUpdateStatus(editRow, editStatus);
-              }
-            }}
-            disabled={loading}
-          >
-            {loading ? 'Updating...' : 'Update'}
-          </Button>
-        </>
-      )}>
-        <div className="ui-form">
-          <div className="form-group">
-            <label className="ui-label">Order ID</label>
-            <input className="ui-input" value={editRow?.orderId || ''} disabled />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Client</label>
-            <input className="ui-input" value={editRow?.client || ''} disabled />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Product</label>
-            <input className="ui-input" value={editRow?.product || ''} disabled />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Quantity</label>
-            <input type="number" className="ui-input" value={editRow?.qty || ''} disabled />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Status</label>
-            <DropdownSelector
-              options={Object.keys(UI_TO_API_STATUS).map(label => ({ value: label, label }))}
-              value={editStatus}
-              onChange={(value) => setEditStatus(value)}
-              placeholder="Select status"
-            />
-          </div>
-
-          {/* Dispatch details — required by the backend when dispatching or
-              partially dispatching an order. */}
-          {DISPATCH_STATUSES.includes(UI_TO_API_STATUS[editStatus]) && (
-            <>
-              <div className="form-group">
-                <label className="ui-label">Courier Name *</label>
-                <input
-                  className="ui-input"
-                  placeholder="e.g., Blue Dart, DTDC"
-                  value={courierName}
-                  onChange={(e) => setCourierName(e.target.value)}
-                />
-              </div>
-              <div className="form-group">
-                <label className="ui-label">Courier Tracking Number *</label>
-                <input
-                  className="ui-input"
-                  placeholder="Enter tracking number"
-                  value={courierTracking}
-                  onChange={(e) => setCourierTracking(e.target.value)}
-                />
-              </div>
-            </>
-          )}
-
-          {/* Partial dispatch also needs the dispatched quantity. */}
-          {UI_TO_API_STATUS[editStatus] === 'partially_dispatched' && (
-            <div className="form-group">
-              <label className="ui-label">Partial Dispatch Quantity *</label>
-              <input
-                type="number"
-                min="1"
-                max={editRow?.qty || undefined}
-                className="ui-input"
-                placeholder={`How many of ${editRow?.qty || 0} are being dispatched`}
-                value={partialQty}
-                onChange={(e) => setPartialQty(e.target.value)}
-              />
-            </div>
-          )}
-        </div>
-      </AsidePanel>
-
-      {/* Create Order Modal */}
-      <AsidePanel 
-        open={createModalOpen} 
-        onClose={() => {
-          setCreateModalOpen(false);
-          resetCreateForm();
-        }} 
-        title="Create New Order"
-        footer={(
-          <>
-            <Button 
-              variant="secondary" 
-              onClick={() => {
-                setCreateModalOpen(false);
-                resetCreateForm();
-              }} 
-              disabled={loading}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleCreateOrder} 
-              disabled={loading}
-            >
-              {loading ? 'Creating...' : 'Create Order'}
-            </Button>
-          </>
-        )}
-      >
-        <div className="ui-form">
-          {/* Order Type - Hidden for admin and party roles */}
-          {/* Salesman and Distributor can see order type dropdown */}
-          {!isAdmin && !isParty && (
-            <div className="form-group">
-              <label className="ui-label">
-                Order Type 
-                {!isDistributor && <span className="text-[red]">*</span>}
-                {isDistributor && <span className="text-[12px] text-[#666]"> (Default: Distributor Order)</span>}
-              </label>
-              <DropdownSelector
-                options={[
-                  { value: '', label: 'Select Order Type' },
-                  ...(isSalesman ? [
-                    { value: 'visit_order', label: 'Visit Order' },
-                    { value: 'whatsapp_order', label: 'WhatsApp Order' },
-                    { value: 'event_order', label: 'Event Order' }
-                  ] : isDistributor ? [
-                    { value: 'distributor_order', label: 'Distributor Order' },
-                    { value: 'party_order', label: 'Party Order' }
-                  ] : [
-                    { value: 'event_order', label: 'Event Order' },
-                    { value: 'party_order', label: 'Party Order' },
-                    { value: 'distributor_order', label: 'Distributor Order' },
-                    { value: 'visit_order', label: 'Visit Order' },
-                    { value: 'whatsapp_order', label: 'WhatsApp Order' }
-                  ])
-                ]}
-                value={createFormData.order_type || ''}
-                onChange={(value) => {
-                  const newOrderType = value;
-                  setCreateFormData(prev => ({ 
-                    ...prev, 
-                    order_type: newOrderType,
-                    party_id: '',
-                    distributor_id: '',
-                    salesman_id: '',
-                    event_id: ''
-                  }));
-                  // Re-filter parties when order type changes (for salesman)
-                  if (isSalesman && allParties.length > 0) {
-                    filterPartiesByZone(allParties, newOrderType);
-                  }
-                  // Visit orders need the browser location — ask up-front so the
-                  // permission prompt isn't a surprise at submit time.
-                  if (newOrderType === 'visit_order') {
-                    getCurrentLocation().catch(() => {/* surfaced via locationError */});
-                  } else {
-                    setLatitude(null);
-                    setLongitude(null);
-                    setLocationError(null);
-                  }
-                }}
-                placeholder="Select Order Type"
-                className="ui-dropdown-custom--full-width"
-              />
-              {createFormData.order_type === 'visit_order' && (
-                <p className={`mt-1 text-[12px] ${locationError ? 'text-[#c62828]' : 'text-[#666]'}`}>
-                  {locationLoading
-                    ? 'Getting your location…'
-                    : latitude !== null && longitude !== null
-                      ? `📍 Location captured (${latitude.toFixed(5)}, ${longitude.toFixed(5)})`
-                      : locationError
-                        ? `Location needed for visit orders: ${locationError}`
-                        : 'Visit orders require your location — allow the browser prompt.'}
-                </p>
-              )}
-            </div>
-          )}
-
-          {/* Country Selection (for fetching parties, distributors, salesmen) */}
-          <div className="form-group">
-            <label className="ui-label">Country</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Country' },
-                ...countries.map(country => ({
-                  value: country.id || country.country_id,
-                  label: country.country_name || country.name
-                }))
-              ]}
-              value={selectedCountry || ''}
-              onChange={(value) => setSelectedCountry(value || null)}
-              onOpen={loadCountries}
-              placeholder="Select Country"
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-
-          {/* Party ID - Conditional */}
-          {(isFieldRequired('party_id') || createFormData.party_id) && (
-            <div className="form-group">
-              <label className="ui-label">
-                Party {isFieldRequired('party_id') && <span className="text-[red]">*</span>}
-              </label>
-              <DropdownSelector
-                options={[
-                  { value: '', label: 'Select Party' },
-                  ...(!selectedCountry ? [] : parties.length === 0 ? [] : parties.map(party => ({
-                    value: party.id || party.party_id,
-                    label: party.party_name
-                  })))
-                ]}
-                value={createFormData.party_id || ''}
-                onChange={(value) => setCreateFormData(prev => ({ ...prev, party_id: value || '' }))}
-                placeholder={!selectedCountry ? 'Please select a country first' : parties.length === 0 ? 'No parties found for this country' : 'Select Party'}
-                disabled={!selectedCountry}
-                className="ui-dropdown-custom--full-width"
-              />
-              {!selectedCountry && (
-                <small className="text-[12px] text-[#666]">Please select a country first</small>
-              )}
-              {selectedCountry && parties.length === 0 && allParties.length > 0 && isSalesman && (createFormData.order_type === 'visit_order' || createFormData.order_type === 'whatsapp_order') && (
-                <small className="text-[12px] text-[#666]">No parties found in your zone for this order type</small>
-              )}
-              {selectedCountry && parties.length === 0 && allParties.length === 0 && (
-                <small className="text-[12px] text-[#666]">No parties available for this country</small>
-              )}
-              {selectedCountry && parties.length > 0 && isSalesman && (createFormData.order_type === 'visit_order' || createFormData.order_type === 'whatsapp_order') && (
-                <small className="text-[12px] text-[#666]">Showing parties from your zone only</small>
-              )}
-              {selectedCountry && parties.length > 0 && isSalesman && createFormData.order_type === 'event_order' && (
-                <small className="text-[12px] text-[#666]">Showing all parties for event orders</small>
-              )}
-            </div>
-          )}
-
-          {/* Distributor ID - Conditional */}
-          {(isFieldRequired('distributor_id') || createFormData.distributor_id) && (
-            <div className="form-group">
-              <label className="ui-label">
-                Distributor {isFieldRequired('distributor_id') && <span className="text-[red]">*</span>}
-              </label>
-              <DropdownSelector
-                options={[
-                  { value: '', label: 'Select Distributor' },
-                  ...(!selectedCountry ? [] : distributors.length === 0 ? [] : distributors.map(distributor => ({
-                    value: distributor.id || distributor.distributor_id,
-                    label: distributor.distributor_name || distributor.name
-                  })))
-                ]}
-                value={createFormData.distributor_id || ''}
-                onChange={(value) => setCreateFormData(prev => ({ ...prev, distributor_id: value || '' }))}
-                placeholder={!selectedCountry ? 'Please select a country first' : distributors.length === 0 ? 'No distributors found for this country' : 'Select Distributor'}
-                disabled={!selectedCountry}
-                className="ui-dropdown-custom--full-width"
-              />
-              {!selectedCountry && (
-                <small className="text-[12px] text-[#666]">Please select a country first</small>
-              )}
-              {selectedCountry && distributors.length === 0 && (
-                <small className="text-[12px] text-[#666]">No distributors available for this country</small>
-              )}
-            </div>
-          )}
-
-          {/* Salesman ID - Conditional - Hidden for salesman role (auto-set) */}
-          {!isSalesman && (isFieldRequired('salesman_id') || createFormData.salesman_id) && (
-            <div className="form-group">
-              <label className="ui-label">
-                Salesman {isFieldRequired('salesman_id') && <span className="text-[red]">*</span>}
-              </label>
-              <DropdownSelector
-                options={[
-                  { value: '', label: 'Select Salesman' },
-                  ...(!selectedCountry ? [] : salesmen.length === 0 ? [] : salesmen.map(salesman => ({
-                    value: salesman.id || salesman.salesman_id,
-                    label: salesman.salesman_name || salesman.name
-                  })))
-                ]}
-                value={createFormData.salesman_id || ''}
-                onChange={(value) => setCreateFormData(prev => ({ ...prev, salesman_id: value || '' }))}
-                placeholder={!selectedCountry ? 'Please select a country first' : salesmen.length === 0 ? 'No salesmen found for this country' : 'Select Salesman'}
-                disabled={!selectedCountry}
-                className="ui-dropdown-custom--full-width"
-              />
-              {!selectedCountry && (
-                <small className="text-[12px] text-[#666]">Please select a country first</small>
-              )}
-              {selectedCountry && salesmen.length === 0 && (
-                <small className="text-[12px] text-[#666]">No salesmen available for this country</small>
-              )}
-            </div>
-          )}
-
-          {/* Event ID - Conditional - Only for event_order */}
-          {createFormData.order_type === 'event_order' && (
-            <div className="form-group">
-              <label className="ui-label">
-                Event <span className="text-[red]">*</span>
-              </label>
-              <DropdownSelector
-                options={[
-                  { value: '', label: 'Select Event' },
-                  ...(events.length === 0 ? [] : events.map(event => ({
-                    value: event.id || event.event_id,
-                    label: `${event.event_name}${event.event_date ? ` (${new Date(event.event_date).toLocaleDateString()})` : ''}`
-                  })))
-                ]}
-                value={createFormData.event_id || ''}
-                onChange={(value) => setCreateFormData(prev => ({ ...prev, event_id: value || '' }))}
-                placeholder={events.length === 0 ? 'Loading events...' : 'Select Event'}
-                className="ui-dropdown-custom--full-width"
-              />
-            </div>
-          )}
-
-          {/* Order Items */}
-          <div className="form-group">
-            <label className="ui-label">
-              Order Items <span className="text-[red]">*</span>
-            </label>
-            <div className="rounded-lg border border-[#E0E0E0] p-4">
-              {createFormData.order_items.map((item, index) => (
-                <div key={index} style={{ 
-                  marginBottom: index < createFormData.order_items.length - 1 ? '16px' : 0,
-                  paddingBottom: index < createFormData.order_items.length - 1 ? '16px' : 0,
-                  borderBottom: index < createFormData.order_items.length - 1 ? '1px solid #E0E0E0' : 'none'
-                }}>
-                  <div className="mb-2 flex items-center justify-between">
-                    <strong>Item {index + 1}</strong>
-                    {createFormData.order_items.length > 1 && (
-                      <Button 
-                        variant="secondary" 
-                        onClick={() => removeOrderItem(index)}
-                        style={{ padding: '4px 8px', fontSize: '12px' }}
-                      >
-                        Remove
-                      </Button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="mb-1 block text-[12px] text-[#666]">Product</label>
-                      <DropdownSelector
-                        options={products.map(product => ({
-                          value: product.id || product.product_id,
-                          label: `${product.model_no || product.product_name || product.name}${product.price ? ` - ₹${product.price}` : ''}`
-                        }))}
-                        value={item.product_id || ''}
-                        onChange={(value) => handleProductSelect(index, value)}
-                        serverSearch
-                        loading={productLoading}
-                        selectedLabel={item.product_label || ''}
-                        onOpen={() => loadProducts('')}
-                        onSearch={loadProducts}
-                        placeholder="Select Product"
-                        className="ui-dropdown-custom--full-width"
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[12px] text-[#666]">Quantity</label>
-                      <input 
-                        type="number"
-                        className="ui-input"
-                        value={item.quantity}
-                        onChange={(e) => updateOrderItem(index, 'quantity', e.target.value)}
-                        min="1"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="mb-1 block text-[12px] text-[#666]">Price</label>
-                      <input 
-                        type="number"
-                        className="ui-input"
-                        value={item.price}
-                        onChange={(e) => updateOrderItem(index, 'price', e.target.value)}
-                        min="0"
-                        step="0.01"
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <Button
-                variant="secondary"
-                onClick={addOrderItem}
-                style={{ marginTop: '12px', width: '100%' }}
-              >
-                + Add Item
-              </Button>
-            </div>
-          </div>
-
-          {/* Apply Offer — user-selected, optional. Only offers that apply to the
-              current items are listed; nothing is auto-applied. */}
-          {availableOffers.length > 0 && (
-            <div className="form-group">
-              <label className="ui-label">Apply Offer <span className="text-text-subtle font-normal">(optional)</span></label>
-              <DropdownSelector
-                className="ui-dropdown-custom--full-width"
-                placeholder="No offer"
-                options={[
-                  { value: '', label: 'No offer' },
-                  ...availableOffers.map((o) => ({ value: o.offer_id, label: o.title || 'Offer' })),
-                ]}
-                value={selectedOffer}
-                onChange={(v) => setSelectedOffer(v)}
-              />
-              <p className="mt-1 mb-0 text-[length:var(--text-xs)] text-text-muted">
-                The selected offer's discount is applied to this order and shown on the order view &amp; PDF.
-              </p>
-            </div>
-          )}
-
-          {/* Order Notes */}
-          <div className="form-group">
-            <label className="ui-label">Order Notes</label>
-            <textarea 
-              className="ui-input"
-              value={createFormData.order_notes}
-              onChange={(e) => setCreateFormData(prev => ({ ...prev, order_notes: e.target.value }))}
-              rows="3"
-              placeholder="Optional notes about this order"
-            />
-          </div>
-        </div>
       </AsidePanel>
     </div>
   );

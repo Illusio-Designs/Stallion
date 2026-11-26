@@ -1,4 +1,4 @@
-import { apiRequest, fetchAllPages, fetchPage, API_DEBUG, TTL_TRANSACTIONAL } from './client';
+import { apiRequest, fetchAllPages, fetchPage, sharedRead, API_DEBUG, TTL_TRANSACTIONAL } from './client';
 import { getCached, invalidateCache } from '../cacheService';
 
 // ==================== TRAYS ENDPOINTS ====================
@@ -7,7 +7,9 @@ import { getCached, invalidateCache } from '../cacheService';
  * Get all trays
  * @returns {Promise<Array>} Array of tray objects
  */
-export const getTrays = async () => {
+export const getTrays = () => sharedRead('trays:all', loadTrays);
+
+const loadTrays = async () => {
   try {
     const response = await fetchAllPages('/trays', {
       method: 'GET',
@@ -57,10 +59,10 @@ export const createTray = async (trayData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const updateTray = async (trayId, trayData) => {
-  const { tray_name, tray_status } = trayData;
+  const { tray_name, tray_status, is_active } = trayData;
   return apiRequest(`/trays/${trayId}`, {
     method: 'PUT',
-    body: { tray_name, tray_status },
+    body: { tray_name, tray_status, ...(is_active === undefined ? {} : { is_active }) },
     includeAuth: true,
   });
 };
@@ -185,9 +187,21 @@ export const updateProductInTray = async (trayProductData) => {
  */
 export const deleteProductFromTray = async (trayProductData) => {
   const { tray_id, product_id } = trayProductData;
-  return apiRequest('/tray_products', {
+  // A DELETE carries no body, so the ids go in the query string.
+  return apiRequest(`/tray_products?tray_id=${encodeURIComponent(tray_id)}&product_id=${encodeURIComponent(product_id)}`, {
     method: 'DELETE',
-    body: { tray_id, product_id },
+    includeAuth: true,
+  });
+};
+
+/**
+ * Move pieces out of a tray: back to the warehouse (no to_tray_id) or into another tray.
+ * @param {Array<{from_tray_id, product_id, qty?, to_tray_id?}>} transfers
+ */
+export const transferTrayProducts = async (transfers) => {
+  return apiRequest('/tray_products/transfer', {
+    method: 'POST',
+    body: { transfers },
     includeAuth: true,
   });
 };
@@ -195,11 +209,12 @@ export const deleteProductFromTray = async (trayProductData) => {
 // ==================== EVENT ENDPOINTS ====================
 
 /**
- * Get all events
+ * Get events
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active events (for pickers); default returns all
  * @returns {Promise<Array>} Array of event objects
  */
-export const getEvents = async () => {
-  return getCached('events', () => apiRequest('/events', {
+export const getEvents = async ({ activeOnly = false } = {}) => {
+  return getCached(activeOnly ? 'events:active' : 'events', () => apiRequest(`/events${activeOnly ? '?active=true' : ''}`, {
     method: 'GET',
     includeAuth: true,
   }), TTL_TRANSACTIONAL);
@@ -236,10 +251,10 @@ export const createEvent = async (eventData) => {
  * @returns {Promise<Object>} Response with message
  */
 export const updateEvent = async (eventId, eventData) => {
-  const { event_name, start_date, end_date, event_location } = eventData;
+  const { event_name, start_date, end_date, event_location, is_active } = eventData;
   const result = await apiRequest(`/events/${eventId}`, {
     method: 'PUT',
-    body: { event_name, start_date, end_date, event_location },
+    body: { event_name, start_date, end_date, event_location, ...(is_active === undefined ? {} : { is_active }) },
     includeAuth: true,
   });
   invalidateCache('events');
@@ -326,6 +341,13 @@ export const getMyOrders = async () => getCached('orders:my', async () => {
 const SELF_SCOPED_ORDER_ROLES = new Set(['party', 'distributor', 'salesman']);
 
 /**
+ * Sales, orders and top parties per state for a date range, with the change against the period
+ * before it. @param {string} from YYYY-MM-DD  @param {string} to YYYY-MM-DD
+ */
+export const getSalesByState = async (from, to) =>
+  apiRequest(`/orders/sales-by-state?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`, { method: 'GET', includeAuth: true });
+
+/**
  * Role-aware order fetch. End-user roles (party / distributor / salesman) get
  * their own token-scoped orders from /orders/my; admin / *_manager roles get the
  * full list from /orders. Use this instead of getOrders() on any page that an
@@ -352,9 +374,49 @@ export const getOrdersPageForRole = (role, page = 1, limit = 20, search = '', st
   SELF_SCOPED_ORDER_ROLES.has((role || '').toLowerCase().trim())
     ? getMyOrdersPage(page, limit, search, status)
     : getOrdersPage(page, limit, search, status);
+/**
+ * One page of orders for the Orders table (role-aware), plus the tab `counts` and the scope-wide
+ * `summary` totals. Status tab, search, dates, type, salesman and sort are all applied by the server.
+ * @returns {Promise<{data:Array, pagination:Object|null, counts:Object|null, summary:Object|null}>}
+ */
+export const getOrdersListPage = async (role, opts = {}) => {
+  const {
+    page = 1, limit = 20, search = '', status = '', startDate = '', endDate = '',
+    orderType = '', salesmanId = '', sort = '', dir = '', counts = false, summary = false,
+  } = opts;
+  const qs = new URLSearchParams({ page: String(page), limit: String(limit) });
+  const add = (k, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') qs.set(k, String(v).trim()); };
+  add('search', search); add('status', status); add('start_date', startDate); add('end_date', endDate);
+  add('order_type', orderType); add('salesman_id', salesmanId); add('sort', sort); add('dir', dir);
+  if (counts) qs.set('counts', '1');
+  if (summary) qs.set('summary', '1');
+  const base = SELF_SCOPED_ORDER_ROLES.has((role || '').toLowerCase().trim()) ? '/orders/my' : '/orders';
+  try {
+    const res = await apiRequest(`${base}?${qs.toString()}`, { method: 'GET', includeAuth: true });
+    return {
+      data: Array.isArray(res) ? res : (res?.data || []),
+      pagination: res?.pagination || null,
+      counts: res?.counts || null,
+      summary: res?.summary || null,
+    };
+  } catch (error) {
+    // "Orders not found" (404) is a valid empty state, not an error.
+    if (error.statusCode === 404) return { data: [], pagination: null, counts: null, summary: null };
+    throw error;
+  }
+};
+/** Dropdown values for the Orders page: { types: string[], salesmen: [{salesman_id, full_name}] } within the caller's scope. */
+export const getOrderFilterOptions = async () => {
+  try {
+    const res = await apiRequest('/orders/filter-options', { method: 'GET', includeAuth: true });
+    return { types: res?.types || [], salesmen: res?.salesmen || [] };
+  } catch {
+    return { types: [], salesmen: [] };
+  }
+};
 /** One page of trays -> { data, pagination }. */
-export const getTraysPage = (page = 1, limit = 20, search = '') =>
-  fetchPage('/trays', { page, limit, search }, { method: 'GET', includeAuth: true });
+export const getTraysPage = (page = 1, limit = 20, search = '', { activeOnly = false } = {}) =>
+  fetchPage('/trays', { page, limit, search, params: activeOnly ? { active: 'true' } : {} }, { method: 'GET', includeAuth: true });
 
 /**
  * Create a new order
@@ -390,6 +452,7 @@ export const createOrder = async (orderData) => {
     order_notes,
     latitude,
     longitude,
+    accuracy,
     offer_id,
   } = orderData;
 
@@ -448,6 +511,10 @@ export const createOrder = async (orderData) => {
   if (longitude !== undefined && longitude !== null) {
     body.longitude = Number(longitude);
   }
+  // GPS accuracy of the phone reading, so the server can allow a little extra for a weak signal.
+  if (accuracy !== undefined && accuracy !== null && Number.isFinite(Number(accuracy))) {
+    body.accuracy = Number(accuracy);
+  }
 
   if (API_DEBUG) {
     console.log('[createOrder] Request body:', JSON.stringify(body, null, 2));
@@ -460,6 +527,7 @@ export const createOrder = async (orderData) => {
     includeAuth: true,
   });
   invalidateCache('orders'); // New order - drop cached order list
+  invalidateCache('products:'); // Stock changed - drop cached product lists so stock shows fresh
   return result;
 };
 
@@ -474,13 +542,14 @@ export const createOrder = async (orderData) => {
  * @returns {Promise<Object>} Updated order object
  */
 export const updateOrderStatus = async (orderId, orderStatusData) => {
-  const { order_status, courier_name, courier_tracking_number, partial_dispatch_qty } = orderStatusData;
+  const { order_status, courier_name, courier_tracking_number, partial_dispatch_qty, cancel_reason } = orderStatusData;
 
   const body = { order_status };
 
   if (courier_name) body.courier_name = courier_name;
   if (courier_tracking_number) body.courier_tracking_number = courier_tracking_number;
   if (partial_dispatch_qty !== undefined) body.partial_dispatch_qty = partial_dispatch_qty;
+  if (cancel_reason) body.cancel_reason = cancel_reason;
 
   const result = await apiRequest(`/orders/${orderId}`, {
     method: 'PUT',
@@ -488,6 +557,93 @@ export const updateOrderStatus = async (orderId, orderStatusData) => {
     includeAuth: true,
   });
   invalidateCache('orders'); // Status changed - drop cached order list
+  return result;
+};
+
+/**
+ * Mark a processing order as dispatched with its courier details.
+ * POST /orders/:id/dispatch
+ * @param {string} orderId - Order ID (UUID)
+ * @param {{courier_name: string, courier_tracking_number: string}} data
+ * @returns {Promise<Object>} Updated order object
+ */
+export const dispatchOrder = async (orderId, { courier_name, courier_tracking_number, qty } = {}) => {
+  const body = { courier_name, courier_tracking_number };
+  if (qty !== undefined && qty !== null && qty !== '') body.qty = Number(qty);
+  const result = await apiRequest(`/orders/${orderId}/dispatch`, {
+    method: 'POST',
+    body,
+    includeAuth: true,
+  });
+  invalidateCache('orders');
+  return result;
+};
+
+/**
+ * Tray tasks: frames booked from a sample tray that must come back to the office.
+ * GET /orders/tray-tasks?status=open|all
+ * Salesmen get only their own tasks; office roles get all of them.
+ * @param {'open'|'all'} [status]
+ * @returns {Promise<Array>} Array of task objects
+ */
+export const getTrayTasks = async (status = 'open') => {
+  const result = await apiRequest(`/orders/tray-tasks?status=${encodeURIComponent(status)}`, {
+    method: 'GET',
+    includeAuth: true,
+  });
+  if (Array.isArray(result)) return result;
+  return Array.isArray(result?.data) ? result.data : [];
+};
+
+/**
+ * The salesman sent the frames back by courier.
+ * POST /orders/tray-tasks/:taskId/in-transit
+ * @param {string} taskId
+ * @param {{courier_name: string, tracking_number: string}} data
+ * @returns {Promise<Object>} Updated task
+ */
+export const markTrayTaskInTransit = async (taskId, { courier_name, tracking_number } = {}) => {
+  const result = await apiRequest(`/orders/tray-tasks/${taskId}/in-transit`, {
+    method: 'POST',
+    body: { courier_name, tracking_number },
+    includeAuth: true,
+  });
+  invalidateCache('orders');
+  return result;
+};
+
+/**
+ * The office received the frames (admin and order manager).
+ * POST /orders/tray-tasks/:taskId/received
+ * @param {string} taskId
+ * @returns {Promise<Object>} Updated task
+ */
+export const markTrayTaskReceived = async (taskId) => {
+  const result = await apiRequest(`/orders/tray-tasks/${taskId}/received`, {
+    method: 'POST',
+    body: {},
+    includeAuth: true,
+  });
+  invalidateCache('orders');
+  return result;
+};
+
+/**
+ * Mark a fully dispatched order as completed (delivered).
+ * POST /orders/:id/complete
+ * @param {string} orderId - Order ID (UUID)
+ * @param {{received_by?: string}} [data]
+ * @returns {Promise<Object>} Updated order object
+ */
+export const completeOrder = async (orderId, { received_by } = {}) => {
+  const body = {};
+  if (received_by && String(received_by).trim()) body.received_by = String(received_by).trim();
+  const result = await apiRequest(`/orders/${orderId}/complete`, {
+    method: 'POST',
+    body,
+    includeAuth: true,
+  });
+  invalidateCache('orders');
   return result;
 };
 
@@ -521,3 +677,7 @@ export const getFeaturedProducts = async (collectionId = "all") => {
 };
 
 
+
+/** Catalog search with current tray and holder assignments. */
+export const searchTrayProducts = (page = 1, search = '') =>
+  fetchPage('/trays/products/search', { page, limit: 20, search }, { method: 'GET', includeAuth: true });

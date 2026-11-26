@@ -8,6 +8,13 @@ const SITE = 'Stallion Eyewear';
 const DEFAULT_DESC =
   'Wholesale sunglasses and optical frames for retailers, opticians and distributors — competitive pricing and reliable supply.';
 
+const DASHBOARD_TITLES = {
+  products: 'Products', orders: 'Orders', expenses: 'Expenses', tray: 'Trays', events: 'Events',
+  offers: 'Offers', party: 'Party', salesmen: 'Salesmen', distributor: 'Distributor',
+  'office-team': 'Office Team', manage: 'Manage', analytics: 'Analytics & Reports',
+  support: 'Support', settings: 'Settings', sample: 'Sample',
+};
+
 /**
  * @param {string[]|undefined} slug - catch-all path segments (e.g. ['product','MAS-MYSTIC-C2'])
  * @returns {import('next').Metadata}
@@ -15,7 +22,7 @@ const DEFAULT_DESC =
 export function metadataForSlug(slug) {
   const seg = Array.isArray(slug) ? slug : [];
   const first = seg[0] || '';
-  const noindex = ['dashboard', 'login', 'register', 'cart'].includes(first);
+  const noindex = ['dashboard', 'login', 'cart'].includes(first);
 
   let title = SITE;
   let description = DEFAULT_DESC;
@@ -48,12 +55,13 @@ export function metadataForSlug(slug) {
       title = `Your Cart | ${SITE}`;
       break;
     case 'login':
-    case 'register':
       title = `Sign in | ${SITE}`;
       break;
-    case 'dashboard':
-      title = `Dashboard | ${SITE}`;
+    case 'dashboard': {
+      const name = DASHBOARD_TITLES[seg[1] || ''];
+      title = `${name || 'Dashboard'} | ${SITE}`;
       break;
+    }
     default:
       title = SITE;
   }

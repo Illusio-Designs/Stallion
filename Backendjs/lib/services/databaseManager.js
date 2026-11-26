@@ -41,6 +41,13 @@ class DatabaseManager {
             // MUST run first or init crash-loops with "Unknown column 'country_id'").
             await this.ensureUserLocationColumns();
             await this.ensurePartyBillingColumns();
+            // Logout support: tokens issued before this time are rejected. Must exist before any
+            // User query, because the User model selects it.
+            await this.ensureColumn('users', 'tokens_valid_from', 'DATETIME NULL');
+            // Upcoming (pre-order) products. The Product model selects these on every query, so they
+            // are added here, before any Product query, even if the alter-sync below fails.
+            await this.ensureColumn('product', 'is_upcoming', 'TINYINT(1) NOT NULL DEFAULT 0');
+            await this.ensureColumn('product', 'preorder_qty', 'INT NOT NULL DEFAULT 0');
 
             // Define table schemas
             const schemas = {
@@ -429,6 +436,9 @@ class DatabaseManager {
             require('../models/TrayProducts');
             require('../models/event');
             require('../models/Order');
+            require('../models/OrderShipment');
+            require('../models/TrayReturnTask');
+            require('../models/Notification');
             require('../models/SalesmanExpense');
             require('../models/SalesmanTargets');
             require('../models/SalesmanCheckIns');
@@ -466,7 +476,7 @@ class DatabaseManager {
             const modelSyncOrder = ['Country', 'State', 'Cities', 'Zone', 'Party', 'Distributor', 'Salesman',
                 'ColorCode', 'FrameColor', 'FrameMaterial', 'FrameType', 'Gender', 'LensColor',
                 'LensMaterial', 'Shape', 'Brand', 'Collection', 'Product', 'Tray', 'SalesmanTray',
-                'TrayProducts', 'Event', 'Order', 'OrderOperation', 'SalesmanExpense', 'SalesmanTargets', 'SalesmanCheckIns', 'DistributorZones', 'SalesmanZones', 'SalesmanStates', 'DistributorStates'];
+                'TrayProducts', 'Event', 'Order', 'OrderOperation', 'OrderShipment', 'TrayReturnTask', 'Notification', 'SalesmanExpense', 'SalesmanTargets', 'SalesmanCheckIns', 'DistributorZones', 'SalesmanZones', 'SalesmanStates', 'DistributorStates'];
 
             // Sync all models except the manually managed ones
             console.log('🔄 Syncing Sequelize models (excluding manually managed tables)...');
@@ -532,6 +542,7 @@ class DatabaseManager {
 
             // Idempotent index sync for all tables (safe on existing live databases)
             await this.syncIndexes();
+            await this.ensureUniqueOrderNumber();
 
             await Country.initializeDefaultCountries();
             await State.initializeDefaultStates();
@@ -580,11 +591,37 @@ class DatabaseManager {
                 });
                 console.log('✅ Added column parties.billing_same_as_shipping');
             }
+            // Columns the Party model selects on every query. Added here, before any Party query,
+            // so a failed alter-sync can never make the whole party list fail with "Unknown column".
+            await this.ensureColumn('parties', 'location_address', 'TEXT NULL');
             await sequelize.query(
                 'UPDATE parties SET billing_same_as_shipping = 1 WHERE billing_same_as_shipping IS NULL'
             );
         } catch (error) {
             console.log('⚠️ ensurePartyBillingColumns warning:', error.message);
+        }
+    }
+
+    /**
+     * Add a column to an existing table when it is missing (idempotent). Used for the
+     * manually managed tables (users, ...) that Sequelize's alter-sync does not touch.
+     */
+    static async ensureColumn(tableName, columnName, definition) {
+        try {
+            const [rows] = await sequelize.query(`
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = DATABASE()
+                  AND table_name = ?
+                  AND column_name = ?
+                LIMIT 1
+            `, { replacements: [tableName, columnName] });
+            if (rows.length === 0) {
+                await sequelize.query(`ALTER TABLE \`${tableName}\` ADD COLUMN \`${columnName}\` ${definition}`);
+                console.log(`✅ Added column ${tableName}.${columnName}`);
+            }
+        } catch (error) {
+            console.log(`⚠️ Could not ensure column ${tableName}.${columnName}:`, error.message);
         }
     }
 
@@ -746,6 +783,34 @@ class DatabaseManager {
      * Add missing indexes from lib/constants/dbIndexes.js without failing startup.
      * Skips indexes that already exist (by name or equivalent columns).
      */
+    /**
+     * Make order numbers unique in the database. Safe to run on every start: if two old orders
+     * already share a number, it only logs a warning and leaves the table as it is.
+     */
+    static async ensureUniqueOrderNumber() {
+        try {
+            if (!(await this.checkTableExists('order'))) return;
+            const [existing] = await sequelize.query(`
+                SELECT 1 FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'order'
+                  AND index_name = 'uq_order_order_number' LIMIT 1
+            `);
+            if (existing.length) return;
+            const [dups] = await sequelize.query(
+                'SELECT order_number, COUNT(*) AS n FROM `order` GROUP BY order_number HAVING COUNT(*) > 1 LIMIT 20'
+            );
+            if (dups.length) {
+                console.log(`⚠️ ${dups.length}+ order numbers are used by more than one order, so the unique rule was NOT added. First ones:`,
+                    dups.slice(0, 5).map((d) => `${d.order_number} (x${d.n})`).join(', '));
+                return;
+            }
+            await sequelize.query('ALTER TABLE `order` ADD UNIQUE INDEX uq_order_order_number (order_number)');
+            console.log('✅ Added unique rule on order.order_number');
+        } catch (error) {
+            console.log('⚠️ Could not add the unique order number rule:', error.message);
+        }
+    }
+
     static async syncIndexes(indexDefinitions = DB_INDEXES) {
         console.log('📇 Syncing database indexes...');
         const queryInterface = sequelize.getQueryInterface();

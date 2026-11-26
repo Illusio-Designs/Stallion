@@ -4,6 +4,7 @@ import '../../styles/components/ui.css';
 
 export default function DropdownSelector({
   options = [],
+  ariaLabel,
   value,
   onChange,
   placeholder = 'Select',
@@ -46,9 +47,11 @@ export default function DropdownSelector({
   const filteredOptions = serverSearch
     ? options
     : (searchQuery
-        ? options.filter(opt =>
-            opt.label.toLowerCase().includes(searchQuery.toLowerCase())
-          )
+        ? options.filter(opt => {
+            const label = String(opt.label).toLowerCase();
+            const q = searchQuery.toLowerCase();
+            return label.includes(q) || label.replace(/\s+/g, '').includes(q.replace(/\s+/g, ''));
+          })
         : options);
 
   // Close dropdown when clicking outside
@@ -110,6 +113,7 @@ export default function DropdownSelector({
         onClick={handleToggle}
         role="button"
         tabIndex={disabled ? -1 : 0}
+        aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-disabled={disabled || undefined}

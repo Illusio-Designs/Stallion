@@ -1,4 +1,5 @@
 const Country = require('../models/Country');
+const { activeFilter, activeUpdate } = require('../utils/geoActive');
 const { logAudit } = require('../utils/auditLogger');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 
@@ -12,7 +13,7 @@ class CountryController {
                 nameFields: ['name', 'code'],
                 phoneFields: ['phone_code'],
             });
-            const where = mergeWhere({ is_active: true }, searchFilter);
+            const where = mergeWhere(activeFilter(req), searchFilter);
             const countries = await Country.findAll({ where });
             res.status(200).json(countries);
         } catch (error) {
@@ -66,7 +67,7 @@ class CountryController {
                 return res.status(404).json({ error: 'Country not found' });
             }
             const oldSnapshot = country.toJSON();
-            const payload = { name, code, phone_code, currency };
+            const payload = { name, code, phone_code, currency, ...activeUpdate(req.body) };
             await Country.update(payload, { where: { id } });
             await logAudit({
                 req,

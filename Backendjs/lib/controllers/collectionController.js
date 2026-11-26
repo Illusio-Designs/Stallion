@@ -1,3 +1,4 @@
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const Collection = require('../models/Collection');
 const { logAudit } = require('../utils/auditLogger');
 const Brand = require('../models/Brand');
@@ -12,7 +13,7 @@ class CollectionController {
                 nameFields: ['collection_name'],
                 phoneFields: [],
             });
-            const where = mergeWhere({}, searchFilter);
+            const where = mergeWhere(activeOnlyWhere(req), searchFilter);
             const collections = await Collection.findAll({ where });
             res.status(200).json(collections);
         } catch (error) {
@@ -67,6 +68,7 @@ class CollectionController {
             }
             const oldSnapshot = collection.toJSON();
             const payload = {
+                ...activeUpdate(req.body),
                 collection_name: collection_name,
                 brand_id: brand_id,
                 updated_at: new Date(),

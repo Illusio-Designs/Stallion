@@ -28,7 +28,6 @@ import { pageKeyToPath, pathToDashboardPage, isDashboardPage, parseProductPath }
 // bundle and is applied on first paint (no unstyled flash on reload / direct
 // navigation). Dashboard pages stay lazy (behind auth) to keep this bundle lean.
 import Login from './Login';
-import Register from './Register';
 import Home from './Home';
 import About from './About';
 import Cart from './Cart';
@@ -53,6 +52,9 @@ const AnalyticsReports = lazy(() => import('./AnalyticsReports'));
 const DashboardSupport = lazy(() => import('./DashboardSupport'));
 const DashboardSettings = lazy(() => import('./DashboardSettings'));
 const DashboardExpenses = lazy(() => import('./DashboardExpenses'));
+
+// Pages a logged-out visitor may open.
+const PUBLIC_PAGES = ['login', 'privacy-policy', 'delete-account'];
 
 const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   const router = useRouter();
@@ -93,9 +95,10 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   
   // Helper to determine layout from page
   const getLayoutFromPage = (page) => {
-    if (['login', 'register'].includes(page)) {
+    if (page === 'login') {
       return 'auth';
-    } else if (isDashboardPage(page)) {
+    } else if (isDashboardPage(page) || ['products', 'product-detail', 'cart'].includes(page)) {
+      // The shop and the cart sit inside the same frame as the dashboard: one header, one menu, one bottom bar.
       return 'dashboard';
     }
     return 'public';
@@ -125,6 +128,18 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
     }
   }, [initialPage, initialProductId]);
 
+  // The sign-in and legal pages are available without a login.
+  // Logged-out visitors are sent to the sign-in page and brought back to the
+  // same page afterwards (?returnUrl=).
+  const needsLogin = !PUBLIC_PAGES.includes(currentPage);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
+  useEffect(() => {
+    if (!mounted || !needsLogin || isLoggedIn()) return;
+    const here = window.location.pathname + window.location.search;
+    router.replace(`/login?returnUrl=${encodeURIComponent(here)}`);
+  }, [mounted, needsLogin, currentPage]);
+
   // Update URL when page or layout changes
   const handlePageChange = (page, productId = null) => {
     if (page === currentPage && productId === currentProductId) return;
@@ -142,6 +157,10 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
   };
 
   const renderPage = () => {
+    // Wait for the login check (and the redirect) instead of flashing the page.
+    if (needsLogin && (!mounted || !isLoggedIn())) {
+      return <Loader isLoading={true} />;
+    }
     // Check if this is a dashboard page that requires role-based access
     const dashboardPages = ['dashboard', 'dashboard-products', 'orders', 'tray', 'events', 'offers', 'party', 'salesmen', 'distributor', 'office-team', 'manage', 'analytics', 'support', 'settings', 'expenses'];
     const isDashboardPage = dashboardPages.includes(currentPage);
@@ -170,8 +189,6 @@ const App = ({ initialPage = 'home', productId: initialProductId = null }) => {
       // Auth Pages
       case 'login':
         return <Login onPageChange={handlePageChange} />;
-      case 'register':
-        return <Register />;
       
       // Public Pages
       case '':

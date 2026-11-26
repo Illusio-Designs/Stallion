@@ -1,3 +1,4 @@
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const Brand = require('../models/Brand');
 const { logAudit } = require('../utils/auditLogger');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
@@ -12,7 +13,7 @@ class BrandController {
                 nameFields: ['brand_name'],
                 phoneFields: [],
             });
-            const where = mergeWhere({}, searchFilter);
+            const where = mergeWhere(activeOnlyWhere(req), searchFilter);
             const brands = await Brand.findAll({ where });
             res.status(200).json(brands);
         } catch (error) {
@@ -56,7 +57,8 @@ class BrandController {
                 return res.status(404).json({ error: 'Brand not found' });
             }
             const oldSnapshot = brand.toJSON();
-            const payload = { brand_name, updated_at: new Date() };
+            const payload = {
+                ...activeUpdate(req.body), brand_name, updated_at: new Date() };
             await Brand.update(payload, { where: { brand_id: id } });
             await logAudit({
                 req,

@@ -17,6 +17,11 @@ const LensMaterial = sequelize.define('LensMaterial', {
         allowNull: false,
         unique: true
     }
+    ,is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    }
 }, {
     tableName: 'lens_material',
     timestamps: true,

@@ -10,6 +10,7 @@ const Party = require('../models/Party');
 const Distributor = require('../models/distributor');
 const { canManageUsers } = require('../utils/roleHelpers');
 const sequelize = require('../constants/database');
+const { listWithOptionalPagination } = require('../utils/listSearchHelpers');
 
 class UserController {
     async getUsers(req, res) {
@@ -22,24 +23,24 @@ class UserController {
                 }
             );
             const roleIds = roles.map(role => role.role_id);
-            const users = await User.findAll(
-                {
-                    where: {
-                        role_id: {
-                            [Op.in]: roleIds
-                        }
-                    },
-                    // Include every assigned role (multi-role) so the office-team
-                    // UI can show/edit all of a member's roles, not just primary.
-                    include: [{
-                        model: Role,
-                        as: 'roles',
-                        attributes: ['role_id', 'role_name'],
-                        through: { attributes: [] },
-                    }],
-                }
-            );
-            res.status(200).json(users);
+            const body = await listWithOptionalPagination(User, req, {
+                where: {
+                    role_id: {
+                        [Op.in]: roleIds
+                    }
+                },
+                // Include every assigned role (multi-role) so the office-team
+                // UI can show/edit all of a member's roles, not just primary.
+                include: [{
+                    model: Role,
+                    as: 'roles',
+                    attributes: ['role_id', 'role_name'],
+                    through: { attributes: [] },
+                }],
+                distinct: true,
+                order: [['created_at', 'ASC'], ['user_id', 'ASC']],
+            });
+            res.status(200).json(body);
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -159,18 +160,22 @@ class UserController {
             });
             res.status(200).json(user);
         } catch (error) {
-            console.log("error", error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }
     async updateUser(req, res) {
         try {
             const id = req.user.user_id;
-            console.log("id", id);
             const { name, is_active, phone, role_id, email, image_url, address, country_id, state_id, city_id } = req.body;
             const user = await User.findByPk(id);
             if (!user) {
                 return res.status(404).json({ error: 'User not found' });
+            }
+
+            // The phone number is the login, so only an admin may change it (no OTP check here).
+            if (phone !== undefined && String(phone).replace(/\D/g, '') !== String(user.phone || '').replace(/\D/g, '') && !canManageUsers(req.userRoleName)) {
+                return res.status(403).json({ error: 'Your phone number can only be changed by an administrator' });
             }
 
             const updates = {
@@ -341,9 +346,7 @@ class UserController {
     // Upload profile image
     async uploadProfileImage(req, res) {
         try {
-            console.log("req.fileInfo", req.fileInfo);
             if (!req.fileInfo) {
-                console.log("No file uploaded");
                 return res.status(400).json({
                     success: false,
                     message: 'No file uploaded'
@@ -354,7 +357,6 @@ class UserController {
             const user = await User.findByPk(id);
 
             if (!user) {
-                console.log("User not found");
                 return res.status(404).json({
                     success: false,
                     message: 'User not found'
@@ -376,7 +378,7 @@ class UserController {
             const updatedUser = await User.findByPk(id);
             res.status(200).json(updatedUser);
         } catch (error) {
-            console.log("error", error);
+            console.error('Request failed:', error.message);
             res.status(500).json({
                 success: false,
                 message: 'Error uploading profile image',

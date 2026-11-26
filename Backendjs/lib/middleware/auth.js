@@ -3,6 +3,7 @@ const User = require('../models/User');
 const UserRole = require('../models/UserRole');
 const Role = require('../models/Role');
 const { getJwtSecret } = require('../utils/jwtSecret');
+const { pickPrimaryRole } = require('../utils/roleHelpers');
 
 async function attachUserRole(req) {
     // A member can hold several roles. Attach EVERY role name so authorization
@@ -25,8 +26,15 @@ async function attachUserRole(req) {
         return;
     }
 
-    const adminRole = roleNames.find((r) => String(r).toLowerCase() === 'admin');
-    req.userRoleName = adminRole || roleNames[0];
+    // Same answer every time for a user with several roles (admin first, then office
+    // roles, then salesman, distributor, party); the database order is not fixed.
+    req.userRoleName = pickPrimaryRole(roleNames);
+}
+
+// A token is revoked when it was issued before the user's last logout.
+function isRevoked(decoded, user) {
+    if (!user.tokens_valid_from || !decoded.iat) return false;
+    return decoded.iat < Math.floor(new Date(user.tokens_valid_from).getTime() / 1000);
 }
 
 /**
@@ -52,6 +60,10 @@ async function authenticateToken(req, res, next) {
                 success: false,
                 message: 'Invalid token - user not found',
             });
+        }
+
+        if (isRevoked(decoded, user)) {
+            return res.status(401).json({ success: false, message: 'Token expired' });
         }
 
         req.user = user;
@@ -84,7 +96,7 @@ async function optionalAuth(req, res, next) {
         if (token) {
             const decoded = jwt.verify(token, getJwtSecret());
             const user = await User.findByPk(decoded.userId);
-            if (user && user.is_active) {
+            if (user && user.is_active && !isRevoked(decoded, user)) {
                 req.user = user;
                 await attachUserRole(req);
             }

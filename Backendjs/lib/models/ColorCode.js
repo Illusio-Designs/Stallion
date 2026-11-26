@@ -17,6 +17,11 @@ const ColorCode = sequelize.define('ColorCode', {
         allowNull: false,
         unique: true
     }
+    ,is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    }
 }, {
     tableName: 'color_code',
     timestamps: true,

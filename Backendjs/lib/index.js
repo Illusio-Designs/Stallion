@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const path = require('path');
 const dotenv = require('dotenv');
 const sequelize = require('./constants/database');
@@ -26,16 +27,40 @@ app.use((req, res, next) => {
     }
     next();
 });
+// Gzip every JSON response (lists of products and orders are large and repeat the same keys, so they
+// shrink to roughly a fifth). Photos and other already-compressed files are skipped automatically.
+app.use(compression({ threshold: 1024 }));
 app.use(express.json());
+// Express 5 leaves req.body undefined when a request has no body (a DELETE, a bare POST). Handlers read
+// fields from it, so give them an empty object instead of a crash.
+app.use((req, _res, next) => { if (req.body === undefined) req.body = {}; next(); });
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files from uploads directory with absolute path
 const uploadsPath = path.resolve(__dirname, '..', 'uploads');
 console.log('📁 Serving static files from:', uploadsPath);
+// Salesman KYC documents (PAN, Aadhar, cancel cheque, photo) are private: only a
+// logged-in admin / sales manager may open them. This is mounted BEFORE the public
+// /uploads handler and never falls through to it.
+const { authenticateToken } = require('./middleware/auth');
+const { checkRole } = require('./middleware/roleAuth');
+const { SALESMAN_DOC_ROLES } = require('./utils/roleHelpers');
+app.use(
+    '/uploads/salesman',
+    authenticateToken,
+    checkRole(SALESMAN_DOC_ROLES),
+    express.static(path.join(uploadsPath, 'salesman'), { fallthrough: false, dotfiles: 'deny', index: false })
+);
+// Product photos get a new file name (a timestamp is part of it) every time one is uploaded, so a
+// copy the browser already has never goes stale: let it keep the photo for a week instead of asking
+// the server "has this changed?" for every picture on every visit. A miss falls through to the
+// handler below, so nothing else changes.
+app.use('/uploads/products', express.static(path.join(uploadsPath, 'products'), { maxAge: '7d', index: false }));
 app.use('/uploads', express.static(uploadsPath));
 
-// Serve static HTML files for testing
-app.use(express.static(path.join(__dirname, '..')));
+// NOTE: the backend folder is deliberately NOT served as static files. It used to
+// be ("for testing"), which let anyone download the source code, migrations and
+// package files from the website. Only /uploads above is public.
 
 // Import and use the route manager
 const routeManager = require('./routes/routeManager');

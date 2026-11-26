@@ -32,7 +32,7 @@ export function SkeletonRows({ rows = 8, cols = 5 }) {
       {Array.from({ length: rows }).map((_, r) => (
         <tr key={`sk-${r}`} className="ui-skeleton-row">
           {Array.from({ length: cols }).map((_, c) => (
-            <td key={`sk-${r}-${c}`} className="py-4 px-2 border-b border-border">
+            <td key={`sk-${r}-${c}`} data-col={c === 0 ? 'primary' : 'skeleton'} className="py-4 px-2 border-b border-border">
               <Skeleton height={14} width={c === 0 ? '50%' : '75%'} />
             </td>
           ))}

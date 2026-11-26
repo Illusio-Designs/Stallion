@@ -2,30 +2,31 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import AsidePanel from '../components/ui/AsidePanel';
+import ShopLocationCapture from '../components/ui/ShopLocationCapture';
 import { useConfirm } from '../components/ui/ConfirmProvider';
+import { istNow } from '../utils/istTime';
 import DatePicker from '../components/ui/DatePicker';
 import DateRangePicker from '../components/ui/DateRangePicker';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import FileUpload from '../components/ui/FileUpload';
+import { resolveUploadUrl } from '../utils/imageUrl';
 import MatchMeter from '../components/ui/MatchMeter';
 import RowActions from '../components/ui/RowActions';
 import StatusBadge from '../components/ui/StatusBadge';
+import Pagination from '../components/ui/Pagination';
 import TableWithControls from '../components/ui/TableWithControls';
 import {
   createSalesman,
   createSalesmanCheckin,
   createSalesmanTarget,
-  deleteSalesman,
   deleteSalesmanTarget,
-  getAllSalesmanCheckins,
+  getVisitReportPage,
+  getSalesmenPage,
   getAllSalesmanTargets,
   getAllZones,
   getCities,
-  getCountries,
-  getMyOrders,
+  getIndianCountries,
   getMyParties,
-  getParties,
-  getSalesmanCheckins,
   getSalesmanProfile,
   getSalesmanTargets,
   getSalesmen,
@@ -35,12 +36,23 @@ import {
   updateSalesmanTarget
 } from '../services/apiService';
 import { getUser, getUserRole } from '../services/authService';
-import { showError, showSuccess } from '../services/notificationService';
+import { showError, showSuccess, showInfo } from '../services/notificationService';
+import { queueCheckin, isNetworkError } from '../services/offlineQueue';
+import { captureCurrentPosition } from '../utils/geolocation';
+import '../styles/redesign-n-salesmen.css';
+import '../styles/redesign-p-salesmen.css';
+import '../styles/redesign-p-forms.css';
+import { FormProgress } from '../components/forms/FormBits';
+import { FiSearch, FiMapPin } from '../components/icons/hugeicons';
 
 // Geofence radius used when a visit/order is recorded (mirror of the backend
 // GEOFENCE_RADIUS_M). A recorded location within this distance of the party's
 // geocoded address counts as a verified, on-site visit.
-const GEOFENCE_RADIUS_M = 250;
+const GEOFENCE_RADIUS_M = 50;
+
+// Rows per server page for the Salesmen and Visit Report tables.
+const SALESMEN_PER_PAGE = 20;
+const VISITS_PER_PAGE = 20;
 
 // Haversine distance in metres between two lat/lng points.
 const distanceMeters = (lat1, lng1, lat2, lng2) => {
@@ -270,25 +282,40 @@ const StatesMultiDropdown = ({ states = [], selectedStates = [], onChange, disab
 const DashboardSuppliers = () => {
   const confirm = useConfirm();
   const isSalesman = getUserRole() === 'salesman';
-  const [activeTab, setActiveTab] = useState('All');
   const [mainTab, setMainTab] = useState(isSalesman ? 'Visit Report' : 'Salesmen');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [salesmen, setSalesmen] = useState([]);
+  const [salesmen, setSalesmen] = useState([]); // the CURRENT PAGE of the Salesmen table (server-paged)
+  const [salesmenLookup, setSalesmenLookup] = useState([]); // all active salesmen, for dropdowns / name lookups only
+  const [salesPage, setSalesPage] = useState(1);
+  const [salesPagination, setSalesPagination] = useState({ total: 0, totalPages: 1 });
+  const [salesCounts, setSalesCounts] = useState(null); // { all, active, inactive } from the server
+  const [salesSearch, setSalesSearch] = useState(''); // debounced listQuery
+  const [salesReload, setSalesReload] = useState(0);
+  const salesReqRef = useRef(0);
   const [countries, setCountries] = useState([]);
   const [selectedCountryFilter, setSelectedCountryFilter] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [listQuery, setListQuery] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
   const [states, setStates] = useState([]);
+  const [filterStates, setFilterStates] = useState([]); // states of the chosen country, for the state filter dropdown
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
+  const [capturePending, setCapturePending] = useState(false);
   const [zoneParties, setZoneParties] = useState([]); // parties for salesman's zones
   const [mySalesmanId, setMySalesmanId] = useState(''); // current salesman's own salesman_id
   const [allPartiesLookup, setAllPartiesLookup] = useState([]); // all parties for name lookup in tables
 
   // Check-ins state
-  const [checkins, setCheckins] = useState([]);
+  const [checkins, setCheckins] = useState([]); // the CURRENT PAGE of the Visit Report (server-paged)
+  const [visitPage, setVisitPage] = useState(1);
+  const [visitSearch, setVisitSearch] = useState('');
+  const [visitPagination, setVisitPagination] = useState({ total: 0, totalPages: 1 });
+  const visitReqRef = useRef(0);
   const [checkinsLoading, setCheckinsLoading] = useState(false);
   const [openCheckinModal, setOpenCheckinModal] = useState(false);
   const [editCheckin, setEditCheckin] = useState(null);
@@ -337,7 +364,7 @@ const DashboardSuppliers = () => {
 
   const fetchCountries = async () => {
     try {
-      const countriesData = await getCountries();
+      const countriesData = await getIndianCountries();
       setCountries(countriesData || []);
     } catch (error) {
       if (!error.message?.toLowerCase().includes('token expired') &&
@@ -347,89 +374,45 @@ const DashboardSuppliers = () => {
     }
   };
 
-  const fetchSalesmenForCountry = useCallback(async (countryId) => {
-    if (!countryId) {
-      console.log('[fetchSalesmenForCountry] No country ID provided, clearing salesmen');
+  // One page of salesmen from the server (search, state and status filters run in SQL).
+  // Re-run whenever the country, page, search, state or status changes, or after a save.
+  const fetchSalesmenPage = useCallback(async () => {
+    if (!selectedCountryFilter) {
       setSalesmen([]);
       setHasSearched(false);
       return;
     }
-
+    const reqId = ++salesReqRef.current;
     setLoading(true);
     setError(null);
-    setHasSearched(false);
     try {
-      // Validate countryId before making API call
-      const cleanCountryId = String(countryId).trim();
-      if (!cleanCountryId || cleanCountryId === 'undefined' || cleanCountryId === 'null') {
-        console.error('[fetchSalesmenForCountry] Invalid country ID:', countryId);
-        setSalesmen([]);
-        setLoading(false);
+      const result = await getSalesmenPage({
+        page: salesPage,
+        limit: SALESMEN_PER_PAGE,
+        country_id: String(selectedCountryFilter).trim(),
+        search: salesSearch,
+        state_id: stateFilter,
+        status: statusFilter || 'all',
+      });
+      if (reqId !== salesReqRef.current) return; // a newer request is already in flight
+      const list = Array.isArray(result.data) ? result.data : [];
+      const totalPages = Math.max(1, Number(result.pagination?.totalPages) || 1);
+      if (list.length === 0 && salesPage > totalPages) {
+        setSalesPage(totalPages); // the last page emptied (e.g. after a status change): go back
         return;
       }
-
-      console.log('[fetchSalesmenForCountry] Fetching salesmen for country:', cleanCountryId);
-      const salesmenData = await getSalesmen(cleanCountryId);
-
-      console.log('[fetchSalesmenForCountry] Received', salesmenData?.length || 0, 'salesmen from API');
-
-      // CRITICAL: Backend returns wrong data, so we MUST filter strictly
-      // Filter out ALL salesmen that don't match the requested country
-      const validSalesmen = (salesmenData || []).filter(d => {
-        if (!d) {
-          console.warn('[fetchSalesmenForCountry] Skipping null/undefined salesman');
-          return false;
-        }
-
-        const salesmanCountryId = String(d.country_id || d.countryId || '').trim();
-        const matches = salesmanCountryId === cleanCountryId;
-
-        if (!matches) {
-          console.warn('[fetchSalesmenForCountry] ❌ REJECTING salesman - country mismatch:', {
-            salesman_id: d.id || d.salesman_id,
-            salesman_name: d.full_name,
-            salesman_country_id: salesmanCountryId,
-            requested_country_id: cleanCountryId,
-            match: false
-          });
-        } else {
-          console.log('[fetchSalesmenForCountry] ✅ ACCEPTING salesman - country matches:', {
-            salesman_id: d.id || d.salesman_id,
-            salesman_name: d.full_name,
-            country_id: salesmanCountryId
-          });
-        }
-        return matches;
-      });
-
-      const filteredOut = salesmenData.length - validSalesmen.length;
-      if (filteredOut > 0) {
-        console.warn('[fetchSalesmenForCountry] ⚠️ Backend returned', filteredOut, 'salesmen with WRONG country_id!');
-        console.warn('[fetchSalesmenForCountry] This is a backend issue - it should filter by country_id');
-      }
-
-      if (validSalesmen.length > 0) {
-        console.log('[fetchSalesmenForCountry] ✅ Found', validSalesmen.length, 'valid salesmen for country:', cleanCountryId);
-      } else {
-        console.log('[fetchSalesmenForCountry] ℹ️ No salesmen found for country:', cleanCountryId);
-        if (salesmenData.length > 0) {
-          console.warn('[fetchSalesmenForCountry] ⚠️ Backend returned', salesmenData.length, 'salesmen but none matched the requested country');
-        }
-      }
-
-      // Force update by creating a new array reference
-      const newSalesmen = Array.isArray(validSalesmen) ? [...validSalesmen] : [];
-      console.log('[fetchSalesmenForCountry] Setting', newSalesmen.length, 'salesmen for country:', cleanCountryId);
-      setSalesmen(newSalesmen);
-      setHasSearched(true); // Mark that we've completed a search - even if empty
+      setSalesmen(list);
+      setSalesPagination({ total: Number(result.pagination?.total) || 0, totalPages });
+      if (result.counts) setSalesCounts(result.counts);
+      setHasSearched(true);
     } catch (error) {
-      console.error('[fetchSalesmenForCountry] Error:', error);
+      if (reqId !== salesReqRef.current) return;
+      console.error('[fetchSalesmenPage] Error:', error);
       const errorMessage = error.message?.toLowerCase() || '';
       const isNotFound = errorMessage.includes('salesmen not found') ||
         errorMessage.includes('no salesmen found') ||
         errorMessage.includes('salesman not found') ||
         error.statusCode === 404;
-
       if (!isNotFound &&
         !errorMessage.includes('token expired') &&
         !errorMessage.includes('unauthorized')) {
@@ -437,11 +420,14 @@ const DashboardSuppliers = () => {
         showError(`Failed to load salesmen: ${error.message}`);
       }
       setSalesmen([]);
-      setHasSearched(true); // Mark that we've completed a search - even if empty
+      setHasSearched(true);
     } finally {
-      setLoading(false);
+      if (reqId === salesReqRef.current) setLoading(false);
     }
-  }, []);
+  }, [selectedCountryFilter, salesPage, salesSearch, stateFilter, statusFilter, salesReload]);
+
+  // Reload the current page (after create / edit / status change / Refresh).
+  const fetchSalesmenForCountry = useCallback(() => { setSalesReload((n) => n + 1); }, []);
 
   const fetchStates = async (countryId) => {
     if (!countryId) {
@@ -557,89 +543,39 @@ const DashboardSuppliers = () => {
     }
   };
 
-  const fetchCheckins = async () => {
+  // One page of the Visit Report from the server. The server attaches party / salesman names,
+  // the linked order's qty / total / notes, and lists visit orders that have no check-in row,
+  // for this page's rows only.
+  const fetchCheckins = async (targetPage = visitPage, search = visitSearch) => {
+    const reqId = ++visitReqRef.current;
     setCheckinsLoading(true);
     try {
-      let data;
+      let salesmanId = '';
       if (isSalesman) {
-        const sid = await ensureMySalesmanId();
-        data = sid ? await getSalesmanCheckins(sid) : [];
-      } else {
-        data = await getAllSalesmanCheckins();
+        salesmanId = await ensureMySalesmanId();
+        if (!salesmanId) {
+          if (reqId === visitReqRef.current) { setCheckins([]); setVisitPagination({ total: 0, totalPages: 1 }); }
+          return;
+        }
       }
-      let rows = Array.isArray(data) ? data : (data?.data || []);
-
-      // Visit ORDERS are placed from the cart and live in the orders table —
-      // they don't create a check-in row, so they'd otherwise be missing from
-      // the Visit Report. Merge the salesman's own visit orders in as "ordered"
-      // rows, skipping any order already represented by a check-in (order_id).
-      // Populate QTY / AMOUNT for order rows (salesman AND admin views):
-      //  1) attach a linked order's qty/amount to its check-in row, and
-      //  2) merge visit orders that have no check-in row of their own.
-      // getMyOrders returns the caller's orders (all orders for admin).
-      try {
-        const orders = await getMyOrders();
-        const orderList = Array.isArray(orders) ? orders : [];
-        // order_items can be a real array OR a JSON string — parse both, else the
-        // QTY column computed to 0/'-' for every order.
-        const parseItems = (v) => {
-          if (Array.isArray(v)) return v;
-          if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch { return []; } }
-          if (v && typeof v === 'object') return Object.values(v);
-          return [];
-        };
-        // Prefer the backend-computed total_qty; fall back to parsing order_items.
-        const qtyOf = (o) => Number(o.total_qty)
-          || parseItems(o.order_items).reduce((s, it) => s + (Number(it.quantity ?? it.qty) || 0), 0)
-          || 0;
-        const orderById = new Map(orderList.map((o) => [String(o.order_id || o.id), o]));
-
-        // 1) enrich check-in rows that reference an order
-        rows = rows.map((c) => {
-          const oid = c.order_id ? String(c.order_id) : null;
-          if (oid && orderById.has(oid)) {
-            const o = orderById.get(oid);
-            return {
-              ...c,
-              order_qty: c.order_qty != null ? c.order_qty : qtyOf(o),
-              order_total: c.order_total != null ? c.order_total : o.order_total,
-              order_notes: c.order_notes != null ? c.order_notes : o.order_notes,
-            };
-          }
-          return c;
-        });
-
-        // 2) merge visit orders not already represented by a check-in row
-        const linked = new Set(rows.map((c) => c.order_id).filter(Boolean).map(String));
-        const visitRows = orderList
-          .filter((o) => (o.order_type === 'visit_order') && !linked.has(String(o.order_id || o.id)))
-          .map((o) => ({
-            id: `order-${o.order_id || o.id}`,
-            type: 'ordered',
-            salesman_id: o.salesman_id,
-            party_id: o.party_id,
-            party_name: o.party_name,
-            order_id: o.order_id || o.id,
-            order_total: o.order_total,
-            order_qty: qtyOf(o),
-            order_notes: o.order_notes,
-            check_in_date: o.order_date || o.created_at || o.createdAt,
-            latitude: o.latitude,
-            longitude: o.longitude,
-          }));
-        rows = [...rows, ...visitRows];
-      } catch (e) {
-        console.error('Failed to merge visit orders into Visit Report:', e);
+      const result = await getVisitReportPage({ page: targetPage, limit: VISITS_PER_PAGE, search, salesmanId });
+      if (reqId !== visitReqRef.current) return; // a newer request is already in flight
+      const rows = Array.isArray(result.data) ? result.data : [];
+      const totalPages = Math.max(1, Number(result.pagination?.totalPages) || 1);
+      if (rows.length === 0 && targetPage > totalPages) {
+        fetchCheckins(totalPages, search); // the last page emptied: show the new last page
+        return;
       }
-
-      // Newest first (works for both check-ins and merged orders).
-      rows.sort((a, b) => new Date(b.check_in_date || 0) - new Date(a.check_in_date || 0));
       setCheckins(rows);
+      setVisitPage(targetPage);
+      setVisitPagination({ total: Number(result.pagination?.total) || 0, totalPages });
     } catch (error) {
+      if (reqId !== visitReqRef.current) return;
       console.error('Failed to load check-ins:', error);
       setCheckins([]);
+      setVisitPagination({ total: 0, totalPages: 1 });
     } finally {
-      setCheckinsLoading(false);
+      if (reqId === visitReqRef.current) setCheckinsLoading(false);
     }
   };
 
@@ -662,35 +598,67 @@ const DashboardSuppliers = () => {
     }
   };
 
-  // Set India as default country filter (only once when countries are loaded)
+  // Default country filter (India, else first country; only once when countries are loaded)
   useEffect(() => {
     if (countries.length > 0 && !selectedCountryFilter && !hasSetDefaultCountry.current) {
       const india = countries.find(c =>
         c.name?.toLowerCase() === 'india' ||
         c.code?.toLowerCase() === 'in'
       );
-      if (india) {
-        console.log('[Filter] Setting default country to India:', india.id);
-        setSelectedCountryFilter(india.id);
-        hasSetDefaultCountry.current = true;
-      }
+      // Fall back to the first country so the list is never empty on first load
+      const defaultCountry = india || countries[0];
+      console.log('[Filter] Setting default country:', defaultCountry.id);
+      setSelectedCountryFilter(defaultCountry.id);
+      hasSetDefaultCountry.current = true;
     }
   }, [countries, selectedCountryFilter]);
 
-  // Fetch salesmen when country filter changes
+  // Fetch the current page of salesmen whenever the country, page, search, state or status changes.
+  // Zones are only needed inside the Add/Edit form, and loading them walks
+  // states -> cities -> zones (100+ requests). Defer to when the form opens.
   useEffect(() => {
+    if (isSalesman) return;
     if (selectedCountryFilter) {
-      console.log('[Filter] Country changed, fetching salesmen for:', selectedCountryFilter);
-      fetchSalesmenForCountry(selectedCountryFilter);
-      // Zones are only needed inside the Add/Edit form, and loading them walks
-      // states -> cities -> zones (100+ requests). Defer to when the form opens.
+      fetchSalesmenPage();
     } else {
-      // If no country selected (All Countries), clear salesmen
-      console.log('[Filter] No country selected (All Countries), clearing salesmen');
       setSalesmen([]);
       setLoading(false);
     }
-  }, [selectedCountryFilter, fetchSalesmenForCountry]);
+  }, [selectedCountryFilter, fetchSalesmenPage, isSalesman]);
+
+  // Debounce the search box (~300ms) and go back to page 1 when it changes.
+  const salesSearchRef = useRef('');
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const next = listQuery.trim();
+      if (next === salesSearchRef.current) return;
+      salesSearchRef.current = next;
+      setSalesSearch(next);
+      setSalesPage(1);
+    }, 300);
+    return () => clearTimeout(t);
+  }, [listQuery]);
+
+  // State filter options come from the chosen country's states, not from the loaded rows.
+  useEffect(() => {
+    if (isSalesman || !selectedCountryFilter) { setFilterStates([]); return; }
+    let live = true;
+    getStates(selectedCountryFilter)
+      .then((list) => { if (live) setFilterStates(Array.isArray(list) ? list : []); })
+      .catch(() => { if (live) setFilterStates([]); });
+    return () => { live = false; };
+  }, [selectedCountryFilter, isSalesman]);
+
+  // Name lookup / dropdown source (Targets tab and its form): all active salesmen of the country,
+  // loaded only when that tab is opened. The Salesmen table itself never needs it.
+  useEffect(() => {
+    if (isSalesman || mainTab !== 'Targets' || !selectedCountryFilter) return;
+    let live = true;
+    getSalesmen(selectedCountryFilter)
+      .then((list) => { if (live) setSalesmenLookup(Array.isArray(list) ? list : []); })
+      .catch(() => { if (live) setSalesmenLookup([]); });
+    return () => { live = false; };
+  }, [mainTab, selectedCountryFilter, isSalesman]);
 
   // Fetch states when country changes in form
   useEffect(() => {
@@ -724,13 +692,8 @@ const DashboardSuppliers = () => {
 
   // Fetch checkins/targets when switching to those tabs
   useEffect(() => {
-    if (mainTab === 'Visit Report') {
-      fetchCheckins();
-      // For admin: fetch all parties for name lookup
-      if (!isSalesman) {
-        getParties().then(data => setAllPartiesLookup(Array.isArray(data) ? data : [])).catch(() => { });
-      }
-    }
+    // The visit rows already carry party / salesman names and party coordinates, so no all-parties load here.
+    if (mainTab === 'Visit Report') fetchCheckins();
     if (mainTab === 'Targets') fetchTargets();
   }, [mainTab]);
 
@@ -738,7 +701,6 @@ const DashboardSuppliers = () => {
   useEffect(() => {
     if (isSalesman) {
       fetchZoneParties();
-      fetchCheckins();
     }
   }, []);
 
@@ -756,75 +718,118 @@ const DashboardSuppliers = () => {
   // GPS can be checked against where the party actually is.
   const partyCoordsMap = useMemo(() => {
     const map = {};
+    // Visit rows carry the party's coordinates (set by the server for this page's rows)...
+    checkins.forEach(c => {
+      if (c.party_id && c.party_latitude != null && c.party_longitude != null) {
+        map[c.party_id] = { lat: Number(c.party_latitude), lng: Number(c.party_longitude) };
+      }
+    });
+    // ...and the salesman's own party list fills in any gaps.
     allPartiesLookup.forEach(p => {
       const id = p.party_id || p.id;
-      if (id && p.latitude != null && p.longitude != null) {
+      if (id && !map[id] && p.latitude != null && p.longitude != null) {
         map[id] = { lat: Number(p.latitude), lng: Number(p.longitude) };
       }
     });
     return map;
-  }, [allPartiesLookup]);
+  }, [allPartiesLookup, checkins]);
 
   const salesmanNameMap = useMemo(() => {
     const map = {};
-    salesmen.forEach(s => {
+    [...salesmenLookup, ...salesmen].forEach(s => {
       const id = s.id || s.salesman_id;
       if (id) map[id] = s.full_name || id;
     });
+    checkins.forEach(c => { if (c.salesman_id && c.salesman_name) map[c.salesman_id] = c.salesman_name; });
     return map;
-  }, [salesmen]);
+  }, [salesmen, salesmenLookup, checkins]);
+
+  // States each salesman works in, as plain names (the API may return objects or ids).
+  const stateNamesOf = (row) => {
+    const src = row.states || row.working_states || row.salesman_states || [];
+    if (!Array.isArray(src)) return [];
+    return src
+      .map(x => (x && typeof x === 'object') ? (x.state_name || x.name || '') : String(x || ''))
+      .filter(Boolean);
+  };
+
+  const renderStatePills = (row) => {
+    const names = stateNamesOf(row);
+    if (names.length === 0) return <span className="text-text-subtle">-</span>;
+    return (
+      <span className="sx-pills">
+        {names.slice(0, 3).map(n => <span key={n} className="sx-pill">{n}</span>)}
+        {names.length > 3 ? <span className="sx-pill sx-pill--more">+{names.length - 3}</span> : null}
+      </span>
+    );
+  };
+
+  const renderTargetBar = (row) => {
+    const pct = row.target_pct;
+    if (pct == null) return <span className="text-text-subtle">No target</span>;
+    return (
+      <span className="sm-prog" title={`${pct}% of target`}>
+        <span className="prog" role="img" aria-label={`${pct} percent of target`}><i style={{ width: `${Math.min(100, pct)}%` }} /></span>
+        <span className="sm-prog__n">{pct}%</span>
+      </span>
+    );
+  };
+
+  const renderStatusButton = (row) => (
+    <button
+      type="button"
+      onClick={() => handleToggleActive(row)}
+      title={row.isActive ? 'Active. Tap to deactivate' : 'Inactive. Tap to activate'}
+      className="sx-status cursor-pointer border-0 bg-transparent p-0"
+    >
+      <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>
+        {row.isActive ? 'Active' : 'Inactive'}
+      </StatusBadge>
+    </button>
+  );
+
+  const initialsOf = (name) => String(name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 
   const columns = useMemo(() => ([
-    { key: 'employee_code', label: 'EMPLOYEE CODE' },
-    { key: 'full_name', label: 'NAME' },
-    { key: 'phone', label: 'PHONE' },
-    { key: 'email', label: 'EMAIL' },
     {
-      key: 'status', label: 'STATUS', render: (_v, row) => (
-        <button
-          type="button"
-          onClick={() => handleToggleActive(row)}
-          title={row.isActive ? 'Active — click to deactivate' : 'Inactive — click to activate'}
-          className="cursor-pointer border-0 bg-transparent p-0"
-        >
-          <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>
-            {row.isActive ? 'Active' : 'Inactive'}
-          </StatusBadge>
-        </button>
-      )
+      key: 'full_name', label: 'SALESMAN', render: (v, row) => {
+        const sub = [row.employee_code, row.phone].filter(Boolean).join(' · ');
+        return (
+          <span className="sm-who sn-who">
+            <span className="sm-pic" aria-hidden="true">{initialsOf(v)}</span>
+            <span className="sm-who__txt sn-trunc" title={`${v || ''}${sub ? ` (${sub})` : ''}`}>
+              <span className="sn-name">{v}</span>
+              {sub ? <small className="sm-sub sn-trunc">{sub}</small> : null}
+            </span>
+          </span>
+        );
+      }
     },
+    { key: 'states', label: 'STATES', render: (_v, row) => renderStatePills(row) },
+    { key: 'visits_today', label: 'VISITS TODAY', render: (_v, row) => row.visits_today || 0 },
+    { key: 'target', label: 'TARGET', render: (_v, row) => renderTargetBar(row) },
+    { key: 'status', label: 'STATUS', render: (_v, row) => renderStatusButton(row) },
     {
       key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions
           onEdit={() => handleEdit(row)}
-          onDelete={() => handleDelete(row)}
         />
       )
     },
   ]), []);
 
-  const rows = useMemo(() => {
-    let filteredSalesmen = [];
-    if (selectedCountryFilter) {
-      const cleanFilterId = String(selectedCountryFilter).trim();
-      filteredSalesmen = salesmen.filter(salesman => {
-        if (!salesman) return false;
-        const salesmanCountryId = String(salesman.country_id || salesman.countryId || '').trim();
-        return salesmanCountryId === cleanFilterId;
-      });
-    }
-    return filteredSalesmen.map(salesman => ({
-      ...salesman,
-      isActive: salesman.is_active !== false,
-    }));
-  }, [salesmen, selectedCountryFilter]);
+  // The server already applied country, search, state and status; just add the display flag.
+  const rows = useMemo(() => salesmen.map(salesman => ({
+    ...salesman,
+    isActive: salesman.is_active !== false,
+  })), [salesmen]);
 
-  const filteredRowsByTab = useMemo(() => {
-    if (activeTab === 'All') return rows;
-    if (activeTab === 'Activate') return rows.filter(r => r.isActive);
-    if (activeTab === 'Deactivate') return rows.filter(r => !r.isActive);
-    return rows;
-  }, [rows, activeTab]);
+  const stateFilterOptions = useMemo(() => (
+    filterStates
+      .map(st => ({ value: String(st.id || st.state_id || ''), label: st.name || st.state_name || '' }))
+      .filter(o => o.value && o.label)
+      .sort((x, y) => x.label.localeCompare(y.label))
+  ), [filterStates]);
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -957,6 +962,7 @@ const DashboardSuppliers = () => {
         is_active: next,
       });
       showSuccess(next ? 'Salesman activated' : 'Salesman deactivated');
+      fetchSalesmenForCountry(); // counts and the status filter may now put this row elsewhere
     } catch (e) {
       // Revert on failure.
       setSalesmen(prev => prev.map(s => {
@@ -979,9 +985,9 @@ const DashboardSuppliers = () => {
           role="switch"
           aria-checked={active}
           onClick={() => handleInputChange('is_active', !active)}
-          className="inline-flex items-center gap-3 cursor-pointer select-none border-0 bg-transparent p-0"
+          className="inline-flex min-h-[28px] items-center gap-3 cursor-pointer select-none border-0 bg-transparent p-0"
         >
-          <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${active ? 'bg-success' : 'bg-border-strong'}`}>
+          <span className={`relative inline-flex h-6 w-11 items-center rounded-full transition ${active ? 'bg-primary' : 'bg-border-strong'}`}>
             <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${active ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </span>
           <span className={`text-[length:var(--text-sm)] font-semibold ${active ? 'text-success' : 'text-text-muted'}`}>
@@ -992,158 +998,151 @@ const DashboardSuppliers = () => {
     );
   };
 
-  const handleDelete = async (row) => {
-    if (!(await confirm(`Are you sure you want to delete this salesman? This will also delete the associated user account.`))) {
-      return;
-    }
+  // Add / Edit form body: Basics, Contact, Working states, Documents.
+  const renderSalesmanFields = (isEdit) => {
+    const phoneVal = (v) => (v ? (String(v).startsWith('+') ? String(v) : '+' + v) : '');
+    const docs = [
+      { key: 'pan_card', urlKey: 'pan_card_url', label: 'PAN card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+      { key: 'aadhar_card', urlKey: 'aadhar_card_url', label: 'Aadhaar card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+      { key: 'cancel_cheque', urlKey: 'cancel_cheque_url', label: 'Cancelled cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
+      { key: 'photo', urlKey: 'photo_url', label: 'Photo', accept: 'image/*', hint: 'Image only' },
+    ];
+    const reqDone = [formData.employee_code, formData.full_name, formData.email, formData.phone, formData.country_id]
+      .filter((v) => String(v ?? '').trim() !== '').length
+      + (Array.isArray(formData.state_ids) && formData.state_ids.length > 0 ? 1 : 0);
+    return (
+      <>
+        <FormProgress label="Details, states, documents" done={reqDone} total={6} />
+        <section className="sx-sec">
+          <h3 className="sx-sec__h">Basics</h3>
+          <div className="sx-grid">
+            <div className="form-group">
+              <label className="ui-label">Employee code *</label>
+              <input className="ui-input" placeholder="Employee code" value={formData.employee_code} onChange={(e) => handleInputChange('employee_code', e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Full name *</label>
+              <input className="ui-input" placeholder="Full name" value={formData.full_name} onChange={(e) => handleInputChange('full_name', e.target.value)} required />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Reporting manager</label>
+              <input className="ui-input" placeholder="Reporting manager" value={formData.reporting_manager} onChange={(e) => handleInputChange('reporting_manager', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Joining date</label>
+              <DatePicker value={formData.joining_date} onChange={(v) => handleInputChange('joining_date', v)} placeholder="Joining date" />
+            </div>
+            {renderActiveToggle()}
+          </div>
+        </section>
 
-    // Validate that row has an ID - check multiple possible ID field names
-    const salesmanId = row.id || row.salesman_id || row.salesmanId;
-    if (!salesmanId) {
-      console.error('Delete failed: Missing salesman ID', row);
-      showError('Invalid salesman data: missing ID. Please refresh the page and try again.');
-      return;
-    }
+        <section className="sx-sec">
+          <h3 className="sx-sec__h">Contact</h3>
+          <div className="sx-grid">
+            <div className="form-group">
+              <label className="ui-label">Phone *</label>
+              <PhoneInput
+                defaultCountry="in"
+                value={phoneVal(formData.phone)}
+                onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
+                className="phone-intl"
+                inputProps={{ required: true, placeholder: 'Enter your phone number' }}
+              />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Alternate phone</label>
+              <PhoneInput
+                defaultCountry="in"
+                value={phoneVal(formData.alternate_phone)}
+                onChange={(phone) => handleInputChange('alternate_phone', phone.replace(/^\+/, ''))}
+                className="phone-intl"
+                inputProps={{ placeholder: 'Enter alternate phone number' }}
+              />
+            </div>
+            <div className="form-group form-group--full">
+              <label className="ui-label">Email *</label>
+              <input className="ui-input" type="email" placeholder="Email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} required />
+            </div>
+            <div className="form-group form-group--full">
+              <label className="ui-label">Address *</label>
+              <input className="ui-input" placeholder="Address" required value={formData.address} onChange={(e) => handleInputChange('address', e.target.value)} />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Country *</label>
+              <DropdownSelector
+                options={[{ value: '', label: 'Select Country' }, ...countries.map(country => ({ value: country.id, label: country.name }))]}
+                value={formData.country_id || ''}
+                onChange={(value) => handleInputChange('country_id', value || '')}
+                placeholder="Select Country"
+                className="ui-dropdown-custom--full-width"
+              />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">State</label>
+              <DropdownSelector
+                options={[{ value: '', label: 'Select State' }, ...states.map(state => ({ value: state.id, label: state.name }))]}
+                value={formData.state_id || ''}
+                onChange={(value) => handleInputChange('state_id', value || '')}
+                placeholder="Select State"
+                disabled={!formData.country_id}
+                className="ui-dropdown-custom--full-width"
+              />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">City</label>
+              <DropdownSelector
+                options={[{ value: '', label: 'Select City' }, ...cities.map(city => ({ value: city.id, label: city.name }))]}
+                value={formData.city_id || ''}
+                onChange={(value) => handleInputChange('city_id', value || '')}
+                placeholder="Select City"
+                disabled={!formData.state_id}
+                className="ui-dropdown-custom--full-width"
+              />
+            </div>
+            <div className="form-group">
+              <label className="ui-label">Zones</label>
+              <ZonesMultiDropdown zones={zones} selectedZones={formData.zones} onChange={(selected) => handleInputChange('zones', selected)} onOpen={fetchZones} />
+            </div>
+          </div>
+        </section>
 
-    // Get phone number from salesman to find associated user
-    const salesmanPhone = row.phone || row.phoneNumber || '';
+        <section className="sx-sec">
+          <h3 className="sx-sec__h">Working states</h3>
+          <p className="sx-sec__d">Parties, orders and reports are limited to these states. Parties in these states are assigned to this salesman automatically.</p>
+          <div className="form-group form-group--full">
+            <label className="ui-label">States *</label>
+            <StatesMultiDropdown
+              states={states}
+              selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
+              onChange={(selected) => handleInputChange('state_ids', selected)}
+            />
+          </div>
+        </section>
 
-    // Also check if user_id is directly available in the row
-    const userId = row.user_id || row.userId;
-
-    // Optimistically remove from table immediately
-    const salesmanName = row.full_name || 'Salesman';
-    setSalesmen(prev => prev.filter(s => {
-      const id = s.id || s.salesman_id || s.salesmanId;
-      return id !== salesmanId;
-    }));
-
-    try {
-      setLoading(true);
-      setError(null);
-      console.log('[Delete Salesman] Deleting salesman with ID:', salesmanId);
-
-      // Delete salesman first
-      await deleteSalesman(salesmanId);
-      console.log('[Delete Salesman] Salesman deleted successfully');
-
-      // Now find and delete associated user account
-      let userToDelete = null;
-
-      // First, try to use user_id if available
-      if (userId) {
-        try {
-          const { deleteUser } = await import('../services/apiService');
-          console.log('[Delete Salesman] Deleting user account with ID:', userId);
-          await deleteUser(userId);
-          console.log('[Delete Salesman] User account deleted successfully');
-          showSuccess('Salesman and associated user account deleted successfully');
-          setError(null);
-          return;
-        } catch (userDeleteError) {
-          console.warn('[Delete Salesman] Failed to delete user by user_id, trying by phone:', userDeleteError);
-        }
-      }
-
-      // If user_id not available or deletion failed, try finding by phone number
-      if (salesmanPhone) {
-        try {
-          const { getUsers, deleteUser } = await import('../services/apiService');
-          console.log('[Delete Salesman] Finding user account with phone:', salesmanPhone);
-
-          // Get all users
-          const usersResponse = await getUsers();
-          let usersArray = [];
-          if (Array.isArray(usersResponse)) {
-            usersArray = usersResponse;
-          } else if (usersResponse && Array.isArray(usersResponse.data)) {
-            usersArray = usersResponse.data;
-          } else if (usersResponse && Array.isArray(usersResponse.users)) {
-            usersArray = usersResponse.users;
-          }
-
-          console.log('[Delete Salesman] Total users found:', usersArray.length);
-
-          // Normalize phone numbers for comparison (remove +, spaces, dashes)
-          const normalizePhone = (phone) => {
-            if (!phone) return '';
-            return String(phone).trim().replace(/^\+/, '').replace(/[\s-]/g, '');
-          };
-
-          const normalizedSalesmanPhone = normalizePhone(salesmanPhone);
-
-          // Find user by phone number
-          const foundUser = usersArray.find(u => {
-            const userPhone = (u.phone || u.phoneNumber || '').trim();
-            const normalizedUserPhone = normalizePhone(userPhone);
-
-            return userPhone === salesmanPhone ||
-              normalizedUserPhone === normalizedSalesmanPhone ||
-              userPhone === `+${salesmanPhone}` ||
-              `+${userPhone}` === salesmanPhone;
-          });
-
-          if (foundUser) {
-            const foundUserId = foundUser.user_id || foundUser.id;
-            console.log('[Delete Salesman] Found associated user account:', {
-              userId: foundUserId,
-              userPhone: foundUser.phone || foundUser.phoneNumber,
-              userName: foundUser.full_name || foundUser.name
-            });
-
-            try {
-              await deleteUser(foundUserId);
-              console.log('[Delete Salesman] User account deleted successfully');
-              showSuccess('Salesman and associated user account deleted successfully');
-            } catch (deleteError) {
-              console.error('[Delete Salesman] Error calling deleteUser:', deleteError);
-              throw deleteError;
-            }
-          } else {
-            console.warn('[Delete Salesman] No user account found with phone:', salesmanPhone);
-            console.warn('[Delete Salesman] Available user phones:', usersArray.map(u => ({
-              id: u.user_id || u.id,
-              phone: u.phone || u.phoneNumber,
-              name: u.full_name || u.name
-            })));
-            showSuccess('Salesman deleted successfully. (No associated user account found - check console for details)');
-          }
-        } catch (userDeleteError) {
-          console.error('[Delete Salesman] Error deleting user account:', userDeleteError);
-          console.error('[Delete Salesman] Error details:', {
-            message: userDeleteError.message,
-            errorData: userDeleteError.errorData,
-            statusCode: userDeleteError.statusCode
-          });
-          showSuccess('Salesman deleted successfully. (User account deletion failed - check console for details)');
-        }
-      } else {
-        console.warn('[Delete Salesman] No phone number or user_id found in salesman record');
-        console.warn('[Delete Salesman] Salesman row data:', row);
-        showSuccess('Salesman deleted successfully');
-      }
-
-      setError(null);
-    } catch (error) {
-      console.error('[Delete Salesman] Delete salesman error:', error);
-
-      // Revert optimistic update on error
-      if (selectedCountryFilter) {
-        await fetchSalesmenForCountry(selectedCountryFilter);
-      } else {
-        // If no filter, we can't easily restore, so just show error
-        setError(`Failed to delete: ${error.message}`);
-      }
-
-      if (!error.message?.toLowerCase().includes('token expired') &&
-        !error.message?.toLowerCase().includes('unauthorized')) {
-        showError(`Failed to delete salesman: ${error.message}`);
-      }
-    } finally {
-      setLoading(false);
-    }
+        <section className="sx-sec">
+          <h3 className="sx-sec__h">Documents{isEdit ? <span className="sx-sec__opt"> (upload only to replace)</span> : null}</h3>
+          <p className="sx-sec__d">PAN, Aadhaar and cheque accept an image or PDF; the photo must be an image. Max 5MB each.</p>
+          <p className="ord-view__lock party-form__lock sx-lock"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M6 11h12v9H6zM9 11V8a3 3 0 0 1 6 0v3" /></svg><span>Only admin and sales managers can open these files.</span></p>
+          <div className="sx-grid sx-docs">
+            {docs.map((doc) => (
+              <FileUpload
+                key={doc.key}
+                label={doc.label}
+                accept={doc.accept}
+                hint={doc.hint}
+                {...(isEdit ? { existingUrl: resolveUploadUrl(editRow && editRow[doc.urlKey]) } : { required: true })}
+                file={formData[doc.key]}
+                onChange={(f) => handleInputChange(doc.key, f)}
+              />
+            ))}
+          </div>
+        </section>
+      </>
+    );
   };
 
+  // A salesman is never deleted (their records are kept). Use the Active/Inactive badge instead:
+  // an inactive salesman cannot sign in, and their tray becomes inactive once it is empty.
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -1193,7 +1192,6 @@ const DashboardSuppliers = () => {
       const trimmedReportingManager = formData.reporting_manager ? String(formData.reporting_manager).trim() : '';
 
       const dataToSend = {
-        user_id: editRow?.user_id || currentUserId,
         employee_code: formData.employee_code.trim(),
         alternate_phone: formData.alternate_phone ? formData.alternate_phone.trim() : '',
         full_name: formData.full_name.trim(),
@@ -1251,11 +1249,13 @@ const DashboardSuppliers = () => {
         try {
           await updateSalesman(salesmanId, {
             ...dataToSend,
+            user_id: editRow.user_id,
             is_active: editRow.is_active !== undefined ? editRow.is_active : true
           });
 
           // Show success notification
           showSuccess('Salesman updated successfully');
+          fetchSalesmenForCountry();
           setError(null);
           setOpenAdd(false);
           setEditRow(null);
@@ -1263,10 +1263,8 @@ const DashboardSuppliers = () => {
         } catch (error) {
           console.error('Update salesman error:', error);
 
-          // Revert optimistic update on error by refetching
-          if (selectedCountryFilter) {
-            await fetchSalesmenForCountry(selectedCountryFilter);
-          }
+          // Revert optimistic update on error by refetching the page
+          fetchSalesmenForCountry();
 
           if (!error.message?.toLowerCase().includes('token expired') &&
             !error.message?.toLowerCase().includes('unauthorized')) {
@@ -1298,19 +1296,10 @@ const DashboardSuppliers = () => {
             phone: phoneNumber,
           };
 
-          const newSalesman = await createSalesman(salesmanData);
+          await createSalesman(salesmanData);
 
-          // Optimistically add to table if it matches the current filter
-          if (selectedCountryFilter && newSalesman && newSalesman.country_id === selectedCountryFilter) {
-            setSalesmen(prev => [...prev, {
-              ...newSalesman,
-              id: newSalesman.id || newSalesman.salesman_id,
-              isActive: newSalesman.is_active !== false,
-            }]);
-          } else if (selectedCountryFilter) {
-            // If country doesn't match filter, just refresh
-            await fetchSalesmenForCountry(selectedCountryFilter);
-          }
+          // Refetch the current page so the new salesman, the counts and the page count are right.
+          fetchSalesmenForCountry();
 
           // Show success notification
           showSuccess('Salesman created successfully');
@@ -1322,9 +1311,7 @@ const DashboardSuppliers = () => {
           console.error('Create salesman error:', createError);
 
           // Revert by refreshing if needed
-          if (selectedCountryFilter) {
-            await fetchSalesmenForCountry(selectedCountryFilter);
-          }
+          fetchSalesmenForCountry();
 
           if (!createError.message?.toLowerCase().includes('token expired') &&
             !createError.message?.toLowerCase().includes('unauthorized')) {
@@ -1347,19 +1334,16 @@ const DashboardSuppliers = () => {
   };
 
   // ---- Check-in handlers ----
-  // datetime-local value for "now" (YYYY-MM-DDTHH:mm) — local time, no seconds.
-  const nowDatetimeLocal = () => {
-    const d = new Date();
-    const pad = (n) => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  };
+  // "Now" as YYYY-MM-DDTHH:mm in Indian time (IST), whatever the phone's own time zone is.
+
   // Default in/out time to "now" (the visit is being logged on the spot); the
   // salesman can adjust. Done here (a client-side user action) — not in the
   // initial state — to avoid an SSR/client hydration mismatch from new Date().
-  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: nowDatetimeLocal(), out_time: nowDatetimeLocal(), next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
+  const resetCheckinForm = () => setCheckinForm({ salesman_id: '', check_in_date: '', party_id: '', contact_person: '', in_time: '', out_time: '', next_visit_date: '', latitude: '', longitude: '', check_in_remarks: '' });
 
   const handleCheckinSubmit = async (e) => {
     e.preventDefault();
+    if (capturePending) { showError('Confirm or cancel the location capture before saving the visit.'); return; }
     if (!checkinForm.party_id) {
       showError('Please select a party before saving.');
       return;
@@ -1368,32 +1352,38 @@ const DashboardSuppliers = () => {
       showError('Please enter the contact person.');
       return;
     }
-    if (!checkinForm.in_time) {
-      showError('Please set the in time.');
-      return;
-    }
-    if (!checkinForm.out_time) {
-      showError('Please set the out time.');
-      return;
-    }
     if (!checkinForm.next_visit_date) {
       showError('Please set the next visit date.');
       return;
+    }
+    {
+      const todayStr = istNow().slice(0, 10);
+      if (checkinForm.next_visit_date < todayStr) {
+        showError('Next visit date cannot be in the past.');
+        return;
+      }
     }
     try {
       setCheckinsLoading(true);
       // Auto-capture location and date for salesman
       let latitude = checkinForm.latitude;
       let longitude = checkinForm.longitude;
-      const checkInDate = new Date().toISOString().split('T')[0];
+      let accuracy;
+      // Keep the original date when editing; only a new check-in gets today's date.
+      const checkInDate = editCheckin?.check_in_date || istNow().slice(0, 10);
 
-      if (isSalesman && navigator.geolocation) {
-        await new Promise((resolve) => {
-          navigator.geolocation.getCurrentPosition(
-            (pos) => { latitude = String(pos.coords.latitude); longitude = String(pos.coords.longitude); resolve(); },
-            () => resolve() // proceed even if denied
-          );
-        });
+      // A salesman's new check-in must carry their GPS (the server enforces the
+      // geofence with it). Editing an existing check-in keeps its stored location.
+      if (isSalesman && !editCheckin) {
+        try {
+          const pos = await captureCurrentPosition();
+          latitude = String(pos.latitude);
+          longitude = String(pos.longitude);
+          accuracy = Number.isFinite(Number(pos.accuracy)) ? Number(pos.accuracy) : undefined;
+        } catch (geoErr) {
+          showError(geoErr?.message || 'Could not get your location. Please allow location access and try again.');
+          return;
+        }
       }
 
       const currentUser = getUser();
@@ -1408,11 +1398,11 @@ const DashboardSuppliers = () => {
         party_id: checkinForm.party_id,
         contact_person: checkinForm.contact_person.trim(),
         type: checkinType,
-        in_time: checkinForm.in_time,
-        out_time: checkinForm.out_time,
+        // In and out time are no longer asked: the server stamps a new visit with the time it was saved.
         next_visit_date: checkinForm.next_visit_date,
         latitude,
         longitude,
+        ...(accuracy !== undefined ? { accuracy } : {}),
         check_in_remarks: checkinForm.check_in_remarks,
       };
       if (checkinType === 'ordered' && editCheckin?.order_id) {
@@ -1422,8 +1412,16 @@ const DashboardSuppliers = () => {
         await updateSalesmanCheckin(editCheckin.id, payload);
         showSuccess('Visit report updated successfully');
       } else {
-        await createSalesmanCheckin(payload);
-        showSuccess('Visit report created successfully');
+        // No signal (or the server cannot be reached): keep the visit on this phone and send it later.
+        try {
+          if (typeof navigator !== 'undefined' && navigator.onLine === false) throw Object.assign(new Error('offline'), {});
+          await createSalesmanCheckin(payload);
+          showSuccess('Visit report created successfully');
+        } catch (sendErr) {
+          if (!isNetworkError(sendErr)) throw sendErr;
+          queueCheckin(payload);
+          showInfo('', null, 'Saved on this phone', `${sendErr.message || 'The visit could not be sent right now'}. This visit is kept and will be sent automatically when the connection or server is back.`);
+        }
       }
       setOpenCheckinModal(false);
       setEditCheckin(null);
@@ -1473,6 +1471,9 @@ const DashboardSuppliers = () => {
     }
   };
 
+  // A target that has started keeps its date, party and order type; only the amount changes.
+  const targetLocked = !!editTarget?.start_date && new Date(editTarget.start_date).getTime() <= Date.now();
+
   const handleTargetEdit = (row) => {
     setEditTarget(row);
     setTargetForm({
@@ -1498,9 +1499,25 @@ const DashboardSuppliers = () => {
     }
   };
 
+  // The salesman home's "Add visit" shortcut lands here with ?addVisit=1: open the form once, then clean the address.
+  useEffect(() => {
+    if (!isSalesman || typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    if (q.get('addVisit') !== '1') return;
+    q.delete('addVisit');
+    const rest = q.toString();
+    window.history.replaceState(null, '', window.location.pathname + (rest ? `?${rest}` : ''));
+    setMainTab('Visit Report');
+    resetCheckinForm();
+    setEditCheckin(null);
+    setOpenCheckinModal(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSalesman]);
+
   return (
     <div className="dash-page">
       <div className="dash-container">
+        <div className="pg-head"><div><h1>Salesmen</h1><p>Targets, visits and the states each one works in.</p></div></div>
         {/* Main tabs */}
         <div className="dash-row">
           <div className="order-tabs-container">
@@ -1524,7 +1541,62 @@ const DashboardSuppliers = () => {
         {/* Salesmen Table - admin only */}
         {!isSalesman && mainTab === 'Salesmen' && (
           <div className="dash-row">
-            <div className="dash-card full">
+            <div className="dash-card full sm-fit">
+              <div className="sx-filters" role="search">
+                <label className="sx-search">
+                  <FiSearch size={16} aria-hidden="true" />
+                  <input
+                    type="search"
+                    className="sx-search__input"
+                    placeholder="Search name, code or phone"
+                    aria-label="Search salesmen"
+                    value={listQuery}
+                    onChange={(e) => setListQuery(e.target.value)}
+                  />
+                </label>
+                <div className="sx-select">
+                  <DropdownSelector
+                    options={countries.map((country) => ({ value: country.id, label: country.name }))}
+                    value={selectedCountryFilter || ''}
+                    onChange={(value) => {
+                      // Salesmen are always loaded per country, so there is no "All" option
+                      if (!value) return;
+                      setSalesmen([]);
+                      setHasSearched(false);
+                      setStateFilter('');
+                      setSalesPage(1);
+                      setSelectedCountryFilter(value);
+                    }}
+                    placeholder="Country"
+                    searchable={false}
+                    className="ui-dropdown-custom--full-width"
+                  />
+                </div>
+                <div className="sx-select">
+                  <DropdownSelector
+                    options={[{ value: '', label: 'All states' }, ...stateFilterOptions]}
+                    value={stateFilter}
+                    onChange={(v) => { setStateFilter(v); setSalesPage(1); }}
+                    placeholder="All states"
+                    className="ui-dropdown-custom--full-width"
+                  />
+                </div>
+                <div className="sx-select">
+                  <DropdownSelector
+                    options={[
+                      { value: '', label: salesCounts ? `All status (${salesCounts.all})` : 'All status' },
+                      { value: 'active', label: salesCounts ? `Active (${salesCounts.active})` : 'Active' },
+                      { value: 'inactive', label: salesCounts ? `Inactive (${salesCounts.inactive})` : 'Inactive' },
+                    ]}
+                    value={statusFilter}
+                    onChange={(v) => { setStatusFilter(v); setSalesPage(1); }}
+                    placeholder="All status"
+                    searchable={false}
+                    className="ui-dropdown-custom--full-width"
+                  />
+                </div>
+                <button type="button" className="ui-btn ui-btn--primary sx-add" onClick={handleAdd}>Add salesman</button>
+              </div>
               {error ? (
                 <div className="ui-state ui-state--error">
                   <div className="ui-state__icon">
@@ -1541,7 +1613,7 @@ const DashboardSuppliers = () => {
                     onClick={() => {
                       setError(null);
                       if (selectedCountryFilter) {
-                        fetchSalesmenForCountry(selectedCountryFilter);
+                        fetchSalesmenForCountry();
                       } else {
                         window.location.reload();
                       }
@@ -1563,60 +1635,72 @@ const DashboardSuppliers = () => {
                   <p className="ui-state__title">No salesmen yet</p>
                   <p className="ui-state__desc">
                     {selectedCountryFilter
-                      ? 'No salesmen found for the selected country. Add one to get started.'
-                      : 'Select a country to view salesmen, or add a new salesman to get started.'}
+                      ? `No salesmen found for ${countries.find(c => String(c.id) === String(selectedCountryFilter))?.name || 'the selected country'}. Pick another country above, or add a new salesman.`
+                      : 'Pick a country above to view salesmen, or add a new salesman to get started.'}
                   </p>
                   <button className="ui-btn ui-btn--primary" onClick={handleAdd}>
                     Add New Salesman
                   </button>
                 </div>
               ) : (
-                <TableWithControls
-                  title="Salesmen"
-                  columns={columns}
-                  rows={rows}
-                  onAddNew={handleAdd}
-                  addNewText="Add New Salesman"
-                  onImport={() => {
-                    setError(null);
-                    if (selectedCountryFilter) {
-                      fetchSalesmenForCountry(selectedCountryFilter);
-                    }
-                  }}
-                  importText="Refresh Data"
-                  showFilter={true}
-                  filterContent={
-                    <div>
-                      <label className="mb-2 block text-xs font-semibold uppercase tracking-[var(--tracking-label)] text-text-subtle">
-                        Filter by Country
-                      </label>
-                      <DropdownSelector
-                        options={[
-                          { value: '', label: 'All Countries' },
-                          ...countries.map(country => ({
-                            value: country.id,
-                            label: country.name
-                          }))
-                        ]}
-                        value={selectedCountryFilter || ''}
-                        onChange={(value) => {
-                          const newCountryId = value || null;
-                          setSalesmen([]);
-                          setHasSearched(false);
-                          setSelectedCountryFilter(newCountryId);
-                          if (!newCountryId) {
-                            setSalesmen([]);
-                            setHasSearched(false);
-                            setLoading(false);
-                          }
-                        }}
-                        placeholder="All Countries"
-                        className="ui-dropdown-custom--full-width"
-                      />
-                    </div>
-                  }
-                  loading={loading}
-                />
+<>
+                  <div className="sx-cards" aria-label="Salesmen">
+                    {loading && rows.length === 0 ? <p className="sx-cards__note">Loading salesmen...</p> : rows.length === 0 ? <p className="sx-cards__note">No salesmen match these filters.</p> : rows.map(row => {
+                      const sid = row.id || row.salesman_id;
+                      return (
+                        <article key={sid} className="sx-card">
+                          <div className="sx-card__top">
+                            <span className="sm-pic" aria-hidden="true">{initialsOf(row.full_name)}</span>
+                            <div className="sx-card__who">
+                              <strong>{row.full_name}</strong>
+                              <small>{[row.employee_code, row.phone].filter(Boolean).join(' · ')}</small>
+                            </div>
+                            {renderStatusButton(row)}
+                          </div>
+                          <div className="sx-card__states">{renderStatePills(row)}</div>
+                          <div className="sx-card__meta">
+                            <span><b>{row.visits_today || 0}</b> visits today</span>
+                            {renderTargetBar(row)}
+                          </div>
+                          <div className="sx-card__act">
+                            <button type="button" className="ui-btn ui-btn--secondary" onClick={() => handleEdit(row)}>Edit</button>
+                            {row.phone ? <a className="ui-btn ui-btn--secondary" href={`tel:${row.phone}`}>Call</a> : null}
+                          </div>
+                        </article>
+                      );
+                    })}
+                    {salesPagination.totalPages > 1 ? (
+                      <Pagination page={salesPage} pageCount={salesPagination.totalPages} onPageChange={(p) => setSalesPage(p)} />
+                    ) : null}
+                  </div>
+                  <div className="sx-tablewrap" style={loading && rows.length > 0 ? { opacity: 0.55, transition: 'opacity .15s' } : undefined} aria-busy={loading}>
+                    <TableWithControls
+                      title="Salesmen"
+                      columns={columns}
+                      rows={rows}
+                      onAddNew={handleAdd}
+                      addNewText="Add salesman"
+                      onImport={() => {
+                        setError(null);
+                        if (selectedCountryFilter) {
+                          fetchSalesmenForCountry();
+                        }
+                      }}
+                      importText="Refresh"
+                      showFilter={false}
+                      showSerialNumber={false}
+                      loading={loading && rows.length === 0}
+                      itemName="Salesmen"
+                      serverPagination
+                      serverPage={salesPage}
+                      serverPageCount={salesPagination.totalPages}
+                      serverPageSize={SALESMEN_PER_PAGE}
+                      serverTotal={salesPagination.total}
+                      onServerPageChange={(p) => setSalesPage(p)}
+                      onServerSearch={(q) => setListQuery(q)}
+                    />
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1626,7 +1710,7 @@ const DashboardSuppliers = () => {
         {mainTab === 'Visit Report' && (
           <div className="dash-row">
             <div className="dash-card full">
-              {!checkinsLoading && checkins.length === 0 ? (
+              {!checkinsLoading && checkins.length === 0 && !visitSearch ? (
                 <div className="ui-state ui-state--empty">
                   <div className="ui-state__icon">
                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1650,6 +1734,53 @@ const DashboardSuppliers = () => {
                   )}
                 </div>
               ) : (
+                <>
+                {/* On phones the visits show as cards and the table (with its Add button) is hidden, so the salesman needs the button here. */}
+                {isSalesman && (
+                  <button
+                    type="button"
+                    className="ui-btn ui-btn--primary sx-addvisit"
+                    onClick={() => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); }}
+                  >
+                    Add visit
+                  </button>
+                )}
+                <div className="sx-cards" aria-label="Visit report">
+                  {checkinsLoading && checkins.length === 0 ? <p className="sx-cards__note">Loading visits...</p> : checkins.map((row, i) => {
+                    const raw = String(row.order_notes || row.check_in_remarks || '');
+                    const text = raw.replace(/^\s*\[In progress\]\s*/i, '').trim();
+                    const inProgress = row.in_progress === true || /^\s*\[In progress\]/i.test(raw);
+                    return (
+                      <article key={row.id || row.check_in_id || i} className="sx-card">
+                        <div className="sx-card__top">
+                          <div className="sx-card__who">
+                            <strong>{row.party_name || partyNameMap[row.party_id] || row.party_id || '-'}</strong>
+                            <small>
+                              {!isSalesman ? `${salesmanNameMap[row.salesman_id] || row.salesman_id || '-'} · ` : ''}
+                              {row.check_in_date ? new Date(row.check_in_date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-'}
+                            </small>
+                          </div>
+                          <StatusBadge status={row.type === 'ordered' ? 'completed' : 'processing'}>{row.type === 'ordered' ? 'Order' : 'Visit'}</StatusBadge>
+                        </div>
+                        {(Number(row.order_total) > 0 || text || inProgress) ? (
+                          <div className="sx-card__meta">
+                            {Number(row.order_total) > 0 ? <b>{`₹${Number(row.order_total).toLocaleString('en-IN')}`}</b> : null}
+                            <span className="sn-reason">{inProgress ? <span className="sn-prog-pill">In progress</span> : null}{text}</span>
+                          </div>
+                        ) : null}
+                        {row.latitude != null && row.longitude != null ? (
+                          <div className="sx-card__act">
+                            <a className="ui-btn ui-btn--secondary" href={`https://www.google.com/maps?q=${row.latitude},${row.longitude}`} target="_blank" rel="noopener noreferrer"><FiMapPin size={16} aria-hidden="true" /> View on map</a>
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                  {visitPagination.totalPages > 1 ? (
+                    <Pagination page={visitPage} pageCount={visitPagination.totalPages} onPageChange={(p) => fetchCheckins(p)} />
+                  ) : null}
+                </div>
+                <div className="sx-tablewrap" style={checkinsLoading && checkins.length > 0 ? { opacity: 0.55, transition: 'opacity .15s' } : undefined} aria-busy={checkinsLoading}>
                 <TableWithControls
                   title="Visit Report"
                   columns={[
@@ -1663,7 +1794,18 @@ const DashboardSuppliers = () => {
                     { key: 'party_id', label: 'PARTY', render: (_v, row) => row.party_name || partyNameMap[row.party_id] || row.party_id || '-' },
                     { key: 'order_qty', label: 'QTY', render: (v) => (v != null && Number(v) > 0) ? Number(v).toLocaleString('en-IN') : '-' },
                     { key: 'order_total', label: 'AMOUNT', render: (v) => (v != null && Number(v) > 0) ? `₹${Number(v).toLocaleString('en-IN')}` : '-' },
-                    { key: 'check_in_remarks', label: 'REASON', render: (v, row) => (row.order_notes || v) || '-' },
+                    { key: 'check_in_remarks', label: 'REASON', render: (v, row) => {
+                      // A visit started from the home screen is saved as "[In progress]" until the visit report is completed.
+                      const raw = String(row.order_notes || v || '');
+                      const inProgress = row.in_progress === true || /^\s*\[In progress\]/i.test(raw);
+                      const text = raw.replace(/^\s*\[In progress\]\s*/i, '').trim();
+                      return (
+                        <span className="sn-reason">
+                          {inProgress ? <span className="sn-prog-pill">In progress</span> : null}
+                          {text || (inProgress ? '' : '-')}
+                        </span>
+                      );
+                    } },
                     {
                       key: 'location', label: 'LOCATION', render: (_v, row) => {
                         const hasDev = row.latitude != null && row.longitude != null;
@@ -1691,16 +1833,40 @@ const DashboardSuppliers = () => {
                   rows={checkins}
                   onAddNew={isSalesman ? () => { resetCheckinForm(); setEditCheckin(null); setOpenCheckinModal(true); } : undefined}
                   addNewText="Add Visit Report"
-                  onImport={fetchCheckins}
+                  onImport={() => fetchCheckins()}
                   importText="Refresh"
-                  loading={checkinsLoading}
+                  showSerialNumber={false}
+                  loading={checkinsLoading && checkins.length === 0}
+                  itemName="Visits"
+                  serverPagination
+                  serverPage={visitPage}
+                  serverPageCount={visitPagination.totalPages}
+                  serverPageSize={VISITS_PER_PAGE}
+                  serverTotal={visitPagination.total}
+                  onServerPageChange={(p) => fetchCheckins(p)}
+                  onServerSearch={(q) => { setVisitSearch(q); fetchCheckins(1, q); }}
                 />
+                </div>
+                </>
               )}
             </div>
           </div>
         )}
 
         {/* Targets Table - admin only */}
+        {!isSalesman && mainTab === 'Targets' && targets.length > 0 && (() => {
+          const goal = targets.reduce((n, t) => n + (Number(t.target_amount) || 0), 0);
+          const done = targets.reduce((n, t) => n + (Number(t.completed_amount) || 0), 0);
+          const pct = goal > 0 ? Math.round((done / goal) * 100) : 0;
+          const inr = (n) => `₹${Math.round(n).toLocaleString('en-IN')}`;
+          return (
+            <div className="dash-row dash-kpis sm-target-cards">
+                <div className="dash-card metric"><h4>Achieved</h4><div className="metric-value">{inr(done)}</div><div className="metric-sub">of {inr(goal)} target</div></div>
+                <div className="dash-card metric"><h4>Due</h4><div className="metric-value">{inr(Math.max(0, goal - done))}</div><div className="metric-sub">still to reach</div></div>
+                <div className="dash-card metric"><h4>Percent</h4><div className="metric-value">{pct}%</div><div className="metric-sub"><span className="prog" role="img" aria-label={`${pct} percent`}><i style={{ width: `${Math.min(100, pct)}%` }} /></span></div></div>
+            </div>
+          );
+        })()}
         {!isSalesman && mainTab === 'Targets' && (
           <div className="dash-row">
             <div className="dash-card full">
@@ -1723,6 +1889,37 @@ const DashboardSuppliers = () => {
                   </button>
                 </div>
               ) : (
+                <>
+                <div className="sx-cards" aria-label="Targets">
+                  {targetsLoading ? <p className="sx-cards__note">Loading targets...</p> : targets.map((row, i) => {
+                    const fmtD = (v) => v ? new Date(v).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '-';
+                    const goal = Number(row.target_amount) || 0;
+                    const done = Number(row.completed_amount) || 0;
+                    const pct = goal > 0 ? Math.min(100, Math.round((done / goal) * 100)) : 0;
+                    return (
+                      <article key={row.id || row.target_id || i} className="sx-card">
+                        <div className="sx-card__top">
+                          <div className="sx-card__who">
+                            <strong>{!isSalesman ? (salesmanNameMap[row.salesman_id] || row.salesman_id || '-') : (row.order_type || 'Overall')}</strong>
+                            <small>{fmtD(row.start_date)} to {fmtD(row.end_date)}{!isSalesman ? ` · ${row.order_type || 'Overall'}` : ''}</small>
+                          </div>
+                          <span className={`ui-badge ${row.target_status === 'pending' || !row.target_status ? 'ui-badge--warning' : 'ui-badge--success'}`}>{row.target_status || 'pending'}</span>
+                        </div>
+                        <div className="sx-card__meta">
+                          <b>{goal ? `₹${goal.toLocaleString('en-IN')}` : '-'}</b>
+                          <span className="sm-prog"><span className="prog" role="img" aria-label={`${pct} percent`}><i style={{ width: `${pct}%` }} /></span><span className="sm-prog__n">{pct}%</span></span>
+                        </div>
+                        {row.target_description ? <p className="sx-card__note">{row.target_description}</p> : null}
+                        {!isSalesman ? (
+                          <div className="sx-card__act">
+                            <button type="button" className="ui-btn ui-btn--secondary" onClick={() => handleTargetEdit(row)}>Edit</button>
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+                <div className="sx-tablewrap">
                 <TableWithControls
                   title="Salesman Targets"
                   columns={[
@@ -1744,7 +1941,7 @@ const DashboardSuppliers = () => {
                     { key: 'target_description', label: 'DESCRIPTION' },
                     ...(!isSalesman ? [{
                       key: 'action', label: 'ACTION', render: (_v, row) => (
-                        <RowActions onEdit={() => handleTargetEdit(row)} onDelete={() => handleTargetDelete(row)} />
+                        <RowActions onEdit={() => handleTargetEdit(row)}/>
                       )
                     }] : []),
                   ]}
@@ -1753,8 +1950,11 @@ const DashboardSuppliers = () => {
                   addNewText="Set Target"
                   onImport={fetchTargets}
                   importText="Refresh"
+                  showSerialNumber={false}
                   loading={targetsLoading}
                 />
+                </div>
+                </>
               )}
             </div>
           </div>
@@ -1766,11 +1966,11 @@ const DashboardSuppliers = () => {
           setOpenAdd(false);
           resetForm();
         }}
-        title="Add New Salesman"
+        title="Add salesman"
         footer={(
           <>
             <button
-              className="ui-btn ui-btn--secondary"
+              className="ui-btn ui-btn--secondary sx-foot-btn"
               onClick={() => {
                 setOpenAdd(false);
                 resetForm();
@@ -1780,191 +1980,16 @@ const DashboardSuppliers = () => {
               Cancel
             </button>
             <button
-              className="ui-btn ui-btn--primary"
+              className="ui-btn ui-btn--primary sx-foot-btn"
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? 'Saving...' : 'Save salesman'}
             </button>
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Employee Code *</label>
-            <input
-              className="ui-input"
-              placeholder="Employee code"
-              value={formData.employee_code}
-              onChange={(e) => handleInputChange('employee_code', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Full Name *</label>
-            <input
-              className="ui-input"
-              placeholder="Full name"
-              value={formData.full_name}
-              onChange={(e) => handleInputChange('full_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Email *</label>
-            <input
-              className="ui-input"
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Phone *</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
-              onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                required: true,
-                placeholder: 'Enter your phone number',
-              }}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Alternate Phone</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.alternate_phone ? (String(formData.alternate_phone).startsWith('+') ? String(formData.alternate_phone) : '+' + formData.alternate_phone) : ''}
-              onChange={(phone) => handleInputChange('alternate_phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                placeholder: 'Enter alternate phone number',
-              }}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address *</label>
-            <input
-              className="ui-input"
-              placeholder="Address"
-              required
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Country *</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Country' },
-                ...countries.map(country => ({
-                  value: country.id,
-                  label: country.name
-                }))
-              ]}
-              value={formData.country_id || ''}
-              onChange={(value) => handleInputChange('country_id', value || '')}
-              placeholder="Select Country"
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">State</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select State' },
-                ...states.map(state => ({
-                  value: state.id,
-                  label: state.name
-                }))
-              ]}
-              value={formData.state_id || ''}
-              onChange={(value) => handleInputChange('state_id', value || '')}
-              placeholder="Select State"
-              disabled={!formData.country_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">City</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select City' },
-                ...cities.map(city => ({
-                  value: city.id,
-                  label: city.name
-                }))
-              ]}
-              value={formData.city_id || ''}
-              onChange={(value) => handleInputChange('city_id', value || '')}
-              placeholder="Select City"
-              disabled={!formData.state_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Zones</label>
-            <ZonesMultiDropdown
-              zones={zones}
-              selectedZones={formData.zones}
-              onChange={(selected) => handleInputChange('zones', selected)}
-              onOpen={fetchZones}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Working States * <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
-            <StatesMultiDropdown
-              states={states}
-              selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
-              onChange={(selected) => handleInputChange('state_ids', selected)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Reporting Manager</label>
-            <input
-              className="ui-input"
-              placeholder="Reporting manager"
-              value={formData.reporting_manager}
-              onChange={(e) => handleInputChange('reporting_manager', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Joining Date</label>
-            <DatePicker
-              value={formData.joining_date}
-              onChange={(v) => handleInputChange('joining_date', v)}
-              placeholder="Joining date"
-            />
-          </div>
-          {renderActiveToggle()}
-          {/* KYC documents — all compulsory on create */}
-          <div className="form-group form-group--full">
-            <label className="ui-label">KYC Documents *</label>
-            <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[
-                { key: 'pan_card', label: 'PAN Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'aadhar_card', label: 'Aadhar Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'cancel_cheque', label: 'Cancel Cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'photo', label: 'Photo', accept: 'image/*', hint: 'Image only' },
-              ].map((doc) => (
-                <FileUpload
-                  key={doc.key}
-                  label={doc.label}
-                  accept={doc.accept}
-                  hint={doc.hint}
-                  required
-                  file={formData[doc.key]}
-                  onChange={(f) => handleInputChange(doc.key, f)}
-                />
-              ))}
-            </div>
-          </div>
-        </form>
+        <form className="ui-form sx-form rf-form" onSubmit={handleSubmit}>{renderSalesmanFields(false)}</form>
       </AsidePanel>
       <AsidePanel
         open={!!editRow}
@@ -1972,11 +1997,11 @@ const DashboardSuppliers = () => {
           setEditRow(null);
           resetForm();
         }}
-        title="Edit Salesman"
+        title="Edit salesman"
         footer={(
           <>
             <button
-              className="ui-btn ui-btn--secondary"
+              className="ui-btn ui-btn--secondary sx-foot-btn"
               onClick={() => {
                 setEditRow(null);
                 resetForm();
@@ -1986,190 +2011,16 @@ const DashboardSuppliers = () => {
               Cancel
             </button>
             <button
-              className="ui-btn ui-btn--primary"
+              className="ui-btn ui-btn--primary sx-foot-btn"
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? 'Updating...' : 'Update'}
+              {loading ? 'Updating...' : 'Update salesman'}
             </button>
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Employee Code *</label>
-            <input
-              className="ui-input"
-              placeholder="Employee code"
-              value={formData.employee_code}
-              onChange={(e) => handleInputChange('employee_code', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Full Name *</label>
-            <input
-              className="ui-input"
-              placeholder="Full name"
-              value={formData.full_name}
-              onChange={(e) => handleInputChange('full_name', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Email *</label>
-            <input
-              className="ui-input"
-              type="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={(e) => handleInputChange('email', e.target.value)}
-              required
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Phone *</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.phone ? (String(formData.phone).startsWith('+') ? String(formData.phone) : '+' + formData.phone) : ''}
-              onChange={(phone) => handleInputChange('phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                required: true,
-                placeholder: 'Enter your phone number',
-              }}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Alternate Phone</label>
-            <PhoneInput
-              defaultCountry="in"
-              value={formData.alternate_phone ? (String(formData.alternate_phone).startsWith('+') ? String(formData.alternate_phone) : '+' + formData.alternate_phone) : ''}
-              onChange={(phone) => handleInputChange('alternate_phone', phone.replace(/^\+/, ''))}
-              className="phone-intl"
-              inputProps={{
-                placeholder: 'Enter alternate phone number',
-              }}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Address *</label>
-            <input
-              className="ui-input"
-              placeholder="Address"
-              required
-              value={formData.address}
-              onChange={(e) => handleInputChange('address', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Country *</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select Country' },
-                ...countries.map(country => ({
-                  value: country.id,
-                  label: country.name
-                }))
-              ]}
-              value={formData.country_id || ''}
-              onChange={(value) => handleInputChange('country_id', value || '')}
-              placeholder="Select Country"
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">State</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select State' },
-                ...states.map(state => ({
-                  value: state.id,
-                  label: state.name
-                }))
-              ]}
-              value={formData.state_id || ''}
-              onChange={(value) => handleInputChange('state_id', value || '')}
-              placeholder="Select State"
-              disabled={!formData.country_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">City</label>
-            <DropdownSelector
-              options={[
-                { value: '', label: 'Select City' },
-                ...cities.map(city => ({
-                  value: city.id,
-                  label: city.name
-                }))
-              ]}
-              value={formData.city_id || ''}
-              onChange={(value) => handleInputChange('city_id', value || '')}
-              placeholder="Select City"
-              disabled={!formData.state_id}
-              className="ui-dropdown-custom--full-width"
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Zones</label>
-            <ZonesMultiDropdown
-              zones={zones}
-              selectedZones={formData.zones}
-              onChange={(selected) => handleInputChange('zones', selected)}
-              onOpen={fetchZones}
-            />
-          </div>
-          <div className="form-group form-group--full">
-            <label className="ui-label">Working States * <span className="text-[#888] font-normal">(parties in these states are auto-assigned to this salesman)</span></label>
-            <StatesMultiDropdown
-              states={states}
-              selectedStates={Array.isArray(formData.state_ids) ? formData.state_ids : []}
-              onChange={(selected) => handleInputChange('state_ids', selected)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Reporting Manager</label>
-            <input
-              className="ui-input"
-              placeholder="Reporting manager"
-              value={formData.reporting_manager}
-              onChange={(e) => handleInputChange('reporting_manager', e.target.value)}
-            />
-          </div>
-          <div className="form-group">
-            <label className="ui-label">Joining Date</label>
-            <DatePicker
-              value={formData.joining_date}
-              onChange={(v) => handleInputChange('joining_date', v)}
-              placeholder="Joining date"
-            />
-          </div>
-          {renderActiveToggle()}
-          {/* KYC documents — optional on edit (upload only to replace an existing one) */}
-          <div className="form-group form-group--full">
-            <label className="ui-label">KYC Documents <span className="text-text-muted font-normal">(upload only to replace)</span></label>
-            <p className="text-[length:var(--text-xs)] text-text-muted mt-0 mb-2">PAN card, Aadhar card and cancel cheque accept image or PDF; photo must be an image. Max 5MB each.</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {[
-                { key: 'pan_card', label: 'PAN Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'aadhar_card', label: 'Aadhar Card', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'cancel_cheque', label: 'Cancel Cheque', accept: 'image/*,application/pdf', hint: 'Image or PDF' },
-                { key: 'photo', label: 'Photo', accept: 'image/*', hint: 'Image only' },
-              ].map((doc) => (
-                <FileUpload
-                  key={doc.key}
-                  label={doc.label}
-                  accept={doc.accept}
-                  hint={doc.hint}
-                  file={formData[doc.key]}
-                  onChange={(f) => handleInputChange(doc.key, f)}
-                />
-              ))}
-            </div>
-          </div>
-        </form>
+        <form className="ui-form sx-form rf-form" onSubmit={handleSubmit}>{renderSalesmanFields(true)}</form>
       </AsidePanel>
 
       {/* Check-in Modal - salesman only */}
@@ -2181,13 +2032,22 @@ const DashboardSuppliers = () => {
           footer={(
             <>
               <button className="ui-btn ui-btn--secondary" onClick={() => { setOpenCheckinModal(false); setEditCheckin(null); resetCheckinForm(); }}>Cancel</button>
-              <button className="ui-btn ui-btn--primary" onClick={handleCheckinSubmit} disabled={checkinsLoading}>
+              <button className="ui-btn ui-btn--primary" onClick={handleCheckinSubmit} disabled={checkinsLoading || capturePending}>
                 {checkinsLoading ? 'Saving...' : 'Save'}
               </button>
             </>
           )}
         >
-          <form className="ui-form" onSubmit={handleCheckinSubmit}>
+          <form className="ui-form rf-form" onSubmit={handleCheckinSubmit}>
+            {editCheckin && (
+              <>
+                <div className="form-group form-group--full">
+                  <label className="ui-label" htmlFor="visit-date-fixed">Visit date</label>
+                  <DatePicker value={String(editCheckin.check_in_date || '').slice(0, 10)} disabled />
+                </div>
+                <p className="form-group--full visit-fixed-note">Date and party cannot be changed after a visit is saved.</p>
+              </>
+            )}
             <div className="form-group form-group--full">
               <label className="ui-label">Party</label>
               <DropdownSelector
@@ -2199,15 +2059,27 @@ const DashboardSuppliers = () => {
                 onChange={(v) => setCheckinForm(prev => ({ ...prev, party_id: v }))}
                 placeholder="Select Party"
                 className="ui-dropdown-custom--full-width"
+                disabled={!!editCheckin}
               />
+              {isSalesman && checkinForm.party_id && !editCheckin && (
+                <ShopLocationCapture key={checkinForm.party_id}
+                  party={zoneParties.find(p => String(p.party_id || p.id) === String(checkinForm.party_id)) || {}}
+                  disabled={checkinsLoading} onPendingChange={setCapturePending} onSaved={async saved => {
+                    setZoneParties(prev => prev.map(p => String(p.party_id || p.id) === String(checkinForm.party_id) ? { ...p, ...saved } : p));
+                    showSuccess('Shop location and shipping address saved.');
+                  }} />
+              )}
               {isSalesman && checkinForm.party_id && (() => {
                 const sp = zoneParties.find(p => (p.party_id || p.id) === checkinForm.party_id);
                 const verified = sp && sp.location_source === 'verified';
+                const hasPoint = sp && sp.latitude != null && sp.longitude != null;
                 return (
                   <p className="mt-2 mb-0 text-[length:var(--text-xs)] text-text-muted">
                     {verified
-                      ? `✅ Party location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — you must be within 250m to check in.`
-                      : 'This party’s location is not set yet. Set it from Party → Edit (“I’m at shop”) before checking in.'}
+                      ? 'Shop spot saved: you must be within 50 m to check in.'
+                      : hasPoint
+                        ? 'Location from the address. Use I’m at the shop to confirm the exact spot.'
+                        : 'Capture this party’s shop location above before checking in.'}
                   </p>
                 );
               })()}
@@ -2216,17 +2088,9 @@ const DashboardSuppliers = () => {
               <label className="ui-label">Contact Person <span className="text-error">*</span></label>
               <input className="ui-input" placeholder="Person you met" value={checkinForm.contact_person} onChange={(e) => setCheckinForm(prev => ({ ...prev, contact_person: e.target.value }))} />
             </div>
-            <div className="form-group">
-              <label className="ui-label">In Time <span className="text-error">*</span></label>
-              <input type="datetime-local" className="ui-input" value={checkinForm.in_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, in_time: e.target.value }))} />
-            </div>
-            <div className="form-group">
-              <label className="ui-label">Out Time <span className="text-error">*</span></label>
-              <input type="datetime-local" className="ui-input" value={checkinForm.out_time} onChange={(e) => setCheckinForm(prev => ({ ...prev, out_time: e.target.value }))} />
-            </div>
             <div className="form-group form-group--full">
               <label className="ui-label">Next Visit Date <span className="text-error">*</span></label>
-              <input type="date" className="ui-input" value={checkinForm.next_visit_date} onChange={(e) => setCheckinForm(prev => ({ ...prev, next_visit_date: e.target.value }))} />
+              <DatePicker min={istNow().slice(0, 10)} value={checkinForm.next_visit_date} onChange={(v) => setCheckinForm(prev => ({ ...prev, next_visit_date: v }))} placeholder="Next visit date" />
             </div>
             <div className="form-group form-group--full">
               <label className="ui-label">Remarks</label>
@@ -2250,17 +2114,18 @@ const DashboardSuppliers = () => {
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleTargetSubmit}>
+        <form className="ui-form rf-form" onSubmit={handleTargetSubmit}>
           {!isSalesman && (
             <div className="form-group form-group--full">
               <label className="ui-label">Salesman</label>
               <DropdownSelector
                 options={[
                   { value: '', label: 'Select Salesman' },
-                  ...salesmen.map(s => ({ value: s.id || s.salesman_id, label: s.full_name }))
+                  ...(salesmenLookup.length ? salesmenLookup : salesmen).map(s => ({ value: s.id || s.salesman_id, label: s.full_name }))
                 ]}
                 value={targetForm.salesman_id}
                 onChange={(v) => setTargetForm(prev => ({ ...prev, salesman_id: v }))}
+                disabled={targetLocked}
                 placeholder="Select Salesman"
                 className="ui-dropdown-custom--full-width"
               />
@@ -2272,6 +2137,7 @@ const DashboardSuppliers = () => {
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Target Period (Start – End)</label>
+            <div className={targetLocked ? 'sn-locked' : undefined} inert={targetLocked || undefined}>
             <DateRangePicker
               from={targetForm.start_date || null}
               to={targetForm.end_date || null}
@@ -2279,6 +2145,10 @@ const DashboardSuppliers = () => {
               placeholder="Select start & end date"
               fullWidth
             />
+            </div>
+            {targetLocked && (
+              <p className="sn-lock-note">Date and party are locked once a target has started. Only the amount can change.</p>
+            )}
           </div>
           <div className="form-group form-group--full">
             <label className="ui-label">Order Type</label>
@@ -2286,9 +2156,14 @@ const DashboardSuppliers = () => {
               options={[
                 { value: '', label: 'Overall (no specific type)' },
                 { value: 'party_order', label: 'Party Order' },
+                { value: 'visit_order', label: 'Visit Order' },
+                { value: 'whatsapp_order', label: 'WhatsApp Order' },
+                { value: 'event_order', label: 'Event Order' },
+                { value: 'distributor_order', label: 'Distributor Order' },
               ]}
               value={targetForm.order_type}
               onChange={(v) => setTargetForm(prev => ({ ...prev, order_type: v }))}
+              disabled={targetLocked}
               placeholder="Select Order Type"
               className="ui-dropdown-custom--full-width"
             />

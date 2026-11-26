@@ -17,6 +17,11 @@ const FrameType = sequelize.define('FrameType', {
         allowNull: false,
         unique: true
     }
+    ,is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    }
 }, {
     tableName: 'frame_type',
     timestamps: true,

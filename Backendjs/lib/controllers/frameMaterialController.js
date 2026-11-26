@@ -1,3 +1,4 @@
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const FrameMaterial = require('../models/FrameMaterial');
 const { logAudit } = require('../utils/auditLogger');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
@@ -11,7 +12,7 @@ class FrameMaterialController {
                 nameFields: ['frame_material'],
                 phoneFields: [],
             });
-            const where = mergeWhere({}, searchFilter);
+            const where = mergeWhere(activeOnlyWhere(req), searchFilter);
             const frameMaterials = await FrameMaterial.findAll({ where });
             res.status(200).json(frameMaterials);
         } catch (error) {
@@ -72,6 +73,7 @@ class FrameMaterialController {
             }
             const oldSnapshot = frameMaterial.toJSON();
             const payload = {
+                ...activeUpdate(req.body),
                 frame_material: frame_material,
                 updated_at: new Date(),
             };

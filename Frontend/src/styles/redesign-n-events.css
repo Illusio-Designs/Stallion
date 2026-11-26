@@ -1,0 +1,3 @@
+:root .ev-page .ev-row__main h3{overflow-wrap:anywhere}
+:root .ev-page .ev-row__main p{overflow-wrap:anywhere}
+@media (max-width:640px){:root .ev-page .seg{width:100%}:root .ev-page .seg button{flex:1}}

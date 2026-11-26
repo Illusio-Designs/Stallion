@@ -60,20 +60,24 @@ async function geocodeAddress(address, opts = {}) {
   // "400092") so the geocoder resolves the postal area instead of failing and
   // falling back to a far-off city centroid.
   const pin = opts.pincode ? String(opts.pincode).replace(/\D/g, '') : '';
-  const attempts = [
-    [address, opts.city, opts.state, pin, country],   // full, most specific
-    [pin, opts.city, opts.state, country],            // pincode + locality
-    [pin, country],                                   // pincode alone -> the postal area
-    [opts.city, opts.state, country],                 // city + state
-    [opts.state, country],                            // state centroid (last resort)
-  ];
-  for (const parts of attempts) {
+  // Each attempt carries how precise its result is, so callers can decide how far
+  // to trust it: 'address' (street level), 'pincode' (postal area), 'city' or
+  // 'state' (a centroid, only good for "roughly which region").
+  const attempts = [];
+  if (address) attempts.push({ precision: 'address', parts: [address, opts.city, opts.state, pin, country] });
+  if (pin) {
+    attempts.push({ precision: 'pincode', parts: [pin, opts.city, opts.state, country] });
+    attempts.push({ precision: 'pincode', parts: [pin, country] });
+  }
+  if (opts.city) attempts.push({ precision: 'city', parts: [opts.city, opts.state, country] });
+  if (opts.state) attempts.push({ precision: 'state', parts: [opts.state, country] });
+  for (const { parts, precision } of attempts) {
     const q = parts.filter(Boolean).join(', ').trim();
     if (!q) continue;
     const r = await geocodeQuery(q);
     if (r.ok) {
-      console.log('[geocode] resolved via:', q, '->', r.coords.latitude, r.coords.longitude);
-      return r.coords;
+      console.log(`[geocode] resolved (${precision})`);
+      return { ...r.coords, precision };
     }
   }
   console.warn('[geocode] FAILED for address:', address, 'pin:', pin);
@@ -114,4 +118,50 @@ async function ensurePartyCoords(party) {
   return party;
 }
 
-module.exports = { geocodeAddress, geocodeDiagnostic, ensurePartyCoords };
+// Reverse geocoding: GPS point -> written address (what delivery apps do). Best-effort:
+// returns null when the service cannot be reached or knows nothing at that spot.
+const GEOCODER_REVERSE_URL = process.env.GEOCODER_REVERSE_URL || GEOCODER_URL.replace(/\/search\/?$/, '/reverse');
+
+async function reverseGeocode(latitude, longitude) {
+  const lat = Number(latitude), lon = Number(longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const url = new URL(GEOCODER_REVERSE_URL);
+  url.searchParams.set('lat', String(lat));
+  url.searchParams.set('lon', String(lon));
+  url.searchParams.set('format', 'jsonv2');
+  url.searchParams.set('zoom', '18');
+  url.searchParams.set('addressdetails', '1');
+  // Match the English country/state/city names used by the app’s lookup lists.
+  url.searchParams.set('accept-language', 'en');
+  if (GEOCODER_KEY) url.searchParams.set('key', GEOCODER_KEY);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': GEOCODER_UA, Accept: 'application/json' }, signal: controller.signal });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (!data || data.error || !data.display_name) return null;
+    const a = data.address || {};
+    // Short street-level line first (shop/house, road, area), then city, state, pincode.
+    const street = [a.shop || a.building || a.amenity, a.house_number, a.road, a.neighbourhood || a.suburb || a.quarter]
+      .filter(Boolean).join(', ');
+    const city = a.city || a.town || a.village || a.county || a.state_district || '';
+    const pincode = a.postcode ? String(a.postcode).replace(/\D/g, '') : '';
+    return {
+      address: String(data.display_name).slice(0, 500),
+      street,
+      city,
+      country: a.country || '',
+      country_code: (a.country_code || '').toUpperCase(),
+      state: a.state || '',
+      pincode,
+    };
+  } catch (e) {
+    console.warn('[reverse-geocode] failed:', e && e.message);
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+module.exports = { geocodeAddress, geocodeDiagnostic, ensurePartyCoords, reverseGeocode };

@@ -34,6 +34,12 @@ const SalesmanTray = sequelize.define('SalesmanTray', {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: DataTypes.NOW
+    },
+    // Set when the tray is taken off the salesman. The row is kept as history, never deleted.
+    released_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+        defaultValue: null
     }
 }, {
     tableName: 'salesman_tray',

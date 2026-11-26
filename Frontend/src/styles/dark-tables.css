@@ -1,0 +1,41 @@
+/* Dark-mode fixes: tables */
+
+/* ===== Group 1: Orders, Parties, Salesmen, Distributors, Office team, Manage ===== */
+:root[data-theme="dark"] .ordn-dispatch__err { color: var(--c-bad); }
+:root[data-theme="dark"] .ordn-seg--ready { box-shadow: inset 0 0 0 1px var(--t-ink); }
+:root[data-theme="dark"] .ordn-seg--held { background: repeating-linear-gradient(45deg, var(--b-card) 0 5px, var(--b-soft2) 5px 10px); }
+:root[data-theme="dark"] .ordn-dot--held { background: repeating-linear-gradient(45deg, var(--b-card) 0 2px, var(--t-faint) 2px 4px); }
+:root[data-theme="dark"] .ordn-dot--canc { border-color: var(--t-faint); }
+:root[data-theme="dark"] .ordn-seg--transit { background-image: repeating-linear-gradient(135deg, var(--b-ink) 0 6px, #cfcfd2 6px 12px); }
+:root[data-theme="dark"] .ordn-dot--transit { background: repeating-linear-gradient(135deg, var(--b-ink) 0 2px, #9a9aa0 2px 4px); }
+:root[data-theme="dark"] .ordn-pill--received { border-color: var(--t-faint); color: var(--t-mute); }
+
+:root[data-theme="dark"] .sn-prog-pill { background: var(--color-warning-soft); color: var(--color-warning); }
+
+:root[data-theme="dark"] .mng-switch__track,
+:root[data-theme="dark"] .pf-switch__track { background: #3d3d42; }
+:root[data-theme="dark"] .pf-switch.is-on .pf-switch__track { background: var(--b-ink); }
+
+:root[data-theme="dark"] .orp-search { border-color: var(--l-line); }
+:root[data-theme="dark"] .orp-search:focus-within,
+:root[data-theme="dark"] .pp-search:focus-within { border-color: var(--t-ink); box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.14); }
+
+:root[data-theme="dark"] .pp-card { border-top-color: var(--l-line); }
+:root[data-theme="dark"] .pp-card--sk { background: var(--b-soft); }
+:root[data-theme="dark"] .pp-table tbody td { border-top-color: var(--l-line); }
+:root[data-theme="dark"] .pp-foot { border-top-color: var(--l-line); }
+:root[data-theme="dark"] .pp-more { box-shadow: 0 10px 28px rgba(0, 0, 0, .6); }
+
+:root[data-theme="dark"] .pp-btn--pri:hover { background: #ffffff; }
+:root[data-theme="dark"] .pp-chip[aria-pressed="true"] b { color: #4a4a4f; }
+:root[data-theme="dark"] .pp-pill--ok { background: var(--c-ok-soft); border-color: transparent; color: var(--c-ok); }
+:root[data-theme="dark"] .pp-check input { accent-color: #f2f2f2; }
+/* Tailwind arbitrary colours left in the page JSX */
+:root[data-theme="dark"] [class*="bg-[#f5f5f5]"] { background: var(--b-soft); color: var(--t-ink); }
+:root[data-theme="dark"] [class*="border-[#E0E0E0]"] { border-color: var(--l-line); }
+:root[data-theme="dark"] [class*="text-[#666]"] { color: var(--t-mute); }
+:root[data-theme="dark"] [class*="text-[#b00020]"] { color: var(--c-bad); }
+/* on/off switch knob (Salesmen form): dark knob on the light "on" track */
+:root[data-theme="dark"] span.rounded-full.bg-white.shadow { background: var(--b-card); }
+/* avatars: soft chip instead of a bright white disc */
+:root[data-theme="dark"] .pp-av { background: var(--b-soft2); color: var(--t-ink); border: 1px solid var(--l-line); }

@@ -3,27 +3,74 @@ import TableWithControls from '../components/ui/TableWithControls';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
-import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
-  getCountries,
+  getIndianCountries,
   createCountry,
   updateCountry,
-  deleteCountry,
   getStates,
   createState,
   updateState,
-  deleteState,
   getCities,
   createCity,
   updateCity,
-  deleteCity,
   getZones,
   getAllZones,
   createZone,
   updateZone,
-  deleteZone,
+  getBrands, createBrand,
+  createCollection,
+  createShape,
+  createFrameColor,
+  createFrameMaterial,
+  createFrameType,
+  createGender,
+  createLensColor,
+  createLensMaterial,
+  createColorCode,
 } from '../services/apiService';
+import StatusBadge from '../components/ui/StatusBadge';
+import { apiRequest } from '../services/api/client';
+import { invalidateCache } from '../services/cacheService';
+import { useConfirm } from '../components/ui/ConfirmProvider';
 import '../styles/pages/dashboard-orders.css';
+import '../styles/redesign-n-manage.css';
+import '../styles/redesign-p-forms.css';
+import '../styles/redesign-n-headings.css';
+
+// Master-data attribute tabs. Lists are read with every item (active and inactive) so they can be
+// switched back on; pickers and shop filters ask the API for ?active=true. Nothing is ever deleted.
+const attr = (idKey, field, label, path, cache, create, extra = {}) => ({ idKey, field, label, path, cache, create, ...extra });
+const ATTRIBUTE_TABS = {
+  Brand: attr('brand_id', 'brand_name', 'Brand Name', '/brands', 'brands', createBrand),
+  Collection: attr('collection_id', 'collection_name', 'Collection Name', '/collections', 'collections', createCollection, { hasBrand: true }),
+  Shape: attr('shape_id', 'shape_name', 'Shape Name', '/shapes', 'shapes', createShape),
+  'Frame Colour': attr('frame_color_id', 'frame_color', 'Frame Colour', '/frame_colors', 'frame_colors', createFrameColor),
+  'Frame Material': attr('frame_material_id', 'frame_material', 'Frame Material', '/frame_materials', 'frame_materials', createFrameMaterial),
+  'Frame Type': attr('frame_type_id', 'frame_type', 'Frame Type', '/frame_types', 'frame_types', createFrameType),
+  Gender: attr('gender_id', 'gender_name', 'Gender Name', '/genders', 'genders', createGender),
+  'Lens Colour': attr('lens_color_id', 'lens_color', 'Lens Colour', '/lens_colors', 'lens_colors', createLensColor),
+  'Lens Material': attr('lens_material_id', 'lens_material', 'Lens Material', '/lens_materials', 'lens_materials', createLensMaterial),
+  'Colour Code': attr('color_code_id', 'color_code', 'Colour Code', '/color_codes', 'color_codes', createColorCode),
+};
+const listAttr = async (cfg) => {
+  try {
+    const res = await apiRequest(cfg.path, { method: 'GET', includeAuth: true });
+    if (Array.isArray(res)) return res;
+    return Array.isArray(res?.data) ? res.data : [];
+  } catch (e) {
+    if (e?.statusCode === 404 || /not found/i.test(e?.message || '')) return [];
+    throw e;
+  }
+};
+const updateAttr = async (cfg, id, payload) => {
+  const r = await apiRequest(`${cfg.path}/${id}`, { method: 'PUT', body: payload, includeAuth: true });
+  invalidateCache(cfg.cache);
+  return r;
+};
+// Manage lists every item (active and inactive) so inactive ones can be switched back on.
+const INC = { includeInactive: true };
+const GEO_TABS = ['Country', 'State', 'City', 'Zone'];
+const attrRowId = (cfg, item) => item[cfg.idKey] ?? item.id;
 
 const DashboardManage = () => {
   const confirm = useConfirm();
@@ -39,6 +86,8 @@ const DashboardManage = () => {
   const [cities, setCities] = useState([]);
   const [zones, setZones] = useState([]);
   const [allZones, setAllZones] = useState([]); // all zones unfiltered
+  const [attrRows, setAttrRows] = useState([]);
+  const [brandList, setBrandList] = useState([]);
 
   // Form states
   const [formData, setFormData] = useState({
@@ -56,6 +105,9 @@ const DashboardManage = () => {
     city_id: '',
     description: '',
     zone_code: '',
+    attr_value: '',
+    brand_id: '',
+    is_active: true,
   });
 
   // Options for dropdowns
@@ -126,7 +178,7 @@ const DashboardManage = () => {
       }
       
       fetchingStatesRef.current = true;
-      getStates(stateCountryFilter)
+      getStates(stateCountryFilter, INC)
         .then((statesData) => {
           setStates(statesData || []);
         })
@@ -165,7 +217,7 @@ const DashboardManage = () => {
         }
         
         fetchingStatesRef.current = true;
-        getStates(india.id)
+        getStates(india.id, INC)
           .then((statesData) => {
             setStates(statesData || []);
           })
@@ -210,7 +262,7 @@ const DashboardManage = () => {
       }
       
       fetchingCitiesRef.current = true; 
-      getCities(cityStateFilter)
+      getCities(cityStateFilter, INC)
         .then((citiesData) => {
           setCities(citiesData || []);
         })
@@ -289,7 +341,7 @@ const DashboardManage = () => {
     try {
       switch (tab) {
         case 'Country':
-          const countriesData = await getCountries().catch((error) => {
+          const countriesData = await getIndianCountries(INC).catch((error) => {
             if (!error.message?.toLowerCase().includes('token expired') && 
                 !error.message?.toLowerCase().includes('unauthorized')) {
               console.error('Error fetching countries:', error);
@@ -307,7 +359,7 @@ const DashboardManage = () => {
         
         case 'State':
           // Only fetch countries, states will be fetched when country filter is selected
-          const countriesForStates = await getCountries().catch(() => []);
+          const countriesForStates = await getIndianCountries(INC).catch(() => []);
           setCountries(countriesForStates || []);
           // Don't fetch states here - wait for country filter selection
           setStates([]);
@@ -315,7 +367,7 @@ const DashboardManage = () => {
         
         case 'City':
           // Only fetch countries, states will be fetched for default country (India)
-          const countriesForCities = await getCountries().catch(() => []);
+          const countriesForCities = await getIndianCountries(INC).catch(() => []);
           setCountries(countriesForCities || []);
           // Don't fetch states here - wait for default country selection
           setStates([]);
@@ -326,8 +378,8 @@ const DashboardManage = () => {
         case 'Zone':
           // Fetch all zones directly, and cities for the filter dropdown
           const [allZonesData, countriesForZones] = await Promise.all([
-            getAllZones().catch(() => []),
-            getCountries().catch(() => []),
+            getAllZones(undefined, INC).catch(() => []),
+            getIndianCountries(INC).catch(() => []),
           ]);
           setAllZones(allZonesData || []);
           setZones(allZonesData || []);
@@ -337,17 +389,27 @@ const DashboardManage = () => {
             c.name?.toLowerCase() === 'india' || c.code?.toLowerCase() === 'in'
           );
           if (indiaForZone) {
-            const statesForZone = await getStates(indiaForZone.id).catch(() => []);
+            const statesForZone = await getStates(indiaForZone.id, INC).catch(() => []);
             const allCitiesPromises = (statesForZone || []).map(s =>
-              getCities(s.id).catch(() => [])
+              getCities(s.id, INC).catch(() => [])
             );
             const citiesArrays = await Promise.all(allCitiesPromises);
             setCities(citiesArrays.flat());
           }
           break;
 
-        default:
+        default: {
+          const cfg = ATTRIBUTE_TABS[tab];
+          if (cfg) {
+            const [list, brands] = await Promise.all([
+              listAttr(cfg),
+              cfg.hasBrand ? getBrands().catch(() => []) : Promise.resolve([]),
+            ]);
+            setAttrRows(list || []);
+            if (cfg.hasBrand) setBrandList(brands || []);
+          }
           break;
+        }
       }
     } catch (error) {
       if (!error.message?.toLowerCase().includes('token expired') && 
@@ -367,7 +429,7 @@ const DashboardManage = () => {
 
   const fetchStates = async (countryId, updateMainArray = false) => {
     try {
-      const statesData = await getStates(countryId);
+      const statesData = await getStates(countryId, INC);
       // Only update main states array if we're on State tab or explicitly requested
       if (updateMainArray || activeTab === 'State') {
         setStates(statesData || []);
@@ -389,7 +451,7 @@ const DashboardManage = () => {
 
   const fetchCities = async (stateId, updateMainArray = false) => {
     try {
-      const citiesData = await getCities(stateId);
+      const citiesData = await getCities(stateId, INC);
       // Only update main cities array if we're on City tab or explicitly requested
       if (updateMainArray || activeTab === 'City') {
         setCities(citiesData || []);
@@ -411,7 +473,7 @@ const DashboardManage = () => {
 
   const fetchZones = async (cityId) => {
     try {
-      const zonesData = await getZones(cityId);
+      const zonesData = await getZones(cityId, INC);
       setZones(zonesData || []);
     } catch (error) {
       // Don't log token expiration errors as they're handled by apiService
@@ -435,6 +497,7 @@ const DashboardManage = () => {
         code: country.code,
         phone_code: country.phone_code,
         currency: country.currency,
+        isActive: country.is_active !== false,
         details: `${country.code} | ${country.phone_code} | ${country.currency}`,
         data: country,
       });
@@ -446,6 +509,7 @@ const DashboardManage = () => {
         id: state.id,
         type: 'State',
         name: state.name,
+        isActive: state.is_active !== false,
         details: `${state.code} | ${country?.name || 'N/A'}`,
         data: state,
       });
@@ -457,6 +521,7 @@ const DashboardManage = () => {
         id: city.id,
         type: 'City',
         name: city.name,
+        isActive: city.is_active !== false,
         details: state?.name || 'N/A',
         data: city,
       });
@@ -468,13 +533,29 @@ const DashboardManage = () => {
         id: zone.id,
         type: 'Zone',
         name: zone.name,
+        isActive: zone.is_active !== false,
         details: `${zone.zone_code || 'N/A'} | ${city?.name || 'N/A'}`,
         data: zone,
       });
     });
 
+    const cfg = ATTRIBUTE_TABS[activeTab];
+    if (cfg) {
+      attrRows.forEach(item => {
+        const brand = cfg.hasBrand ? brandList.find(b => b.brand_id === item.brand_id) : null;
+        allRows.push({
+          id: attrRowId(cfg, item),
+          type: activeTab,
+          name: item[cfg.field] ?? '',
+          isActive: item.is_active !== false,
+          details: cfg.hasBrand ? (item.brand?.brand_name || item.brand_name || brand?.brand_name || 'N/A') : '',
+          data: item,
+        });
+      });
+    }
+
     return allRows;
-  }, [countries, states, cities, allZones]);
+  }, [countries, states, cities, allZones, attrRows, brandList, activeTab]);
 
   const columns = useMemo(() => {
     // Different columns for different tabs
@@ -484,11 +565,26 @@ const DashboardManage = () => {
         { key: 'code', label: 'CODE' },
         { key: 'phone_code', label: 'PHONE CODE' },
         { key: 'currency', label: 'CURRENCY' },
+        { key: 'isActive', label: 'STATUS', render: (_v, row) => (
+          <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>{row.isActive ? 'Active' : 'Inactive'}</StatusBadge>
+        ) },
         { key: 'action', label: 'ACTION', render: (_v, row) => (
           <RowActions 
             onEdit={() => handleEdit(row)} 
-            onDelete={() => handleDelete(row)} 
+
           />
+        ) },
+      ];
+    }
+    if (ATTRIBUTE_TABS[activeTab]) {
+      return [
+        { key: 'name', label: 'NAME' },
+        ...(ATTRIBUTE_TABS[activeTab].hasBrand ? [{ key: 'details', label: 'BRAND' }] : []),
+        { key: 'isActive', label: 'STATUS', render: (_v, row) => (
+          <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>{row.isActive ? 'Active' : 'Inactive'}</StatusBadge>
+        ) },
+        { key: 'action', label: 'ACTION', render: (_v, row) => (
+          <RowActions onEdit={() => handleEdit(row)}/>
         ) },
       ];
     }
@@ -497,21 +593,19 @@ const DashboardManage = () => {
       { key: 'type', label: 'TYPE' },
       { key: 'name', label: 'NAME' },
       { key: 'details', label: 'DETAILS' },
+      { key: 'isActive', label: 'STATUS', render: (_v, row) => (
+        <StatusBadge status={row.isActive ? 'completed' : 'cancelled'}>{row.isActive ? 'Active' : 'Inactive'}</StatusBadge>
+      ) },
       { key: 'action', label: 'ACTION', render: (_v, row) => (
         <RowActions 
           onEdit={() => handleEdit(row)} 
-          onDelete={() => handleDelete(row)} 
+
         />
       ) },
     ];
   }, [activeTab]);
 
-  const tabs = useMemo(() => ([
-    'Country',
-    'State',
-    'City',
-    'Zone',
-  ]), []);
+  const tabs = useMemo(() => ([...GEO_TABS, ...Object.keys(ATTRIBUTE_TABS)]), []);
 
   const filteredRowsByTab = useMemo(() => {
     let filtered = rows.filter(row => row.type === activeTab);
@@ -556,6 +650,9 @@ const DashboardManage = () => {
       city_id: '',
       description: '',
       zone_code: '',
+      attr_value: '',
+      brand_id: '',
+      is_active: true,
     });
   };
 
@@ -578,6 +675,9 @@ const DashboardManage = () => {
       city_id: data.city_id || '',
       description: data.description || '',
       zone_code: data.zone_code || '',
+      attr_value: ATTRIBUTE_TABS[type] ? (data[ATTRIBUTE_TABS[type].field] ?? '') : '',
+      brand_id: data.brand_id || '',
+      is_active: data.is_active !== false,
     };
 
     setFormData(editData);
@@ -595,56 +695,20 @@ const DashboardManage = () => {
     }
   };
 
-  const handleDelete = async (row) => {
-    if (!(await confirm(`Are you sure you want to delete this ${row.type}?`))) {
-      return;
-    }
-
-    try {
-      setLoading(true);
-      switch (row.type) {
-        case 'Country':
-          await deleteCountry(row.id);
-          break;
-        case 'State':
-          await deleteState(row.id);
-          break;
-        case 'City':
-          await deleteCity(row.id);
-          break;
-        case 'Zone':
-          await deleteZone(row.id);
-          break;
-      }
-      await fetchDataForTab(activeTab);
-      setError(null); // Clear any previous errors
-    } catch (error) {
-      // Don't show alert for token expiration as user will be redirected
-      if (error.message?.toLowerCase().includes('token expired') || 
-          error.message?.toLowerCase().includes('unauthorized')) {
-        // Token expiration is handled by apiService, just return
-        return;
-      }
-      console.error('Error deleting:', error);
-      
-      // Check for foreign key constraint errors
-      if (error.message?.toLowerCase().includes('foreign key constraint') ||
-          error.message?.toLowerCase().includes('cannot delete or update a parent row')) {
-        setError('Cannot delete this item because other records depend on it. Please delete the dependent records first.');
-      } else if (error.message?.toLowerCase().includes("doesn't exist") ||
-          error.message?.toLowerCase().includes('table')) {
-        setError('Database tables not found. Please contact the administrator to set up the database tables.');
-      } else {
-        setError(`Failed to delete item: ${error.message}`);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
+    // Switching a country, state or city off also hides everything under it.
+    const UNDER = { Country: 'states, cities and zones', State: 'cities and zones', City: 'zones' };
+    if (editRow && UNDER[formData.type] && formData.is_active === false && editRow.isActive !== false) {
+      const ok = await confirm({
+        title: `Switch off this ${formData.type.toLowerCase()}?`,
+        message: `All ${UNDER[formData.type]} under it will also be hidden from forms, filters and the shop. Nothing is deleted, and switching it back on shows them again. Saved parties and orders keep their place.`,
+        confirmLabel: 'Switch off',
+      });
+      if (!ok) return;
+    }
+
     try {
       setLoading(true);
       const { type } = formData;
@@ -657,6 +721,7 @@ const DashboardManage = () => {
             code: formData.code,
             phone_code: formData.phone_code,
             currency: formData.currency,
+            ...(editRow ? { is_active: formData.is_active !== false } : {}),
           };
           if (editRow) {
             await updateCountry(editRow.id, dataToSend);
@@ -669,6 +734,7 @@ const DashboardManage = () => {
             name: formData.name,
             code: formData.code,
             country_id: formData.country_id,
+            ...(editRow ? { is_active: formData.is_active !== false } : {}),
           };
           if (editRow) {
             await updateState(editRow.id, dataToSend);
@@ -680,6 +746,7 @@ const DashboardManage = () => {
           dataToSend = {
             name: formData.name,
             state_id: formData.state_id,
+            ...(editRow ? { is_active: formData.is_active !== false } : {}),
           };
           if (editRow) {
             await updateCity(editRow.id, dataToSend);
@@ -695,6 +762,7 @@ const DashboardManage = () => {
             state_id: formData.state_id,
             country_id: formData.country_id,
             zone_code: formData.zone_code || '',
+            ...(editRow ? { is_active: formData.is_active !== false } : {}),
           };
           if (editRow) {
             await updateZone(editRow.id, dataToSend);
@@ -702,6 +770,19 @@ const DashboardManage = () => {
             await createZone(dataToSend);
           }
           break;
+        default: {
+          const cfg = ATTRIBUTE_TABS[type];
+          if (cfg) {
+            const payload = { [cfg.field]: formData.attr_value };
+            if (cfg.hasBrand) payload.brand_id = formData.brand_id;
+            if (editRow) {
+              await updateAttr(cfg, editRow.id, { ...payload, is_active: formData.is_active !== false });
+            } else {
+              await cfg.create(payload);
+              invalidateCache(cfg.cache);
+            }
+          }
+        }
       }
       
       await fetchDataForTab(activeTab);
@@ -912,16 +993,62 @@ const DashboardManage = () => {
           </>
         );
 
-      default:
-        return null;
+      default: {
+        const cfg = ATTRIBUTE_TABS[type];
+        if (!cfg) return null;
+        return (
+          <>
+            {cfg.hasBrand && (
+              <div className="form-group form-group--full">
+                <label className="ui-label">Brand *</label>
+                <DropdownSelector
+                  options={brandList.filter(b => b.is_active !== false || b.brand_id === formData.brand_id).map(b => ({ value: b.brand_id, label: b.brand_name }))}
+                  value={formData.brand_id}
+                  onChange={(value) => handleInputChange('brand_id', value)}
+                  placeholder="Select brand"
+                />
+              </div>
+            )}
+            <div className="form-group form-group--full">
+              <label className="ui-label">{cfg.label} *</label>
+              <input
+                className="ui-input"
+                placeholder={`Enter ${cfg.label.toLowerCase()}`}
+                value={formData.attr_value}
+                onChange={(e) => handleInputChange('attr_value', e.target.value)}
+                required
+              />
+            </div>
+            {editRow && (
+              <div className="form-group form-group--full">
+                <label className="ui-label">Status</label>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={formData.is_active !== false}
+                  onClick={() => handleInputChange('is_active', formData.is_active === false)}
+                  className="mng-switch"
+                >
+                  <span className={`mng-switch__track ${formData.is_active !== false ? 'is-on' : ''}`}>
+                    <span className="mng-switch__dot" />
+                  </span>
+                  <span className="mng-switch__label">{formData.is_active !== false ? 'Active' : 'Inactive'}</span>
+                </button>
+                <p className="mng-note">Inactive items are hidden from product forms and shop filters. Nothing is ever deleted.</p>
+              </div>
+            )}
+          </>
+        );
+      }
     }
   };
 
   return (
     <div className="dash-page">
       <div className="dash-container">
+        <div className="pg-head"><div><h1>Manage</h1><p>The lists behind every dropdown: locations, brands, shapes, frames, lenses and more.</p></div></div>
         <div className="dash-row">
-          <div className="order-tabs-container col-span-full flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm [scrollbar-color:var(--color-grey-300)_transparent] [scrollbar-width:thin]">
+          <div className="order-tabs-container manage-tabs col-span-full flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm [scrollbar-color:var(--color-grey-300)_transparent] [scrollbar-width:thin]">
             {tabs.map(tab => (
               <button
                 key={tab}
@@ -930,7 +1057,8 @@ const DashboardManage = () => {
                     ? 'active bg-primary text-text-on-primary hover:bg-primary'
                     : 'text-text-muted hover:bg-primary-soft hover:text-primary'
                 }`}
-                onClick={() => setActiveTab(tab)}
+                onClick={(e) => { setActiveTab(tab); e.currentTarget.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }); }}
+                aria-pressed={activeTab === tab}
               >
                 {tab}
               </button>
@@ -988,6 +1116,7 @@ const DashboardManage = () => {
           <div className="dash-card full">
             <TableWithControls
               title="Manage"
+              titleAs="h2"
               columns={columns}
               rows={filteredRowsByTab}
               onAddNew={handleAdd}
@@ -1080,7 +1209,7 @@ const DashboardManage = () => {
           setOpenAdd(false);
           resetForm();
         }}
-        title={`Add ${activeTab}`}
+        title={`Add ${String(activeTab).toLowerCase()}`}
         footer={(
           <>
             <button 
@@ -1098,12 +1227,13 @@ const DashboardManage = () => {
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? 'Saving...' : 'Save'}
+              {loading ? 'Saving...' : `Save ${String(activeTab || '').toLowerCase()}`}
             </button>
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
+        <form className="ui-form rf-form" onSubmit={handleSubmit}>
+          <h3 className="rf-sec__h rf-full">{formData.type || activeTab} details</h3>
           {renderFormFields()}
         </form>
       </AsidePanel>
@@ -1113,7 +1243,7 @@ const DashboardManage = () => {
           setEditRow(null);
           resetForm();
         }}
-        title={`Edit ${editRow?.type || ''}`}
+        title={`Edit ${String(editRow?.type || '').toLowerCase()}`}
         footer={(
           <>
             <button 
@@ -1131,13 +1261,35 @@ const DashboardManage = () => {
               onClick={handleSubmit}
               disabled={loading}
             >
-              {loading ? 'Updating...' : 'Update'}
+              {loading ? 'Updating...' : `Update ${String(editRow?.type || '').toLowerCase()}`}
             </button>
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
+        <form className="ui-form rf-form" onSubmit={handleSubmit}>
+          <h3 className="rf-sec__h rf-full">{formData.type || activeTab} details</h3>
           {renderFormFields()}
+          {GEO_TABS.includes(formData.type) && (
+            <div className="form-group form-group--full">
+              <label className="ui-label">Status</label>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={formData.is_active !== false}
+                onClick={() => handleInputChange('is_active', formData.is_active === false)}
+                className="mng-switch"
+              >
+                <span className={`mng-switch__track ${formData.is_active !== false ? 'is-on' : ''}`}>
+                  <span className="mng-switch__dot" />
+                </span>
+                <span className="mng-switch__label">{formData.is_active !== false ? 'Active' : 'Inactive'}</span>
+              </button>
+              <p className="mng-note">
+                {{ Country: 'Switching a country off also hides its states, cities and zones. ', State: 'Switching a state off also hides its cities and zones. ', City: 'Switching a city off also hides its zones. ' }[formData.type] || ''}
+                Inactive items are hidden from forms. Nothing is ever deleted.
+              </p>
+            </div>
+          )}
         </form>
       </AsidePanel>
     </div>

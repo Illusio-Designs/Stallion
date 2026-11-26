@@ -5,6 +5,7 @@ import RowActions from '../components/ui/RowActions';
 import { Skeleton } from '../components/ui/Skeleton';
 import MediaImageCard from '../components/ui/MediaImageCard';
 import TableWithControls from '../components/ui/TableWithControls';
+import StatusBadge from '../components/ui/StatusBadge';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   bulkUploadProducts,
@@ -32,9 +33,31 @@ import {
 } from '../services/apiService';
 import { showError, showSuccess } from '../services/notificationService';
 import { invalidateCache } from '../services/cacheService';
+import StockHistoryPanel from '../components/StockHistoryPanel';
 import { getProductImageUrl, PRODUCT_IMAGE_PLACEHOLDER } from '../utils/imageUrl';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard-products.css';
+import '../styles/redesign-n-manage.css';
+import '../styles/redesign-p-products.css';
+import { FiDownload } from '../components/icons/hugeicons';
+
+// Picker options for the add/edit form: active items only, plus the item the
+// product currently uses (even if it has since been made inactive) so it stays
+// visible and selected. That item is looked up in the full list; it is labelled
+// "(inactive)" when it is inactive. While the active list is still loading, the
+// selected active item also resolves from the full list so the label never blanks.
+const buildPickerOptions = (activeList, fullList, selectedId, idKey, getLabel) => {
+  const idOf = (x) => x[idKey] || x.id;
+  const options = (activeList || []).map(x => ({ value: idOf(x), label: getLabel(x) }));
+  if (selectedId && !options.some(o => String(o.value) === String(selectedId))) {
+    const current = (fullList || []).find(x => String(idOf(x)) === String(selectedId));
+    if (current) {
+      const inactive = current.is_active === false;
+      options.push({ value: idOf(current), label: inactive ? `${getLabel(current)} (inactive)` : getLabel(current) });
+    }
+  }
+  return options;
+};
 
 // Helper function to parse image_urls from various formats
 // Handles: arrays, JSON strings like "[\"/uploads/products/image.webp\"]", plain strings
@@ -151,6 +174,43 @@ const ProductThumb = ({ product, alt }) => {
   );
 };
 
+// Stock state of one product row: drives the chip in the table and the phone card.
+const stockInfo = (row) => {
+  const st = String(row.status || '').toLowerCase();
+  const qty = Number(row.total_qty) || 0;
+  if (row.is_active === false) return { label: 'Inactive', tone: 'off' };
+  if (st !== 'active') return { label: st ? st.charAt(0).toUpperCase() + st.slice(1) : 'Draft', tone: 'draft' };
+  if (row.is_upcoming) return { label: 'Preorder', tone: 'upcoming' };
+  if (qty <= 0) return { label: 'Sold out', tone: 'out' };
+  if (qty <= 5) return { label: 'Low stock', tone: 'low' };
+  return { label: 'In stock', tone: 'in' };
+};
+
+// The Upcoming (pre-order) switch of the add / edit form.
+const UpcomingSwitch = ({ checked, onToggle }) => (
+  <div className="form-group form-group--full">
+    <label className="ui-label">Preorder product</label>
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onToggle}
+      className="mng-switch"
+    >
+      <span className={`mng-switch__track ${checked ? 'is-on' : ''}`}>
+        <span className="mng-switch__dot" />
+      </span>
+      <span className="mng-switch__label">{checked ? 'Preorder' : 'Regular'}</span>
+    </button>
+    <p className="mng-note">No stock is kept. Customers can order any quantity.</p>
+  </div>
+);
+
+const StockChip = ({ row }) => {
+  const info = stockInfo(row);
+  return <span className={`pp-chip pp-chip--${info.tone}`}>{info.label}</span>;
+};
+
 const DashboardProducts = () => {
   const confirm = useConfirm();
   const PRODUCTS_PER_PAGE = 20;
@@ -162,6 +222,10 @@ const DashboardProducts = () => {
   const [productPage, setProductPage] = useState(1);
   const [productPageCount, setProductPageCount] = useState(1);
   const [productSearch, setProductSearch] = useState('');
+  // Server-side list filters (brand, frame type, in-stock). The ref is read by
+  // fetchProductsPage so every reload (after a save too) keeps the filters.
+  const [listFilters, setListFilters] = useState({ brand_id: '', frame_type_id: '', stock: '' });
+  const listFiltersRef = useRef(listFilters);
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [openBulkUpload, setOpenBulkUpload] = useState(false);
@@ -172,6 +236,7 @@ const DashboardProducts = () => {
   const [selectedBulkFile, setSelectedBulkFile] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null);
   const [imageTargetProduct, setImageTargetProduct] = useState(null);
+  const [historyProduct, setHistoryProduct] = useState(null); // product whose stock history is open
   const [orphanedImages, setOrphanedImages] = useState([]); // Images uploaded without product_id
   const [invalidImageUrls, setInvalidImageUrls] = useState(new Set()); // Track images that failed to load
   const [selectedImageIds, setSelectedImageIds] = useState(new Set()); // For multiple selection in modal
@@ -181,15 +246,25 @@ const DashboardProducts = () => {
 
   // Related data for dropdowns
   const [brands, setBrands] = useState([]);
+  const [activeBrands, setActiveBrands] = useState([]);
   const [collections, setCollections] = useState([]);
+  const [activeCollections, setActiveCollections] = useState([]);
   const [genders, setGenders] = useState([]);
+  const [activeGenders, setActiveGenders] = useState([]);
   const [colorCodes, setColorCodes] = useState([]);
+  const [activeColorCodes, setActiveColorCodes] = useState([]);
   const [shapes, setShapes] = useState([]);
+  const [activeShapes, setActiveShapes] = useState([]);
   const [lensColors, setLensColors] = useState([]);
+  const [activeLensColors, setActiveLensColors] = useState([]);
   const [frameColors, setFrameColors] = useState([]);
+  const [activeFrameColors, setActiveFrameColors] = useState([]);
   const [frameTypes, setFrameTypes] = useState([]);
+  const [activeFrameTypes, setActiveFrameTypes] = useState([]);
   const [lensMaterials, setLensMaterials] = useState([]);
+  const [activeLensMaterials, setActiveLensMaterials] = useState([]);
   const [frameMaterials, setFrameMaterials] = useState([]);
+  const [activeFrameMaterials, setActiveFrameMaterials] = useState([]);
 
   // Form data
   const [formData, setFormData] = useState({
@@ -209,6 +284,8 @@ const DashboardProducts = () => {
     collection_id: '',
     warehouse_qty: '',
     status: 'draft',
+    is_active: true,
+    is_upcoming: false,
   });
 
   // Load orphaned images from localStorage on mount
@@ -373,16 +450,46 @@ const DashboardProducts = () => {
       console.error(`Failed to load ${key}:`, e);
     }
   };
-  const loadBrands = () => loadLookup('brands', getBrands, setBrands);
-  const loadCollections = () => loadLookup('collections', getCollections, setCollections);
-  const loadGenders = () => loadLookup('genders', getGenders, setGenders);
-  const loadColorCodes = () => loadLookup('colorCodes', getColorCodes, setColorCodes);
-  const loadShapes = () => loadLookup('shapes', getShapes, setShapes);
-  const loadLensColors = () => loadLookup('lensColors', getLensColors, setLensColors);
-  const loadFrameColors = () => loadLookup('frameColors', getFrameColors, setFrameColors);
-  const loadFrameTypes = () => loadLookup('frameTypes', getFrameTypes, setFrameTypes);
-  const loadLensMaterials = () => loadLookup('lensMaterials', getLensMaterials, setLensMaterials);
-  const loadFrameMaterials = () => loadLookup('frameMaterials', getFrameMaterials, setFrameMaterials);
+  const loadBrands = () => {
+    loadLookup('brands', getBrands, setBrands);
+    loadLookup('brands:active', () => getBrands({ activeOnly: true }), setActiveBrands);
+  };
+  const loadCollections = () => {
+    loadLookup('collections', getCollections, setCollections);
+    loadLookup('collections:active', () => getCollections({ activeOnly: true }), setActiveCollections);
+  };
+  const loadGenders = () => {
+    loadLookup('genders', getGenders, setGenders);
+    loadLookup('genders:active', () => getGenders({ activeOnly: true }), setActiveGenders);
+  };
+  const loadColorCodes = () => {
+    loadLookup('colorCodes', getColorCodes, setColorCodes);
+    loadLookup('colorCodes:active', () => getColorCodes({ activeOnly: true }), setActiveColorCodes);
+  };
+  const loadShapes = () => {
+    loadLookup('shapes', getShapes, setShapes);
+    loadLookup('shapes:active', () => getShapes({ activeOnly: true }), setActiveShapes);
+  };
+  const loadLensColors = () => {
+    loadLookup('lensColors', getLensColors, setLensColors);
+    loadLookup('lensColors:active', () => getLensColors({ activeOnly: true }), setActiveLensColors);
+  };
+  const loadFrameColors = () => {
+    loadLookup('frameColors', getFrameColors, setFrameColors);
+    loadLookup('frameColors:active', () => getFrameColors({ activeOnly: true }), setActiveFrameColors);
+  };
+  const loadFrameTypes = () => {
+    loadLookup('frameTypes', getFrameTypes, setFrameTypes);
+    loadLookup('frameTypes:active', () => getFrameTypes({ activeOnly: true }), setActiveFrameTypes);
+  };
+  const loadLensMaterials = () => {
+    loadLookup('lensMaterials', getLensMaterials, setLensMaterials);
+    loadLookup('lensMaterials:active', () => getLensMaterials({ activeOnly: true }), setActiveLensMaterials);
+  };
+  const loadFrameMaterials = () => {
+    loadLookup('frameMaterials', getFrameMaterials, setFrameMaterials);
+    loadLookup('frameMaterials:active', () => getFrameMaterials({ activeOnly: true }), setActiveFrameMaterials);
+  };
 
   // Lightweight paginated fetch for the Products listing tab.
   // Fetches only ONE page (20) of products - NO attribute lookups on listing.
@@ -396,10 +503,21 @@ const DashboardProducts = () => {
       // The Unuploaded Media Gallery reuses THIS paginated endpoint with an
       // image_status filter, so it no longer pulls the whole catalogue.
       const unuploaded = activeTab === 'Unuploaded Media Gallery';
-      let filters = term ? { search: term, status: null } : null;
+      const lf = unuploaded ? { brand_id: '', frame_type_id: '', stock: '' } : listFiltersRef.current;
+      const hasListFilter = !!(lf.brand_id || lf.frame_type_id || lf.stock);
+      let filters = (term || hasListFilter) ? { status: null } : null;
+      if (term) filters.search = term;
+      if (lf.brand_id) filters.brand_id = lf.brand_id;
+      if (lf.frame_type_id) filters.frame_type_id = lf.frame_type_id;
+      if (lf.stock === 'in') filters.in_stock = true;
       if (unuploaded) filters = { ...(filters || {}), image_status: 'unuploaded', status: null };
       const result = await getProducts(targetPage, PRODUCTS_PER_PAGE, filters);
       const list = result.data || [];
+      // A delete may have emptied the last page: step back to the last valid page.
+      const lastPage = result.pagination?.totalPages != null ? Math.max(1, result.pagination.totalPages) : 1;
+      if (list.length === 0 && targetPage > lastPage) {
+        return fetchProductsPage(lastPage, search);
+      }
       setProducts(list);
       setProductPage(targetPage);
       if (result.pagination?.totalPages != null) {
@@ -1197,6 +1315,9 @@ const DashboardProducts = () => {
         tray_qty: product.tray_qty || 0,
         total_qty: product.total_qty || product.qty || 0,
         status: product.status || 'draft',
+        is_active: product.is_active !== false,
+        is_upcoming: product.is_upcoming === true || product.is_upcoming === 1,
+        preorder_qty: Number(product.preorder_qty) || 0,
         hasUploadedMedia: hasUploadedMedia,
         data: product,
       };
@@ -1803,6 +1924,15 @@ const DashboardProducts = () => {
     }));
   };
 
+  // One Status control: Draft, Active or Inactive. It drives the two stored fields together:
+  // status (draft / active) and the manual on/off switch is_active.
+  const statusChoice = (f) => ((f.is_active === false || f.status === 'inactive') ? 'inactive' : (f.status === 'active' ? 'active' : 'draft'));
+  const handleStatusChoice = (value) => setFormData((prev) => ({
+    ...prev,
+    status: value === 'inactive' ? (prev.status === 'inactive' ? 'draft' : prev.status) : value,
+    is_active: value !== 'inactive',
+  }));
+
   const resetForm = () => {
     setFormData({
       model_no: '',
@@ -1823,6 +1953,8 @@ const DashboardProducts = () => {
       tray_qty: '',
       total_qty: '',
       status: 'draft',
+      is_active: true,
+      is_upcoming: false,
     });
   };
 
@@ -1854,6 +1986,8 @@ const DashboardProducts = () => {
       tray_qty: product.tray_qty || '',
       total_qty: product.total_qty || '',
       status: product.status || 'draft',
+      is_active: product.is_active !== false,
+      is_upcoming: product.is_upcoming === true || product.is_upcoming === 1,
     });
     setEditRow(row);
   };
@@ -2002,26 +2136,62 @@ const DashboardProducts = () => {
     }
   };
 
+  const applyListFilter = (patch) => {
+    const next = { ...listFiltersRef.current, ...patch };
+    listFiltersRef.current = next;
+    setListFilters(next);
+    fetchProductsPage(1, productSearch);
+  };
+  const clearListFilters = () => applyListFilter({ brand_id: '', frame_type_id: '', stock: '' });
+  const anyListFilter = !!(listFilters.brand_id || listFilters.frame_type_id || listFilters.stock);
+
+  // Export the rows on screen (this page of results) as a CSV file.
+  const handleExportRows = () => {
+    const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const head = ['Model no', 'Brand', 'Collection', 'Gender', 'Shape', 'Frame type', 'Stock', 'Status', 'WHP', 'MRP'];
+    const lines = rows.map(r => [
+      r.model_no, r.brand, r.collection, r.gender_name, r.shape_name, r.frame_type_name,
+      r.total_qty, stockInfo(r).label, r.whp, r.mrp,
+    ].map(esc).join(','));
+    const blob = new Blob([[head.map(esc).join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'stallion-products.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   const columns = useMemo(() => ([
     {
       key: 'image',
       label: 'IMAGE',
-      width: '84px',
+      width: '72px',
       render: (_v, row) => <ProductThumb product={row.data} alt={row.model_no} />,
     },
-    { key: 'model_no', label: 'MODEL NO', width: '120px' },
-    { key: 'color_code_name', label: 'COLOR CODE', width: '120px' },
-    { key: 'warehouse_qty', label: 'WAREHOUSE QTY', width: '140px' },
-    { key: 'tray_qty', label: 'TRAY QTY', width: '110px' },
-    { key: 'total_qty', label: 'TOTAL QTY', width: '110px' },
-    { key: 'status', label: 'STATUS', width: '100px' },
-    { key: 'brand', label: 'BRAND', width: '120px' },
-    { key: 'collection', label: 'COLLECTION', width: '130px' },
+    { key: 'model_no', label: 'MODEL NO', width: '110px' },
+    { key: 'brand', label: 'BRAND', width: '90px' },
+    { key: 'gender_name', label: 'GENDER', width: '80px' },
+    { key: 'shape_name', label: 'SHAPE', width: '80px' },
     {
-      key: 'action', label: 'ACTION', width: '120px', render: (_v, row) => (
+      key: 'total_qty', label: 'STOCK', width: '110px',
+      render: (v, row) => (
+        <span className="pp-stock">
+          <StockChip row={row} />
+          <span className="pp-qty">{row.is_upcoming ? `${row.preorder_qty || 0} ordered` : (Number(v) || 0)}</span>
+        </span>
+      ),
+    },
+    { key: 'whp', label: 'WHP', width: '90px', render: (_v, row) => <b>{row.whp_formatted}</b> },
+    { key: 'mrp', label: 'MRP', width: '90px', render: (_v, row) => row.mrp_formatted },
+    {
+      key: 'action', label: 'ACTION', width: '100px', render: (_v, row) => (
         <RowActions
           onEdit={() => handleEdit(row)}
-          onDelete={() => handleDelete(row)}
+          onHistory={() => setHistoryProduct({ id: row.product_id || row.id, model_no: row.model_no })}
+
           onUpload={(!row.data?.image_url && activeTab === 'Unuploaded Media Gallery')
             ? () => handleAttachImage(row)
             : undefined}
@@ -2086,12 +2256,15 @@ const DashboardProducts = () => {
         collection_id: formData.collection_id,
         warehouse_qty: parseInt(formData.warehouse_qty) || 0,
         status: formData.status,
+        // Upcoming (pre-order): no stock is kept; the stock fields are ignored for availability.
+        is_upcoming: formData.is_upcoming === true,
       };
 
       // Include tray_qty and total_qty only when updating (edit mode)
       if (editRow) {
         dataToSend.tray_qty = parseInt(formData.tray_qty) || 0;
         dataToSend.total_qty = parseInt(formData.total_qty) || 0;
+        dataToSend.is_active = formData.is_active !== false;
         await updateProduct(editRow.id, dataToSend);
         showSuccess('Product updated successfully');
       } else {
@@ -2417,12 +2590,12 @@ const DashboardProducts = () => {
     const headers = [
       'model_no', 'gender', 'color_code', 'shape', 'lens_color', 'frame_color',
       'frame_type', 'lens_material', 'frame_material', 'mrp', 'whp', 'size_mm',
-      'warehouse_qty', 'brand', 'collection', 'status',
+      'warehouse_qty', 'brand', 'collection', 'status', 'preorder',
     ];
     const example = [
       'STL-1001', 'Unisex', 'C1', 'Round', 'Brown', 'Black',
       'Full Rim', 'Polycarbonate', 'Acetate', '1999', '900', '52',
-      '10', 'Stallion', 'Classic', 'active',
+      '10', 'Stallion', 'Classic', 'active', 'no',
     ];
     const esc = (v) => {
       const s = String(v ?? '');
@@ -2444,6 +2617,7 @@ const DashboardProducts = () => {
   return (
     <div className="dash-page">
       <div className="dash-container">
+        <div className="pg-head"><div><h1>Products</h1><p>Admin and product managers can change products. Everyone can browse them.</p></div></div>
         {error && (
           <div className="dash-row">
             <div className="dash-card full">
@@ -2460,7 +2634,7 @@ const DashboardProducts = () => {
           </div>
         )}
         <div className="dash-row flex flex-wrap justify-between items-center gap-3">
-          <div className="order-tabs-container min-w-0 flex-1">
+          <div className="order-tabs-container pp-tabs min-w-0 flex-1">
             {['Products', 'Media Gallery', 'Unuploaded Media Gallery'].map(tab => (
               <button
                 key={tab}
@@ -2605,7 +2779,6 @@ const DashboardProducts = () => {
                           status={item.type}
                           deletable={item.type !== 'assigned'}
                           loading={loading}
-                          onDelete={handleDelete}
                         />
                       );
                     })}
@@ -2613,6 +2786,69 @@ const DashboardProducts = () => {
                 )}
               </div>
             ) : (
+              <>
+              {activeTab === 'Products' && (
+                <div className="pp-filters">
+                  <div className="pp-filters__field">
+                    <DropdownSelector
+                      options={[{ value: '', label: 'All brands' }, ...(brands || []).map(b => ({ value: b.brand_id || b.id, label: b.brand_name }))]}
+                      value={listFilters.brand_id}
+                      onChange={(v) => applyListFilter({ brand_id: v })}
+                      placeholder="Brand"
+                      onOpen={loadBrands}
+                    />
+                  </div>
+                  <div className="pp-filters__field">
+                    <DropdownSelector
+                      options={[{ value: '', label: 'All frame types' }, ...(frameTypes || []).map(f => ({ value: f.frame_type_id || f.id, label: f.frame_type }))]}
+                      value={listFilters.frame_type_id}
+                      onChange={(v) => applyListFilter({ frame_type_id: v })}
+                      placeholder="Frame type"
+                      onOpen={loadFrameTypes}
+                    />
+                  </div>
+                  <div className="pp-filters__field">
+                    <DropdownSelector
+                      options={[{ value: '', label: 'All stock' }, { value: 'in', label: 'In stock' }]}
+                      value={listFilters.stock}
+                      onChange={(v) => applyListFilter({ stock: v })}
+                      placeholder="Stock"
+                      searchable={false}
+                    />
+                  </div>
+                  {anyListFilter && (
+                    <button type="button" className="pp-btn" onClick={clearListFilters}>Clear filters</button>
+                  )}
+                  <button type="button" className="pp-btn pp-filters__export" onClick={handleExportRows} disabled={rows.length === 0}>
+                    <FiDownload size={16} aria-hidden="true" /> Export
+                  </button>
+                </div>
+              )}
+              <div className={`pp-list ${activeTab === 'Products' ? 'pp-list--cards' : ''}`}>
+              {activeTab === 'Products' && (
+                <ul className="pp-cards" aria-label="Products">
+                  {loading && filteredRowsByTab.length === 0 && <li className="pp-cards__note">Loading products…</li>}
+                  {!loading && filteredRowsByTab.length === 0 && <li className="pp-cards__note">No products found.</li>}
+                  {filteredRowsByTab.map(row => (
+                    <li key={row.id} className="pp-card">
+                      <ProductThumb product={row.data} alt={row.model_no} />
+                      <div className="pp-card__main">
+                        <b className="pp-card__model">{row.model_no}</b>
+                        <span className="pp-card__brand">{row.brand}</span>
+                        <StockChip row={row} />
+                      </div>
+                      <div className="pp-card__side">
+                        <b>{row.whp_formatted}</b>
+                        <span>MRP {row.mrp_formatted}</span>
+                        <RowActions
+                          onEdit={() => handleEdit(row)}
+                          onHistory={() => setHistoryProduct({ id: row.product_id || row.id, model_no: row.model_no })}
+                        />
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <TableWithControls
                 title={activeTab === 'Unuploaded Media Gallery' ? 'Unuploaded Media Gallery' : 'Products'}
                 columns={columns}
@@ -2631,10 +2867,18 @@ const DashboardProducts = () => {
                 onServerPageChange={(p) => fetchProductsPage(p, productSearch)}
                 onServerSearch={(s) => { setProductSearch(s); fetchProductsPage(1, s); }}
               />
+              </div>
+              </>
             )}
           </div>
         </div>
       </div>
+      <StockHistoryPanel
+        open={!!historyProduct}
+        onClose={() => setHistoryProduct(null)}
+        productId={historyProduct?.id}
+        modelNo={historyProduct?.model_no}
+      />
       <AsidePanel
         open={openAdd}
         onClose={() => {
@@ -2664,7 +2908,8 @@ const DashboardProducts = () => {
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
+        <form className="ui-form pp-form" onSubmit={handleSubmit}>
+          <h3 className="pp-group form-group--full">Model and brand</h3>
           <div className="form-group form-group--full">
             <label className="ui-label">Model No *</label>
             <input
@@ -2678,10 +2923,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Brand *</label>
             <DropdownSelector
-              options={brands.map(b => ({
-                value: b.brand_id || b.id,
-                label: b.brand_name
-              }))}
+              options={buildPickerOptions(activeBrands, brands, formData.brand_id, 'brand_id', x => x.brand_name)}
               value={formData.brand_id}
               onChange={(value) => handleInputChange('brand_id', value)}
               placeholder="Select brand"
@@ -2691,10 +2933,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Collection *</label>
             <DropdownSelector
-              options={collections.map(c => ({
-                value: c.collection_id || c.id,
-                label: c.collection_name
-              }))}
+              options={buildPickerOptions(activeCollections, collections, formData.collection_id, 'collection_id', x => x.collection_name)}
               value={formData.collection_id}
               onChange={(value) => handleInputChange('collection_id', value)}
               placeholder="Select collection"
@@ -2704,23 +2943,18 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Gender</label>
             <DropdownSelector
-              options={genders.map(g => ({
-                value: g.gender_id || g.id,
-                label: g.gender_name
-              }))}
+              options={buildPickerOptions(activeGenders, genders, formData.gender_id, 'gender_id', x => x.gender_name)}
               value={formData.gender_id}
               onChange={(value) => handleInputChange('gender_id', value)}
               placeholder="Select gender"
               onOpen={loadGenders}
             />
           </div>
+          <h3 className="pp-group form-group--full">Look</h3>
           <div className="form-group">
             <label className="ui-label">Color Code</label>
             <DropdownSelector
-              options={colorCodes.map(c => ({
-                value: c.color_code_id || c.id,
-                label: c.color_code
-              }))}
+              options={buildPickerOptions(activeColorCodes, colorCodes, formData.color_code_id, 'color_code_id', x => x.color_code)}
               value={formData.color_code_id}
               onChange={(value) => handleInputChange('color_code_id', value)}
               placeholder="Select color code"
@@ -2730,10 +2964,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Shape</label>
             <DropdownSelector
-              options={shapes.map(s => ({
-                value: s.shape_id || s.id,
-                label: s.shape_name
-              }))}
+              options={buildPickerOptions(activeShapes, shapes, formData.shape_id, 'shape_id', x => x.shape_name)}
               value={formData.shape_id}
               onChange={(value) => handleInputChange('shape_id', value)}
               placeholder="Select shape"
@@ -2743,10 +2974,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Color</label>
             <DropdownSelector
-              options={lensColors.map(l => ({
-                value: l.lens_color_id || l.id,
-                label: l.lens_color
-              }))}
+              options={buildPickerOptions(activeLensColors, lensColors, formData.lens_color_id, 'lens_color_id', x => x.lens_color)}
               value={formData.lens_color_id}
               onChange={(value) => handleInputChange('lens_color_id', value)}
               placeholder="Select lens color"
@@ -2756,10 +2984,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Color</label>
             <DropdownSelector
-              options={frameColors.map(f => ({
-                value: f.frame_color_id || f.id,
-                label: f.frame_color
-              }))}
+              options={buildPickerOptions(activeFrameColors, frameColors, formData.frame_color_id, 'frame_color_id', x => x.frame_color)}
               value={formData.frame_color_id}
               onChange={(value) => handleInputChange('frame_color_id', value)}
               placeholder="Select frame color"
@@ -2769,10 +2994,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Type</label>
             <DropdownSelector
-              options={frameTypes.map(f => ({
-                value: f.frame_type_id || f.id,
-                label: f.frame_type
-              }))}
+              options={buildPickerOptions(activeFrameTypes, frameTypes, formData.frame_type_id, 'frame_type_id', x => x.frame_type)}
               value={formData.frame_type_id}
               onChange={(value) => handleInputChange('frame_type_id', value)}
               placeholder="Select frame type"
@@ -2782,10 +3004,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Material</label>
             <DropdownSelector
-              options={lensMaterials.map(l => ({
-                value: l.lens_material_id || l.id,
-                label: l.lens_material
-              }))}
+              options={buildPickerOptions(activeLensMaterials, lensMaterials, formData.lens_material_id, 'lens_material_id', x => x.lens_material)}
               value={formData.lens_material_id}
               onChange={(value) => handleInputChange('lens_material_id', value)}
               placeholder="Select lens material"
@@ -2795,16 +3014,14 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Material</label>
             <DropdownSelector
-              options={frameMaterials.map(f => ({
-                value: f.frame_material_id || f.id,
-                label: f.frame_material
-              }))}
+              options={buildPickerOptions(activeFrameMaterials, frameMaterials, formData.frame_material_id, 'frame_material_id', x => x.frame_material)}
               value={formData.frame_material_id}
               onChange={(value) => handleInputChange('frame_material_id', value)}
               placeholder="Select frame material"
               onOpen={loadFrameMaterials}
             />
           </div>
+          <h3 className="pp-group form-group--full">Price and stock</h3>
           <div className="form-group">
             <label className="ui-label">MRP *</label>
             <input
@@ -2838,18 +3055,23 @@ const DashboardProducts = () => {
               onChange={(e) => handleInputChange('size_mm', e.target.value)}
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Warehouse Qty *</label>
+          <UpcomingSwitch
+            checked={formData.is_upcoming === true}
+            onToggle={() => handleInputChange('is_upcoming', formData.is_upcoming !== true)}
+          />
+          <div className={`form-group ${formData.is_upcoming ? 'opacity-50' : ''}`}>
+            <label className="ui-label">{formData.is_upcoming ? 'Warehouse Qty' : 'Warehouse Qty *'}</label>
             <input
               className="ui-input"
               type="number"
               placeholder="Enter warehouse quantity"
               value={formData.warehouse_qty}
               onChange={(e) => handleInputChange('warehouse_qty', e.target.value)}
-              required
+              required={!formData.is_upcoming}
+              disabled={formData.is_upcoming === true}
             />
           </div>
-          <div className="form-group">
+          <div className={`form-group ${formData.is_upcoming ? 'opacity-50' : ''}`}>
             <label className="ui-label">Total Qty</label>
             <input
               className="ui-input bg-surface-muted"
@@ -2868,12 +3090,13 @@ const DashboardProducts = () => {
               options={[
                 { value: 'draft', label: 'Draft' },
                 { value: 'active', label: 'Active' },
-                { value: 'inactive', label: 'Inactive' }
+                { value: 'inactive', label: 'Inactive' },
               ]}
-              value={formData.status}
-              onChange={(value) => handleInputChange('status', value)}
+              value={statusChoice(formData)}
+              onChange={handleStatusChoice}
               placeholder="Select status"
             />
+            <p className="mng-note">Draft is not ready yet. Inactive hides the product from the shop and pickers. Nothing is ever deleted.</p>
           </div>
         </form>
       </AsidePanel>
@@ -2906,7 +3129,8 @@ const DashboardProducts = () => {
           </>
         )}
       >
-        <form className="ui-form" onSubmit={handleSubmit}>
+        <form className="ui-form pp-form" onSubmit={handleSubmit}>
+          <h3 className="pp-group form-group--full">Model and brand</h3>
           <div className="form-group form-group--full">
             <label className="ui-label">Model No *</label>
             <input
@@ -2920,10 +3144,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Brand *</label>
             <DropdownSelector
-              options={brands.map(b => ({
-                value: b.brand_id || b.id,
-                label: b.brand_name
-              }))}
+              options={buildPickerOptions(activeBrands, brands, formData.brand_id, 'brand_id', x => x.brand_name)}
               value={formData.brand_id}
               onChange={(value) => handleInputChange('brand_id', value)}
               placeholder="Select brand"
@@ -2933,10 +3154,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Collection *</label>
             <DropdownSelector
-              options={collections.map(c => ({
-                value: c.collection_id || c.id,
-                label: c.collection_name
-              }))}
+              options={buildPickerOptions(activeCollections, collections, formData.collection_id, 'collection_id', x => x.collection_name)}
               value={formData.collection_id}
               onChange={(value) => handleInputChange('collection_id', value)}
               placeholder="Select collection"
@@ -2946,23 +3164,18 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Gender</label>
             <DropdownSelector
-              options={genders.map(g => ({
-                value: g.gender_id || g.id,
-                label: g.gender_name
-              }))}
+              options={buildPickerOptions(activeGenders, genders, formData.gender_id, 'gender_id', x => x.gender_name)}
               value={formData.gender_id}
               onChange={(value) => handleInputChange('gender_id', value)}
               placeholder="Select gender"
               onOpen={loadGenders}
             />
           </div>
+          <h3 className="pp-group form-group--full">Look</h3>
           <div className="form-group">
             <label className="ui-label">Color Code</label>
             <DropdownSelector
-              options={colorCodes.map(c => ({
-                value: c.color_code_id || c.id,
-                label: c.color_code
-              }))}
+              options={buildPickerOptions(activeColorCodes, colorCodes, formData.color_code_id, 'color_code_id', x => x.color_code)}
               value={formData.color_code_id}
               onChange={(value) => handleInputChange('color_code_id', value)}
               placeholder="Select color code"
@@ -2972,10 +3185,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Shape</label>
             <DropdownSelector
-              options={shapes.map(s => ({
-                value: s.shape_id || s.id,
-                label: s.shape_name
-              }))}
+              options={buildPickerOptions(activeShapes, shapes, formData.shape_id, 'shape_id', x => x.shape_name)}
               value={formData.shape_id}
               onChange={(value) => handleInputChange('shape_id', value)}
               placeholder="Select shape"
@@ -2985,10 +3195,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Color</label>
             <DropdownSelector
-              options={lensColors.map(l => ({
-                value: l.lens_color_id || l.id,
-                label: l.lens_color
-              }))}
+              options={buildPickerOptions(activeLensColors, lensColors, formData.lens_color_id, 'lens_color_id', x => x.lens_color)}
               value={formData.lens_color_id}
               onChange={(value) => handleInputChange('lens_color_id', value)}
               placeholder="Select lens color"
@@ -2998,10 +3205,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Color</label>
             <DropdownSelector
-              options={frameColors.map(f => ({
-                value: f.frame_color_id || f.id,
-                label: f.frame_color
-              }))}
+              options={buildPickerOptions(activeFrameColors, frameColors, formData.frame_color_id, 'frame_color_id', x => x.frame_color)}
               value={formData.frame_color_id}
               onChange={(value) => handleInputChange('frame_color_id', value)}
               placeholder="Select frame color"
@@ -3011,10 +3215,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Type</label>
             <DropdownSelector
-              options={frameTypes.map(f => ({
-                value: f.frame_type_id || f.id,
-                label: f.frame_type
-              }))}
+              options={buildPickerOptions(activeFrameTypes, frameTypes, formData.frame_type_id, 'frame_type_id', x => x.frame_type)}
               value={formData.frame_type_id}
               onChange={(value) => handleInputChange('frame_type_id', value)}
               placeholder="Select frame type"
@@ -3024,10 +3225,7 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Lens Material</label>
             <DropdownSelector
-              options={lensMaterials.map(l => ({
-                value: l.lens_material_id || l.id,
-                label: l.lens_material
-              }))}
+              options={buildPickerOptions(activeLensMaterials, lensMaterials, formData.lens_material_id, 'lens_material_id', x => x.lens_material)}
               value={formData.lens_material_id}
               onChange={(value) => handleInputChange('lens_material_id', value)}
               placeholder="Select lens material"
@@ -3037,16 +3235,14 @@ const DashboardProducts = () => {
           <div className="form-group">
             <label className="ui-label">Frame Material</label>
             <DropdownSelector
-              options={frameMaterials.map(f => ({
-                value: f.frame_material_id || f.id,
-                label: f.frame_material
-              }))}
+              options={buildPickerOptions(activeFrameMaterials, frameMaterials, formData.frame_material_id, 'frame_material_id', x => x.frame_material)}
               value={formData.frame_material_id}
               onChange={(value) => handleInputChange('frame_material_id', value)}
               placeholder="Select frame material"
               onOpen={loadFrameMaterials}
             />
           </div>
+          <h3 className="pp-group form-group--full">Price and stock</h3>
           <div className="form-group">
             <label className="ui-label">MRP *</label>
             <input
@@ -3080,18 +3276,23 @@ const DashboardProducts = () => {
               onChange={(e) => handleInputChange('size_mm', e.target.value)}
             />
           </div>
-          <div className="form-group">
-            <label className="ui-label">Warehouse Qty *</label>
+          <UpcomingSwitch
+            checked={formData.is_upcoming === true}
+            onToggle={() => handleInputChange('is_upcoming', formData.is_upcoming !== true)}
+          />
+          <div className={`form-group ${formData.is_upcoming ? 'opacity-50' : ''}`}>
+            <label className="ui-label">{formData.is_upcoming ? 'Warehouse Qty' : 'Warehouse Qty *'}</label>
             <input
               className="ui-input"
               type="number"
               placeholder="Enter warehouse quantity"
               value={formData.warehouse_qty}
               onChange={(e) => handleInputChange('warehouse_qty', e.target.value)}
-              required
+              required={!formData.is_upcoming}
+              disabled={formData.is_upcoming === true}
             />
           </div>
-          <div className="form-group">
+          <div className={`form-group ${formData.is_upcoming ? 'opacity-50' : ''}`}>
             <label className="ui-label">Total Qty</label>
             <input
               className="ui-input bg-surface-muted"
@@ -3110,14 +3311,15 @@ const DashboardProducts = () => {
               options={[
                 { value: 'draft', label: 'Draft' },
                 { value: 'active', label: 'Active' },
-                { value: 'inactive', label: 'Inactive' }
+                { value: 'inactive', label: 'Inactive' },
               ]}
-              value={formData.status}
-              onChange={(value) => handleInputChange('status', value)}
+              value={statusChoice(formData)}
+              onChange={handleStatusChoice}
               placeholder="Select status"
             />
+            <p className="mng-note">Draft is not ready yet. Inactive hides the product from the shop and pickers. Nothing is ever deleted.</p>
           </div>
-
+          {editRow && <h3 className="pp-group form-group--full">Images</h3>}
           {/* Assigned Images Preview + Assign Button */}
           {editRow && (() => {
             const imgs = parseImageUrls(editRow.data);
@@ -3267,11 +3469,11 @@ const DashboardProducts = () => {
           {uploadProgress && (
             <div style={{
               padding: '12px',
-              backgroundColor: uploadProgress.success ? '#d4edda' : '#f8d7da',
-              border: `1px solid ${uploadProgress.success ? '#c3e6cb' : '#f5c6cb'}`,
+              backgroundColor: uploadProgress.success ? 'var(--ops-ok-bg, #d4edda)' : 'var(--ops-bad-bg, #f8d7da)',
+              border: `1px solid ${uploadProgress.success ? 'var(--ops-ok-line, #c3e6cb)' : 'var(--ops-bad-line, #f5c6cb)'}`,
               borderRadius: '8px',
               marginTop: '16px',
-              color: uploadProgress.success ? '#155724' : '#721c24'
+              color: uploadProgress.success ? 'var(--ops-ok-ink, #155724)' : 'var(--ops-bad-ink, #721c24)'
             }}>
               <strong>{uploadProgress.success ? 'Success!' : 'Error:'}</strong> {uploadProgress.message}
               {uploadProgress.details && (
@@ -3345,23 +3547,23 @@ const DashboardProducts = () => {
                     <div
                       key={item.id}
                       style={{
-                        border: isSelected ? '3px solid #16171d' : '2px solid #e5e7eb',
+                        border: isSelected ? '3px solid var(--ops-sel, #16171d)' : '2px solid var(--ops-line, #e5e7eb)',
                         borderRadius: '8px',
                         overflow: 'hidden',
-                        background: isSelected ? '#f3f4f5' : '#fff',
+                        background: isSelected ? 'var(--ops-sel-bg, #f3f4f5)' : 'var(--ops-card, #fff)',
                         cursor: 'pointer',
                         transition: 'all 0.2s',
                         position: 'relative'
                       }}
                       onMouseEnter={(e) => {
                         if (!isSelected) {
-                          e.currentTarget.style.borderColor = '#16171d';
+                          e.currentTarget.style.borderColor = 'var(--ops-sel, #16171d)';
                           e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (!isSelected) {
-                          e.currentTarget.style.borderColor = '#e5e7eb';
+                          e.currentTarget.style.borderColor = 'var(--ops-line, #e5e7eb)';
                           e.currentTarget.style.boxShadow = 'none';
                         }
                       }}
@@ -3384,8 +3586,8 @@ const DashboardProducts = () => {
                         top: '8px',
                         left: '8px',
                         zIndex: 3,
-                        background: isSelected ? '#16171d' : 'rgba(255, 255, 255, 0.9)',
-                        border: '2px solid #16171d',
+                        background: isSelected ? 'var(--ops-sel, #16171d)' : 'var(--ops-chk-bg, rgba(255, 255, 255, 0.9))',
+                        border: '2px solid var(--ops-sel, #16171d)',
                         borderRadius: '4px',
                         width: '24px',
                         height: '24px',
@@ -3395,7 +3597,7 @@ const DashboardProducts = () => {
                         cursor: 'pointer'
                       }}>
                         {isSelected && (
-                          <span className="text-white text-sm font-bold">✓</span>
+                          <span className="text-white text-sm font-bold" style={{ color: "var(--ops-tick, #fff)" }}>✓</span>
                         )}
                       </div>
                       <div className="w-full aspect-[4/3] bg-surface-muted relative">

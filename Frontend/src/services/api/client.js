@@ -6,6 +6,7 @@
 
 import { logout } from '../authService';
 import { showError } from '../notificationService';
+import { invalidateShared, mapLimit, shareRequest } from '../requestShare';
 
 // Cache TTLs (ms). Lookup data rarely changes; transactional data is shorter.
 const TTL_LOOKUP = 10 * 60 * 1000; // 10 min - countries, roles, brands, attributes
@@ -32,6 +33,10 @@ const getBaseURL = () => {
 // Get BASE_URL - will be evaluated at module load time
 // For dynamic access, use getBaseURL() function
 const BASE_URL = getBaseURL();
+
+// POST endpoints that only read (the list/search calls that need a body). They must not wipe the
+// shared list requests, or the shop and the party list would keep throwing each other's data away.
+const READ_ONLY_POST = /^\/(?:products\/?(?:\?|$)|[a-z_-]+\/get(?:\?|$)|offers\/available|orders\/quote)/;
 
 // Flag to prevent infinite redirect loops
 let isRedirecting = false;
@@ -147,6 +152,22 @@ const handleResponse = async (response) => {
                     (errorData.data && (errorData.data.error || errorData.data.message || errorData.data.msg)) ||
                     errorMessage;
       
+      // Validation answers often come as a list of problems: show every one of them.
+      if (errorMessage === 'An error occurred' || !errorMessage) {
+        const list = Array.isArray(errorData.errors) ? errorData.errors : (Array.isArray(errorData.details) ? errorData.details : null);
+        if (list && list.length) {
+          errorMessage = list.map((e) => (typeof e === 'string' ? e : (e && (e.msg || e.message)) || '')).filter(Boolean).join('. ') || errorMessage;
+        }
+      }
+
+      // The server firewall (Imunify360) blocks the request before it reaches the
+      // API and answers with its own JSON message. Show something users can act
+      // on instead of the firewall's wording, and keep the original in the console.
+      if (/imunify360|bot-protection/i.test(String(errorMessage))) {
+        console.error('[API Error] Blocked by server firewall:', errorMessage, response.url);
+        errorMessage = 'The server blocked this request. Please try again in a moment, or contact support if it keeps happening.';
+      }
+
       // If we still have the default message, try to get more info
       if (errorMessage === 'An error occurred' && errorData) {
         // Log the full error data for debugging
@@ -159,16 +180,18 @@ const handleResponse = async (response) => {
         
         // Try to construct a more informative message
         if (response.status === 404) {
-          errorMessage = 'Resource not found';
+          errorMessage = 'Not found';
         } else if (response.status === 500) {
-          errorMessage = 'Internal server error. Please try again later.';
+          errorMessage = 'The server hit an error and gave no reason';
         } else if (response.status === 400) {
-          errorMessage = 'Bad request. Please check your input.';
+          errorMessage = 'The server did not accept the details sent';
         } else if (response.status === 403) {
-          errorMessage = 'Access forbidden';
+          errorMessage = 'You do not have permission for this';
         } else {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          errorMessage = `The server answered ${response.status}${response.statusText ? ` ${response.statusText}` : ''}`;
         }
+        // Say which request failed so the problem can be found quickly.
+        try { errorMessage += ` (${response.status} on ${new URL(response.url).pathname})`; } catch { /* no url */ }
       }
     } catch (parseError) {
       // If we can't parse the error response, use status text
@@ -190,7 +213,7 @@ const handleResponse = async (response) => {
       showError('Your session has expired. Please login again.');
       
       // Clear authentication immediately
-      logout();
+      logout({ keepCart: true });
       
       // Redirect to login page after a short delay to ensure notification is visible
       // Check if we're not already on the login page to avoid infinite loops
@@ -286,7 +309,7 @@ const apiRequest = async (endpoint, options = {}) => {
       isRedirecting = true;
       window.__hasShownLogoutNotification = true;
       showError('Your session has expired. Please login again.');
-      logout();
+      logout({ keepCart: true });
       
       const currentPath = window.location.pathname;
       if (!currentPath.includes('/login')) {
@@ -401,12 +424,27 @@ const apiRequest = async (endpoint, options = {}) => {
     if (API_DEBUG) console.log(`[API Request] DELETE request - no body sent`);
   }
 
+  // A write (anything but a GET, except the POSTs that only read a list) may change what the
+  // shared list requests returned a moment ago: forget them before and after the call.
+  const isWrite = actualMethod !== 'GET' && !READ_ONLY_POST.test(normalizedEndpoint);
+  if (isWrite) invalidateShared();
+
   try {
     const response = await fetch(fullUrl, config);
     return await handleResponse(response);
   } catch (error) {
     if (!silent) console.error(`API Error [${method} ${fullUrl}]:`, error);
+    // The request never got an answer: say what that usually means instead of the browser's bare "Failed to fetch".
+    if (error && error.statusCode === undefined && /failed to fetch|load failed|networkerror|network request failed/i.test(String(error.message))) {
+      const offline = typeof navigator !== 'undefined' && navigator.onLine === false;
+      error.message = offline
+        ? 'No internet connection. Check your signal and try again.'
+        : `Could not reach the server. The connection dropped, or the server is down (${error.message}).`;
+      error.isNetworkFailure = true;
+    }
     throw error;
+  } finally {
+    if (isWrite) invalidateShared();
   }
 };
 
@@ -418,6 +456,10 @@ const apiRequest = async (endpoint, options = {}) => {
 // limit and return the unwrapped array (no per-page looping). Tables that want
 // true 20/page server pagination pass their own page/limit and read .pagination.
 const PAGE_SIZE = 20;        // strict server page size for true server-paginated tables
+const SERVER_MAX_LIMIT = 100;   // backend clamps `limit` to 1..100
+const MAX_LOAD_ALL_PAGES = 50;  // safety bound for load-all loops
+const SHARED_READ_TTL = 10 * 1000; // how long a shared list answer is reused (ms)
+const PARALLEL_PAGES = 6;       // pages of one "load all" asked for at the same time (browser limit per host)
 const LIST_LIMIT = 1000;     // single-call "load all" size for client-side lists/dropdowns
 
 /** Normalize an array | { data, pagination } response to its array. */
@@ -431,6 +473,15 @@ const withListPaging = (endpoint, { page = 1, limit = LIST_LIMIT } = {}) => {
 };
 
 /**
+ * Share one "load a whole list" call between everything that asks for it at the same time, and
+ * reuse the answer for a few seconds. Any write (see apiRequest) or logout drops it. The key
+ * carries the login token, so one user's list is never handed to another.
+ * @param {string} key - what is being read, e.g. 'parties:all'
+ * @param {() => Promise<any>} fetcher
+ */
+const sharedRead = (key, fetcher) => shareRequest(`${getAuthToken() || ''}|${key}`, fetcher, SHARED_READ_TTL);
+
+/**
  * Single request that loads a full list (page 1, large limit) and returns the
  * unwrapped array — one network call, no looping. Used by dropdowns/dashboards
  * that need the whole list.
@@ -438,8 +489,24 @@ const withListPaging = (endpoint, { page = 1, limit = LIST_LIMIT } = {}) => {
  * @param {Object} [opts] - apiRequest options (method/body/includeAuth/silent)
  */
 const fetchAllPages = async (endpoint, opts = {}, { limit = LIST_LIMIT } = {}) => {
-  const res = await apiRequest(withListPaging(endpoint, { limit }), opts);
-  return unwrapList(res);
+  // The backend caps `limit` at 100 per request, so a "load all" walks the pages
+  // (bounded) using pagination.totalPages instead of relying on one huge page.
+  const perPage = Math.min(Math.max(1, Number(limit) || LIST_LIMIT), SERVER_MAX_LIMIT);
+  const first = await apiRequest(withListPaging(endpoint, { page: 1, limit: perPage }), opts);
+  let all = unwrapList(first);
+  const wantAll = (Number(limit) || LIST_LIMIT) > SERVER_MAX_LIMIT;
+  const totalPages = Number(first && first.pagination && first.pagination.totalPages) || 1;
+  if (wantAll && totalPages > 1) {
+    // The first answer says how many pages there are, so the rest are asked for together
+    // (a few at a time) instead of one after the other. Same pages, same order.
+    const last = Math.min(totalPages, MAX_LOAD_ALL_PAGES);
+    const pages = [];
+    for (let page = 2; page <= last; page += 1) pages.push(page);
+    const rest = await mapLimit(pages, PARALLEL_PAGES, (page) =>
+      apiRequest(withListPaging(endpoint, { page, limit: perPage }), opts));
+    rest.forEach((res) => { all = all.concat(unwrapList(res)); });
+  }
+  return all;
 };
 
 /**
@@ -479,4 +546,5 @@ export {
   withListPaging,
   fetchAllPages,
   fetchPage,
+  sharedRead,
 };

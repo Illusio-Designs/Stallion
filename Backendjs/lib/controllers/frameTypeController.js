@@ -1,3 +1,4 @@
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const FrameType = require('../models/FrameType');
 const { logAudit } = require('../utils/auditLogger');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
@@ -11,7 +12,7 @@ class FrameTypeController {
                 nameFields: ['frame_type'],
                 phoneFields: [],
             });
-            const where = mergeWhere({}, searchFilter);
+            const where = mergeWhere(activeOnlyWhere(req), searchFilter);
             const frameTypes = await FrameType.findAll({ where });
             res.status(200).json(frameTypes);
         } catch (error) {
@@ -73,6 +74,7 @@ class FrameTypeController {
             }
             const oldSnapshot = frameType.toJSON();
             const payload = {
+                ...activeUpdate(req.body),
                 frame_type: frame_type,
                 updated_at: new Date(),
             };

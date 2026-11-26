@@ -1,3 +1,4 @@
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const ColorCode = require('../models/ColorCode');
 const { logAudit } = require('../utils/auditLogger');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
@@ -12,7 +13,7 @@ class ColorCodesController {
                 nameFields: ['color_code'],
                 phoneFields: [],
             });
-            const where = mergeWhere({}, searchFilter);
+            const where = mergeWhere(activeOnlyWhere(req), searchFilter);
             const colorCodes = await ColorCode.findAll({ where });
             res.status(200).json(colorCodes);
         } catch (error) {
@@ -57,6 +58,7 @@ class ColorCodesController {
             }
             const oldSnapshot = colorCode.toJSON();
             const payload = {
+                ...activeUpdate(req.body),
                 color_code: color_code,
                 updated_at: new Date(),
             };

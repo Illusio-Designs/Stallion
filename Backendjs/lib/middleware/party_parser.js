@@ -25,7 +25,7 @@ function mapRecordToParty(record) {
     // column, or any other text (e.g. "Active") stays active.
     const activeVal = getCell(record, 'active', 'Active', 'is_active', 'is_active');
     const isActive = activeVal === null
-        ? true
+        ? null
         : !/^(0|false|no|n|inactive|disable|disabled|deactivate|deactivated)$/i.test(activeVal);
 
     const billingSameVal = getCell(
@@ -35,7 +35,7 @@ function mapRecordToParty(record) {
         'billing same as shipping'
     );
     const billingSameAsShipping = billingSameVal === null
-        ? true
+        ? null
         : /^(1|true|yes|y)$/i.test(billingSameVal);
 
     return {

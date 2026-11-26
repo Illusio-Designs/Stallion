@@ -45,6 +45,9 @@ const nextConfig = {
     // intentionally omitted for now — it needs per-source tuning against the
     // app's inline styles/scripts and the API/MSG91 origins.)
     return [
+      // The service worker and the manifest must never be served from an old cache.
+      { source: '/sw.js', headers: [{ key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' }, { key: 'Service-Worker-Allowed', value: '/' }] },
+      { source: '/manifest.webmanifest', headers: [{ key: 'Cache-Control', value: 'no-cache' }, { key: 'Content-Type', value: 'application/manifest+json' }] },
       {
         source: '/:path*',
         headers: [

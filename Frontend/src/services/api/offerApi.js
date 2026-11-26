@@ -32,6 +32,17 @@ export const updateOffer = async (offerId, offer) => {
   return result;
 };
 
+/** Admin: switch an offer on or off (never deletes). */
+export const setOfferActive = async (offerId, isActive) => {
+  const result = await apiRequest(`/offers/${offerId}/active`, {
+    method: 'PATCH',
+    body: { is_active: !!isActive },
+    includeAuth: true,
+  });
+  invalidateCache('offers');
+  return result;
+};
+
 /** Admin: delete an offer. */
 export const deleteOffer = async (offerId) => {
   const result = await apiRequest(`/offers/${offerId}`, {
@@ -53,6 +64,14 @@ export const getAvailableOffers = async (orderItems) => {
     body: { order_items: orderItems },
     includeAuth: true,
   });
+};
+
+/**
+ * Products that an active offer touches, so the shop can highlight them.
+ * @returns {Promise<{products: Object<string, {offer_id, title, offer_type, label}>}>}
+ */
+export const getOfferProducts = async () => {
+  return apiRequest('/offers/highlighted', { method: 'GET', includeAuth: true });
 };
 
 /**

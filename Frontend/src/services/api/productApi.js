@@ -33,6 +33,7 @@ export const parseProductsResponse = (response) => {
  * @param {number|Array<number>} [filters.frame_type_id] - Frame type ID(s)
  * @param {number|Array<number>} [filters.lens_material_id] - Lens material ID(s)
  * @param {number|Array<number>} [filters.frame_material_id] - Frame material ID(s)
+ * @param {string|Array<string>} [filters.collection_id] - Collection ID(s)
  * @param {string|Array<string>} [filters.brand_id] - Brand ID(s)
  * @param {Object} [filters.price] - Price range filter
  * @param {number} [filters.price.min] - Minimum price
@@ -121,9 +122,33 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
       filterBody.brand_id = filters.brand_id;
     }
 
+    if (filters.collection_id !== undefined && filters.collection_id !== null) {
+      filterBody.collection_id = filters.collection_id;
+    }
+
     // status (optional, include if provided to filter by status, or null to get all including drafts)
     if (filters.status !== undefined) {
       filterBody.status = filters.status;
+    }
+
+    // product_ids: only these products (the shop's "On offer" filter)
+    if (Array.isArray(filters.product_ids) && filters.product_ids.length > 0) {
+      filterBody.product_ids = filters.product_ids;
+    }
+
+    // in_stock: true -> only frames with stock (the shop never lists sold-out ones)
+    if (filters.in_stock === true) {
+      filterBody.in_stock = true;
+    }
+
+    // warehouse_in_stock: true -> only frames with warehouse stock (the tray assign picker)
+    if (filters.warehouse_in_stock === true) {
+      filterBody.warehouse_in_stock = true;
+    }
+
+    // active: true -> only products that are switched on (shop and pickers)
+    if (filters.active === true) {
+      filterBody.active = true;
     }
 
     // search (server-side text search on model_no/size/status) — used by the
@@ -139,13 +164,11 @@ const fetchProductsUncached = async (page = 1, limit = 20, filters = {}) => {
       filterBody.image_status = filters.image_status;
     }
 
-    // Always include price filter (backend requires it)
-    // If price is not provided, use full range (0-10000) to show all products
+    // Price is an optional filter. Only send it when the caller really set a
+    // range: the server then returns products of every price. (A default range
+    // used to be sent here and hid every frame with an MRP above its maximum.)
     if (filters.price !== undefined && filters.price !== null) {
       filterBody.price = filters.price;
-    } else {
-      // Default to full range when no price filter is specified
-      filterBody.price = { min: 0, max: 10000 };
     }
 
     // Always use POST with body since backend requires price field
@@ -197,10 +220,12 @@ export const getProducts = async (page = 1, limit = 20, filters = {}) => {
  * @param {number} [page=1]
  * @param {number} [limit=20]
  * @param {string} [search=''] - text matched against model_no/size/status
+ * @param {{activeOnly?: boolean, warehouseInStock?: boolean}} [options] - activeOnly: true hides products switched off (pickers); warehouseInStock: true hides frames with no warehouse stock (tray assign)
  */
-export const getProductsPage = async (page = 1, limit = 20, search = '') => {
+export const getProductsPage = async (page = 1, limit = 20, search = '', { activeOnly = false, warehouseInStock = false } = {}) => {
   const term = String(search || '').trim();
-  return getProducts(page, limit, term ? { search: term } : null);
+  const filters = { ...(term ? { search: term } : {}), ...(activeOnly ? { active: true } : {}), ...(warehouseInStock ? { warehouse_in_stock: true } : {}) };
+  return getProducts(page, limit, Object.keys(filters).length ? filters : null);
 };
 
 /**
@@ -242,6 +267,7 @@ export const createProduct = async (productData) => {
     collection_id,
     warehouse_qty,
     status,
+    is_upcoming,
   } = productData;
 
   const result = await apiRequest('/products/create', {
@@ -263,6 +289,8 @@ export const createProduct = async (productData) => {
       collection_id,
       warehouse_qty,
       status,
+      // Upcoming (pre-order) product: no stock kept, any quantity can be ordered.
+      ...(is_upcoming !== undefined ? { is_upcoming: !!is_upcoming } : {}),
     },
     includeAuth: true,
   });
@@ -314,6 +342,8 @@ export const updateProduct = async (productId, productData) => {
     tray_qty,
     total_qty,
     status,
+    is_active,
+    is_upcoming,
     image_urls, // Array of image paths
   } = productData;
 
@@ -341,6 +371,14 @@ export const updateProduct = async (productId, productData) => {
   // Include image_urls if provided (array of image paths)
   if (image_urls !== undefined) {
     body.image_urls = image_urls;
+  }
+  // The manual Active/Inactive switch: only sent when the caller sets it.
+  if (is_active !== undefined) {
+    body.is_active = is_active;
+  }
+  // The Upcoming (pre-order) switch: only sent when the caller sets it.
+  if (is_upcoming !== undefined) {
+    body.is_upcoming = !!is_upcoming;
   }
 
   const result = await apiRequest(`/products/${productId}`, {
@@ -624,3 +662,13 @@ export const deleteProductImage = async (fileName) => {
   });
 };
 
+
+/**
+ * Every stock change of one product, newest first, with the warehouse and tray numbers after each.
+ * @returns {Promise<{summary:Object, data:Array, pagination:Object}>}
+ */
+export const getProductStockHistory = async (productId, { kind = '', page = 1, limit = 20 } = {}) => {
+  const q = new URLSearchParams({ page: String(page), limit: String(limit) });
+  if (kind) q.set('kind', kind);
+  return apiRequest(`/products/${encodeURIComponent(productId)}/stock-history?${q.toString()}`, { method: 'GET', includeAuth: true });
+};

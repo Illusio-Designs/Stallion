@@ -19,6 +19,11 @@ const Collection = sequelize.define('Collection', {
             key: 'brand_id'
         }
     },
+    is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    }
 }, {
     tableName: 'collection',
     timestamps: true,

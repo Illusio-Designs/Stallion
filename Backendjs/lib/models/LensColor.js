@@ -15,6 +15,11 @@ const LensColor = sequelize.define('LensColor', {
         allowNull: false,
         unique: true
     }
+    ,is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    }
 }, {
     tableName: 'lens_color',
     timestamps: true,

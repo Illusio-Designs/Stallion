@@ -17,7 +17,7 @@
   transition: margin-left var(--transition) ease;
 }
 .dashboard-layout.collapsed .dashboard-shell {
-  margin-left: 64px;
+  margin-left: 76px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -44,7 +44,9 @@
   padding: var(--space-6) var(--space-6);   /* 24px */
 }
 
-@media (max-width: 768px) {
+/* Phone breakpoint is < 768px so it matches Tailwind's `md:` (>= 768px) exactly;
+   a 768px viewport must not fall into both the phone and desktop layouts. */
+@media (max-width: 767.98px) {
   .dashboard-content {
     padding: var(--space-5) var(--space-4);  /* 20px / 16px */
   }
@@ -52,7 +54,7 @@
 
 /* On small screens the sidebar collapses to an overlay/off-canvas pattern
    owned by the sidebar component; the shell should not reserve its width. */
-@media (max-width: 768px) {
+@media (max-width: 767.98px) {
   .dashboard-layout .dashboard-shell,
   .dashboard-layout.collapsed .dashboard-shell {
     margin-left: 0;
@@ -62,5 +64,51 @@
 @media (max-width: 375px) {
   .dashboard-content {
     padding: var(--space-4) var(--space-4);  /* 16px keeps tap targets clear */
+  }
+}
+
+/* On phones a floating bottom nav (about 72px tall, plus the home-bar inset)
+   sits over the page. The padding shorthands above would reset the bottom
+   padding that keeps the end of the page clear of it (they outrank the Tailwind
+   pb-[...] utility), so set it here, after them. Without this the last rows,
+   pager and Save buttons end up under the nav and cannot be reached. */
+@media (max-width: 767.98px) {
+  .dashboard-content {
+    padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ==========================================================================
+   Tablet
+   ========================================================================== */
+
+/* Tablet (iPad): 768 to 1100px. The sidebar is the 76px icon rail by default
+   (see DashboardLayout), so give the page the width back and make everything
+   comfortable for a finger. */
+@media (min-width: 768px) and (max-width: 1100px) {
+  .dashboard-content {
+    max-width: none;
+    padding: var(--space-5) var(--space-5);
+  }
+
+  /* 44px is the minimum comfortable touch target. */
+  .dashboard-layout .ui-btn,
+  .dashboard-layout .ui-input,
+  .dashboard-layout .ui-select,
+  .dashboard-layout .ui-dropdown-custom {
+    min-height: 44px;
+  }
+  .dashboard-sidebar-nav a {
+    min-height: 44px;
+  }
+  .dashboard-layout .ui-table tbody td {
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-3);
+  }
+
+  /* Toolbars above tables wrap instead of squeezing their buttons. */
+  .dashboard-layout .ui-table__controls,
+  .dashboard-layout .ui-table__actions {
+    flex-wrap: wrap;
   }
 }

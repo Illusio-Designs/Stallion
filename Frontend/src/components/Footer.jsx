@@ -1,5 +1,5 @@
 import React from 'react';
-import { FiInstagram, FiFacebook, FiLinkedin, FiHeart } from 'react-icons/fi';
+import { FiInstagram, FiFacebook, FiLinkedin, FiHeart } from './icons/hugeicons';
 import '../styles/components/Footer.css';
 
 const Footer = ({ onPageChange }) => {

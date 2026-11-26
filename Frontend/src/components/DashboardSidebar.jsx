@@ -1,22 +1,59 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react';
 import '../styles/components/DashboardSidebar.css';
 import {
-  FiGrid, FiPackage, FiShoppingCart, FiDollarSign, FiInbox, FiCalendar,
+  FiGrid, FiPackage, FiShoppingCart, FiInbox, FiCalendar,
   FiUsers, FiUser, FiTruck, FiBriefcase, FiSliders, FiBarChart2,
   FiHelpCircle, FiSettings, FiChevronsLeft, FiX, FiShoppingBag, FiTag,
-} from 'react-icons/fi';
+} from './icons/hugeicons';
+import RupeeIcon from './icons/RupeeIcon';
 import { getUserRoles } from '../services/authService';
 import { filterMenuItemsByRoles } from '../utils/rolePermissions';
 
 const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleCollapse, isMobileOpen = false, onMobileClose }) => {
   const [tooltipState, setTooltipState] = useState({ show: false, text: '', top: 0 });
+  // Tooltips label the icons in the collapsed rail. Mouse hover and keyboard
+  // focus show them directly; on touch (iPad) a long-press shows one for a
+  // moment and does not navigate.
+  const pressTimer = useRef(null);
+  const hideTimer = useRef(null);
+  const longPressed = useRef(false);
+  const showTip = (el, text) => {
+    const rect = el.getBoundingClientRect();
+    setTooltipState({ show: true, text, top: rect.top + rect.height / 2 });
+  };
+  const hideTip = () => setTooltipState({ show: false, text: '', top: 0 });
+  const tipHandlers = (text) => ({
+    onMouseEnter: (e) => { if (isCollapsed) showTip(e.currentTarget, text); },
+    onMouseLeave: () => { if (isCollapsed) hideTip(); },
+    onFocus: (e) => { if (isCollapsed) showTip(e.currentTarget, text); },
+    onBlur: () => { if (isCollapsed) hideTip(); },
+    onTouchStart: (e) => {
+      if (!isCollapsed) return;
+      const el = e.currentTarget;
+      longPressed.current = false;
+      clearTimeout(hideTimer.current);
+      pressTimer.current = setTimeout(() => {
+        longPressed.current = true;
+        showTip(el, text);
+      }, 400);
+    },
+    onTouchEnd: () => {
+      clearTimeout(pressTimer.current);
+      if (longPressed.current) {
+        hideTimer.current = setTimeout(hideTip, 1500);
+      }
+    },
+    onTouchMove: () => clearTimeout(pressTimer.current),
+    onTouchCancel: () => { clearTimeout(pressTimer.current); hideTip(); },
+  });
+  useEffect(() => () => { clearTimeout(pressTimer.current); clearTimeout(hideTimer.current); }, []);
   // Single crisp icon system (react-icons) — inherits currentColor (white on
   // the indigo sidebar), no webp + filter:brightness() hack.
   const sidebarIcons = {
     dashboard: FiGrid,
     'dashboard-products': FiPackage,
     orders: FiShoppingCart,
-    expenses: FiDollarSign,
+    expenses: RupeeIcon,
     tray: FiInbox,
     events: FiCalendar,
     offers: FiTag,
@@ -28,6 +65,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     analytics: FiBarChart2,
     support: FiHelpCircle,
     settings: FiSettings,
+    shop: FiShoppingBag,
   };
   
   // Role comes from localStorage, which doesn't exist during SSR. Reading it
@@ -41,29 +79,33 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
   const userRoles = mounted ? getUserRoles() : [];
 
   // All available menu items
+  // In the order people work: home, the shop, then orders and parties, then the rest.
   const allMenuItems = [
     { id: 'dashboard', text: 'Dashboard' },
-    { id: 'dashboard-products', text: 'Products' },
     { id: 'orders', text: 'Orders' },
+    { id: 'party', text: 'Parties' },
     { id: 'expenses', text: 'Expenses' },
-    { id: 'tray', text: 'Sample' },
+    { id: 'dashboard-products', text: 'Products' },
+    { id: 'tray', text: 'Sample trays' },
     { id: 'events', text: 'Events' },
     { id: 'offers', text: 'Offers' },
-    { id: 'party', text: 'Party' },
     { id: 'salesmen', text: 'Salesmen' },
-    { id: 'distributor', text: 'Distributor' },
-    { id: 'office-team', text: 'Office Team' },
+    { id: 'distributor', text: 'Distributors' },
+    { id: 'office-team', text: 'Office team' },
     { id: 'manage', text: 'Manage' },
-    { id: 'analytics', text: 'Analytics & Reports' },
+    { id: 'analytics', text: 'Reports' },
     { id: 'support', text: 'Support' },
     { id: 'settings', text: 'Settings' },
   ];
+
   
   // Filter menu items based on the union of the user's roles
   const rolesKey = userRoles.join(',');
   const menuItems = useMemo(() => {
-    if (!userRoles.length) return allMenuItems; // If no role, show all (fallback)
-    return filterMenuItemsByRoles(allMenuItems, userRoles);
+    const list = userRoles.length ? filterMenuItemsByRoles(allMenuItems, userRoles) : allMenuItems; // no role: show all (fallback)
+    // The shop is a row of this menu too, right after the Dashboard (there is no separate shop navigation).
+    const at = list.findIndex((it) => it.id === 'dashboard');
+    return [...list.slice(0, at + 1), { id: 'shop', text: 'Shop' }, ...list.slice(at + 1)];
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rolesKey]);
 
@@ -71,8 +113,8 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
     <aside
       className={`dashboard-sidebar ${isCollapsed ? 'collapsed' : 'expanded'} ${
         isMobileOpen ? 'mobile-open max-md:translate-x-0' : 'max-md:-translate-x-full'
-      } fixed left-0 top-0 z-[1000] flex h-screen flex-col overflow-visible bg-surface text-text border-r border-border transition-transform duration-200 ease-[ease] motion-reduce:transition-none md:translate-x-0 ${
-        isCollapsed ? 'w-16 md:w-16' : 'w-60'
+      } fixed left-0 top-0 z-[1000] flex h-dvh flex-col overflow-visible bg-surface text-text border-r border-border transition-transform duration-200 ease-[ease] motion-reduce:transition-none md:translate-x-0 ${
+        isCollapsed ? 'w-[76px] md:w-[76px]' : 'w-60'
       }`}
     >
       <div
@@ -121,7 +163,7 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
                     ? 'mx-auto h-11 w-11 justify-center p-0'
                     : 'min-h-10 gap-3 px-3 py-2'
                 } ${
-                  currentPage === item.id
+                  (currentPage === item.id || (item.id === 'shop' && ['products', 'product-detail', 'cart'].includes(currentPage)))
                     ? isCollapsed
                       ? 'active bg-accent text-text-on-primary font-semibold'
                       : "active bg-primary text-text-on-primary font-semibold before:absolute before:left-[-12px] before:top-1/2 before:h-5 before:w-[3px] before:-translate-y-1/2 before:rounded-pill before:bg-accent before:content-['']"
@@ -129,24 +171,14 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
                 }`}
                 onClick={(e) => {
                   e.preventDefault();
-                  onPageChange(item.id);
+                  // A long-press only shows the label; it must not navigate.
+                  if (longPressed.current) { longPressed.current = false; return; }
+                  hideTip();
+                  onPageChange(item.id === 'shop' ? 'products' : item.id);
                   onMobileClose?.();
                 }}
-                onMouseEnter={(e) => {
-                  if (isCollapsed) {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setTooltipState({
-                      show: true,
-                      text: item.text,
-                      top: rect.top + rect.height / 2
-                    });
-                  }
-                }}
-                onMouseLeave={() => {
-                  if (isCollapsed) {
-                    setTooltipState({ show: false, text: '', top: 0 });
-                  }
-                }}
+                {...tipHandlers(item.text)}
+                style={{ WebkitTouchCallout: 'none' }}
                 aria-label={item.text}
               >
                 <span className="sidebar-icon inline-flex h-5 w-5 flex-shrink-0 items-center justify-center [&>svg]:h-5 [&>svg]:w-5 [&>svg]:flex-shrink-0">
@@ -157,37 +189,9 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
                     {item.text}
                   </span>
                 )}
-                {isCollapsed && tooltipState.show && tooltipState.text === item.text && (
-                  <span
-                    className="sidebar-tooltip sidebar-tooltip--fixed fixed left-[76px] z-[10000] -translate-y-1/2 whitespace-nowrap rounded-sm bg-grey-900 px-2 py-1 text-[length:var(--text-xs)] text-text-on-primary shadow-md after:absolute after:left-[-5px] after:top-1/2 after:-translate-y-1/2 after:border-[5px] after:border-solid after:border-transparent after:border-r-grey-900 after:content-['']"
-                    style={{ top: `${tooltipState.top}px` }}
-                  >
-                    {item.text}
-                  </span>
-                )}
               </a>
             </li>
           ))}
-          {/* Back to Shop — lives in the drawer on mobile (the header button is
-              hidden below md). A real CTA button (dark fill, white label), not a
-              flat nav row. */}
-          <li className="mb-1 mt-3 md:hidden">
-            {/* inline color: the global `.dashboard-sidebar-nav a` rule forces a
-                grey/dark text colour (and its :hover flips it dark) which outranks
-                the Tailwind text-on-primary utility. Since the button fill is dark
-                (bg-primary), pin the label WHITE inline so it stays visible in
-                every state — not just on hover. */}
-            <a
-              href="/products"
-              style={{ color: 'var(--color-text-on-primary)' }}
-              className="flex min-h-10 items-center justify-center gap-2 rounded-md bg-primary text-text-on-primary px-4 py-2.5 text-[length:var(--text-sm)] font-semibold no-underline shadow-sm outline-none transition-[background-color,transform] duration-200 ease-[ease] hover:bg-primary-hover focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] active:scale-[0.98] motion-reduce:transition-none"
-              onClick={() => onMobileClose?.()}
-              aria-label="Back to Shop"
-            >
-              <FiShoppingBag size={18} aria-hidden="true" className="flex-shrink-0" />
-              Back to Shop
-            </a>
-          </li>
         </ul>
       </nav>
       <div
@@ -199,7 +203,8 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
           className={`sidebar-toggle flex min-h-10 w-full cursor-pointer items-center rounded-md border-none bg-transparent text-[length:var(--text-xs)] font-medium text-text-muted outline-none transition-[background-color,color] duration-200 ease-[ease] hover:bg-grey-100 hover:text-text focus-visible:shadow-[0_0_0_2px_rgba(0,0,0,0.3)] active:scale-[0.98] motion-reduce:transition-none ${
             isCollapsed ? 'justify-center gap-0 p-2' : 'justify-start gap-2 px-3 py-2'
           }`}
-          onClick={onToggleCollapse}
+          onClick={() => { hideTip(); onToggleCollapse(); }}
+          {...tipHandlers('Expand sidebar')}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           aria-expanded={!isCollapsed}
         >
@@ -214,6 +219,15 @@ const DashboardSidebar = ({ onPageChange, currentPage, isCollapsed, onToggleColl
           )}
         </button>
       </div>
+      {isCollapsed && tooltipState.show && (
+        <span
+          role="tooltip"
+          className="sidebar-tooltip sidebar-tooltip--fixed pointer-events-none fixed left-[84px] z-[10000] -translate-y-1/2 whitespace-nowrap rounded-sm bg-grey-900 px-2 py-1 text-[length:var(--text-xs)] text-text-on-primary shadow-md after:absolute after:left-[-5px] after:top-1/2 after:-translate-y-1/2 after:border-[5px] after:border-solid after:border-transparent after:border-r-grey-900 after:content-['']"
+          style={{ top: `${tooltipState.top}px` }}
+        >
+          {tooltipState.text}
+        </span>
+      )}
     </aside>
   );
 };

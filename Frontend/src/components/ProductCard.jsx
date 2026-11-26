@@ -3,6 +3,9 @@ import '../styles/components/ProductCard.css';
 import { addToCart } from '../services/cartService';
 import { showAddToCartSuccess } from '../services/notificationService';
 import { encodeUploadName } from '../utils/imageUrl';
+import { FiShoppingCart } from './icons/hugeicons';
+import '../styles/redesign-p-shop.css';
+import { MAX_ORDER_QTY } from '../utils/upcoming';
 
 const formatPrice = (value) =>
   new Intl.NumberFormat('en-IN', {
@@ -31,6 +34,8 @@ const ProductCard = ({
   whp,
   mrp,
   stock,
+  isUpcoming = false,
+  offer = null,
   colors = [
     { color: '#000000', name: 'Black' },
     { color: '#E5E5E5', name: 'Grey' },
@@ -41,9 +46,10 @@ const ProductCard = ({
   const [activeColor, setActiveColor] = useState(0);
   const [qty, setQty] = useState(1);
   // Available stock (number). undefined => unknown, treat as available.
-  const stockNum = stock == null ? null : Number(stock);
+  // An upcoming (pre-order) frame keeps no stock: no cap, never sold out.
+  const stockNum = isUpcoming || stock == null ? null : Number(stock);
   const outOfStock = stockNum != null && stockNum <= 0;
-  const atMax = stockNum != null && qty >= stockNum;
+  const atMax = isUpcoming ? qty >= MAX_ORDER_QTY : stockNum != null && qty >= stockNum;
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgBroken, setImgBroken] = useState(false);
 
@@ -69,7 +75,7 @@ const ProductCard = ({
       whp: whp != null ? whp : 0,
       mrp: mrp != null ? mrp : 0,
       quantity: quantity,
-      ...(stockNum != null ? { stock: stockNum } : {}),
+      ...(isUpcoming ? { is_upcoming: true } : stockNum != null ? { stock: stockNum } : {}),
     });
     showAddToCartSuccess(productName, quantity);
   };
@@ -138,17 +144,18 @@ const ProductCard = ({
   const hasPrice = whp != null && Number(whp) > 0;
   const hasMrp = mrp != null && Number(mrp) > 0;
   const isDiscounted = hasPrice && hasMrp && Number(mrp) > Number(whp);
+  const offPct = isDiscounted ? Math.round(100 - (Number(whp) * 100) / Number(mrp)) : 0;
+  const lineTotal = formatPrice((Number(whp) || 0) * qty);
 
   return (
-    <div className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
+    <div data-offer={offer ? 'true' : undefined} className="product-card group box-border h-full bg-surface border border-border rounded-lg p-4 shadow-sm transition duration-300 ease-[ease] motion-reduce:transition-none hover:-translate-y-1 hover:shadow-lg focus-within:shadow-[var(--shadow-md),var(--focus-ring)]">
+      {hasPrice && (
+        <div className="pc-head">
+          <span className="pc-price-now">{formatPrice(whp)}</span>
+          {offPct > 0 && <span className="pc-off">{offPct}% off MRP</span>}
+        </div>
+      )}
       <div className={`product-image relative overflow-hidden rounded-md${imgBroken ? ' aspect-square' : ''}`}>
-        {/* Stock tag (top-left) — only shown when the product is out of stock;
-            in-stock is the default so we don't clutter every card with a badge. */}
-        {outOfStock && (
-          <span className="pc-stock-tag absolute left-2.5 top-2.5 z-[2] rounded-pill bg-error px-2.5 py-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-text-on-primary">
-            Out of stock
-          </span>
-        )}
         {/* View (eye) button (top-right) — replaces the wishlist icon */}
         <button
           type="button"
@@ -182,26 +189,29 @@ const ProductCard = ({
             src={imageUrl}
             alt={productName}
             loading="lazy"
+            decoding="async"
             className={`pc-image-img transition duration-300 ease-[ease] motion-reduce:transition-none ${imgLoaded ? 'is-loaded opacity-100 group-hover:scale-105' : 'opacity-0'}`}
             onLoad={() => setImgLoaded(true)}
             onError={handleImageError}
           />
         )}
       </div>
+      {/* One status badge under the photo, never on it: Preorder, Sold out, Only N left or In stock. */}
+      <p className="pc-sub">
+        {isUpcoming
+          ? <span className="pc-status pc-status--pre">Preorder</span>
+          : outOfStock
+            ? <span className="pc-status pc-status--out">Sold out</span>
+            : stockNum != null && stockNum <= 5
+              ? <span className="pc-status pc-status--low">{`Only ${stockNum} left`}</span>
+              : <span className="pc-status pc-status--in">In stock</span>}
+        {offer && offer.label ? <span className="pc-offer" title={offer.title || 'Offer'}>{offer.label}</span> : null}
+      </p>
+
       {/* Clamp/height owned entirely by .product-name in CSS — mixing Tailwind
           display utilities here fought the -webkit-box clamp and let long titles
           overflow onto the price row. */}
       <h3 className="product-name" title={productName}>{productName}</h3>
-
-      {hasPrice && (
-        <div className="pc-price flex items-baseline flex-wrap gap-2 mb-3">
-          <span className="pc-price-label self-center text-[length:var(--text-xs)] font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle">WHP</span>
-          <span className="pc-price-now text-[length:var(--text-md)] font-semibold text-text leading-[var(--leading-tight)]">{formatPrice(whp)}</span>
-          {isDiscounted && (
-            <span className="pc-price-mrp text-[length:var(--text-sm)] font-normal text-text-subtle line-through">{formatPrice(mrp)}</span>
-          )}
-        </div>
-      )}
 
       <div className="pc-actions flex w-full items-center gap-2 mt-3">
         <div className="pc-qty inline-flex h-10 flex-none items-center overflow-hidden rounded-md border border-border-strong bg-surface" role="group" aria-label="Quantity selector">
@@ -216,7 +226,7 @@ const ProductCard = ({
           <button
             type="button"
             className="pc-qty-btn h-full w-8 cursor-pointer border-none bg-primary-soft text-primary text-[length:var(--text-lg)] leading-none transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-soft-hover active:not-disabled:bg-primary-soft-hover disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle focus-visible:relative focus-visible:z-[1] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
-            onClick={() => setQty(q => (stockNum != null ? Math.min(stockNum, q + 1) : q + 1))}
+            onClick={() => setQty(q => Math.min(isUpcoming ? MAX_ORDER_QTY : stockNum != null ? stockNum : MAX_ORDER_QTY, q + 1))}
             disabled={outOfStock || atMax}
             aria-label="Increase quantity"
           >+</button>
@@ -230,10 +240,8 @@ const ProductCard = ({
           title={outOfStock ? 'Out of stock' : 'Add to cart'}
           className="pc-add-btn inline-flex items-center justify-center flex-1 min-w-0 min-h-10 cursor-pointer rounded-md border-none bg-primary px-3 text-text-on-primary transition duration-[120ms] ease-[ease] hover:not-disabled:bg-primary-hover active:not-disabled:translate-y-px active:not-disabled:bg-primary-active disabled:cursor-not-allowed disabled:bg-surface-muted disabled:text-text-subtle disabled:opacity-100 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)]"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" />
-            <path d="M1 1h4l2.7 13.4a2 2 0 0 0 2 1.6h9.7a2 2 0 0 0 2-1.6L23 6H6" />
-          </svg>
+          <FiShoppingCart size={18} aria-hidden="true" />
+          <span className="pc-add-label">{outOfStock ? 'Sold out' : hasPrice ? `Add · ${lineTotal}` : 'Add to cart'}</span>
         </button>
       </div>
     </div>

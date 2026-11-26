@@ -1,19 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
+import ThemeSwitch from '../components/ThemeSwitch';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import { showSuccess, showError } from '../services/notificationService';
-import { updateUser, getMe, wipeAllData, deleteAllParties, WIPE_CONFIRM_PHRASE } from '../services/apiService';
+import { updateUser, uploadProfileImage, getMe } from '../services/apiService';
+import { resolveProfileImageUrl, toStoredProfileImage } from '../utils/profileImage';
 import { getUser, getUserRole } from '../services/authService';
-import { useConfirm } from '../components/ui/ConfirmProvider';
 import '../styles/pages/dashboard-settings.css';
+import '../styles/redesign-p-account.css';
 
 const DashboardSettings = () => {
-  const confirm = useConfirm();
-  const isAdmin = useMemo(() => getUserRole() === 'admin', []);
-  const [wipeConfirmText, setWipeConfirmText] = useState('');
-  const [wiping, setWiping] = useState(false);
-  const [deletingParties, setDeletingParties] = useState(false);
   const [userName, setUserName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
@@ -100,14 +97,14 @@ const DashboardSettings = () => {
           }
           
           // Use API response first (for cross-device sync) - accept base64 from API
-          const apiAvatar = apiImageUrl || apiProfileImage;
+          const apiAvatar = resolveProfileImageUrl(apiImageUrl || apiProfileImage);
           const storedAvatar = typeof window !== 'undefined' ? window.localStorage.getItem('userAvatarUrl') : null;
           const validStoredAvatar = storedAvatar && storedAvatar.trim() !== ''
             ? storedAvatar 
             : null;
           
           // Prioritize API response (for cross-device sync) - can be URL or base64
-          const avatarValue = apiAvatar || validStoredAvatar || '';
+          const avatarValue = apiAvatar || resolveProfileImageUrl(validStoredAvatar) || '';
           
           console.log('Setting avatar value:', {
             hasValue: !!avatarValue,
@@ -174,7 +171,7 @@ const DashboardSettings = () => {
           }
         })() : '';
         
-        const avatarValue = validStoredAvatar || userAvatar || '';
+        const avatarValue = resolveProfileImageUrl(validStoredAvatar || userAvatar) || '';
         
         let next = { 
           name: storedName || '', 
@@ -356,38 +353,36 @@ const DashboardSettings = () => {
         // Prepare user data
         // If we have a file, send it directly in updateUser (it will use FormData)
         // If we have a URL (not data URL), send it in image_url
-        const isDataUrl = avatar && avatar.startsWith('data:image/');
-        const imageUrlValue = isDataUrl ? '' : (avatar || '');
-
-        // If we have a file, convert it to base64 (compressed) for JSON payload
-        // Otherwise use the existing URL
-        let profileImageBase64 = '';
+        // A newly picked photo is uploaded to the server first; the server saves
+        // the file and answers with its stored file name. That name is what the
+        // profile keeps, so the photo is still there after a reload or on another
+        // device. With no new photo: an unchanged one is sent back as it is, a
+        // removed one ('') clears it, and a local preview is left alone.
+        let imageUrlValue;
         if (avatarFile) {
           try {
-            // Convert compressed file to base64
-            profileImageBase64 = await new Promise((resolve, reject) => {
-              const reader = new FileReader();
-              reader.onerror = reject;
-              reader.onload = () => resolve(reader.result);
-              reader.readAsDataURL(avatarFile);
-            });
-          } catch (error) {
-            console.error('Error converting file to base64:', error);
-            showError('Failed to process image');
+            const uploaded = await uploadProfileImage(currentUserId, avatarFile);
+            const storedName = uploaded && (uploaded.profile_image || uploaded.image_url || uploaded.data?.profile_image);
+            if (!storedName) throw new Error('The server did not return the saved photo.');
+            imageUrlValue = String(storedName);
+          } catch (uploadError) {
+            console.error('Profile photo upload failed:', uploadError);
+            showError(`Could not upload the photo: ${uploadError?.message || 'please try again'}`);
             setLoading(false);
             return;
           }
+        } else {
+          imageUrlValue = toStoredProfileImage(avatar);
         }
 
         const userData = {
           name: userName.trim(),
           email: email.trim() || '',
           phone: phone.trim() || '',
-          profile_image: profileImageBase64, // Send compressed base64 if file exists
           is_active: isActive,
-          image_url: imageUrlValue, // Send URL if it's a regular URL (not data URL)
+          image_url: imageUrlValue, // file name to keep, '' to remove, undefined to leave as is
           role_id: currentRoleId,
-          profileImageFile: null, // Don't use FormData, send as base64 in JSON
+          profileImageFile: null,
         };
 
         console.log('Updating user with data:', { 
@@ -417,6 +412,14 @@ const DashboardSettings = () => {
           updatedImageUrl = response.data.user.profile_image;
         }
         
+        // The photo we just uploaded is known exactly; otherwise use what the server
+        // sent back. Either way, turn a stored file name into a loadable path.
+        if (avatarFile && imageUrlValue) {
+          updatedImageUrl = resolveProfileImageUrl(imageUrlValue);
+        } else if (updatedImageUrl) {
+          updatedImageUrl = resolveProfileImageUrl(updatedImageUrl);
+        }
+
         // If we got image from API (URL or base64), use it (this ensures cross-device sync)
         if (updatedImageUrl && updatedImageUrl.trim() !== '') {
           setAvatar(updatedImageUrl);
@@ -437,7 +440,7 @@ const DashboardSettings = () => {
                   preview: fetchedImage.substring(0, 50) + '...',
                   end: '...' + fetchedImage.substring(Math.max(0, fetchedImage.length - 50))
                 });
-                setAvatar(fetchedImage);
+                setAvatar(resolveProfileImageUrl(fetchedImage));
                 setAvatarError(false); // Reset error state
               } else {
                 console.warn('No image found in refetched user data');
@@ -493,224 +496,111 @@ const DashboardSettings = () => {
     setLoading(false);
   };
 
-  const handleWipeData = async () => {
-    if (wipeConfirmText !== WIPE_CONFIRM_PHRASE) return;
-
-    const ok = await confirm({
-      title: 'Wipe all data?',
-      message:
-        'This permanently deletes ALL products (and their images), parties, orders, salesmen, trays, distributors, offers, events, audit logs, and every user except admins. Master data (roles, geography, product attributes, brands, collections) and admin accounts are kept. This cannot be undone.',
-      confirmLabel: 'Wipe everything',
-      danger: true,
-    });
-    if (!ok) return;
-
-    try {
-      setWiping(true);
-      const res = await wipeAllData();
-      const files = res?.filesDeleted?.total ?? 0;
-      showSuccess(res?.message || `Data wiped. ${files} file(s) removed.`);
-      setWipeConfirmText('');
-    } catch (error) {
-      showError(`Data wipe failed: ${error?.message || 'Unknown error'}`);
-    } finally {
-      setWiping(false);
-    }
-  };
-
-  const handleDeleteAllParties = async () => {
-    if (wipeConfirmText !== WIPE_CONFIRM_PHRASE) return;
-
-    const ok = await confirm({
-      title: 'Delete all parties?',
-      message:
-        'This permanently deletes ALL parties, their login accounts, and their uploaded documents. Products, orders, salesmen, distributors and everything else are kept. This cannot be undone.',
-      confirmLabel: 'Delete all parties',
-      danger: true,
-    });
-    if (!ok) return;
-
-    try {
-      setDeletingParties(true);
-      const res = await deleteAllParties();
-      showSuccess(res?.message || 'All parties deleted.');
-      setWipeConfirmText('');
-    } catch (error) {
-      showError(`Delete all parties failed: ${error?.message || 'Unknown error'}`);
-    } finally {
-      setDeletingParties(false);
-    }
-  };
+  const roleLabel = (() => {
+    let r = '';
+    try { r = getUserRole() || ''; } catch { r = ''; }
+    return r ? r.charAt(0).toUpperCase() + r.slice(1).replace(/_/g, ' ') : '';
+  })();
+  const initials = (userName || '').trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0].toUpperCase()).join('') || '?';
+  const dirty = avatarFile !== null || userName !== initialData.name || email !== initialData.email || phone !== initialData.phone || avatar !== initialData.avatar;
 
   return (
     <div className="dash-page">
       <div className="dash-container">
-        <div className="dash-row">
-          <div className="dash-card full settings p-4 min-[561px]:p-6">
-            <div className="settings-header flex flex-wrap items-end justify-between gap-4 mb-5 min-[561px]:mb-6">
-              <div>
-                <h4 className="settings-title m-0 text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.01em] font-semibold text-text">Profile Settings</h4>
-                <p className="settings-subtitle mt-1 mb-0 text-text-muted text-[length:var(--text-base)] leading-[var(--leading-normal)]">Update your personal information and profile photo.</p>
+        <div className="pg-head"><div><h1>Settings</h1><p>Your profile and sign-in. Everyone can change their own.</p></div></div>
+        <section className="dash-card acc-card" aria-label="Appearance" style={{ marginBottom: 16 }}>
+          <h2 style={{ fontSize: 16, margin: '0 0 4px' }}>Appearance</h2>
+          <p style={{ margin: '0 0 12px', color: 'var(--t-mute)' }}>Choose how Stallion looks. System follows your device.</p>
+          <ThemeSwitch variant="cards" />
+        </section>
+        <form onSubmit={handleSubmit} className="ui-form acc-settings">
+          <section className="dash-card acc-card acc-profile" aria-label="Profile">
+            <div className="acc-avatar">
+              {avatar && !avatarError ? (
+                <img
+                  key={avatar.substring(0, 100)}
+                  src={avatar}
+                  alt="Profile photo"
+                  onError={() => setAvatarError(true)}
+                  onLoad={() => setAvatarError(false)}
+                />
+              ) : (
+                <span aria-hidden="true">{initials}</span>
+              )}
+            </div>
+            <div className="acc-profile__who">
+              <b className="acc-profile__name">{userName || 'Your name'}</b>
+              <span className="acc-profile__meta">{[roleLabel, phone && `+${String(phone).replace(/^\+/, '')}`].filter(Boolean).join(' \u00b7 ') || 'Signed in'}</span>
+              {avatarError && <span className="acc-err">Failed to load image</span>}
+              <span className="acc-hint">JPG or PNG, up to about 2 MB.</span>
+            </div>
+            <div className="acc-profile__actions">
+              <input
+                id="avatar-input"
+                type="file"
+                accept="image/*"
+                className="hidden-input hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  handleAvatarChange(file);
+                  if (e.target) e.target.value = '';
+                }}
+              />
+              <Button type="button" onClick={() => document.getElementById('avatar-input').click()} size="sm">Change photo</Button>
+              {avatar && (
+                <Button type="button" variant="ghost" size="sm" onClick={() => {
+                  setAvatar('');
+                  setAvatarFile(null);
+                  setAvatarError(false);
+                }}>Remove</Button>
+              )}
+            </div>
+          </section>
+
+          <section className="dash-card acc-card" aria-labelledby="set-contact">
+            <div className="acc-sec-head">
+              <h2 id="set-contact" className="acc-h">Contact</h2>
+              <p className="acc-sub">Used for orders and visit reports.</p>
+            </div>
+            <div className="acc-grid">
+              <div className="acc-field">
+                <label className="ui-label" htmlFor="set-name">Full name</label>
+                <input id="set-name" className="ui-input" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Enter your name" required />
+              </div>
+              <div className="acc-field">
+                <label className="ui-label" htmlFor="set-email">Email</label>
+                <input id="set-email" className="ui-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
               </div>
             </div>
+          </section>
 
-            <div className="settings-grid grid grid-cols-1 items-start gap-6 mt-6 min-[769px]:grid-cols-[280px_1fr] min-[769px]:gap-8 min-[769px]:mt-8">
-              <aside className="settings-sidebar flex flex-col gap-3">
-                <div className="settings-avatar__preview settings-avatar__preview--lg flex h-32 w-32 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-muted text-center text-[length:var(--text-xs)] text-text-subtle">
-                  {avatar && !avatarError ? (
-                    <img 
-                      key={avatar.substring(0, 100)} // Force re-render if avatar changes
-                      src={avatar} 
-                      alt="Avatar" 
-                      onError={(e) => {
-                        console.error('Failed to load avatar image:', {
-                          src: avatar ? avatar.substring(0, 100) : 'empty',
-                          hasAvatar: !!avatar,
-                          avatarLength: avatar ? avatar.length : 0,
-                          isBase64: avatar ? avatar.startsWith('data:') : false,
-                          error: e.target?.error,
-                          naturalWidth: e.target?.naturalWidth,
-                          naturalHeight: e.target?.naturalHeight
-                        });
-                        setAvatarError(true);
-                      }}
-                      onLoad={(e) => {
-                        console.log('Avatar image loaded successfully:', {
-                          naturalWidth: e.target.naturalWidth,
-                          naturalHeight: e.target.naturalHeight,
-                          complete: e.target.complete,
-                          avatarLength: avatar.length
-                        });
-                        setAvatarError(false);
-                      }}
-                      className="block w-full h-full object-cover visible opacity-100"
-                    />
-                  ) : avatarError ? (
-                    <span className="text-[#ef4444] text-[12px]">Failed to load image</span>
-                  ) : (
-                    <span>No Image</span>
-                  )}
-                </div>
-                <div className="settings-avatar__actions flex flex-wrap items-center gap-2">
-                  <input
-                    id="avatar-input"
-                    type="file"
-                    accept="image/*"
-                    className="hidden-input hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      handleAvatarChange(file);
-                      // Reset input to allow selecting the same file again
-                      if (e.target) {
-                        e.target.value = '';
-                      }
-                    }} 
-                  />
-                  <Button type="button" onClick={() => document.getElementById('avatar-input').click()} size="sm">Change Photo</Button>
-                  {avatar && (
-                    <Button type="button" variant="ghost" size="sm" onClick={() => {
-                      setAvatar('');
-                      setAvatarFile(null);
-                      setAvatarError(false);
-                    }}>Remove</Button>
-                  )}
-                  <div className="settings-hint mt-1 text-[length:var(--text-xs)] leading-[var(--leading-normal)] text-text-subtle">JPG, PNG up to ~2MB recommended.</div>
-                </div>
-              </aside>
-
-              <form onSubmit={handleSubmit} className="settings-form ui-form grid max-w-[720px] grid-cols-1 gap-5 min-[561px]:gap-6">
-                <div className="form-group flex flex-col gap-2">
-                  <label className="ui-label">User Name</label>
-                  <input className="ui-input" type="text" value={userName} onChange={(e) => setUserName(e.target.value)} placeholder="Enter your name" required />
-                </div>
-                <div className="form-group flex flex-col gap-2">
-                  <label className="ui-label">Email</label>
-                  <input className="ui-input" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" />
-                </div>
-                <div className="form-group flex flex-col gap-2">
-                  <label className="ui-label">Phone Number</label>
-                  <PhoneInput
-                    defaultCountry="in"
-                    value={phone ? (String(phone).startsWith('+') ? String(phone) : '+' + phone) : ''}
-                    onChange={(phone) => setPhone(phone.replace(/^\+/, ''))}
-                    className="phone-intl"
-                    inputProps={{
-                      placeholder: 'Enter your phone number',
-                    }}
-                  />
-                </div>
-
-                <div className="settings-actions flex flex-col-reverse items-stretch gap-3 mt-2 pt-6 border-t border-border [&_.ui-btn]:w-full min-[561px]:flex-row min-[561px]:items-center min-[561px]:justify-end min-[561px]:[&_.ui-btn]:w-auto">
-                  <Button 
-                    type="button" 
-                    variant="secondary" 
-                    onClick={handleReset}
-                    disabled={loading}
-                  >
-                    Reset
-                  </Button>
-                  <Button 
-                    type="submit"
-                    disabled={loading || !userName.trim()}
-                  >
-                    {loading ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
-              </form>
+          <section className="dash-card acc-card" aria-labelledby="set-signin">
+            <div className="acc-sec-head">
+              <h2 id="set-signin" className="acc-h">Sign in</h2>
+              <p className="acc-sub">This phone number is how you sign in. We send a code to it.</p>
             </div>
+            <div className="acc-grid">
+              <div className="acc-field">
+                <label className="ui-label" htmlFor="set-phone">Phone number</label>
+                <PhoneInput
+                  defaultCountry="in"
+                  value={phone ? (String(phone).startsWith('+') ? String(phone) : '+' + phone) : ''}
+                  onChange={(phone) => setPhone(phone.replace(/^\+/, ''))}
+                  className="phone-intl"
+                  inputProps={{ id: 'set-phone', placeholder: 'Enter your phone number' }}
+                />
+              </div>
+            </div>
+          </section>
+
+          <div className="acc-savebar">
+            <Button type="button" variant="secondary" onClick={handleReset} disabled={loading || !dirty}>Reset</Button>
+            <Button type="submit" disabled={loading || !userName.trim()}>{loading ? 'Saving...' : 'Save changes'}</Button>
           </div>
-
-          {isAdmin && (
-            <div className="dash-card full settings p-4 min-[561px]:p-6 mt-6 border border-error/40">
-              <div className="settings-header mb-4">
-                <h4 className="settings-title m-0 text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.01em] font-semibold text-error">Danger Zone</h4>
-                <p className="settings-subtitle mt-1 mb-0 text-text-muted text-[length:var(--text-base)] leading-[var(--leading-normal)]">
-                  Wipe all test/transactional data in one go. This deletes every product (and image), party, order,
-                  salesman, tray, distributor, offer, event, audit log, and all non-admin users. Master data
-                  (roles, geography, product attributes, brands, collections) and admin accounts are kept.
-                  Or use <strong>Delete all parties</strong> to remove only the parties (and their login accounts + documents), keeping everything else.
-                  <strong className="text-error"> This cannot be undone.</strong>
-                </p>
-              </div>
-              <div className="settings-form ui-form grid max-w-[720px] grid-cols-1 gap-4">
-                <div className="form-group flex flex-col gap-2">
-                  <label className="ui-label">Type <span className="font-semibold text-error">{WIPE_CONFIRM_PHRASE}</span> to enable the button</label>
-                  <input
-                    className="ui-input"
-                    type="text"
-                    value={wipeConfirmText}
-                    onChange={(e) => setWipeConfirmText(e.target.value)}
-                    placeholder={WIPE_CONFIRM_PHRASE}
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                </div>
-                <div className="settings-actions flex flex-wrap items-center justify-end gap-3">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleDeleteAllParties}
-                    disabled={deletingParties || wiping || wipeConfirmText !== WIPE_CONFIRM_PHRASE}
-                  >
-                    {deletingParties ? 'Deleting…' : 'Delete all parties'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={handleWipeData}
-                    disabled={wiping || deletingParties || wipeConfirmText !== WIPE_CONFIRM_PHRASE}
-                  >
-                    {wiping ? 'Wiping…' : 'Wipe all data'}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        </form>
       </div>
     </div>
   );
 };
 
 export default DashboardSettings;
-

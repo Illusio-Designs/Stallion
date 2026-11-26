@@ -1,4 +1,16 @@
-import { apiRequest, fetchAllPages, fetchPage, getBaseURL, getAuthToken, handleResponse } from './client';
+import { apiRequest, fetchAllPages, fetchPage, getBaseURL, getAuthToken, handleResponse, sharedRead } from './client';
+import { invalidateShared } from '../requestShare';
+
+// File uploads go straight to fetch (multipart), not through apiRequest, so they tell the shared
+// list requests themselves that something changed.
+const rawWrite = async (url, init) => {
+  invalidateShared();
+  try {
+    return await fetch(url, init);
+  } finally {
+    invalidateShared();
+  }
+};
 
 // ==================== DISTRIBUTOR ENDPOINTS ====================
 
@@ -410,7 +422,8 @@ export const deleteDistributor = async (distributorId) => {
 // These derive everything from the JWT (no body needed), so they're callable
 // from the browser. Used to show end-user roles only their own parties.
 
-const scopedList = async (endpoint) => {
+const scopedList = (endpoint) => sharedRead(`scoped:${endpoint}`, () => loadScopedList(endpoint));
+const loadScopedList = async (endpoint) => {
   try {
     const response = await fetchAllPages(endpoint, { method: 'GET', includeAuth: true });
     return Array.isArray(response) ? response : (response?.data || []);
@@ -428,7 +441,8 @@ export const getSalesmanParties = async () => scopedList('/parties/my');
 // GET /distributors/parties — parties under the authenticated distributor.
 export const getDistributorParties = async () => scopedList('/distributors/parties');
 // GET /parties/my — parties for the current user's role.
-export const getMyParties = async () => scopedList('/parties/my');
+// opts.scope 'event': a salesman gets every party (event orders); otherwise only his working states.
+export const getMyParties = async (opts = {}) => scopedList(opts && opts.scope ? `/parties/my?scope=${encodeURIComponent(opts.scope)}` : '/parties/my');
 
 /**
  * Role-aware party fetch. End-user roles get their own token-scoped parties;
@@ -453,6 +467,33 @@ export const getPartiesPage = (countryId, page = 1, limit = 20, search = '') =>
     body: countryId ? { country_id: String(countryId).trim() } : {},
     includeAuth: true,
   });
+/**
+ * One page of the Party TABLE, filtered and sorted by the server -> { data, pagination, counts }.
+ * Managers use POST /parties/get; salesman, distributor and party use GET /parties/my (token-scoped).
+ * params: { page, limit, search, status ('active'|'inactive'|'no_location'|''), state_id, salesman_id, country_id, sort, dir }.
+ * `counts` = { all, active, inactive, no_location } for the tab badges (same search and filters, tab ignored).
+ */
+export const getPartiesTablePage = async (role, params = {}) => {
+  const { page = 1, limit = 20, search = '', status = '', state_id = '', salesman_id = '', country_id = '', sort = '', dir = '' } = params;
+  const manager = !['salesman', 'distributor', 'party'].includes((role || '').toLowerCase());
+  const q = new URLSearchParams({ page: String(page), limit: String(limit) });
+  const add = (k, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') q.set(k, String(v).trim()); };
+  add('search', search); add('status', status); add('state_id', state_id); add('salesman_id', salesman_id);
+  add('sort', sort); add('dir', sort ? dir : '');
+  if (manager) {
+    add('country_id', country_id);
+    const res = await apiRequest(`/parties/get?${q.toString()}`, { method: 'POST', body: country_id ? { country_id: String(country_id).trim() } : {}, includeAuth: true });
+    return { data: Array.isArray(res) ? res : (res?.data || []), pagination: res?.pagination || null, counts: res?.counts || null };
+  }
+  const res = await apiRequest(`/parties/my?${q.toString()}`, { method: 'GET', includeAuth: true });
+  return { data: Array.isArray(res) ? res : (res?.data || []), pagination: res?.pagination || null, counts: res?.counts || null };
+};
+/** States and salesmen the party list can be filtered by (for the dropdowns) -> { states: [{id,name}], salesmen: [{id,name}] }. */
+export const getPartyFilterOptions = async (countryId) => {
+  const q = countryId ? `?country_id=${encodeURIComponent(String(countryId).trim())}` : '';
+  const res = await apiRequest(`/parties/filter-options${q}`, { method: 'GET', includeAuth: true });
+  return { states: res?.states || [], salesmen: res?.salesmen || [] };
+};
 /** One page of distributors -> { data, pagination }. */
 export const getDistributorsPage = (countryId, page = 1, limit = 20, search = '') =>
   fetchPage('/distributors/get', { page, limit, search }, {
@@ -461,7 +502,35 @@ export const getDistributorsPage = (countryId, page = 1, limit = 20, search = ''
     includeAuth: true,
   });
 
-export const getParties = async (countryId) => {
+/**
+ * One server-filtered page of distributors for the Distributors list.
+ * -> { data, pagination, counts: { All, Active, Inactive } }
+ * status: 'all' | 'active' | 'inactive'; stateId filters by state; sort: name|contact|status|created.
+ */
+export const getDistributorsListPage = async (
+  countryId,
+  { page = 1, limit = 20, search = '', status = 'all', stateId = '', sort = '', dir = 'asc' } = {},
+) => {
+  const res = await apiRequest(
+    (() => {
+      const qs = new URLSearchParams({ page: String(page), limit: String(limit), status: String(status || 'all').toLowerCase() });
+      if (String(search || '').trim()) qs.set('search', String(search).trim());
+      if (stateId) qs.set('state_id', String(stateId));
+      if (sort) { qs.set('sort', sort); qs.set('dir', dir === 'desc' ? 'desc' : 'asc'); }
+      return `/distributors/get?${qs.toString()}`;
+    })(),
+    { method: 'POST', body: countryId ? { country_id: String(countryId).trim() } : {}, includeAuth: true },
+  );
+  return {
+    data: Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []),
+    pagination: (res && res.pagination) || null,
+    counts: (res && res.counts) || null,
+  };
+};
+
+export const getParties = (countryId) => sharedRead(`parties:${countryId || ''}`, () => loadParties(countryId));
+
+const loadParties = async (countryId) => {
   // If no countryId provided, use POST /parties/get with empty body to get all parties
   if (!countryId) {
     try {
@@ -618,6 +687,13 @@ export const getParties = async (countryId) => {
  * @param {string} partyId - Party ID (UUID)
  * @returns {Promise<Object>} Party object
  */
+// One party by id for the signed-in user (a salesman may open the parties of his own states).
+export const getPartyDetails = async (partyId) => {
+  const id = String(partyId || '').trim();
+  if (!id) throw new Error('Invalid party ID provided');
+  return apiRequest(`/parties/${encodeURIComponent(id)}`, { method: 'GET', includeAuth: true });
+};
+
 export const getPartyById = async (partyId) => {
   if (!partyId || typeof partyId !== 'string' || partyId.trim() === '') {
     throw new Error('Invalid party ID provided');
@@ -764,6 +840,22 @@ const getCityId = () => {
     user_id: (user_id && isValidUUID(user_id)) ? String(user_id).trim() : undefined,
   };
   
+  // The point of the picked Google address: the shop's location until a visit saves the exact spot.
+  if (partyData.address_lat !== null && partyData.address_lat !== undefined && partyData.address_lng !== null && partyData.address_lng !== undefined
+    && Number.isFinite(Number(partyData.address_lat)) && Number.isFinite(Number(partyData.address_lng))) {
+    requestBody.address_lat = Number(partyData.address_lat);
+    requestBody.address_lng = Number(partyData.address_lng);
+  }
+
+  // Preserve the explicit on-site capture through payload normalization.
+  if (partyData.latitude != null && partyData.longitude != null) {
+    requestBody.latitude = partyData.latitude;
+    requestBody.longitude = partyData.longitude;
+    requestBody.accuracy = partyData.accuracy ?? partyData.location_accuracy_m;
+    requestBody.shipping_address_confirmed = partyData.shipping_address_confirmed === true;
+    requestBody.confirm_address_mismatch = partyData.confirm_address_mismatch === true;
+  }
+
   // Validate that all required fields are present (no undefined)
   const requiredFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'country_id', 'pincode', 'gstin', 'pan'];
   for (const field of requiredFields) {
@@ -890,6 +982,13 @@ export const updateParty = async (partyId, partyData) => {
     prefered_courier: prefered_courier ? String(prefered_courier) : undefined,
   };
   
+  // The point of the picked Google address: the shop's location until a visit saves the exact spot.
+  if (partyData.address_lat !== null && partyData.address_lat !== undefined && partyData.address_lng !== null && partyData.address_lng !== undefined
+    && Number.isFinite(Number(partyData.address_lat)) && Number.isFinite(Number(partyData.address_lng))) {
+    requestBody.address_lat = Number(partyData.address_lat);
+    requestBody.address_lng = Number(partyData.address_lng);
+  }
+
   // Validate that all required fields are present (no undefined)
   const requiredFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'country_id', 'pincode', 'gstin', 'pan'];
   for (const field of requiredFields) {
@@ -907,7 +1006,7 @@ export const updateParty = async (partyId, partyData) => {
   // Final validation: ensure absolutely no undefined values for required fields
   // Optional fields (credit_days, prefered_courier) can be undefined and will be omitted from JSON
   const finalRequestBody = {};
-  const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'billing_address', 'billing_same_as_shipping', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier', 'is_active'];
+  const allFields = ['party_name', 'trade_name', 'contact_person', 'email', 'phone', 'address', 'billing_address', 'billing_same_as_shipping', 'country_id', 'state_id', 'city_id', 'zone_id', 'pincode', 'gstin', 'pan', 'credit_days', 'prefered_courier', 'address_lat', 'address_lng', 'is_active'];
   allFields.forEach(field => {
     const value = requestBody[field];
     // Only include the field if it has a value (undefined will be omitted during JSON.stringify)
@@ -980,7 +1079,7 @@ export const setPartyLocation = async (partyId, coords) => {
 
 /**
  * On-site capture ("I'm at the shop"): send the device GPS + accuracy to set the
- * party's TRUSTED verified location (the 250m geofence anchor). The backend
+ * party's TRUSTED verified location (the 50m geofence anchor). The backend
  * validates accuracy and proximity to the party's address before saving.
  * @param {string} partyId
  * @param {{latitude:number, longitude:number, accuracy:number}} pos
@@ -993,7 +1092,114 @@ export const verifyPartyLocation = async (partyId, pos) => {
       latitude: pos.latitude,
       longitude: pos.longitude,
       accuracy: pos.accuracy,
+      ...(pos.shipping_address ? { shipping_address: pos.shipping_address } : {}),
+      ...(pos.confirmMismatch ? { confirm_address_mismatch: true } : {}),
     },
+    includeAuth: true,
+  });
+};
+
+/**
+ * Address suggestions while typing (Google Places through the server).
+ * @returns {Promise<{configured:boolean, suggestions:Array<{place_id:string,text:string,main:string,secondary:string}>}>}
+ */
+export const suggestAddress = async (input, session) => {
+  return apiRequest('/parties/address-suggest', { method: 'POST', body: { input, session }, includeAuth: true });
+};
+
+/**
+ * The picked address with its pincode and the ids of its country, state and city.
+ * Missing countries, states and cities are added to the lists by the server.
+ */
+export const addressDetails = async (placeId, session) => {
+  return apiRequest('/parties/address-details', { method: 'POST', body: { place_id: placeId, session }, includeAuth: true });
+};
+
+/**
+ * Read the written address at a GPS point (like delivery apps). Nothing is saved.
+ * @returns {Promise<{found:boolean, address?:string, street?:string, city?:string, state?:string, pincode?:string}>}
+ */
+export const reverseGeocodeLocation = async (pos) => {
+  return apiRequest('/parties/reverse-geocode', {
+    method: 'POST',
+    body: { latitude: pos.latitude, longitude: pos.longitude },
+    includeAuth: true,
+  });
+};
+
+/**
+ * Same as verifyPartyLocation, but when the server says the phone is far from the
+ * written address it asks the salesman (ask(message) -> boolean) whether he is at the
+ * right shop and the address is wrong, and saves the spot anyway if he confirms.
+ */
+export const verifyPartyLocationAsking = async (partyId, pos, ask) => {
+  try {
+    return await verifyPartyLocation(partyId, pos);
+  } catch (err) {
+    if (err?.errorData?.code === 'address_far' && typeof ask === 'function' && (await ask(err.message))) {
+      return verifyPartyLocation(partyId, { ...pos, confirmMismatch: true });
+    }
+    throw err;
+  }
+};
+
+// Dialog text for the "far from the written address" question.
+export const ADDRESS_FAR_CONFIRM = (message) => ({
+  title: 'Address does not match',
+  message: `${message}`,
+  confirmLabel: 'Open Edit party',
+});
+
+// Send the salesman to Edit party for one party and bring him back to returnTo after he saves
+// (used when a party has no location yet). Carried across the page change in sessionStorage.
+const EDIT_PARTY_KEY = 'stallion.editParty';
+export const rememberEditParty = (partyId, returnTo, extra = {}) => {
+  try {
+    sessionStorage.setItem(EDIT_PARTY_KEY, JSON.stringify({ party_id: String(partyId), returnTo, ...extra, at: Date.now() }));
+  } catch { /* storage unavailable: the party can still be opened by hand */ }
+};
+export const takeEditParty = () => {
+  try {
+    const raw = sessionStorage.getItem(EDIT_PARTY_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(EDIT_PARTY_KEY);
+    const v = JSON.parse(raw);
+    return v && v.party_id && Date.now() - Number(v.at || 0) < 30 * 60 * 1000 ? v : null;
+  } catch { return null; }
+};
+
+// After the spot is saved, Edit party opens with the address already updated from the
+// GPS spot. The address is carried across the page change in sessionStorage.
+const ADDRESS_FIX_KEY = 'stallion.addressFix';
+export const rememberAddressFix = (partyId, res) => {
+  try {
+    sessionStorage.setItem(ADDRESS_FIX_KEY, JSON.stringify({
+      party_id: String(partyId),
+      address: res?.location_address || '',
+      pincode: res?.location_address_parts?.pincode || '',
+      at: Date.now(),
+    }));
+  } catch { /* storage unavailable: the party can still be edited by hand */ }
+};
+export const takeAddressFix = () => {
+  try {
+    const raw = sessionStorage.getItem(ADDRESS_FIX_KEY);
+    if (!raw) return null;
+    sessionStorage.removeItem(ADDRESS_FIX_KEY);
+    const fix = JSON.parse(raw);
+    return fix && fix.address && Date.now() - Number(fix.at || 0) < 30 * 60 * 1000 ? fix : null;
+  } catch { return null; }
+};
+
+/**
+ * Remove a party's saved location (managers only) so "I'm at shop" can capture it
+ * again. Used when the first capture was wrong.
+ * @param {string} partyId
+ * @returns {Promise<{message:string}>}
+ */
+export const removePartyLocation = async (partyId) => {
+  return apiRequest(`/parties/${partyId}/location`, {
+    method: 'DELETE',
     includeAuth: true,
   });
 };
@@ -1011,7 +1217,7 @@ export const bulkUploadParties = async (file) => {
   const token = getAuthToken();
   const headers = { Accept: 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
-  const response = await fetch(fullUrl, {
+  const response = await rawWrite(fullUrl, {
     method: 'POST',
     headers,
     credentials: 'omit',
@@ -1371,7 +1577,7 @@ export const createSalesman = async (salesmanData) => {
   const headers = { Accept: 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
   // Don't set Content-Type — the browser adds the multipart boundary.
-  const response = await fetch(`${baseUrl}/salesmen`, {
+  const response = await rawWrite(`${baseUrl}/salesmen`, {
     method: 'POST',
     headers,
     credentials: 'omit',
@@ -1536,7 +1742,7 @@ export const updateSalesman = async (salesmanId, salesmanData) => {
     const token = getAuthToken();
     const headers = { Accept: 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
-    const response = await fetch(`${baseUrl}/salesmen/${cleanSalesmanId}`, {
+    const response = await rawWrite(`${baseUrl}/salesmen/${cleanSalesmanId}`, {
       method: 'PUT', headers, credentials: 'omit', body: formData,
     });
     return await handleResponse(response);

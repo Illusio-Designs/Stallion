@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const salesmanExpenseController = require('../controllers/salesmanExpenseController');
 const { authenticateToken } = require('../middleware/auth');
@@ -9,7 +10,7 @@ router.get('/admin/all', authenticateToken, salesmanExpenseController.getAllAdmi
 router.get('/admin/:salesman_id', authenticateToken, salesmanExpenseController.getAdminSalesmanExpenses);
 router.post('/', authenticateToken, salesmanExpenseController.createSalesmanExpense);
 router.put('/:id', authenticateToken, salesmanExpenseController.updateSalesmanExpense);
-router.delete('/:id', authenticateToken, salesmanExpenseController.deleteSalesmanExpense);
+router.delete('/:id', authenticateToken, noDelete('An expense'));
 router.post('/upload-images', authenticateToken, billUpload, salesmanExpenseController.uploadImages);
 
 module.exports = router;

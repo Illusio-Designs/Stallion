@@ -28,16 +28,17 @@ const salesmanTrayRoutes = require('./salesman_tray');
 const trayProductsRoutes = require('./tray_products');
 const eventRoutes = require('./event');
 const orderRoutes = require('./order');
+const notificationRoutes = require('./notification');
 const salesmanExpenseRoutes = require('./salesman_expense');
 const salesmanTargetsRoutes = require('./salesman_targets');
 const salesmanCheckInsRoutes = require('./salesman_checkins');
 const offerRoutes = require('./offer');
 const adminRoutes = require('./admin');
+const dashboardRoutes = require('./dashboard');
 
+// One short line per request (no query string, so searches and phone numbers stay out of the log).
 router.use((req, res, next) => {
-    const timestamp = new Date();
-    const timeString = `${timestamp.getDate()}/${timestamp.getMonth() + 1}/${timestamp.getFullYear()} ${timestamp.getHours()}:${timestamp.getMinutes()}:${timestamp.getSeconds()}`;
-    console.log(`-------------------------------- ${req.method} ${req.url} ${timeString} --------------------------------`);
+    console.log(`${req.method} ${(req.originalUrl || req.url).split('?')[0]}`);
     next();
 });
 
@@ -68,11 +69,13 @@ router.use('/salesman_trays', salesmanTrayRoutes);
 router.use('/tray_products', trayProductsRoutes);
 router.use('/events', eventRoutes);
 router.use('/orders', orderRoutes);
+router.use('/notifications', notificationRoutes);
 router.use('/salesman_expenses', salesmanExpenseRoutes);
 router.use('/salesman_targets', salesmanTargetsRoutes);
 router.use('/salesman_checkins', salesmanCheckInsRoutes);
 router.use('/offers', offerRoutes);
 router.use('/admin', adminRoutes);
+router.use('/dashboard', dashboardRoutes);
 
 // API documentation route
 router.get('/docs', (req, res) => {

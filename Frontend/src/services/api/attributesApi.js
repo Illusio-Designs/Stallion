@@ -5,11 +5,12 @@ import { getCached, invalidateCache } from '../cacheService';
 
 /**
  * Get all color codes
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active items (for pickers and filters); default returns all
  * @returns {Promise<Array>} Array of color code objects
  */
-export const getColorCodes = async () => {
+export const getColorCodes = async ({ activeOnly = false } = {}) => {
   try {
-    const response = await apiRequest('/color_codes', {
+    const response = await apiRequest(`/color_codes${activeOnly ? '?active=true' : ''}`, {
       method: 'GET',
       includeAuth: true,
     });
@@ -83,11 +84,12 @@ export const deleteColorCode = async (colorCodeId) => {
 
 /**
  * Get all frame colors
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active items (for pickers and filters); default returns all
  * @returns {Promise<Array>} Array of frame color objects
  */
-export const getFrameColors = async () => {
+export const getFrameColors = async ({ activeOnly = false } = {}) => {
   try {
-    const response = await apiRequest('/frame_colors', {
+    const response = await apiRequest(`/frame_colors${activeOnly ? '?active=true' : ''}`, {
       method: 'GET',
       includeAuth: true,
     });
@@ -161,11 +163,12 @@ export const deleteFrameColor = async (frameColorId) => {
 
 /**
  * Get all frame materials
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active items (for pickers and filters); default returns all
  * @returns {Promise<Array>} Array of frame material objects
  */
-export const getFrameMaterials = async () => {
+export const getFrameMaterials = async ({ activeOnly = false } = {}) => {
   try {
-    const response = await apiRequest('/frame_materials', {
+    const response = await apiRequest(`/frame_materials${activeOnly ? '?active=true' : ''}`, {
       method: 'GET',
       includeAuth: true,
     });
@@ -239,11 +242,12 @@ export const deleteFrameMaterial = async (frameMaterialId) => {
 
 /**
  * Get all frame types
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active items (for pickers and filters); default returns all
  * @returns {Promise<Array>} Array of frame type objects
  */
-export const getFrameTypes = async () => {
+export const getFrameTypes = async ({ activeOnly = false } = {}) => {
   try {
-    const response = await apiRequest('/frame_types', {
+    const response = await apiRequest(`/frame_types${activeOnly ? '?active=true' : ''}`, {
       method: 'GET',
       includeAuth: true,
     });
@@ -317,11 +321,12 @@ export const deleteFrameType = async (frameTypeId) => {
 
 /**
  * Get all genders
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active items (for pickers and filters); default returns all
  * @returns {Promise<Array>} Array of gender objects
  */
-export const getGenders = async () => {
+export const getGenders = async ({ activeOnly = false } = {}) => {
   try {
-    const response = await apiRequest('/genders', {
+    const response = await apiRequest(`/genders${activeOnly ? '?active=true' : ''}`, {
       method: 'GET',
       includeAuth: true,
     });
@@ -395,11 +400,12 @@ export const deleteGender = async (genderId) => {
 
 /**
  * Get all lens colors
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active items (for pickers and filters); default returns all
  * @returns {Promise<Array>} Array of lens color objects
  */
-export const getLensColors = async () => {
+export const getLensColors = async ({ activeOnly = false } = {}) => {
   try {
-    const response = await apiRequest('/lens_colors', {
+    const response = await apiRequest(`/lens_colors${activeOnly ? '?active=true' : ''}`, {
       method: 'GET',
       includeAuth: true,
     });
@@ -473,11 +479,12 @@ export const deleteLensColor = async (lensColorId) => {
 
 /**
  * Get all lens materials
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active items (for pickers and filters); default returns all
  * @returns {Promise<Array>} Array of lens material objects
  */
-export const getLensMaterials = async () => {
+export const getLensMaterials = async ({ activeOnly = false } = {}) => {
   try {
-    const response = await apiRequest('/lens_materials', {
+    const response = await apiRequest(`/lens_materials${activeOnly ? '?active=true' : ''}`, {
       method: 'GET',
       includeAuth: true,
     });
@@ -551,11 +558,12 @@ export const deleteLensMaterial = async (lensMaterialId) => {
 
 /**
  * Get all shapes
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active items (for pickers and filters); default returns all
  * @returns {Promise<Array>} Array of shape objects
  */
-export const getShapes = async () => {
+export const getShapes = async ({ activeOnly = false } = {}) => {
   try {
-    const response = await apiRequest('/shapes', {
+    const response = await apiRequest(`/shapes${activeOnly ? '?active=true' : ''}`, {
       method: 'GET',
       includeAuth: true,
     });
@@ -629,11 +637,12 @@ export const deleteShape = async (shapeId) => {
 
 /**
  * Get all brands
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active items (for pickers and filters); default returns all
  * @returns {Promise<Array>} Array of brand objects
  */
-export const getBrands = async () => getCached('brands', async () => {
+export const getBrands = async ({ activeOnly = false } = {}) => getCached(activeOnly ? 'brands:active' : 'brands', async () => {
   try {
-    const response = await apiRequest('/brands', {
+    const response = await apiRequest(`/brands${activeOnly ? '?active=true' : ''}`, {
       method: 'GET',
       includeAuth: true,
     });
@@ -713,11 +722,12 @@ export const deleteBrand = async (brandId) => {
 
 /**
  * Get all collections
+ * @param {{activeOnly?: boolean}} [options] - activeOnly: true returns only active items (for pickers and filters); default returns all
  * @returns {Promise<Array>} Array of collection objects
  */
-export const getCollections = async () => getCached('collections', async () => {
+export const getCollections = async ({ activeOnly = false } = {}) => getCached(activeOnly ? 'collections:active' : 'collections', async () => {
   try {
-    const response = await apiRequest('/collections', {
+    const response = await apiRequest(`/collections${activeOnly ? '?active=true' : ''}`, {
       method: 'GET',
       includeAuth: false, // Changed to false so it can be used on public pages like Home
     });

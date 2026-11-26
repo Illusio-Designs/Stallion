@@ -4,11 +4,18 @@
 // check in. We compare the device GPS (sent from the app) against the party's
 // stored coordinates and require the distance to be within GEOFENCE_RADIUS_M.
 
-// Radius of the geofence in metres. 250m by default: coordinates come from
-// GEOCODING the party's address, which is rarely accurate to 50m (especially
-// for Indian addresses), so a tighter fence would wrongly reject real visits.
+// Radius of the geofence in metres. 100m by default: phone GPS inside a shop drifts
+// 20-60m and the saved point can be off by up to 50m, so a tighter fence would
+// wrongly reject real visits.
 // Overridable via env (GEOFENCE_RADIUS_M) without a redeploy.
-const GEOFENCE_RADIUS_M = Number(process.env.GEOFENCE_RADIUS_M) || 250;
+const GEOFENCE_RADIUS_M = Number(process.env.GEOFENCE_RADIUS_M) || 50;
+// Until a shop has a precise spot (learned from the first visit), its point comes from the
+// address and can be off by up to ~100m, so a wider radius is used for that first visit.
+const ROUGH_RADIUS_M = Number(process.env.GEOFENCE_ROUGH_RADIUS_M) || 150;
+// A visit is refused when the phone itself reports a worse GPS accuracy than this.
+const MAX_VISIT_ACCURACY_M = Number(process.env.VISIT_MAX_ACCURACY_M) || 50;
+// A weak signal gets up to this much extra distance on top of the radius.
+const ACCURACY_ALLOWANCE_CAP_M = Number(process.env.VISIT_ACCURACY_ALLOWANCE_M) || 25;
 
 const toRad = (deg) => (Number(deg) * Math.PI) / 180;
 
@@ -82,14 +89,23 @@ function checkAddressProximity({ deviceLat, deviceLng, refLat, refLng }) {
 //      captured (the original Rajkot->Navi Mumbai class of error).
 const CAPTURE_MAX_ACCURACY_M = Number(process.env.CAPTURE_MAX_ACCURACY_M) || 50;
 const CAPTURE_MAX_ADDRESS_DISTANCE_M = Number(process.env.CAPTURE_MAX_ADDRESS_DISTANCE_M) || 2000;
+// A pincode centroid is the middle of a postal area (several km across), so when
+// that is all we could resolve we allow a wider distance than for a street match.
+const CAPTURE_MAX_PINCODE_DISTANCE_M = Number(process.env.CAPTURE_MAX_PINCODE_DISTANCE_M) || 8000;
 
 /**
  * Validate an on-site location capture.
- * @returns {{ ok: boolean, distance: number|null, reason?: string }}
+ *
+ * The phone must be near the party's geocoded address. How near depends on how
+ * precisely the address resolved (refPrecision): 'address' uses the tight limit,
+ * 'pincode' the wider one. A city/state centroid, or no result at all, cannot
+ * prove the person is at the shop, so the capture is accepted but flagged
+ * accepted as it is (noReference: true) when the GPS fix itself is good.
+ * @returns {{ ok: boolean, distance: number|null, reason?: string, noReference?: boolean }}
  */
-function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng }) {
+function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng, refPrecision, allowFarFromAddress = false }) {
   const lat = Number(deviceLat), lng = Number(deviceLng);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+  if (deviceLat == null || deviceLng == null || deviceLat === '' || deviceLng === '' || !Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
     return { ok: false, distance: null, reason: 'A valid current location is required. Please enable GPS and try again.' };
   }
   const acc = Number(accuracy);
@@ -103,21 +119,29 @@ function validateOnsiteCapture({ deviceLat, deviceLng, accuracy, refLat, refLng 
       reason: `GPS signal is too weak (accurate to only ${Math.round(acc)}m). Move to open sky and try again — it must be within ${CAPTURE_MAX_ACCURACY_M}m.`,
     };
   }
-  // Compare to the address anchor when we have one (best-effort — if the address
-  // can't be geocoded we still allow the on-site person to set it).
-  if (refLat != null && refLng != null && refLat !== '' && refLng !== '') {
-    const distance = distanceMeters(lat, lng, refLat, refLng);
-    if (distance != null && distance > CAPTURE_MAX_ADDRESS_DISTANCE_M) {
-      const km = (distance / 1000).toFixed(distance >= 10000 ? 0 : 1);
-      return {
-        ok: false,
-        distance,
-        reason: `You are about ${km} km from this party's registered address. Make sure you selected the correct party and are standing at its shop before capturing.`,
-      };
-    }
-    return { ok: true, distance };
+  const hasRef = refLat != null && refLng != null && refLat !== '' && refLng !== '';
+  // 'precise' is the default for callers that don't say how the address resolved.
+  const precision = refPrecision || 'address';
+  if (!hasRef || precision === 'city' || precision === 'state') {
+    // The map cannot place this address, so the phone cannot be compared with it.
+    // A good GPS fix is enough: the capture is accepted as it is.
+    return { ok: true, distance: null, noReference: true };
   }
-  return { ok: true, distance: null };
+  const limit = precision === 'pincode' ? CAPTURE_MAX_PINCODE_DISTANCE_M : CAPTURE_MAX_ADDRESS_DISTANCE_M;
+  const distance = distanceMeters(lat, lng, refLat, refLng);
+  if (distance != null && distance > limit) {
+    // The written address may simply be wrong or incomplete. With a good GPS fix the
+    // salesman can confirm he is at the right shop and save the spot anyway.
+    if (allowFarFromAddress) return { ok: true, distance, farFromAddress: true };
+    const km = (distance / 1000).toFixed(distance >= 10000 ? 0 : 1);
+    return {
+      ok: false,
+      distance,
+      farFromAddress: true,
+      reason: `You are about ${km} km from this party's written address. If you are at the right shop and the address is wrong, open Edit party: the address is updated from your location and the spot is kept. Otherwise check that you picked the correct party.`,
+    };
+  }
+  return { ok: true, distance };
 }
 
 function checkGeofence({ deviceLat, deviceLng, party, action = 'perform this action' }) {
@@ -145,11 +169,64 @@ function checkGeofence({ deviceLat, deviceLng, party, action = 'perform this act
   return { ok: true, distance };
 }
 
+/**
+ * Visit order / check-in distance rule: the straight-line distance (Haversine) between
+ * the party's saved latitude/longitude and the phone's latitude/longitude.
+ *  - party has a precise ("verified") spot: within GEOFENCE_RADIUS_M (50m) plus an
+ *    allowance for a weak signal (the phone's reported accuracy, at most 25m extra);
+ *  - party only has a point from its address: within ROUGH_RADIUS_M (150m). When that
+ *    passes with a good GPS fix, `learn: true` tells the caller to save the phone's
+ *    position as the shop's precise spot, so later visits use the 50m rule;
+ *  - party has no point at all: refused with code 'no_location' (edit the party).
+ * @returns {{ ok: boolean, distance: number|null, mode?: 'precise'|'rough', learn?: boolean, code?: string, reason?: string }}
+ */
+function checkVisitLocation({ deviceLat, deviceLng, accuracy, party, action = 'perform this action' }) {
+  const lat = Number(deviceLat), lng = Number(deviceLng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return { ok: false, distance: null, code: 'no_gps', reason: 'A valid current location is required. Please turn on location and try again.' };
+  }
+  const acc = Number(accuracy);
+  const hasAcc = Number.isFinite(acc) && acc > 0;
+  if (hasAcc && acc > MAX_VISIT_ACCURACY_M) {
+    return { ok: false, distance: null, code: 'weak_gps', reason: `GPS signal is too weak (accurate to only ${Math.round(acc)}m). Move to open sky and try again; it must be within ${MAX_VISIT_ACCURACY_M}m.` };
+  }
+  const pLat = party && (party.latitude ?? party.lat);
+  const pLng = party && (party.longitude ?? party.lng);
+  if (pLat == null || pLng == null || pLat === '' || pLng === '') {
+    return { ok: false, distance: null, code: 'no_location', reason: "This party has no location yet. Use I’m at the shop to capture and confirm its shipping address, then try again." };
+  }
+  const distance = distanceMeters(lat, lng, pLat, pLng);
+  if (distance == null) {
+    return { ok: false, distance: null, code: 'no_gps', reason: 'A valid current location is required.' };
+  }
+  const precise = party.location_source === 'verified';
+  const allowed = precise
+    ? GEOFENCE_RADIUS_M + (hasAcc ? Math.min(acc, ACCURACY_ALLOWANCE_CAP_M) : 0)
+    : ROUGH_RADIUS_M;
+  if (distance > allowed) {
+    return {
+      ok: false,
+      distance,
+      mode: precise ? 'precise' : 'rough',
+      code: 'too_far',
+      reason: precise
+        ? `You must be within ${GEOFENCE_RADIUS_M}m of the party to ${action}. You are about ${Math.round(distance)}m away.`
+        : `You are about ${Math.round(distance)}m from this party's address (limit ${ROUGH_RADIUS_M}m). Move closer to the shop, or check the party's address.`,
+    };
+  }
+  // A visit validates proximity; only the explicit address-confirmation flow saves a shop anchor.
+  return { ok: true, distance, mode: precise ? 'precise' : 'rough', learn: false };
+}
+
 module.exports = {
   GEOFENCE_RADIUS_M,
+  ROUGH_RADIUS_M,
+  MAX_VISIT_ACCURACY_M,
+  checkVisitLocation,
   ADDRESS_PROXIMITY_RADIUS_M,
   CAPTURE_MAX_ACCURACY_M,
   CAPTURE_MAX_ADDRESS_DISTANCE_M,
+  CAPTURE_MAX_PINCODE_DISTANCE_M,
   distanceMeters,
   checkGeofence,
   checkAddressProximity,

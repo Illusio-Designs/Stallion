@@ -1,12 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
-import Header from '../components/Header';
-import Footer from '../components/Footer';
 import '../styles/pages/Login.css';
+import '../styles/redesign-p-login.css';
 import { showLoginSuccess, showError, showSuccess } from '../services/notificationService';
 import { setAuth, isLoggedIn, getUserRoles, getUser } from '../services/authService';
-import { checkUser, login, getMe, getMyRole } from '../services/apiService';
+import { checkUser, login, getMe, getMyRole, requestOtpResend } from '../services/apiService';
 import { getAccessiblePagesForRoles, hasAnyRolePageAccess } from '../utils/rolePermissions';
 import { pageKeyToPath } from '../utils/dashboardRoutes';
 import { verifyOTP, resendOTP, initializeOTPWidget, destroyOTPWidget } from '../services/msg91Service';
@@ -184,13 +183,17 @@ const Login = ({ onPageChange }) => {
       const errorDataMessage = (error.errorData?.error || error.errorData?.message || error.errorData?.msg || '').toLowerCase();
       const errorText = JSON.stringify(error.errorData || {}).toLowerCase();
       
-      if (error.statusCode === 400 || 
-          errorMessage.includes('user not found') || 
+      // Only a real "user not found" gets that explanation; any other error shows what the
+      // server actually said (for example a limit on code requests).
+      if (errorMessage.includes('user not found') || 
           errorDataMessage.includes('user not found') ||
           errorText.includes('user not found')) {
+        setPhoneError('This number is not registered. Check it, or ask your administrator to add you.');
         showError('User not found. Please ensure your phone number is registered. If you were just created by an administrator, please wait a few moments and try again, or contact your administrator.');
       } else {
-        showError(error.message || 'Something went wrong. Please try again.');
+        const reason = errorDataMessage ? (error.errorData?.error || error.errorData?.message || error.errorData?.msg) : (error.message || 'Something went wrong. Please try again.');
+        setPhoneError(reason);
+        showError(reason);
       }
     } finally {
       setLoading(false);
@@ -200,8 +203,18 @@ const Login = ({ onPageChange }) => {
   const handleOTPChange = (index, value) => {
     if (value && !/^\d+$/.test(value)) return;
     if (otpError) setOtpError('');
+    // A phone's code autofill (or a paste) puts the whole code into one box:
+    // spread it over the boxes instead of keeping a single digit.
+    if (value.length > 1) {
+      const digits = value.slice(0, 6 - index).split('');
+      const spread = [...otp];
+      digits.forEach((d, i) => { spread[index + i] = d; });
+      setOtp(spread);
+      otpInputRefs.current[Math.min(index + digits.length, 5)]?.focus();
+      return;
+    }
     const newOtp = [...otp];
-    newOtp[index] = value.slice(-1);
+    newOtp[index] = value;
     setOtp(newOtp);
     if (value && index < 5) {
       otpInputRefs.current[index + 1]?.focus();
@@ -319,6 +332,7 @@ const Login = ({ onPageChange }) => {
               ...userData,
               role: loginResponse.role,
               role_name: loginResponse.role,
+              roles: loginResponse.roles || undefined,
             };
           } else {
             // Fallback to decoded JWT data (least preferred)
@@ -616,12 +630,17 @@ const Login = ({ onPageChange }) => {
     } catch (error) {
       console.error('OTP verification error:', error);
       const errorMessage = error.message || error.error?.message || 'Incorrect code. Please try again.';
-      setOtpError(errorMessage);
+      const lower = String(errorMessage).toLowerCase();
+      let reason = errorMessage;
+      if (lower.includes('expire')) reason = 'This code has expired. Tap Resend code to get a new one.';
+      else if (lower.includes('incorrect') || lower.includes('invalid') || lower.includes('wrong') || lower.includes('mismatch')) reason = 'That code is wrong. Check the SMS and try again.';
+      setOtpError(reason);
       showError(errorMessage);
 
       // Clear OTP on error
       setOtp(['', '', '', '', '', '']);
-      otpInputRefs.current[0]?.focus();
+      // The boxes are disabled while loading; focus once they are enabled again.
+      setTimeout(() => otpInputRefs.current[0]?.focus(), 50);
     } finally {
       setLoading(false);
     }
@@ -634,13 +653,16 @@ const Login = ({ onPageChange }) => {
     setResendDisabled(true);
 
     try {
+      // Server-side limit on resends (max 3 per 15 minutes, 30 s apart).
+      await requestOtpResend(phoneNumber);
       const resendResponse = await resendOTP();
       
       if (resendResponse.success) {
         showSuccess('OTP resent successfully');
         setResendTimer(30); // 30 seconds cooldown
         setOtp(['', '', '', '', '', '']);
-        otpInputRefs.current[0]?.focus();
+        // The boxes are disabled while loading; focus once they are enabled again.
+        setTimeout(() => otpInputRefs.current[0]?.focus(), 0);
       } else {
         showError(resendResponse.message || 'Failed to resend OTP');
         setResendDisabled(false);
@@ -663,18 +685,23 @@ const Login = ({ onPageChange }) => {
   };
 
   return (
-    <div className="login-page relative flex min-h-screen flex-col bg-[var(--color-primary-active)]">
-      <Header onPageChange={handlePageChange} currentPage="login" />
-      <div className="login-background absolute left-0 top-0 z-0 w-full">
-        <img src="/images/banners/loginbg.webp" alt="Login Background" className="login-bg-image h-auto w-full object-cover opacity-45" />
-        <div className="login-gradient-overlay absolute inset-0 z-[1] bg-[linear-gradient(180deg,rgba(18,14,77,0)_0%,var(--color-primary-active)_92%)]"></div>
-      </div>
-      <div className="login-content relative z-[2] flex flex-1 items-center justify-center px-4 py-10 md:py-16">
-        <div className="login-container box-border w-full max-w-[440px] rounded-xl border border-border bg-surface px-5 py-6 shadow-xl sm:px-6 sm:py-8 md:px-10 md:py-12">
+    <div className="login-page auth-split">
+      <section className="auth-panel">
+        <button type="button" className="auth-brand" onClick={() => handlePageChange('')} aria-label="Stallion Eyewear home">
+          <img src="/images/logo/logo.webp" alt="Stallion Eyewear" className="auth-brand-logo" />
+        </button>
+        <div className="auth-panel-main">
+          <p className="auth-headline">Wholesale frames, one tap away.</p>
+          <p className="auth-panel-text">Orders, parties and visits in one app.</p>
+        </div>
+        <p className="auth-panel-foot">Salesmen, parties, distributors and the office team all sign in here.</p>
+      </section>
+      <div className="login-content auth-form-side">
+        <div className="login-container login-card">
           {!showOTP ? (
             <>
-              <h1 className="login-title m-0 mb-2 text-center text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Sign in</h1>
-              <p className="login-subtitle m-0 mb-8 text-center text-[length:var(--text-base)] font-normal leading-[var(--leading-normal)] text-text-muted">Enter your mobile number to receive a one-time code.</p>
+              <h1 className="login-title m-0 mb-1 text-left text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Sign in</h1>
+              <p className="login-subtitle m-0 mb-5 text-left text-[length:var(--text-base)] font-normal leading-[var(--leading-normal)] text-text-muted">Enter your mobile number to receive a one-time code.</p>
               <form className="login-form flex flex-col gap-6" onSubmit={handleSubmit} noValidate>
                 <div className="login-input-group flex flex-col gap-2">
                   <label className="ui-label" htmlFor="phone">Mobile number</label>
@@ -706,12 +733,30 @@ const Login = ({ onPageChange }) => {
             </>
           ) : (
             <>
-              <h1 className="login-title m-0 mb-2 text-center text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Verify your number</h1>
-              <p className="login-subtitle m-0 mb-8 text-center text-[length:var(--text-base)] font-normal leading-[var(--leading-normal)] text-text-muted">
-                We sent a 6-digit code to
-                {phoneNumber ? <strong className="login-phone-hint whitespace-nowrap font-semibold text-text"> +{String(phoneNumber).replace(/^\+/, '')}</strong> : ' your phone'}.
+              <h1 className="login-title m-0 mb-1 text-left text-xl font-bold leading-[var(--leading-tight)] tracking-[-0.02em] text-text sm:text-[length:var(--text-2xl)]">Verify your number</h1>
+              <p className="login-subtitle m-0 mb-5 text-left text-[length:var(--text-base)] font-normal leading-[var(--leading-normal)] text-text-muted">
+                Enter the 6-digit code we sent by SMS.
               </p>
               <form className="login-form flex flex-col gap-6" onSubmit={handleOTPVerify} noValidate>
+                <div className="login-phone-row">
+                  <div>
+                    <span className="login-phone-label">Sent to</span>
+                    <strong className="login-phone-hint">{phoneNumber ? `+${String(phoneNumber).replace(/^\+/, '')}` : 'your phone'}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    className="login-link-btn"
+                    onClick={() => {
+                      destroyOTPWidget();
+                      setShowOTP(false);
+                      setOtp(['', '', '', '', '', '']);
+                      setOtpError('');
+                    }}
+                    disabled={loading}
+                  >
+                    Change number
+                  </button>
+                </div>
                 <div className="login-input-group flex flex-col gap-2">
                   <span className="ui-label" id="otp-label">One-time code</span>
                   <div
@@ -726,7 +771,7 @@ const Login = ({ onPageChange }) => {
                         type="text"
                         inputMode="numeric"
                         autoComplete={index === 0 ? 'one-time-code' : 'off'}
-                        maxLength={1}
+                        maxLength={6}
                         value={digit}
                         onChange={(e) => handleOTPChange(index, e.target.value)}
                         onKeyDown={(e) => handleOTPKeyDown(index, e)}
@@ -750,7 +795,7 @@ const Login = ({ onPageChange }) => {
                 >
                   <span className="ui-btn__label">{loading ? 'Verifying…' : 'Verify code'}</span>
                 </button>
-                <div className="resend-otp-container -mt-2 text-center">
+                <div className="resend-otp-container login-resend">
                   <button
                     type="button"
                     className="resend-otp-btn cursor-pointer rounded-sm border-none bg-transparent px-3 py-2 text-[length:var(--text-sm)] font-medium text-primary transition-[color,background] duration-200 ease-[ease] hover:enabled:bg-primary-soft hover:enabled:text-primary-hover focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:cursor-not-allowed disabled:text-text-subtle motion-reduce:transition-none"
@@ -758,7 +803,7 @@ const Login = ({ onPageChange }) => {
                     disabled={resendDisabled || loading}
                   >
                     {resendTimer > 0
-                      ? `Resend code in ${resendTimer}s`
+                      ? `Resend in 0:${String(resendTimer).padStart(2, '0')}`
                       : 'Resend code'}
                   </button>
                 </div>
@@ -767,7 +812,6 @@ const Login = ({ onPageChange }) => {
           )}
         </div>
       </div>
-      <Footer />
     </div>
   );
 };

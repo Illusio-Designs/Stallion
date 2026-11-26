@@ -1,3 +1,4 @@
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
 const Shape = require('../models/Shape');
 const { logAudit } = require('../utils/auditLogger');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
@@ -11,7 +12,7 @@ class ShapesController {
                 nameFields: ['shape_name'],
                 phoneFields: [],
             });
-            const where = mergeWhere({}, searchFilter);
+            const where = mergeWhere(activeOnlyWhere(req), searchFilter);
             const shapes = await Shape.findAll({ where });
             res.status(200).json(shapes);
         } catch (error) {
@@ -52,6 +53,7 @@ class ShapesController {
             }
             const oldSnapshot = shape.toJSON();
             const payload = {
+                ...activeUpdate(req.body),
                 shape_name: shape_name,
                 updated_at: new Date(),
             };

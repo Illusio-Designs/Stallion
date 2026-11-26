@@ -18,10 +18,18 @@ export const useTokenMonitor = (isDashboard = false) => {
 
     // Initialize the logged in state
     wasLoggedInRef.current = isLoggedIn();
+    if (wasLoggedInRef.current) window.__manualLogout = false;
 
     // Function to check token presence
     const checkToken = () => {
       const currentlyLoggedIn = isLoggedIn();
+
+      // The person pressed Logout themselves: nothing expired, so show no error.
+      if (window.__manualLogout && !currentlyLoggedIn) {
+        window.__manualLogout = false;
+        wasLoggedInRef.current = false;
+        return;
+      }
       
       // If user was logged in but now token is missing, log them out
       // Only show notification if it hasn't been shown already
@@ -31,7 +39,7 @@ export const useTokenMonitor = (isDashboard = false) => {
         
         // Token was removed - log out immediately
         showError('Your session has expired. Please login again.');
-        logout();
+        logout({ keepCart: true });
         
         // Redirect to login page
         const currentPath = window.location.pathname;

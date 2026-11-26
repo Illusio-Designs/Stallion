@@ -22,6 +22,12 @@ const Tray = sequelize.define('Tray', {
         type: DataTypes.STRING(20),
         allowNull: false,
         defaultValue: 'available'
+    },
+    // Manual switch, separate from the automatic 'inactive' tray_status. Never deleted.
+    is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
     }
 }, {
     tableName: 'tray',

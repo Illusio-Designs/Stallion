@@ -1,28 +1,50 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import '../styles/pages/dashboard-analytics.css';
+import '../styles/redesign-p-account.css';
+import { FiDownload } from '../components/icons/hugeicons';
 import TableWithControls from '../components/ui/TableWithControls';
 import StatusBadge from '../components/ui/StatusBadge';
 import Skeleton from '../components/ui/Skeleton';
 import MatchMeter from '../components/ui/MatchMeter';
+import SalesByState from '../components/SalesByState';
 import {
   getAllSalesmanTargets,
   getSalesmanTargets,
-  getAllSalesmanCheckins,
+  getSalesmanCheckinsPage,
   getSalesmanCheckins,
   getSalesmanProfile,
   getMyOrdersPage,
   getOrdersPage,
 } from '../services/apiService';
 
-// Rows to load per report list (check-ins + orders). Kept small on purpose.
-const REPORT_LIMIT = 20;
+// Rows to load per report list (check-ins + orders). Older rows load on demand.
+const REPORT_LIMIT = 20; // page size; more rows load on demand via "Load more"
 import { getUser, getUserRole } from '../services/authService';
 import { showError } from '../services/notificationService';
+import { downloadCsv } from '../utils/exportCsv';
 
 const TABS = [
-  { key: 'targets', label: 'Target Achievement' },
-  { key: 'checkins', label: 'Visit Report' },
+  { key: 'targets', label: 'Targets' },
+  { key: 'states', label: 'Sales by state' },
+  { key: 'checkins', label: 'Visits' },
 ];
+
+const PERIODS = [
+  { key: '7d', label: '7 days' },
+  { key: 'month', label: 'This month' },
+  { key: 'quarter', label: 'Quarter' },
+  { key: 'year', label: 'Year' },
+];
+// Start of the chosen period (end is always now).
+const periodStart = (key) => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  if (key === '7d') d.setDate(d.getDate() - 6);
+  else if (key === 'month') d.setDate(1);
+  else if (key === 'quarter') { d.setMonth(Math.floor(d.getMonth() / 3) * 3); d.setDate(1); }
+  else { d.setMonth(0); d.setDate(1); }
+  return d;
+};
 
 const money = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const fmtDate = (d) =>
@@ -30,7 +52,7 @@ const fmtDate = (d) =>
 
 // Geofence radius (mirror of backend GEOFENCE_RADIUS_M) + Haversine distance in
 // metres, used to verify a recorded visit's GPS against the party's address.
-const GEOFENCE_RADIUS_M = 250;
+const GEOFENCE_RADIUS_M = 50;
 const distanceMeters = (lat1, lng1, lat2, lng2) => {
   const toRad = (d) => (Number(d) * Math.PI) / 180;
   const R = 6371000;
@@ -46,7 +68,7 @@ const titleCase = (s) =>
 // Inline achievement progress bar
 const Progress = ({ pct }) => {
   const v = Math.max(0, Math.min(100, Math.round(pct)));
-  const color = v >= 100 ? 'var(--color-success)' : v >= 50 ? 'var(--color-primary)' : 'var(--color-warning)';
+  const color = v >= 50 ? 'var(--t-ink)' : 'var(--t-faint)';
   return (
     <div className="flex items-center gap-2 min-w-[120px]">
       <div className="flex-1 h-[6px] rounded-[999px] bg-[var(--color-grey-200)] overflow-hidden">
@@ -57,6 +79,42 @@ const Progress = ({ pct }) => {
   );
 };
 
+// Turn visit ORDERS into Visit Report rows, skipping any already linked by a
+// check-in (order_id).
+const visitOrdersToRows = (orders, existing) => {
+  const linked = new Set((existing || []).map((x) => x.order_id).filter(Boolean));
+  return (orders || [])
+    .filter((o) => o.order_type === 'visit_order' && !linked.has(o.order_id || o.id))
+    .map((o) => {
+          // The backend already computes total_qty robustly (order_items may be a
+          // JSON string), so trust it and only fall back to a local sum.
+          let its = o.order_items;
+          if (typeof its === 'string') { try { its = JSON.parse(its); } catch { its = []; } }
+          if (its && typeof its === 'object' && !Array.isArray(its)) its = Object.values(its);
+          const localQty = Array.isArray(its)
+            ? its.reduce((s, it) => s + (Number(it && (it.quantity ?? it.qty)) || 0), 0)
+            : 0;
+          const qty = o.total_qty != null ? Number(o.total_qty) : localQty;
+          return {
+            id: `order-${o.order_id || o.id}`,
+            type: 'ordered',
+            salesman_id: o.salesman_id,
+            salesman_name: o.salesman_name,
+            party_id: o.party_id,
+            party_name: o.party_name,
+            party_latitude: o.party_latitude,
+            party_longitude: o.party_longitude,
+            order_id: o.order_id || o.id,
+            order_total: o.order_total,
+            order_qty: qty,
+            order_notes: o.order_notes,
+            check_in_date: o.order_date || o.created_at || o.createdAt,
+            latitude: o.latitude,
+            longitude: o.longitude,
+          };
+    });
+};
+
 const AnalyticsReports = () => {
   const [activeTab, setActiveTab] = useState('targets');
   const [targets, setTargets] = useState([]);
@@ -65,6 +123,11 @@ const AnalyticsReports = () => {
   const [parties, setParties] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
+  // Visit Report server paging (check-ins + visit orders are fetched page by page).
+  const [visitPage, setVisitPage] = useState(1);
+  const [visitMore, setVisitMore] = useState({ checkins: false, orders: false });
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [period, setPeriod] = useState('year');
 
   const userRole = useMemo(() => getUserRole(), []);
   const user = useMemo(() => getUser(), []);
@@ -99,7 +162,7 @@ const AnalyticsReports = () => {
     // Independent calls: an empty table (404) or one failing call must not break the other.
     const [tRes, cRes] = await Promise.allSettled([
       isSalesman ? (sid ? getSalesmanTargets(sid) : Promise.resolve([])) : getAllSalesmanTargets(),
-      isSalesman ? (sid ? getSalesmanCheckins(sid) : Promise.resolve([])) : getAllSalesmanCheckins(REPORT_LIMIT),
+      isSalesman ? (sid ? getSalesmanCheckins(sid) : Promise.resolve([])) : getSalesmanCheckinsPage(1, REPORT_LIMIT),
     ]);
 
     let realError = false;
@@ -107,53 +170,31 @@ const AnalyticsReports = () => {
     let c = [];
     if (tRes.status === 'fulfilled') t = asArray(tRes.value);
     else if (!isNotFound(tRes.reason)) { realError = true; console.error('targets load failed:', tRes.reason); }
-    if (cRes.status === 'fulfilled') c = asArray(cRes.value);
+    let moreCheckins = false;
+    if (cRes.status === 'fulfilled') {
+      c = asArray(cRes.value);
+      const pg = cRes.value && cRes.value.pagination;
+      moreCheckins = !!(pg && pg.page < pg.totalPages);
+    }
     else if (!isNotFound(cRes.reason)) { realError = true; console.error('check-ins load failed:', cRes.reason); }
 
     // Visit ORDERS live in the orders table and don't create a check-in, so they
     // would be missing from the Visit Report. Merge them in as "ordered" rows,
     // skipping any order already linked by a check-in (order_id).
+    let moreOrders = false;
     try {
       const ordersRes = isSalesman
         ? await getMyOrdersPage(1, REPORT_LIMIT)
         : await getOrdersPage(1, REPORT_LIMIT);
-      const orders = asArray(ordersRes);
-      const linked = new Set(c.map((x) => x.order_id).filter(Boolean));
-      const orderRows = orders
-        .filter((o) => o.order_type === 'visit_order' && !linked.has(o.order_id || o.id))
-        .map((o) => {
-          // The backend already computes total_qty robustly (order_items may be a
-          // JSON string), so trust it and only fall back to a local sum.
-          let its = o.order_items;
-          if (typeof its === 'string') { try { its = JSON.parse(its); } catch { its = []; } }
-          if (its && typeof its === 'object' && !Array.isArray(its)) its = Object.values(its);
-          const localQty = Array.isArray(its)
-            ? its.reduce((s, it) => s + (Number(it && (it.quantity ?? it.qty)) || 0), 0)
-            : 0;
-          const qty = o.total_qty != null ? Number(o.total_qty) : localQty;
-          return {
-            id: `order-${o.order_id || o.id}`,
-            type: 'ordered',
-            salesman_id: o.salesman_id,
-            salesman_name: o.salesman_name,
-            party_id: o.party_id,
-            party_name: o.party_name,
-            party_latitude: o.party_latitude,
-            party_longitude: o.party_longitude,
-            order_id: o.order_id || o.id,
-            order_total: o.order_total,
-            order_qty: qty,
-            order_notes: o.order_notes,
-            check_in_date: o.order_date || o.created_at || o.createdAt,
-            latitude: o.latitude,
-            longitude: o.longitude,
-          };
-        });
-      c = [...c, ...orderRows];
+      const opg = ordersRes && ordersRes.pagination;
+      moreOrders = !!(opg && opg.page < opg.totalPages);
+      c = [...c, ...visitOrdersToRows(asArray(ordersRes), c)];
     } catch (e) { console.error('Failed to merge visit orders:', e); }
 
     setTargets(t);
     setCheckins(c);
+    setVisitPage(1);
+    setVisitMore({ checkins: moreCheckins, orders: moreOrders });
     setLoadError(realError);
     if (realError) showError('Could not load some reports.');
 
@@ -183,6 +224,53 @@ const AnalyticsReports = () => {
     setLoading(false);
   };
 
+  // Load the next page of the Visit Report (check-ins + visit orders) and append.
+  const loadMoreVisits = async () => {
+    if (loadingMore) return;
+    setLoadingMore(true);
+    const next = visitPage + 1;
+    const asArray = (r) => (Array.isArray(r) ? r : r?.data || []);
+    try {
+      const [cRes, oRes] = await Promise.allSettled([
+        visitMore.checkins ? getSalesmanCheckinsPage(next, REPORT_LIMIT) : Promise.resolve(null),
+        visitMore.orders ? (isSalesman ? getMyOrdersPage(next, REPORT_LIMIT) : getOrdersPage(next, REPORT_LIMIT)) : Promise.resolve(null),
+      ]);
+      const hasMore = { checkins: false, orders: false };
+      let added = [];
+      if (cRes.status === 'fulfilled' && cRes.value) {
+        added = added.concat(asArray(cRes.value));
+        const pg = cRes.value.pagination;
+        hasMore.checkins = !!(pg && pg.page < pg.totalPages);
+      }
+      const base = [...checkins, ...added];
+      if (oRes.status === 'fulfilled' && oRes.value) {
+        added = added.concat(visitOrdersToRows(asArray(oRes.value), base));
+        const pg = oRes.value.pagination;
+        hasMore.orders = !!(pg && pg.page < pg.totalPages);
+      }
+      if (cRes.status === 'rejected' || oRes.status === 'rejected') showError('Could not load more visits.');
+      setCheckins((prev) => {
+        const seen = new Set(prev.map((x) => x.id).filter(Boolean));
+        return [...prev, ...added.filter((x) => !(x.id && seen.has(x.id)))];
+      });
+      // Keep the name / location lookups in step with the newly added rows.
+      setSalesmen((prev) => {
+        const m = new Map(prev.map((x) => [String(x.salesman_id), x]));
+        added.forEach((x) => { if (x.salesman_id && x.salesman_name && !m.has(String(x.salesman_id))) m.set(String(x.salesman_id), { salesman_id: x.salesman_id, full_name: x.salesman_name }); });
+        return [...m.values()];
+      });
+      setParties((prev) => {
+        const m = new Map(prev.map((x) => [String(x.party_id), x]));
+        added.forEach((x) => { if (x.party_id && !m.has(String(x.party_id))) m.set(String(x.party_id), { party_id: x.party_id, party_name: x.party_name || null, latitude: x.party_latitude != null ? x.party_latitude : null, longitude: x.party_longitude != null ? x.party_longitude : null }); });
+        return [...m.values()];
+      });
+      setVisitPage(next);
+      setVisitMore(hasMore);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   const salesmanName = (id) => {
     const s = salesmen.find((x) => String(x.salesman_id || x.id) === String(id));
     return s?.full_name || s?.name || (id ? `Salesman ${String(id).slice(0, 8)}` : 'N/A');
@@ -200,14 +288,44 @@ const AnalyticsReports = () => {
     return null;
   };
 
+  // Period filter (by date): targets that overlap the period, visits inside it.
+  const periodRange = useMemo(() => ({ from: periodStart(period), to: new Date() }), [period]);
+  const periodTargets = useMemo(() => targets.filter((t) => {
+    if (!t.start_date && !t.end_date) return true;
+    const s = t.start_date ? new Date(t.start_date) : null;
+    const e = t.end_date ? new Date(t.end_date) : null;
+    if (e && !isNaN(e) && e < periodRange.from) return false;
+    if (s && !isNaN(s) && s > periodRange.to) return false;
+    return true;
+  }), [targets, periodRange]);
+  const periodCheckins = useMemo(() => checkins.filter((c) => {
+    if (!c.check_in_date) return true;
+    const d = new Date(c.check_in_date);
+    return isNaN(d) || (d >= periodRange.from && d <= periodRange.to);
+  }), [checkins, periodRange]);
+
   // ---- Target summary (real data) ----
   const summary = useMemo(() => {
-    const total = targets.reduce((s, t) => s + (Number(t.target_amount) || 0), 0);
-    const achieved = targets.reduce((s, t) => s + (Number(t.completed_amount) || 0), 0);
+    const total = periodTargets.reduce((s, t) => s + (Number(t.target_amount) || 0), 0);
+    const achieved = periodTargets.reduce((s, t) => s + (Number(t.completed_amount) || 0), 0);
     const due = Math.max(0, total - achieved);
     const pct = total > 0 ? Math.round((achieved / total) * 100) : 0;
     return { total, achieved, due, pct };
-  }, [targets]);
+  }, [periodTargets]);
+
+  // Achieved amount per salesman (display only, from the same targets list).
+  const bySalesman = useMemo(() => {
+    const sums = {};
+    periodTargets.forEach((t) => {
+      const id = t.salesman_id || 'na';
+      sums[id] = (sums[id] || 0) + (Number(t.completed_amount) || 0);
+    });
+    const list = Object.keys(sums).map((id) => ({ id, name: salesmanName(id === 'na' ? null : id), amount: sums[id] }))
+      .sort((a, b) => b.amount - a.amount).slice(0, 8);
+    const max = list.reduce((m, r) => Math.max(m, r.amount), 0);
+    return list.map((r) => ({ ...r, pct: max > 0 ? Math.round((r.amount / max) * 100) : 0 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [periodTargets, salesmen]);
 
   const targetColumns = useMemo(() => ([
     { key: 'salesman', label: 'SALESMAN', width: '150px' },
@@ -219,7 +337,7 @@ const AnalyticsReports = () => {
     { key: 'status', label: 'STATUS', width: '110px', render: (v) => <StatusBadge status={String(v).toLowerCase()}>{String(v).toUpperCase()}</StatusBadge> },
   ]), []);
 
-  const targetRows = useMemo(() => targets.map((t, i) => {
+  const targetRows = useMemo(() => periodTargets.map((t, i) => {
     const target = Number(t.target_amount) || 0;
     const achieved = Number(t.completed_amount) || 0;
     return {
@@ -233,7 +351,7 @@ const AnalyticsReports = () => {
       status: t.target_status || 'pending',
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [targets, salesmen]);
+  }), [periodTargets, salesmen]);
 
   const checkinColumns = useMemo(() => ([
     { key: 'type', label: 'TYPE', render: (v) => (
@@ -261,7 +379,7 @@ const AnalyticsReports = () => {
     { key: 'reason', label: 'REASON' },
   ]), []);
 
-  const checkinRows = useMemo(() => [...checkins]
+  const checkinRows = useMemo(() => [...periodCheckins]
     .sort((a, b) => new Date(b.check_in_date || 0) - new Date(a.check_in_date || 0))
     .map((c, i) => ({
       id: c.id || i,
@@ -276,7 +394,34 @@ const AnalyticsReports = () => {
       reason: (c.type === 'ordered' ? (c.order_notes || c.check_in_remarks) : c.check_in_remarks) || '—',
     })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [checkins, salesmen, parties]);
+    [periodCheckins, salesmen, parties]);
+
+  const exportVisible = () => {
+    if (activeTab === 'targets') {
+      downloadCsv('target-achievement', [
+        { label: 'Salesman', value: (r) => r.salesman },
+        { label: 'Period', value: (r) => r.period },
+        { label: 'Order type', value: (r) => r.type },
+        { label: 'Target', value: (r) => r.target },
+        { label: 'Achieved', value: (r) => r.achieved },
+        { label: 'Progress %', value: (r) => Math.round(r.progress) },
+        { label: 'Status', value: (r) => r.status },
+      ], targetRows);
+    } else {
+      downloadCsv('visit-report', [
+        { label: 'Type', value: (r) => (r.type === 'ordered' ? 'Order' : 'Visit') },
+        { label: 'Salesman', value: (r) => r.salesman },
+        { label: 'Party', value: (r) => r.party },
+        { label: 'Date', value: (r) => r.date },
+        { label: 'Quantity', value: (r) => r.qty },
+        { label: 'Amount', value: (r) => r.amount },
+        { label: 'Reason', value: (r) => r.reason },
+      ], checkinRows);
+    }
+  };
+  const visibleCount = activeTab === 'targets' ? targetRows.length : checkinRows.length;
+  const visitCount = periodCheckins.length;
+  const periodLabel = PERIODS.find((p) => p.key === period)?.label || '';
 
   const backendDown = (
     <div className="ui-state ui-state--error">
@@ -295,50 +440,93 @@ const AnalyticsReports = () => {
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4">
-
-        {/* Tab navigation */}
-        <div className="dash-row">
-          <div className="order-tabs-container col-[1/-1] flex w-full gap-2 overflow-x-auto rounded-lg border border-border bg-surface px-3 py-2 shadow-sm">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                className={`order-tab inline-flex min-h-10 flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-4 py-2 text-[length:var(--text-base)] font-semibold leading-snug transition-colors active:scale-[0.98] ${activeTab === tab.key ? 'active bg-primary text-white' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
-                onClick={() => setActiveTab(tab.key)}
-              >
-                {tab.label}
-              </button>
-            ))}
+        <div className="pg-head">
+          <div><h1>Reports</h1><p>{fmtDate(periodRange.from)} to {fmtDate(periodRange.to)}. Cancelled orders count toward targets.</p></div>
+          <div className="pg-head__tools">
+            <div className="seg rep-seg rep-periods" role="group" aria-label="Period">
+              {PERIODS.map((p) => (
+                <button key={p.key} type="button" aria-pressed={period === p.key} className={period === p.key ? 'on' : ''} onClick={() => setPeriod(p.key)}>{p.label}</button>
+              ))}
+            </div>
+            <button type="button" className="gbtn rep-export rep-dl" onClick={exportVisible} disabled={loading || visibleCount === 0} title={activeTab === 'targets' ? 'Download the targets as a CSV file' : 'Download the visits as a CSV file'}>
+              <FiDownload size={16} aria-hidden="true" /> Download
+            </button>
           </div>
         </div>
+
+        {/* Four numbers for the chosen period */}
+        <div className="rep-kpis" aria-label="Summary">
+          {[
+            { label: 'Target done', value: `${summary.pct}%`, dark: true },
+            { label: 'Achieved', value: money(summary.achieved) },
+            { label: 'Due', value: money(summary.due) },
+            { label: 'Visits', value: String(visitCount) },
+          ].map((card) => (
+            <div key={card.label} className={`rep-kpi${card.dark ? ' rep-kpi--dk' : ''}`}>
+              <small>{card.label}</small>
+              <b>{loading ? <Skeleton width={70} height={22} /> : card.value}</b>
+            </div>
+          ))}
+        </div>
+
+        {/* Views */}
+        <div className="rep-tabs" role="tablist" aria-label="Report">
+          {TABS.map((tab) => (
+            <button key={tab.key} type="button" role="tab" aria-selected={activeTab === tab.key} className={`rep-tab${activeTab === tab.key ? ' on' : ''}`} onClick={() => setActiveTab(tab.key)}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'states' && <SalesByState from={periodRange.from} to={periodRange.to} />}
 
         {/* ===== Target Achievement ===== */}
         {activeTab === 'targets' && (
           <>
-            <div className="dash-row analytics-summary grid grid-cols-1 sm:grid-cols-12 gap-3 sm:gap-4">
-              {[
-                { label: 'Total Target', value: money(summary.total) },
-                { label: 'Achieved', value: money(summary.achieved) },
-                { label: 'Due', value: money(summary.due) },
-                { label: 'Completed %', value: `${summary.pct}%` },
-              ].map((card) => (
-                <div key={card.label} className="dash-card metric analytics-card flex flex-col gap-1 bg-surface border border-border rounded-lg shadow-sm p-5 col-span-1 sm:col-span-6 lg:col-span-3">
-                  <h4 className="m-0 text-xs font-semibold tracking-[var(--tracking-label)] uppercase text-text-subtle">{card.label}</h4>
-                  <div className="metric-value text-xl font-bold leading-tight tracking-[-0.01em] text-text tabular-nums">
-                    {loading ? <Skeleton width={90} height={24} /> : card.value}
-                  </div>
+            {!loading && bySalesman.length > 0 && (
+              <div className="dash-row">
+                <div className="dash-card full an-bars">
+                  <h3 className="an-bars__title">Achieved by salesman</h3>
+                  <ul className="an-bars__list">
+                    {bySalesman.map((r) => (
+                      <li key={r.id} className="an-bars__row">
+                        <span className="an-bars__name">{r.name}</span>
+                        <span className="prog" role="img" aria-label={`${r.name}: ${money(r.amount)}`}><i style={{ width: `${r.pct}%` }} /></span>
+                        <b className="an-bars__val">{money(r.amount)}</b>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
 
             <div className="dash-row">
               <div className="dash-card full">
                 {loadError && !loading ? backendDown : (!loading && targetRows.length === 0) ? (
-                  <div className="ui-state ui-state--empty">
-                    <p className="ui-state__title">No targets yet</p>
-                    <p className="ui-state__desc">Salesman targets and their achievement will show here once created.</p>
+                  <div className="ui-state ui-state--empty rep-empty">
+                    <p className="ui-state__title">{targets.length ? `No targets in ${periodLabel.toLowerCase()}` : 'No targets set yet'}</p>
+                    <p className="ui-state__desc">{targets.length ? 'Pick a longer period to see more.' : (isSalesman ? 'Your manager sets your target. It will show here with how much you have done. Your visits and sales are still shown.' : 'Set a target for a salesman and the progress will show here. Sales by state and Visits already work.')}</p>
+                    <div className="rep-empty__actions">
+                      <button type="button" className="gbtn" onClick={() => setActiveTab('states')}>See sales by state</button>
+                      <button type="button" className="gbtn" onClick={() => setActiveTab('checkins')}>See visits</button>
+                    </div>
                   </div>
                 ) : (
-                  <TableWithControls title="Target Achievement" columns={targetColumns} rows={targetRows} itemName="Target" loading={loading} selectable={false} />
+                  <>
+                    <ul className="rep-cards">
+                      {targetRows.map((r) => (
+                        <li key={r.id} className="rep-cardrow">
+                          <div className="rep-cardrow__top"><b>{r.salesman}</b><StatusBadge status={String(r.status).toLowerCase()}>{String(r.status).toUpperCase()}</StatusBadge></div>
+                          <div className="rep-cardrow__sub">{r.type} · {r.period}</div>
+                          <Progress pct={r.progress} />
+                          <div className="rep-cardrow__nums"><span>Target {r.target}</span><span>Achieved {r.achieved}</span></div>
+                        </li>
+                      ))}
+                    </ul>
+                    <div className="rep-table">
+                      <TableWithControls title="Target achievement" columns={targetColumns} rows={targetRows} itemName="Target" loading={loading} selectable={false} />
+                    </div>
+                  </>
                 )}
               </div>
             </div>
@@ -351,11 +539,39 @@ const AnalyticsReports = () => {
             <div className="dash-card full">
               {loadError && !loading ? backendDown : (!loading && checkinRows.length === 0) ? (
                 <div className="ui-state ui-state--empty">
-                  <p className="ui-state__title">No visit reports yet</p>
-                  <p className="ui-state__desc">Salesman visit reports (with party and location) will show here.</p>
+                  <p className="ui-state__title">{checkins.length ? `No visits in ${periodLabel.toLowerCase()}` : 'No visits yet'}</p>
+                  <p className="ui-state__desc">{checkins.length ? 'Pick a longer period to see more.' : 'Salesman visit reports (with party and location) will show here.'}</p>
                 </div>
               ) : (
-                <TableWithControls title="Visit Report" columns={checkinColumns} rows={checkinRows} itemName="Visit Report" loading={loading} selectable={false} />
+                <>
+                  <ul className="rep-cards">
+                    {checkinRows.map((r) => (
+                      <li key={r.id} className="rep-cardrow">
+                        <div className="rep-cardrow__top"><b>{r.party}</b><span className="rep-cardrow__date">{r.date}</span></div>
+                        <div className="rep-cardrow__sub">{r.salesman} · {r.type === 'ordered' ? 'Order' : 'Visit'}</div>
+                        {r.type === 'ordered' && <div className="rep-cardrow__nums"><span>{r.qty} frames</span><span>{r.amount}</span></div>}
+                        {r.reason !== '—' && <div className="rep-cardrow__note">{r.reason}</div>}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="rep-table">
+                    <TableWithControls title="Visits" columns={checkinColumns} rows={checkinRows} itemName="Visit" loading={loading} selectable={false} />
+                  </div>
+                  {!loading && (
+                    <div className="ui-state__desc" style={{ display: 'flex', alignItems: 'center', gap: 12, justifyContent: 'center', padding: '12px 0' }}>
+                      <span>
+                        {(visitMore.checkins || visitMore.orders)
+                          ? `Showing the latest ${checkinRows.length} visits — older visits are not loaded yet.`
+                          : `Showing all ${checkinRows.length} visits.`}
+                      </span>
+                      {(visitMore.checkins || visitMore.orders) && (
+                        <button type="button" className="ui-pill" onClick={loadMoreVisits} disabled={loadingMore}>
+                          {loadingMore ? 'Loading…' : 'Load more'}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

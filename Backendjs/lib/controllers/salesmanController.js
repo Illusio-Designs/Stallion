@@ -2,18 +2,155 @@ const Salesman = require('../models/Salesman');
 const { logAudit } = require('../utils/auditLogger');
 const Tray = require('../models/Tray');
 const { TrayStatus } = require('../constants/enums');
+const { syncSalesmanTrays } = require('../utils/trayLifecycle');
 const SalesmanTray = require('../models/SalesmanTray');
+const SalesmanCheckIns = require('../models/SalesmanCheckIns');
+const SalesmanTargets = require('../models/SalesmanTargets');
 const SalesmanZones = require('../models/SalesmanZones');
 const Zone = require('../models/Zone');
 const SalesmanStates = require('../models/SalesmanStates');
 const State = require('../models/State');
 const { resolveStateIds, resolveStateId } = require('../utils/stateResolver');
 const User = require('../models/User');
-const { findOrCreateRoleUser } = require('../utils/userFactory');
+const { findOrCreateRoleUser, acquireCreateLock, last10Of } = require('../utils/userFactory');
+const UserRole = require('../models/UserRole');
+const Role = require('../models/Role');
+const { isAdmin, hasRole, SALESMAN_DOC_ROLES } = require('../utils/roleHelpers');
+
+// KYC documents are only for admin / sales manager. Everyone else (including the
+// other logged-in users who read the salesman list for dropdowns) gets the record
+// without the document paths.
+const DOC_FIELDS = ['pan_card_url', 'aadhar_card_url', 'cancel_cheque_url', 'photo_url'];
+const canSeeDocs = (req) => hasRole(
+    (req.userRoleNames && req.userRoleNames.length) ? req.userRoleNames : [req.userRoleName],
+    SALESMAN_DOC_ROLES
+);
+const forViewer = (req, obj) => {
+    if (canSeeDocs(req)) return obj;
+    const copy = { ...obj };
+    DOC_FIELDS.forEach((f) => { delete copy[f]; });
+    return copy;
+};
+
+// A login account that also holds another role (admin, a manager, ...) is not a
+// plain salesman login. Only an admin may link a salesman record to it or change
+// its phone, email or status; otherwise editing a "salesman" could hand someone
+// an admin's account.
+const accountHoldsOtherRoles = async (userId, transaction) => {
+    const links = await UserRole.findAll({ where: { user_id: userId }, transaction });
+    if (!links.length) return false;
+    const roles = await Role.findAll({ where: { role_id: links.map((l) => l.role_id) }, transaction });
+    return roles.some((r) => String(r.role_name || '').toLowerCase() !== 'salesman');
+};
 const sequelize = require('../constants/database');
-const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
+const { Op } = require('sequelize');
+const { getListSearchParams, buildNamePhoneFilter, mergeWhere, parseOptionalPagination, buildPaginatedResponse, UNPAGINATED_CAP } = require('../utils/listSearchHelpers');
 const { SALESMAN_UPLOAD_DIR } = require('../constants/multer');
 const fs = require('fs');
+
+// One page of the Salesmen table (POST /salesmen/get with page/limit). Extra params (body or query):
+//   status     all | active | inactive  (default all: the table shows inactive salesmen too)
+//   country_id only salesmen of that country
+//   state_id   only salesmen who work in that state
+//   sort / dir name | code | status | created  /  asc | desc  (default: created, asc)
+// Returns { data, pagination, counts: { all, active, inactive } }. The counts ignore the status
+// filter (they are the tab badges) but respect search / country / state.
+// Each row also carries state names, visits_today (IST) and target_pct for the page's salesmen only.
+async function getSalesmenPage(req, res, pagination, searchFilter) {
+    const param = (k) => {
+        const v = (req.body && req.body[k] !== undefined) ? req.body[k] : (req.query || {})[k];
+        return v === undefined || v === null ? '' : String(v).trim();
+    };
+    const baseParts = [];
+    const countryId = param('country_id');
+    if (countryId) baseParts.push({ country_id: countryId });
+    const stateId = param('state_id');
+    if (stateId) {
+        baseParts.push({
+            salesman_id: {
+                [Op.in]: sequelize.literal(`(SELECT salesman_id FROM salesman_states WHERE state_id = ${sequelize.escape(stateId)})`),
+            },
+        });
+    }
+    const baseWhere = mergeWhere(baseParts.length ? { [Op.and]: baseParts } : {}, searchFilter);
+    const status = param('status').toLowerCase();
+    const statusWhere = status === 'active' ? { is_active: true } : status === 'inactive' ? { is_active: false } : {};
+    const where = mergeWhere(baseWhere, statusWhere);
+
+    const SORTS = { name: 'full_name', code: 'employee_code', status: 'is_active', created: 'created_at' };
+    const sortCol = SORTS[param('sort').toLowerCase()] || 'created_at';
+    const dir = param('dir').toLowerCase() === 'desc' ? 'DESC' : 'ASC';
+    const order = [[sortCol, dir], ['salesman_id', 'ASC']];
+
+    const [count, salesmen, groups] = await Promise.all([
+        Salesman.count({ where }),
+        Salesman.findAll({ where, order, limit: pagination.limit, offset: pagination.offset }),
+        Salesman.findAll({
+            where: baseWhere,
+            attributes: ['is_active', [sequelize.fn('COUNT', sequelize.col('salesman_id')), 'n']],
+            group: ['is_active'],
+            raw: true,
+        }),
+    ]);
+    const counts = { all: 0, active: 0, inactive: 0 };
+    groups.forEach((g) => {
+        const n = Number(g.n) || 0;
+        counts.all += n;
+        if (g.is_active === true || g.is_active === 1 || g.is_active === '1') counts.active += n; else counts.inactive += n;
+    });
+
+    const ids = salesmen.map((s) => s.salesman_id);
+    const istDay = new Date(Date.now() + 330 * 60 * 1000).toISOString().slice(0, 10);
+    const dayStart = new Date(new Date(`${istDay}T00:00:00.000Z`).getTime() - 330 * 60 * 1000);
+    const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+    const [allZones, allStates, visitRows, targetRows] = ids.length
+        ? await Promise.all([
+            SalesmanZones.findAll({ where: { salesman_id: ids } }),
+            SalesmanStates.findAll({ where: { salesman_id: ids } }),
+            SalesmanCheckIns.findAll({
+                where: { salesman_id: ids, type: { [Op.ne]: 'ordered' }, check_in_date: { [Op.gte]: dayStart, [Op.lt]: dayEnd } },
+                attributes: ['salesman_id', [sequelize.fn('COUNT', sequelize.col('id')), 'n']],
+                group: ['salesman_id'],
+                raw: true,
+            }),
+            SalesmanTargets.findAll({
+                where: { salesman_id: ids },
+                attributes: [
+                    'salesman_id',
+                    [sequelize.fn('SUM', sequelize.col('completed_amount')), 'done'],
+                    [sequelize.fn('SUM', sequelize.col('target_amount')), 'goal'],
+                ],
+                group: ['salesman_id'],
+                raw: true,
+            }),
+        ])
+        : [[], [], [], []];
+    const stateIds = [...new Set(allStates.map((x) => x.state_id).filter(Boolean))];
+    const stateRows = stateIds.length ? await State.findAll({ where: { id: stateIds }, attributes: ['id', 'name'], raw: true }) : [];
+    const stateName = {};
+    stateRows.forEach((st) => { stateName[st.id] = st.name; });
+    const zonesBy = {};
+    const statesBy = {};
+    allZones.forEach((z) => { (zonesBy[z.salesman_id] = zonesBy[z.salesman_id] || []).push(z.toJSON()); });
+    allStates.forEach((st) => {
+        (statesBy[st.salesman_id] = statesBy[st.salesman_id] || []).push({ ...st.toJSON(), state_name: stateName[st.state_id] || null });
+    });
+    const visitsBy = {};
+    visitRows.forEach((v) => { visitsBy[v.salesman_id] = Number(v.n) || 0; });
+    const pctBy = {};
+    targetRows.forEach((t) => {
+        const goal = Number(t.goal) || 0;
+        if (goal > 0) pctBy[t.salesman_id] = Math.round(((Number(t.done) || 0) / goal) * 100);
+    });
+    const response = salesmen.map((salesman) => forViewer(req, {
+        ...salesman.toJSON(),
+        zones: zonesBy[salesman.salesman_id] || [],
+        states: statesBy[salesman.salesman_id] || [],
+        visits_today: visitsBy[salesman.salesman_id] || 0,
+        target_pct: pctBy[salesman.salesman_id] != null ? pctBy[salesman.salesman_id] : null,
+    }));
+    res.status(200).json({ ...buildPaginatedResponse(response, pagination, count), counts });
+}
 
 class SalesmanController {
 
@@ -29,7 +166,7 @@ class SalesmanController {
             }
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
             const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
-            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
+            res.status(200).json(forViewer(req, { ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates }));
         }
         catch (error) {
             res.status(500).json({ error: error.message });
@@ -48,7 +185,7 @@ class SalesmanController {
             }
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: id } });
             const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: id } });
-            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
+            res.status(200).json(forViewer(req, { ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates }));
         } catch (error) {
             res.status(500).json({ error: error.message });
         }
@@ -63,16 +200,34 @@ class SalesmanController {
                 nameFields: ['full_name', 'employee_code'],
                 phoneFields: ['phone', 'alternate_phone'],
             });
-            const where = mergeWhere({ is_active: true }, searchFilter);
-            const salesmen = await Salesman.findAll({ where });
-            const response = await Promise.all(salesmen.map(async (salesman) => {
-                const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
-                const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
-                return {
-                    ...salesman.toJSON(),
-                    zones: salesmanZones.map(zone => zone.toJSON()),
-                    states: salesmanStates.map(s => s.toJSON()),
+            // Optional pagination: with page/limit -> { data, pagination, counts }; without -> plain
+            // array (legacy shape) hard-capped so the response is never unbounded.
+            const pagination = parseOptionalPagination(req);
+            if (pagination) {
+                if (pagination.error) {
+                    return res.status(pagination.status).json({ error: pagination.error });
                 }
+                return await getSalesmenPage(req, res, pagination, searchFilter);
+            }
+            const where = mergeWhere({ is_active: true }, searchFilter);
+            const order = [['created_at', 'ASC'], ['salesman_id', 'ASC']];
+            const salesmen = await Salesman.findAll({ where, order, limit: UNPAGINATED_CAP });
+            // Two batched queries (zones + states for all salesmen) instead of 2 per row.
+            const ids = salesmen.map((s) => s.salesman_id);
+            const [allZones, allStates] = ids.length
+                ? await Promise.all([
+                    SalesmanZones.findAll({ where: { salesman_id: ids } }),
+                    SalesmanStates.findAll({ where: { salesman_id: ids } }),
+                ])
+                : [[], []];
+            const zonesBy = {};
+            const statesBy = {};
+            allZones.forEach((z) => { (zonesBy[z.salesman_id] = zonesBy[z.salesman_id] || []).push(z.toJSON()); });
+            allStates.forEach((st) => { (statesBy[st.salesman_id] = statesBy[st.salesman_id] || []).push(st.toJSON()); });
+            const response = salesmen.map((salesman) => forViewer(req, {
+                ...salesman.toJSON(),
+                zones: zonesBy[salesman.salesman_id] || [],
+                states: statesBy[salesman.salesman_id] || [],
             }));
             res.status(200).json(response);
         } catch (error) {
@@ -80,9 +235,13 @@ class SalesmanController {
         }
     }
     async createSalesman(req, res) {
+        let releaseLock = () => {};
         try {
             const user = req.user;
             const { user_id, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date } = req.body;
+            if (user_id && String(user_id) === String(user.user_id)) {
+                return res.status(400).json({ error: 'Create the salesman with their own login details.' });
+            }
 
             // zones / state_ids arrive as JSON strings over multipart (the form now
             // sends files), or as real arrays over JSON — normalize both.
@@ -127,6 +286,19 @@ class SalesmanController {
                 return res.status(400).json({ error: 'Salesman with this employee code already exists' });
             }
 
+            // One salesman per phone number (the phone is the login), and one create per number at a time.
+            releaseLock = acquireCreateLock('salesman', phone);
+            const phoneDigits = last10Of(phone);
+            if (phoneDigits.length >= 10) {
+                const samePhone = await Salesman.findOne({
+                    where: { phone: { [Op.like]: `%${phoneDigits}` } },
+                    attributes: ['salesman_id', 'full_name'],
+                });
+                if (samePhone) {
+                    return res.status(400).json({ error: `A salesman with this phone number already exists: ${samePhone.full_name}.` });
+                }
+            }
+
             if (!user_id) {
                 if (!phone) {
                     return res.status(400).json({ error: 'Phone is required to create salesman login' });
@@ -140,6 +312,20 @@ class SalesmanController {
             // transaction just to roll it back on a bad input.
             const resolvedStateIds = await resolveStateIds(state_ids);
 
+            // Coerce optional UUID/date fields: '' -> null (Sequelize UUID/DATE
+            // columns reject an empty string with a generic "Validation error").
+            const uuidOrNull = (v) => {
+                const s = v === null || v === undefined ? '' : String(v).trim();
+                return s === '' ? null : s;
+            };
+            const reportingManagerId = uuidOrNull(reporting_manager);
+            const countryIdVal = uuidOrNull(country_id);
+            const stateIdVal = uuidOrNull(state_id);
+            const cityIdVal = uuidOrNull(city_id);
+            const joiningDateVal = (joining_date === null || joining_date === undefined || String(joining_date).trim() === '')
+                ? null
+                : joining_date;
+
             // Create the login user + salesman + zones/states + tray ATOMICALLY.
             // If ANY step fails the whole thing rolls back, so a failed create no
             // longer leaves an orphaned user (which then blocked retry with
@@ -151,6 +337,9 @@ class SalesmanController {
                     const existingUser = await User.findOne({ where: { user_id }, transaction: t });
                     if (!existingUser) {
                         throw { status: 400, message: 'User not found' };
+                    }
+                    if (!isAdmin(req.userRoleNames) && await accountHoldsOtherRoles(user_id, t)) {
+                        throw { status: 403, message: 'Only an admin can link a salesman to an account that has other roles.' };
                     }
                 } else {
                     const loginUser = await findOrCreateRoleUser({
@@ -169,13 +358,13 @@ class SalesmanController {
                     alternate_phone,
                     email,
                     full_name,
-                    reporting_manager,
+                    reporting_manager: reportingManagerId,
                     address,
-                    country_id,
-                    state_id,
-                    city_id,
+                    country_id: countryIdVal,
+                    state_id: stateIdVal,
+                    city_id: cityIdVal,
                     zone_preference,
-                    joining_date,
+                    joining_date: joiningDateVal,
                     pan_card_url,
                     aadhar_card_url,
                     cancel_cheque_url,
@@ -229,7 +418,7 @@ class SalesmanController {
             });
             const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
             const salesmanStates = await SalesmanStates.findAll({ where: { salesman_id: salesman.salesman_id } });
-            res.status(200).json({ ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates });
+            res.status(200).json(forViewer(req, { ...salesman.toJSON(), zones: salesmanZones, states: salesmanStates }));
         } catch (error) {
             // The transaction already rolled back, so no orphan user/salesman was
             // left. Clean up any uploaded KYC files that are now unreferenced.
@@ -243,6 +432,8 @@ class SalesmanController {
             }
             console.error(error);
             res.status(500).json({ error: error.message });
+        } finally {
+            releaseLock();
         }
     }
     async updateSalesman(req, res) {
@@ -279,27 +470,46 @@ class SalesmanController {
                 ? `/uploads/${SALESMAN_UPLOAD_DIR}/${files[field][0].filename}`
                 : undefined);
 
+            // UUID foreign-key columns reject an empty string with a generic
+            // "Validation error". Coerce '' (e.g. a cleared Reporting Manager or
+            // an unset country) to null; leave undefined fields out so a partial
+            // update never wipes an existing value.
+            const uuidOrNull = (v) => {
+                if (v === undefined) return undefined;
+                const s = v === null ? '' : String(v).trim();
+                return s === '' ? null : s;
+            };
+            const dateOrNull = (v) => {
+                if (v === undefined) return undefined;
+                return (v === null || String(v).trim() === '') ? null : v;
+            };
+
             const payload = {
-                employee_code,
-                phone,
-                alternate_phone,
-                email,
-                full_name,
-                reporting_manager,
-                address,
-                country_id,
-                state_id,
-                city_id,
-                zone_preference,
-                joining_date,
                 updated_at: new Date(),
                 updated_by: user.user_id,
-                is_active: is_active,
             };
+            if (employee_code !== undefined) payload.employee_code = employee_code;
+            if (phone !== undefined) payload.phone = phone;
+            if (alternate_phone !== undefined) payload.alternate_phone = alternate_phone;
+            if (email !== undefined) payload.email = email;
+            if (full_name !== undefined) payload.full_name = full_name;
+            if (reporting_manager !== undefined) payload.reporting_manager = uuidOrNull(reporting_manager);
+            if (address !== undefined) payload.address = address;
+            if (country_id !== undefined) payload.country_id = uuidOrNull(country_id);
+            if (state_id !== undefined) payload.state_id = uuidOrNull(state_id);
+            if (city_id !== undefined) payload.city_id = uuidOrNull(city_id);
+            if (zone_preference !== undefined) payload.zone_preference = zone_preference;
+            if (joining_date !== undefined) payload.joining_date = dateOrNull(joining_date);
+            if (is_active !== undefined) payload.is_active = is_active;
             if (docUrl('pan_card')) payload.pan_card_url = docUrl('pan_card');
             if (docUrl('aadhar_card')) payload.aadhar_card_url = docUrl('aadhar_card');
             if (docUrl('cancel_cheque')) payload.cancel_cheque_url = docUrl('cancel_cheque');
             if (docUrl('photo')) payload.photo_url = docUrl('photo');
+            // Refuse BEFORE saving anything when the linked login is not a plain
+            // salesman account and the caller is not an admin.
+            if (salesman.user_id && !isAdmin(req.userRoleNames) && await accountHoldsOtherRoles(salesman.user_id)) {
+                return res.status(403).json({ error: 'Only an admin can change a salesman whose login account has other roles.' });
+            }
             await Salesman.update(payload, { where: { salesman_id: id } });
             // Keep the linked login account (users table) in sync. Login (OTP)
             // matches users.phone EXACTLY against the E.164 form (+91XXXXXXXXXX),
@@ -317,9 +527,40 @@ class SalesmanController {
                     }
                     return s;
                 };
+                const linkedUser = await User.findByPk(salesman.user_id);
                 const userUpdate = { updated_at: new Date() };
-                if (phone !== undefined && phone !== null && String(phone).trim() !== '') userUpdate.phone = toE164(phone);
-                if (email !== undefined && email !== null && String(email).trim() !== '') userUpdate.email = email;
+                if (phone !== undefined && phone !== null && String(phone).trim() !== '') {
+                    const newPhone = toE164(phone);
+                    const currentPhone = linkedUser ? toE164(linkedUser.phone) : null;
+                    // Only touch the login phone when it actually changes. Rewriting
+                    // it to the same (normalized) value is a needless write that can
+                    // clash with another account's identical E.164 number and fail
+                    // the users.phone UNIQUE constraint ("phone must be unique").
+                    if (newPhone && newPhone !== currentPhone) {
+                        const clash = await User.findOne({
+                            where: { phone: newPhone, user_id: { [Op.ne]: salesman.user_id } },
+                        });
+                        if (clash) {
+                            return res.status(400).json({ error: 'This phone number is already used by another account.' });
+                        }
+                        userUpdate.phone = newPhone;
+                    }
+                }
+                if (email !== undefined && email !== null && String(email).trim() !== '') {
+                    const newEmail = String(email).trim();
+                    const currentEmail = linkedUser && linkedUser.email ? String(linkedUser.email).trim() : null;
+                    // users.email is UNIQUE too — only change it when it differs, and
+                    // block a change to an address another account already owns.
+                    if (newEmail !== currentEmail) {
+                        const emailClash = await User.findOne({
+                            where: { email: newEmail, user_id: { [Op.ne]: salesman.user_id } },
+                        });
+                        if (emailClash) {
+                            return res.status(400).json({ error: 'This email is already used by another account.' });
+                        }
+                        userUpdate.email = newEmail;
+                    }
+                }
                 if (full_name !== undefined && full_name !== null && String(full_name).trim() !== '') userUpdate.full_name = full_name;
                 // Mirror active/inactive onto the login account so deactivating a
                 // salesman who has left actually BLOCKS their access — the auth
@@ -347,6 +588,9 @@ class SalesmanController {
                     await SalesmanStates.create({ salesman_id: id, state_id: stId });
                 }
             }
+            if (is_active !== undefined && is_active !== null) {
+                await syncSalesmanTrays(id);
+            }
             await logAudit({
                 req,
                 action: 'update',
@@ -358,37 +602,19 @@ class SalesmanController {
             });
             res.status(200).json({ message: 'Salesman updated successfully' });
         } catch (error) {
+            // Surface the specific field(s) instead of a bare "Validation error".
+            if (error && Array.isArray(error.errors) && error.errors.length) {
+                const detail = error.errors.map((e) => e.message).join('; ');
+                return res.status(400).json({ error: detail });
+            }
             res.status(500).json({ error: error.message });
         }
     }
 
+    // A salesman is never deleted: orders, check-ins, targets, expenses and the tray all
+    // refer to them. When a salesman leaves, make them inactive instead.
     async deleteSalesman(req, res) {
-        try {
-            const id = req.params.id;
-            if (!id) {
-                return res.status(400).json({ error: 'Salesman ID is required' });
-            }
-            const salesman = await Salesman.findOne({ where: { salesman_id: id } });
-            if (!salesman) {
-                return res.status(404).json({ error: 'Salesman not found' });
-            }
-            const snapshot = salesman.toJSON();
-            await SalesmanZones.destroy({ where: { salesman_id: id } });
-            await SalesmanStates.destroy({ where: { salesman_id: id } });
-            await salesman.destroy();
-            await logAudit({
-                req,
-                action: 'delete',
-                description: 'Salesman deleted',
-                tableName: 'salesmen',
-                recordId: id,
-                oldValues: snapshot,
-                newValues: null,
-            });
-            res.status(200).json({ message: 'Salesman deleted successfully' });
-        } catch (error) {
-            res.status(500).json({ error: error.message });
-        }
+        return res.status(409).json({ error: 'A salesman cannot be deleted because their records are kept. Make the salesman inactive instead.' });
     }
 
     // Salesmen whose working states include the given state (name or id).
@@ -401,7 +627,7 @@ class SalesmanController {
             const links = await SalesmanStates.findAll({ where: { state_id: stateId } });
             const ids = links.map(l => l.salesman_id);
             const salesmen = ids.length ? await Salesman.findAll({ where: { salesman_id: ids } }) : [];
-            res.status(200).json(salesmen);
+            res.status(200).json(salesmen.map((sm) => forViewer(req, sm.toJSON())));
         } catch (error) {
             res.status(error.statusCode || 500).json({ error: error.message });
         }

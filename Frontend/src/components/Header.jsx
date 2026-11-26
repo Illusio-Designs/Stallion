@@ -1,15 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import '../styles/components/Header.css';
+import GooeySearch from './ui/GooeySearch';
 import { getCartCount, registerCartListener } from '../services/cartService';
-import { isLoggedIn, logout as authLogout } from '../services/authService';
+import { isLoggedIn, logout as authLogout, getUser } from '../services/authService';
+import { resolveProfileImageUrl } from '../utils/profileImage';
 import { showLogoutSuccess } from '../services/notificationService';
-import { FiSearch, FiShoppingCart, FiUser, FiMenu, FiX } from 'react-icons/fi';
+import { FiSearch, FiShoppingCart, FiUser, FiMenu, FiX } from './icons/hugeicons';
 
 const Header = ({ onPageChange, currentPage }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [cartCount, setCartCount] = useState(0);
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [profile, setProfile] = useState({ name: '', avatar: '' });
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef(null);
@@ -156,6 +159,21 @@ const Header = ({ onPageChange, currentPage }) => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [isUserDropdownOpen]);
 
+  // Name and photo for the round profile button (same as the dashboard's).
+  useEffect(() => {
+    if (!loggedIn) return;
+    try {
+      const u = getUser() || {};
+      const name = localStorage.getItem('userName') || u.full_name || u.fullName || u.name || u.email || '';
+      const avatar = localStorage.getItem('userAvatarUrl') || u.profile_image || u.image_url || u.avatar || u.avatarUrl || '';
+      setProfile({ name: String(name), avatar: String(avatar || '').trim() });
+    } catch (_e) { /* no stored profile */ }
+  }, [loggedIn, currentPage]);
+  const initials = (() => {
+    const parts = (profile.name || '').trim().split(/\s+/);
+    return `${parts[0]?.[0] || ''}${parts[1]?.[0] || ''}`.toUpperCase() || 'U';
+  })();
+
   // Handle user icon click
   const handleUserIconClick = () => {
     if (loggedIn) {
@@ -220,7 +238,7 @@ const Header = ({ onPageChange, currentPage }) => {
   };
 
   const navItems = [
-    { id: '', text: 'Home' },
+    { id: 'dashboard', text: 'Dashboard' },
     { id: 'products', text: 'Shop' },
     { id: 'about', text: 'About' }
   ];
@@ -230,6 +248,10 @@ const Header = ({ onPageChange, currentPage }) => {
       <div className="header-content relative mx-auto flex h-full items-center justify-between px-[4%] sm:px-[5%]">
         {/* mobile backdrop */}
         <div className={`mobile-backdrop fixed inset-0 z-[1002] transition-[background,backdrop-filter] duration-300 ease-[ease] motion-reduce:transition-none ${isMenuOpen ? 'open pointer-events-auto' : 'pointer-events-none'}`} onClick={() => setIsMenuOpen(false)} aria-hidden="true" />
+
+        <div className="logo flex cursor-pointer items-center rounded-sm focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)]" onClick={() => onPageChange ? onPageChange('') : window.location.href = '/'}>
+          <img src="/images/logo/logo.webp" alt="Stallion Eyewear" className="logo-image block h-11 w-[124px] object-contain" />
+        </div>
 
         <nav
           ref={drawerRef}
@@ -266,42 +288,46 @@ const Header = ({ onPageChange, currentPage }) => {
             </a>
           ))}
         </nav>
-        
-        <div className="logo flex cursor-pointer items-center rounded-sm focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)]" onClick={() => onPageChange ? onPageChange('') : window.location.href = '/'}>
-          <img src="/images/logo/logo.webp" alt="Stallion Eyewear" className="logo-image block h-11 w-[124px] object-contain" />
-        </div>
 
         <div className="header-actions flex items-center gap-2 md:gap-5">
-          <div className="search-bar relative hidden items-center rounded-pill border border-border-strong bg-grey-100 px-4 py-2 transition-[background,border-color,box-shadow] duration-200 ease-[ease] hover:bg-grey-200 focus-within:border-border-strong focus-within:bg-grey-200 focus-within:shadow-[0_0_0_3px_rgba(0,0,0,0.12)] sm:flex sm:min-w-[150px] md:min-w-[220px]">
-            <form onSubmit={handleSearchSubmit} role="search" className="flex w-full items-center">
-              <FiSearch size={18} className="search-icon mr-2 shrink-0 text-text-muted" aria-hidden="true" />
-              <input
-                type="text"
-                placeholder="Search products..."
-                aria-label="Search products"
-                value={searchQuery}
-                onChange={handleSearchChange}
-                className="min-w-0 flex-1 border-none bg-none p-0 text-[length:var(--text-base)] leading-[var(--leading-normal)] text-text outline-none placeholder:text-text-subtle"
-              />
-            </form>
+          <div className="flex">
+            <GooeySearch
+              value={searchQuery}
+              onChange={(q) => handleSearchChange({ target: { value: q } })}
+              onSubmit={() => handleSearchSubmit({ preventDefault() {} })}
+              placeholder="Search products..."
+              label="Search products"
+              openWidth={220}
+              phoneAuto
+            />
           </div>
           <div className="action-icons flex items-center gap-2">
-            <button type="button" className="icon-btn cart-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text transition-[background,transform] duration-200 ease-[ease] hover:bg-grey-100 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] active:scale-[0.94]" onClick={() => onPageChange('cart')} aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}>
-              <FiShoppingCart size={28} aria-hidden="true" />
+            <button type="button" className="hd-btn hd-btn--ghost cart-btn" onClick={() => onPageChange('cart')} aria-label={cartCount > 0 ? `Cart, ${cartCount} item${cartCount === 1 ? '' : 's'}` : 'Cart'}>
+              <FiShoppingCart size={18} aria-hidden="true" />
+              <span className="hd-btn__text">Cart</span>
               {cartCount > 0 && (
-                <span className="cart-badge absolute right-0.5 top-0.5 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-pill border-2 border-primary bg-accent px-[5px] text-[length:var(--text-xs)] font-bold leading-none text-text-on-accent" aria-hidden="true">{cartCount > 99 ? '99+' : cartCount}</span>
+                <span className="cart-badge" aria-hidden="true">{cartCount > 99 ? '99+' : cartCount}</span>
               )}
             </button>
             <div className="user-menu-container relative" ref={dropdownRef}>
               <button
                 type="button"
-                className="icon-btn user-btn relative inline-flex h-10 w-10 cursor-pointer items-center justify-center rounded-pill border-none bg-none p-2 text-text transition-[background,transform] duration-200 ease-[ease] hover:bg-grey-100 focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.25)] active:scale-[0.94]"
+                className={loggedIn ? 'profile-avatar-btn' : 'hd-btn hd-btn--solid user-btn'}
                 onClick={handleUserIconClick}
                 aria-label={loggedIn ? 'User menu' : 'Login'}
                 aria-haspopup={loggedIn ? 'menu' : undefined}
                 aria-expanded={loggedIn ? isUserDropdownOpen : undefined}
               >
-                <FiUser size={28} aria-hidden="true" />
+                {loggedIn ? (
+                  profile.avatar
+                    ? <img src={resolveProfileImageUrl(profile.avatar)} alt={profile.name || 'Profile'} className="profile-avatar-img" />
+                    : <span className="profile-avatar-initials">{initials}</span>
+                ) : (
+                  <>
+                    <FiUser size={18} aria-hidden="true" />
+                    <span className="hd-btn__text">Sign in</span>
+                  </>
+                )}
               </button>
               {loggedIn && isUserDropdownOpen && (
                 <div className="user-dropdown absolute right-0 top-[calc(100%+0.5rem)] z-[1001] min-w-[184px] max-[768px]:min-w-[168px] overflow-hidden rounded-lg border border-border bg-surface p-1 shadow-lg" role="menu">
@@ -312,6 +338,14 @@ const Header = ({ onPageChange, currentPage }) => {
                     onClick={handleDashboardClick}
                   >
                     My Dashboard
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="dropdown-item flex min-h-10 w-full cursor-pointer items-center gap-2 rounded-md border-none bg-none px-3 py-2 text-left text-[length:var(--text-base)] text-text"
+                    onClick={() => { setIsUserDropdownOpen(false); onPageChange('settings'); }}
+                  >
+                    Edit Profile
                   </button>
                   <button
                     type="button"

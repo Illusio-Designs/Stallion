@@ -8,6 +8,7 @@ const SalesmanZones = require('../models/SalesmanZones');
 const Distributor = require('../models/distributor');
 const DistributorZones = require('../models/DistributorZones');
 const User = require('../models/User');
+const { activeFilter, activeUpdate, withActiveParents } = require('../utils/geoActive');
 const { Op } = require('sequelize');
 const { getListSearchParams, buildNamePhoneFilter, mergeWhere } = require('../utils/listSearchHelpers');
 class ZoneController {
@@ -22,7 +23,7 @@ class ZoneController {
                 nameFields: ['name', 'zone_code'],
                 phoneFields: [],
             });
-            const where = mergeWhere({ is_active: true, city_id }, searchFilter);
+            const where = withActiveParents(req, mergeWhere({ ...activeFilter(req), city_id }, searchFilter), 'zone');
             const zones = await Zone.findAll({ where });
             res.status(200).json(zones);
         } catch (error) {
@@ -57,20 +58,18 @@ class ZoneController {
             // Based on role, get zone_id from appropriate model
             if (roleName === 'party') {
                 // Get zone_id from Party model
-                const party = await Party.findOne({
-                    where: {
-                        [Op.or]: [
-                            { email: user.email },
-                            { phone: user.phone }
-                        ]
-                    }
-                });
+                // Match this user's own party. Only use email/phone when they have a value: an empty
+                // email would otherwise match some other party that has no email.
+                const ownConditions = [{ user_id: user.user_id }];
+                if (user.email) ownConditions.push({ email: user.email });
+                if (user.phone) ownConditions.push({ phone: user.phone });
+                const party = await Party.findOne({ where: { [Op.or]: ownConditions } });
 
                 if (!party) {
                     return res.status(404).json({ error: 'Party record not found for this user' });
                 }
 
-                zones = await Zone.findAll({ where: { is_active: true, id: party.zone_id } });
+                zones = await Zone.findAll({ where: withActiveParents(req, { is_active: true, id: party.zone_id }, 'zone') });
 
             } else if (roleName === 'salesman') {
                 // Get zone_preference from Salesman model (stored as text)
@@ -83,7 +82,7 @@ class ZoneController {
                 }
 
                 const salesmanZones = await SalesmanZones.findAll({ where: { salesman_id: salesman.salesman_id } });
-                zones = await Zone.findAll({ where: { is_active: true, id: salesmanZones.map(zone => zone.zone_id) } });
+                zones = await Zone.findAll({ where: withActiveParents(req, { is_active: true, id: salesmanZones.map(zone => zone.zone_id) }, 'zone') });
 
             } else if (roleName === 'distributor') {
                 // Get zone_id from Distributor model
@@ -120,7 +119,7 @@ class ZoneController {
                     }
                 }
                 const distributorZones = await DistributorZones.findAll({ where: { distributor_id: distributor.distributor_id } });
-                zones = await Zone.findAll({ where: { is_active: true, id: distributorZones.map(zone => zone.zone_id) } });
+                zones = await Zone.findAll({ where: withActiveParents(req, { is_active: true, id: distributorZones.map(zone => zone.zone_id) }, 'zone') });
 
             } else {
                 return res.status(400).json({ error: `Role '${roleName}' is not supported for this operation` });
@@ -199,6 +198,7 @@ class ZoneController {
                 state_id,
                 country_id,
                 zone_code,
+                ...activeUpdate(req.body),
                 updated_at: new Date(),
                 updated_by: user.user_id
             };

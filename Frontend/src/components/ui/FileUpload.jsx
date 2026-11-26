@@ -10,8 +10,10 @@ import React, { useEffect, useRef, useState } from 'react';
  *  - label, hint, accept, required
  *  - file: the current File object (or null)
  *  - onChange(fileOrNull)
+ *  - existingUrl: full URL of an already-uploaded file (shown when no new file
+ *    is picked, e.g. on an edit form). "View" opens it; "Change" replaces it.
  */
-export default function FileUpload({ label, hint, accept, required = false, file = null, onChange }) {
+export default function FileUpload({ label, hint, accept, required = false, file = null, onChange, existingUrl = null }) {
   const inputRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
@@ -26,6 +28,32 @@ export default function FileUpload({ label, hint, accept, required = false, file
     setPreviewUrl(null);
     return undefined;
   }, [file]);
+
+  // Salesman KYC documents are private: the browser can't send the login token with
+  // a plain <img>/<a>, so fetch them with it and show/open a temporary blob URL.
+  const isPrivate = !!existingUrl && /\/uploads\/salesman\//.test(existingUrl);
+  const [privateUrl, setPrivateUrl] = useState(null);
+  useEffect(() => {
+    if (!isPrivate) { setPrivateUrl(null); return undefined; }
+    let objectUrl = null;
+    let cancelled = false;
+    (async () => {
+      try {
+        const path = new URL(existingUrl, window.location.origin).pathname;
+        const token = localStorage.getItem('token');
+        const res = await fetch(path, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        if (!res.ok) throw new Error('denied');
+        const blob = await res.blob();
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setPrivateUrl(objectUrl);
+      } catch (_) {
+        if (!cancelled) setPrivateUrl(null);
+      }
+    })();
+    return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
+  }, [existingUrl, isPrivate]);
+  const shownUrl = isPrivate ? privateUrl : existingUrl;
 
   const pick = () => inputRef.current && inputRef.current.click();
   const take = (files) => { const f = files && files[0]; if (f) onChange(f); };
@@ -45,7 +73,32 @@ export default function FileUpload({ label, hint, accept, required = false, file
         </label>
       )}
 
-      {!file ? (
+      {!file && existingUrl && (!isPrivate || privateUrl) ? (
+        // An already-uploaded document (edit mode). Show a card with a View link
+        // and a Change button; the underlying value is only replaced if the user
+        // picks a new file.
+        (() => {
+          const isImage = /\.(png|jpe?g|gif|webp|bmp|svg)(\?|#|$)/i.test(existingUrl);
+          return (
+            <div className="flex items-center gap-3 rounded-lg border border-border-strong bg-surface p-2.5">
+              {isImage ? (
+                <img src={shownUrl} alt={label || 'Uploaded file'} className="h-11 w-11 flex-none rounded-md border border-border object-cover" />
+              ) : (
+                <span className="flex h-11 w-11 flex-none items-center justify-center rounded-md bg-primary-soft text-primary">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" />
+                  </svg>
+                </span>
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="m-0 truncate text-[length:var(--text-sm)] font-medium text-text">Uploaded document</p>
+                <a href={shownUrl} target="_blank" rel="noopener noreferrer" className="m-0 text-[length:var(--text-xs)] font-medium text-primary hover:underline">View file</a>
+              </div>
+              <button type="button" onClick={pick} className="flex-none rounded-md border border-border-strong bg-surface px-2.5 py-1 text-[length:var(--text-xs)] font-medium text-text transition hover:bg-surface-muted focus:outline-none focus-visible:shadow-[var(--focus-ring)]">Change</button>
+            </div>
+          );
+        })()
+      ) : !file ? (
         <div
           role="button"
           tabIndex={0}

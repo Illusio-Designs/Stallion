@@ -2,28 +2,42 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import AsidePanel from '../components/ui/AsidePanel';
 import RowActions from '../components/ui/RowActions';
-import TableWithControls from '../components/ui/TableWithControls';
 import { useConfirm } from '../components/ui/ConfirmProvider';
 import {
   addProductToTray,
   deleteProductFromTray,
   deleteTray,
+  transferTrayProducts,
   getBrands,
   getCollections,
   getProductsPage,
+  getProductsByIds,
   getProductsInTray,
+  getTrayTasks,
   getTraysPage,
+  searchTrayProducts,
   updateProductInTray,
   updateTray,
 } from '../services/apiService';
 import { showError, showSuccess } from '../services/notificationService';
+import { getUserRoles } from '../services/authService';
+import { TASK_PILL } from '../utils/orderStatus';
 import '../styles/pages/dashboard-orders.css';
 import '../styles/pages/dashboard.css';
+import '../styles/redesign-n-tray.css';
+import '../styles/redesign-n-manage.css';
+import '../styles/redesign-n-orders.css';
+import GooeySearch from '../components/ui/GooeySearch';
+import { FiSearch, FiX, FiEdit, FiUndo } from '../components/icons/hugeicons';
+import '../styles/redesign-p-trayassign.css';
+import '../styles/redesign-p-forms.css';
+import { FormSec, ChipRow } from '../components/forms/FormBits';
 
 const TrayStatus = {
   AVAILABLE: 'available',
   ASSIGNED: 'assigned',
-  CLOSED: 'closed'
+  CLOSED: 'closed',
+  INACTIVE: 'inactive'
 };
 
 const TrayProductStatus = {
@@ -53,22 +67,50 @@ const getStatusLabel = (status) => {
 const getStatusColor = (status) => {
   switch (status) {
     case TrayProductStatus.ALLOTED:
-      return { bg: '#e3f2fd', text: '#1976d2' };
+      return { bg: 'var(--b-soft2)', text: 'var(--t-ink)' };
     case TrayProductStatus.PRIORITY_BOOKED:
-      return { bg: '#fff3e0', text: '#e65100' };
+      return { bg: 'var(--b-ink)', text: 'var(--t-on-ink)' };
     case TrayProductStatus.PARTIALLY_BOOKED:
-      return { bg: '#f3e5f5', text: '#6a1b9a' };
+      return { bg: 'var(--b-soft)', text: 'var(--ops-partial, #3b3b3b)' };
     case TrayProductStatus.RETURNED:
-      return { bg: '#ffebee', text: '#c62828' };
+      return { bg: 'var(--c-bad-soft)', text: 'var(--c-bad)' };
     default:
-      return { bg: '#f5f5f5', text: '#666' };
+      return { bg: 'var(--b-soft)', text: 'var(--t-mute)' };
   }
+};
+
+// Display-only helpers for the tray cards (use whatever the row carries).
+const TRAY_SLOTS = 12;
+const trayFrames = (t) => (Array.isArray(t.frames) ? t.frames : []);
+const trayHolder = (t) => t.salesman_name || t.holder_name || t.assigned_to_name || t.salesman?.full_name || null;
+const traySince = (t) => {
+  const d = t.assigned_at || t.assigned_since || t.assigned_on;
+  if (!d) return null;
+  const dt = new Date(d);
+  return Number.isNaN(dt.getTime()) ? null : dt.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+};
+const trayState = (t) => {
+  const st = String(t.tray_status || '').toLowerCase();
+  if (st === TrayStatus.CLOSED) return 'closed';
+  if (st === TrayStatus.INACTIVE) return 'inactive';
+  const due = t.due_date || t.return_by;
+  if (st === 'overdue' || t.is_overdue || t.overdue || (st === TrayStatus.ASSIGNED && due && new Date(due) < new Date())) return 'overdue';
+  if (st === TrayStatus.ASSIGNED) return 'assigned';
+  return 'available';
+};
+const TRAY_PILL = {
+  available: ['ok', 'Available'],
+  assigned: ['info', 'With a salesman'],
+  overdue: ['bad', 'Overdue'],
+  closed: ['idle', 'Closed'],
+  inactive: ['idle', 'Inactive (salesman left)'],
 };
 
 const DashboardTray = () => {
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('all-trays');
-  const [dateRange, setDateRange] = useState('Feb 25, 2025 - Mar 25, 2025');
+  const [trayFilter, setTrayFilter] = useState('all');
+  const [traySearch, setTraySearch] = useState('');
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [trays, setTrays] = useState([]);
@@ -77,13 +119,35 @@ const DashboardTray = () => {
   const [trayTotal, setTrayTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({ tray_name: '', tray_status: TrayStatus.AVAILABLE });
+  const [form, setForm] = useState({ tray_name: '', tray_status: TrayStatus.AVAILABLE, is_active: true });
+  const [showInactive, setShowInactive] = useState(false);
   const [error, setError] = useState(null);
 
   // Product assignment tab state
   const [selectedTray, setSelectedTray] = useState('');
   const [trayProducts, setTrayProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
+  // Details of the products inside the open tray, fetched by id. (allProducts is only the first page
+  // of the picker, so a product beyond it used to show as N/A.)
+  const [trayProductMap, setTrayProductMap] = useState({});
+  useEffect(() => {
+    const ids = [...new Set((trayProducts || []).map((tp) => String(tp.product_id || tp.product?.product_id || tp.product?.id || '').toLowerCase()).filter(Boolean))]
+      .filter((id) => !trayProductMap[id]);
+    if (ids.length === 0) return undefined;
+    let cancelled = false;
+    getProductsByIds(ids)
+      .then((list) => {
+        if (cancelled) return;
+        setTrayProductMap((prev) => {
+          const next = { ...prev };
+          (list || []).forEach((p) => { const id = String(p.product_id || p.id || '').toLowerCase(); if (id) next[id] = p; });
+          return next;
+        });
+      })
+      .catch(() => { /* the row keeps showing its id */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trayProducts]);
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [brands, setBrands] = useState([]);
   const [collections, setCollections] = useState([]);
@@ -94,39 +158,18 @@ const DashboardTray = () => {
   const [editProductStatus, setEditProductStatus] = useState(TrayProductStatus.ALLOTED);
   const [openEditProduct, setOpenEditProduct] = useState(false);
 
-  const columns = useMemo(() => ([
-    { key: 'tray_name', label: 'SAMPLE NAME' },
-    {
-      key: 'tray_status',
-      label: 'STATUS',
-      render: (_v, row) => {
-        const status = row.tray_status || '';
-        if (status === TrayStatus.AVAILABLE) return 'AVAILABLE';
-        if (status === TrayStatus.ASSIGNED) return 'ASSIGNED';
-        if (status === TrayStatus.CLOSED) return 'CLOSED';
-        return status.toUpperCase();
-      }
-    },
-    {
-      key: 'action',
-      label: 'ACTIONS',
-      render: (_v, row) => (
-        <RowActions
-          onEdit={() => openEdit(row)}
-          onDownload={null}
-          onDelete={() => handleDelete(row)}
-        />
-      ),
-    },
-  ]), []);
-
   // Server-paginated trays: 20 per page, fetched per page (and on search).
-  const fetchTraysPage = async (page = 1, search = '') => {
+  const fetchTraysPage = async (page = 1, search = '', withInactive = showInactive) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await getTraysPage(page, 20, search);
+      const res = await getTraysPage(page, 20, search, { activeOnly: !withInactive });
       const data = Array.isArray(res) ? res : (Array.isArray(res?.data) ? res.data : []);
+      // A delete may have emptied the last page: step back to the last valid page.
+      const lastPage = Math.max(1, res?.pagination?.totalPages ?? 1);
+      if (data.length === 0 && page > lastPage) {
+        return fetchTraysPage(lastPage, search, withInactive);
+      }
       setTrays(data);
       setTrayPage(page);
       setTrayPageCount(Math.max(1, res?.pagination?.totalPages ?? 1));
@@ -140,14 +183,14 @@ const DashboardTray = () => {
   };
 
   // Refresh the current page (used after add/update/delete).
-  const fetchTrays = () => fetchTraysPage(trayPage);
+  const fetchTrays = () => fetchTraysPage(trayPage, '');
 
   // Assign-to-tray picker: 20 per page with server-side search (model_no/size).
   // Opening the picker / picking a tray loads page 1; typing re-queries the server.
   const fetchAllProducts = async (search = '') => {
     setLoadingProducts(true);
     try {
-      const result = await getProductsPage(1, 20, search);
+      const result = await getProductsPage(1, 20, search, { activeOnly: true, warehouseInStock: true });
       setAllProducts(Array.isArray(result) ? result : (result?.data || []));
     } catch (err) {
       console.error('Failed to load products:', err);
@@ -191,7 +234,7 @@ const DashboardTray = () => {
     fetchTrays();
   }, []);
 
-  const resetForm = () => setForm({ tray_name: '', tray_status: TrayStatus.AVAILABLE });
+  const resetForm = () => setForm({ tray_name: '', tray_status: TrayStatus.AVAILABLE, is_active: true });
 
   const handleSubmitNew = async () => {
     if (!form.tray_name.trim()) {
@@ -215,6 +258,7 @@ const DashboardTray = () => {
     setForm({
       tray_name: row.tray_name || '',
       tray_status: row.tray_status || TrayStatus.AVAILABLE,
+      is_active: row.is_active !== false,
     });
   };
 
@@ -231,6 +275,7 @@ const DashboardTray = () => {
       await updateTray(trayId, {
         tray_name: form.tray_name.trim(),
         tray_status: form.tray_status,
+        is_active: form.is_active !== false,
       });
       showSuccess('Tray updated successfully');
       await fetchTrays();
@@ -390,6 +435,97 @@ const DashboardTray = () => {
     }
   };
 
+  // Move a piece to the warehouse or into another tray (toTrayId '' = warehouse).
+  const handleMoveProduct = async (trayProduct, toTrayId) => {
+    if (!trayProduct?.product_id || !selectedTray || toTrayId === undefined || toTrayId === null) return;
+    const target = toTrayId === '' ? 'the warehouse' : 'the selected tray';
+    const confirmed = await confirm(`Move this piece to ${target}?`);
+    if (!confirmed) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await transferTrayProducts([{
+        from_tray_id: selectedTray,
+        product_id: trayProduct.product_id,
+        ...(toTrayId ? { to_tray_id: toTrayId } : {}),
+      }]);
+      showSuccess(toTrayId ? 'Moved to the other tray' : 'Moved back to the warehouse');
+      const items = await getProductsInTray(selectedTray);
+      setTrayProducts(Array.isArray(items) ? items : []);
+      await fetchTrays();
+    } catch (err) {
+      const message = err.message || 'Failed to move the piece';
+      setError(message);
+      showError(message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Tray cards: pick frames in a card (by slot), then "Take back" returns them to the warehouse
+  // (same transfer API as the Assign Products tab). With nothing picked it takes back every frame.
+  const [cardPick, setCardPick] = useState({}); // { [trayId]: [product_id] }
+  const [cardBusy, setCardBusy] = useState('');
+
+  // Return tasks: frames booked from trays for orders that must come back to the office.
+  // Shown to admin and tray manager only (the salesman sees their own on the home page).
+  // A salesman sees the trays that are with him and cannot add, edit or move anything.
+  const readOnly = useMemo(() => {
+    const roles = getUserRoles();
+    return roles.includes('salesman') && !roles.some((r) => ['admin', 'tray_manager', 'sales_manager'].includes(r));
+  }, []);
+  const canSeeReturnTasks = useMemo(() => getUserRoles().some((r) => ['admin', 'tray_manager'].includes(r)), []);
+  const [returnTasks, setReturnTasks] = useState([]);
+  useEffect(() => {
+    if (!canSeeReturnTasks) return undefined;
+    let alive = true;
+    getTrayTasks('open')
+      .then((list) => { if (alive) setReturnTasks(Array.isArray(list) ? list : []); })
+      .catch(() => { if (alive) setReturnTasks([]); });
+    return () => { alive = false; };
+  }, [canSeeReturnTasks]);
+  // Pieces booked for orders per tray (not yet sent back).
+  const bookedByTray = useMemo(() => {
+    const out = {};
+    returnTasks.forEach((t) => {
+      if (t.status === 'booked' && t.tray_id) out[t.tray_id] = (out[t.tray_id] || 0) + (Number(t.qty) || 0);
+    });
+    return out;
+  }, [returnTasks]);
+  const toggleCardPick = (trayId, productId) => {
+    setCardPick((prev) => {
+      const cur = prev[trayId] || [];
+      return { ...prev, [trayId]: cur.includes(productId) ? cur.filter((id) => id !== productId) : [...cur, productId] };
+    });
+  };
+  const handleAssignFrame = (tray) => {
+    const trayId = tray.tray_id || tray.id;
+    if (!trayId) return;
+    setActiveTab('assign-products');
+    handleTrayChange(trayId);
+  };
+  const handleTakeBack = async (tray) => {
+    const trayId = tray.tray_id || tray.id;
+    const frames = trayFrames(tray);
+    if (!trayId || frames.length === 0) return;
+    const picked = cardPick[trayId] || [];
+    const list = picked.length ? frames.filter((f) => picked.includes(f.product_id)) : frames;
+    const confirmed = await confirm(`Take ${list.length} ${list.length === 1 ? 'frame' : 'frames'} back from "${tray.tray_name}" to the warehouse?`);
+    if (!confirmed) return;
+    setCardBusy(trayId);
+    setError(null);
+    try {
+      await transferTrayProducts(list.map((f) => ({ from_tray_id: trayId, product_id: f.product_id })));
+      showSuccess('Taken back to the warehouse');
+      setCardPick((prev) => ({ ...prev, [trayId]: [] }));
+      await fetchTrays();
+    } catch (err) {
+      showError(err.message || 'Failed to take the frames back');
+    } finally {
+      setCardBusy('');
+    }
+  };
+
   const startEditProduct = (trayProduct) => {
     setEditingProduct(trayProduct);
     setEditProductStatus(trayProduct.status || TrayProductStatus.ALLOTED);
@@ -402,7 +538,52 @@ const DashboardTray = () => {
     setOpenEditProduct(false);
   };
 
-  const rows = useMemo(() => trays, [trays]);
+  const trayChips = useMemo(() => {
+    const counts = { all: trays.length, available: 0, assigned: 0, overdue: 0, closed: 0 };
+    trays.forEach((t) => { counts[trayState(t)] += 1; });
+    const chips = [
+      { key: 'all', label: 'All', count: counts.all },
+      { key: 'available', label: 'Available', count: counts.available },
+      { key: 'assigned', label: 'With a salesman', count: counts.assigned },
+      { key: 'overdue', label: 'Overdue', count: counts.overdue },
+    ];
+    if (counts.closed > 0) chips.push({ key: 'closed', label: 'Closed', count: counts.closed });
+    return chips;
+  }, [trays]);
+  const visibleTrays = useMemo(
+    () => (trayFilter === 'all' ? trays : trays.filter((t) => trayState(t) === trayFilter)),
+    [trays, trayFilter],
+  );
+  const [productResults, setProductResults] = useState([]);
+  const [searchPage, setSearchPage] = useState(1);
+  const [searchPages, setSearchPages] = useState(1);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchError, setSearchError] = useState('');
+  const [searchRevision, setSearchRevision] = useState(0);
+  const searching = Boolean(traySearch.trim());
+  useEffect(() => {
+    if (!traySearch.trim()) return undefined;
+    let alive = true;
+    setSearchLoading(true);
+    setSearchError('');
+    const timer = setTimeout(() => {
+      searchTrayProducts(searchPage, traySearch.trim())
+        .then((res) => {
+          if (!alive) return;
+          setProductResults(res?.data || []);
+          setSearchPages(Math.max(1, res?.pagination?.totalPages || 1));
+        })
+        .catch((err) => { if (alive) setSearchError(err.message || 'Failed to search products'); })
+        .finally(() => { if (alive) setSearchLoading(false); });
+    }, 350);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [traySearch, searchPage, searchRevision]);
+  const handleTraySearch = (term) => {
+    setTraySearch(term);
+    setSearchPage(1);
+    setProductResults([]);
+    setSearchLoading(Boolean(term.trim()));
+  };
 
   // Reset selected tray when switching tabs
   useEffect(() => {
@@ -420,11 +601,69 @@ const DashboardTray = () => {
     }
   }, [activeTab]);
 
+  // Assign products view: values derived for display only.
+  const pickedLabels = useRef({});
+  const selTrayObj = selectedTray ? trays.find((t) => String(t.tray_id || t.id) === String(selectedTray)) : null;
+  const selTrayHolder = selTrayObj ? trayHolder(selTrayObj) : null;
+  const selTraySince = selTrayObj ? traySince(selTrayObj) : null;
+  const selTrayCount = selectedTray ? trayProducts.length : 0;
+  const moveOptions = [
+    { value: '__warehouse', label: 'Warehouse' },
+    ...trays
+      .filter((t) => (t.tray_id || t.id) !== selectedTray && t.tray_status !== 'inactive' && t.is_active !== false)
+      .map((t) => ({ value: t.tray_id || t.id, label: t.tray_name || t.name })),
+  ];
+  const inr = (v) => (v ? `₹${parseFloat(v || 0).toLocaleString('en-IN')}` : 'N/A');
+  const assignRows = trayProducts.map((tp) => {
+    const productId = tp.product_id || tp.product?.product_id || tp.product?.id;
+    const product = trayProductMap[String(productId || '').toLowerCase()] || allProducts.find(p => {
+      const pId = p.product_id || p.id;
+      return pId && productId && String(pId).toLowerCase() === String(productId).toLowerCase();
+    });
+    const productData = product || tp.product;
+    const brandId = productData?.brand_id;
+    const collectionId = productData?.collection_id;
+    const brand = brandId ? brands.find(b => {
+      const bId = b.brand_id || b.id;
+      return bId && String(bId).toLowerCase() === String(brandId).toLowerCase();
+    }) : null;
+    const collection = collectionId ? collections.find(c => {
+      const cId = c.collection_id || c.id;
+      return cId && String(cId).toLowerCase() === String(collectionId).toLowerCase();
+    }) : null;
+    const st = tp.status || TrayProductStatus.ALLOTED;
+    return {
+      tp,
+      key: tp.id,
+      model: productData?.model_no || 'N/A',
+      unresolvedId: !product && productId ? String(productId) : '',
+      brand: brand?.brand_name || productData?.brand_name || 'N/A',
+      collection: collection?.collection_name || productData?.collection_name || 'N/A',
+      mrp: inr(productData?.mrp),
+      whp: inr(productData?.whp),
+      statusColor: getStatusColor(st),
+      statusLabel: getStatusLabel(st),
+    };
+  });
+
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-[var(--space-4)]">
+        <div className="page-head tray-head">
+          <div>
+            <h1>Sample trays</h1>
+            <p>{readOnly ? 'The trays that are with you. The office gives and takes them back.' : 'Admin and tray managers manage trays. Sales managers can assign them to salesmen.'}</p>
+          </div>
+          {activeTab === 'all-trays' && (
+            <div className="page-head__actions">
+              <button className="ui-btn ui-btn--secondary" onClick={fetchTrays} disabled={loading}>Refresh</button>
+              {!readOnly && <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Tray</button>}
+            </div>
+          )}
+        </div>
+
         {/* Tab Navigation */}
-        <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
+        {!readOnly && (<div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
           <div className="order-tabs-container col-span-full flex w-full gap-[var(--space-2)] overflow-x-auto rounded-lg border border-border bg-surface px-[var(--space-3)] py-[var(--space-2)] shadow-sm">
             <button
               className={`order-tab inline-flex min-h-[40px] flex-shrink-0 cursor-pointer items-center whitespace-nowrap rounded-md px-[var(--space-4)] py-[var(--space-2)] text-[length:var(--text-base)] font-semibold leading-snug transition-colors active:scale-[0.98] ${activeTab === 'all-trays' ? 'active bg-primary text-white' : 'text-text-muted hover:bg-primary-soft hover:text-primary'}`}
@@ -439,428 +678,471 @@ const DashboardTray = () => {
               Assign Products
             </button>
           </div>
-        </div>
+        </div>)}
 
         {/* Tab Content */}
         {activeTab === 'all-trays' && (
-          <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
-            <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
-              <TableWithControls
-                title="Sample Management"
-                columns={columns}
-                rows={rows}
-                selectable={!loading}
-                onAddNew={() => setOpenAdd(true)}
-                addNewText="Add New Tray"
-                onImport={fetchTrays}
-                importText="Refresh"
-                dateRange={dateRange}
-                onDateChange={setDateRange}
-                itemName="Sample"
-                loading={loading}
-                serverPagination
-                serverPage={trayPage}
-                serverPageCount={trayPageCount}
-                serverPageSize={20}
-                serverTotal={trayTotal}
-                onServerPageChange={(p) => fetchTraysPage(p)}
-              />
-              {error && !loading && (
-                <div className="ui-state ui-state--error">
-                  <div className="ui-state__icon">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <circle cx="12" cy="12" r="10" />
-                      <line x1="12" y1="8" x2="12" y2="12" />
-                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
+          <div className="tray-view">
+            {canSeeReturnTasks && returnTasks.length > 0 && (
+              <section className="ordn-tasks" aria-label="Return tasks">
+                <h5 className="ord-view__section-title">Return tasks <span className="tray-meta">({returnTasks.length})</span></h5>
+                {returnTasks.map((t) => (
+                  <div className="ordn-task" key={t.task_id}>
+                    <div className="ordn-task__head">
+                      <b className="min-w-0 break-words">{[t.tray_name, t.salesman_name].filter(Boolean).join(' · ') || 'Tray'}</b>
+                      <span className={`ordn-pill ordn-pill--${t.status}`}>{TASK_PILL[t.status] || t.status}</span>
+                    </div>
+                    <div className="ordn-task__meta">{Number(t.qty) || 0} pieces{t.order_number ? ` · Order ${t.order_number}` : ''}</div>
                   </div>
-                  <p className="ui-state__title">Couldn't load trays</p>
-                  <p className="ui-state__desc">{error}</p>
-                  <button className="ui-btn ui-btn--secondary" onClick={fetchTrays}>Try again</button>
-                </div>
-              )}
+                ))}
+              </section>
+            )}
+            <div className="tray-toolbar">
+              <div className="chips" role="tablist" aria-label="Filter trays">
+                {trayChips.map((c) => (
+                  <button
+                    key={c.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={trayFilter === c.key}
+                    className={`chip${trayFilter === c.key ? ' on' : ''}`}
+                    onClick={() => setTrayFilter(c.key)}
+                  >
+                    {c.label} <b>{c.count}</b>
+                  </button>
+                ))}
+                {!readOnly && <button
+                  type="button"
+                  aria-pressed={showInactive}
+                  className={`chip${showInactive ? ' on' : ''}`}
+                  onClick={() => { const next = !showInactive; setShowInactive(next); fetchTraysPage(1, '', next); }}
+                >
+                  Show inactive
+                </button>}
+              </div>
+              <GooeySearch
+                value={traySearch}
+                onChange={handleTraySearch}
+                placeholder="Search products by name/model"
+                label="Search products by name or model"
+                openWidth={260}
+                rowOnPhone
+              />
             </div>
+
+            {searching ? (
+              <section aria-label="Product search results" aria-live="polite">
+                {searchLoading ? <p role="status">Searching products…</p>
+                  : searchError ? <div className="ui-state ui-state--error" role="alert">
+                    <p>{searchError}</p>
+                    <button className="ui-btn ui-btn--secondary" onClick={() => setSearchRevision((v) => v + 1)}>Try again</button>
+                  </div>
+                  : productResults.length === 0 ? <div className="ui-state ui-state--empty"><p>No products match "{traySearch.trim()}"</p></div>
+                  : <div className="tray-grid">{productResults.map((p) => (
+                    <article className="tray-card tray-product-result" key={p.product_id}>
+                      <h3>{p.model_no}</h3>
+                      <p className="tray-product-result__status">{p.assignments.length ? 'Assigned' : 'Not assigned'}</p>
+                      {p.assignments.map((a) => <p key={a.tray_id}>
+                        <strong>{a.tray_name || 'Unnamed tray'}</strong>
+                        <span className="tra-block">{a.holder_name ? `With ${a.holder_name}` : 'At office · No holder'}</span>
+                      </p>)}
+                    </article>
+                  ))}</div>}
+                {!searchLoading && !searchError && searchPages > 1 && <div className="tray-pager">
+                  <button className="ui-btn ui-btn--secondary" disabled={searchPage <= 1} onClick={() => setSearchPage((v) => v - 1)}>Previous</button>
+                  <span>Page {searchPage} of {searchPages}</span>
+                  <button className="ui-btn ui-btn--secondary" disabled={searchPage >= searchPages} onClick={() => setSearchPage((v) => v + 1)}>Next</button>
+                </div>}
+              </section>
+            ) : error && !loading ? (
+              <div className="ui-state ui-state--error">
+                <div className="ui-state__icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                </div>
+                <p className="ui-state__title">Couldn't load trays</p>
+                <p className="ui-state__desc">{error}</p>
+                <button className="ui-btn ui-btn--secondary" onClick={fetchTrays}>Try again</button>
+              </div>
+            ) : loading && trays.length === 0 ? (
+              <div className="tray-grid" aria-busy="true">
+                {[0, 1, 2].map((i) => <div key={i} className="tray-card ui-skeleton" style={{ height: 190 }} />)}
+              </div>
+            ) : visibleTrays.length === 0 ? (
+              <div className="ui-state ui-state--empty">
+                <p className="ui-state__title">{trays.length === 0 ? 'No trays yet' : 'No trays in this view'}</p>
+                <p className="ui-state__desc">{trays.length === 0 ? (readOnly ? 'The office has not given you a tray yet.' : 'Add a tray to start grouping sample frames.') : 'Try another filter.'}</p>
+                {trays.length === 0 && !readOnly && <button className="ui-btn ui-btn--primary" onClick={() => setOpenAdd(true)}>Add New Tray</button>}
+              </div>
+            ) : (
+              <div className="tray-grid">
+                {visibleTrays.map((t) => {
+                  const state = trayState(t);
+                  const [pillCls, pillLabel] = TRAY_PILL[state];
+                  const holder = trayHolder(t);
+                  const since = traySince(t);
+                  const trayId = t.tray_id || t.id;
+                  const frames = trayFrames(t);
+                  const picked = cardPick[trayId] || [];
+                  const shown = frames.slice(0, TRAY_SLOTS);
+                  const busy = cardBusy === trayId;
+                  const trayOff = t.is_active === false;
+                  const canAssign = !trayOff && (state === 'available' || state === 'assigned' || state === 'overdue');
+                  return (
+                    <div key={trayId || t.tray_name} className="tray-card trn-card">
+                      <div className="tray-card__top">
+                        <div className="trn-title">
+                          <h3>{t.tray_name || 'Untitled tray'}</h3>
+                          <span className={`trn-who${holder ? '' : ' trn-who--none'}`}>
+                            {holder ? `${holder}${since ? ` · since ${since}` : ''}` : 'Not assigned'}
+                          </span>
+                        </div>
+                        <span className="tray-card__pills">
+                          {trayOff && <span className="pill idle">Inactive</span>}
+                          <span className={`pill ${pillCls}`}>{pillLabel}</span>
+                        </span>
+                      </div>
+                      {(bookedByTray[trayId] || 0) > 0 && <span className="tray-meta">{bookedByTray[trayId]} booked for orders</span>}
+                      <div className="trn-fill">
+                        <span className="trn-fill__pill">{frames.length} of {TRAY_SLOTS}</span>
+                        {frames.length > TRAY_SLOTS && <span className="trn-fill__more">+{frames.length - TRAY_SLOTS} more{readOnly ? "" : " in Assign Products"}</span>}
+                      </div>
+                      <div className="trn-slots" role="group" aria-label={`Frames in ${t.tray_name}`}>
+                        {Array.from({ length: TRAY_SLOTS }).map((_, i) => {
+                          const f = shown[i];
+                          if (!f) return <span key={i} className="trn-slot trn-slot--empty" aria-hidden="true" />;
+                          const on = picked.includes(f.product_id);
+                          return (
+                            <button
+                              key={f.product_id}
+                              type="button"
+                              className={`trn-slot trn-slot--full${on ? ' on' : ''}`}
+                              aria-pressed={on}
+                              title={`${f.model_no || 'Frame'}${f.qty > 1 ? ` x${f.qty}` : ''} (${getStatusLabel(f.status)})`}
+                              disabled={readOnly}
+                              onClick={() => toggleCardPick(trayId, f.product_id)}
+                            >
+                              {String(f.model_no || '?').slice(0, 5)}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {frames.length === 0 && <span className="tray-meta">No frames yet.</span>}
+                      {!readOnly && <div className="tray-card__actions trn-actions">
+                        <button type="button" className="ui-btn ui-btn--primary" onClick={() => handleAssignFrame(t)} disabled={!canAssign || saving || busy}>Assign frame</button>
+                        <button type="button" className="ui-btn ui-btn--secondary" onClick={() => handleTakeBack(t)} disabled={frames.length === 0 || saving || busy}>
+                          {busy ? 'Taking back…' : picked.length ? `Take back (${picked.length})` : 'Take back'}
+                        </button>
+                        <button type="button" className="ui-btn ui-btn--secondary" onClick={() => openEdit(t)}>Edit</button>
+                      </div>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!searching && trayPageCount > 1 && (
+              <div className="tray-pager">
+                <button className="ui-btn ui-btn--secondary" disabled={loading || trayPage <= 1} onClick={() => fetchTraysPage(trayPage - 1, '')}>Previous</button>
+                <span>Page {trayPage} of {trayPageCount} · {trayTotal} trays</span>
+                <button className="ui-btn ui-btn--secondary" disabled={loading || trayPage >= trayPageCount} onClick={() => fetchTraysPage(trayPage + 1, '')}>Next</button>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'assign-products' && (
-          <div className="dash-row grid grid-cols-12 gap-[var(--space-4)] max-[560px]:grid-cols-1 max-[560px]:gap-[var(--space-3)]">
-            <div className="dash-card full col-span-full rounded-lg border border-border bg-surface p-0 shadow-sm">
-              <div className="p-3 sm:p-5">
-                <h2 className="mt-0 mb-5">Assign Products to Sample</h2>
+          <div className="tra">
+            <div className="tra-head">
+              <h2>Assign products</h2>
+              <p>Pick a tray, add frames, move them to another tray or take them back.</p>
+            </div>
 
-                {error && <div className="mb-3 rounded-lg border border-[#fcc] bg-[#fee] p-3 text-[red]">{error}</div>}
+            {error && <div className="tra-error" role="alert">{error}</div>}
 
-                {/* Single Section: Tray Selection, Add Product, and Products Table */}
-                <div className="flex flex-col gap-6">
-                  {/* Tray Selection */}
-                  <div className="form-group">
-                    <label className="ui-label" style={{ marginBottom: '8px', fontSize: '16px', fontWeight: 700 }}>Select Sample</label>
-                    <DropdownSelector
-                      options={trays.map(t => ({
-                        value: t.tray_id || t.id,
-                        label: t.tray_name || 'N/A'
-                      }))}
-                      value={selectedTray}
-                      onChange={handleTrayChange}
-                      placeholder="Select a tray"
+            {/* Tray: pick one, then see who holds it and how full it is */}
+            <section className="tra-card" aria-label="Tray">
+              <div className="tra-tray">
+                <div className="tra-tray__info">
+                  <h3>{selTrayObj ? (selTrayObj.tray_name || 'Tray') : 'Select a tray'}</h3>
+                  <p className="tra-sub">
+                    {selTrayObj
+                      ? [
+                          selTrayHolder ? `With ${selTrayHolder}${selTraySince ? ` since ${selTraySince}` : ''}` : 'Not with a salesman',
+                          `${selTrayCount} of ${TRAY_SLOTS} pieces`,
+                        ].join(' · ')
+                      : 'Choose a tray to see its products and add more.'}
+                  </p>
+                </div>
+                <div className="tra-tray__pick">
+                  <DropdownSelector
+                    options={trays.filter((t) => t.is_active !== false).map(t => ({
+                      value: t.tray_id || t.id,
+                      label: t.tray_name || 'N/A'
+                    }))}
+                    value={selectedTray}
+                    onChange={handleTrayChange}
+                    placeholder="Select a tray"
+                  />
+                </div>
+              </div>
+              {selTrayObj && (
+                <div className="tra-bar" role="img" aria-label={`${selTrayCount} of ${TRAY_SLOTS} pieces`}>
+                  <i style={{ width: `${Math.min(100, Math.round((selTrayCount / TRAY_SLOTS) * 100))}%` }} />
+                </div>
+              )}
+            </section>
+
+            {/* Add products: one search, chips for what is picked, one Add button */}
+            {selectedTray && !readOnly && (
+              <section className="tra-card tra-add" aria-label="Add products">
+                <h3>Add products</h3>
+                <div className="tra-field">
+                  <label htmlFor="tra-search">Search frames to add</label>
+                  <div className={`tra-search${productDropdownOpen ? ' is-open' : ''}`}>
+                    <FiSearch size={18} />
+                    <input
+                      id="tra-search"
+                      type="text"
+                      autoComplete="off"
+                      placeholder="Search by model, brand or collection"
+                      value={productSearch}
+                      onFocus={() => setProductDropdownOpen(true)}
+                      onChange={(e) => { setProductDropdownOpen(true); handleProductSearchChange(e.target.value); }}
                     />
-                  </div>
-
-                  {/* Add Product Section - Only show when tray is selected */}
-                  {selectedTray && (
-                    <div className="rounded-xl border border-[#e5e7eb] bg-[#f9fafb] p-4 sm:p-6">
-                      <h3 className="mb-5 mt-0 text-[18px] font-bold text-[#000000]">
-                        Add Products to Tray
-                      </h3>
-                      <div className="flex flex-col gap-4">
-                        <div className="form-group" style={{ position: 'relative' }}>
-                          <label className="ui-label" style={{ marginBottom: '8px' }}>Select Products</label>
-                          <div className="relative">
-                            {/* Trigger button */}
-                            <button
-                              type="button"
-                              onClick={() => { setProductDropdownOpen(!productDropdownOpen); if (productDropdownOpen) setProductSearch(''); }}
-                              style={{
-                                width: '100%',
-                                padding: '10px 12px',
-                                border: `1px solid ${productDropdownOpen ? '#16171d' : '#e5e7eb'}`,
-                                borderRadius: '8px',
-                                backgroundColor: '#fff',
-                                cursor: 'pointer',
-                                textAlign: 'left',
-                                fontSize: '14px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                color: selectedProducts.length === 0 ? '#999' : '#333'
-                              }}
-                            >
-                              <span>
-                                {selectedProducts.length === 0
-                                  ? 'Select products to add'
-                                  : `${selectedProducts.length} product(s) selected`}
-                              </span>
-                              <span className="text-[12px] text-[#666]">
-                                {productDropdownOpen ? '▲' : '▼'}
-                              </span>
-                            </button>
-
-                            {productDropdownOpen && (
-                              <>
-                                {/* Dropdown panel */}
-                                <div
-                                  className="absolute left-0 right-0 top-full z-[1001] mt-1 flex h-[270px] flex-col rounded-[10px] border border-[#e5e7eb] bg-white shadow-[0_8px_24px_rgba(0,0,0,0.12)]"
-                                >
-                                  {/* Search bar — sticky top */}
-                                  <div className="shrink-0 border-b border-[#f0f0f0] p-[10px]">
-                                    <input
-                                      type="text"
-                                      placeholder="🔍  Search by model, brand or collection..."
-                                      value={productSearch}
-                                      onChange={(e) => handleProductSearchChange(e.target.value)}
-                                      onClick={(e) => e.stopPropagation()}
-                                      autoFocus
-                                      className="box-border w-full rounded-md border border-[#e5e7eb] bg-[#f9fafb] p-[8px_10px] text-[13px] outline-none"
-                                    />
-                                  </div>
-
-                                  {/* Product list — scrollable */}
-                                  <div className="flex-1 overflow-y-auto p-[6px]">
-                                    {loadingProducts ? (
-                                      <div className="p-5 text-center text-[13px] text-[#999]">
-                                        Loading…
-                                      </div>
-                                    ) : allProducts.length === 0 ? (
-                                      <div className="p-5 text-center text-[13px] text-[#999]">
-                                        {productSearch.trim() ? `No products match "${productSearch}"` : 'No products available'}
-                                      </div>
-                                    ) : (() => {
-                                      return allProducts.map((p) => {
-                                        const productId = p.id || p.product_id;
-                                        const productIdStr = String(productId);
-                                        const isSelected = selectedProducts.includes(productIdStr);
-                                        return (
-                                          <label
-                                            key={productId}
-                                            style={{
-                                              display: 'flex',
-                                              alignItems: 'center',
-                                              padding: '9px 10px',
-                                              borderRadius: '6px',
-                                              cursor: 'pointer',
-                                              backgroundColor: isSelected ? '#f3f4f5' : 'transparent',
-                                              borderLeft: isSelected ? '3px solid #16171d' : '3px solid transparent',
-                                              marginBottom: '2px',
-                                              transition: 'all 0.15s'
-                                            }}
-                                            onMouseEnter={(e) => { if (!isSelected) e.currentTarget.style.backgroundColor = '#f5f5f5'; }}
-                                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = isSelected ? '#f3f4f5' : 'transparent'; }}
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              checked={isSelected}
-                                              onChange={(e) => {
-                                                if (e.target.checked) {
-                                                  setSelectedProducts(prev => [...prev, productIdStr]);
-                                                } else {
-                                                  setSelectedProducts(prev => prev.filter(id => id !== productIdStr));
-                                                }
-                                              }}
-                                              className="mr-[10px] h-4 w-4 shrink-0 cursor-pointer accent-[#16171d]"
-                                            />
-                                            <span className="text-[13px] leading-[1.4] text-[#333]">
-                                              <strong className="text-[#111]">{p.model_no || 'N/A'}</strong>
-                                              {(p.brand_name || p.collection_name) && (
-                                                <span className="ml-[6px] text-[#888]">
-                                                  {[p.brand_name, p.collection_name].filter(Boolean).join(' · ')}
-                                                </span>
-                                              )}
-                                            </span>
-                                          </label>
-                                        );
-                                      });
-                                    })()}
-                                  </div>
-
-                                  {/* Footer with actions — sticky bottom */}
-                                  <div className="flex shrink-0 items-center justify-between rounded-b-[10px] border-t border-[#f0f0f0] bg-[#fafafa] p-[10px_12px]">
-                                    <span className="text-[12px] text-[#888]">
-                                      {selectedProducts.length > 0 ? `${selectedProducts.length} selected` : 'None selected'}
-                                    </span>
-                                    <div className="flex gap-2">
-                                      {selectedProducts.length > 0 && (
-                                        <button
-                                          type="button"
-                                          className="ui-btn ui-btn--secondary"
-                                          onClick={(e) => { e.stopPropagation(); setSelectedProducts([]); }}
-                                          style={{ padding: '6px 14px', fontSize: '13px' }}
-                                        >
-                                          Clear
-                                        </button>
-                                      )}
-                                      <button
-                                        type="button"
-                                        className="ui-btn ui-btn--primary"
-                                        disabled={saving || selectedProducts.length === 0}
-                                        onClick={(e) => { e.stopPropagation(); handleAddProduct(); }}
-                                        style={{ padding: '6px 16px', fontSize: '13px' }}
-                                      >
-                                        {saving ? 'Adding...' : `Add ${selectedProducts.length > 0 ? selectedProducts.length : ''} Product${selectedProducts.length !== 1 ? 's' : ''}`}
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                                {/* Backdrop — rendered after panel so panel stays on top */}
-                                <div
-                                  className="fixed inset-0 z-[999]"
-                                  onClick={() => { setProductDropdownOpen(false); setProductSearch(''); }}
-                                />
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Products List - Always visible */}
-                  <div>
-                    <h3 className="mb-[15px] mt-0">
-                      Products in Sample ({trayProducts.length})
-                    </h3>
-                    <div className="max-h-[500px] overflow-x-auto overflow-y-auto rounded-lg border border-[#e5e7eb]">
-                      <table className="w-full min-w-[720px] border-collapse">
-                        <thead>
-                          <tr className="sticky top-0 bg-[#f0f0f0]">
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">MODEL NO</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">BRAND</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">COLLECTION</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">MRP</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">WHP</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">QUANTITY</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">STATUS</th>
-                            <th className="border-b-2 border-[#ddd] p-3 text-left">ACTIONS</th>
-                          </tr>
-                        </thead>
-                        <tbody>
+                    {productDropdownOpen && (
+                      <button type="button" className="tra-search__done" onClick={() => { setProductDropdownOpen(false); setProductSearch(''); }}>Done</button>
+                    )}
+                    {productDropdownOpen && (
+                      <div className="tra-panel" role="listbox" aria-multiselectable="true">
+                        <div className="tra-panel__list">
                           {loadingProducts ? (
-                            Array.from({ length: 4 }).map((_, i) => (
-                              <tr key={`sk-${i}`} className="border-b border-[#eee]">
-                                {Array.from({ length: 8 }).map((__, c) => (
-                                  <td key={c} className="p-3">
-                                    <span className="ui-skeleton" style={{ display: 'block', height: '14px', width: c === 7 ? '60px' : '100%', borderRadius: '6px' }} />
-                                  </td>
-                                ))}
-                              </tr>
-                            ))
-                          ) : error && selectedTray ? (
-                            <tr>
-                              <td colSpan="8" className="p-0">
-                                <div className="ui-state ui-state--error">
-                                  <div className="ui-state__icon">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                      <circle cx="12" cy="12" r="10" />
-                                      <line x1="12" y1="8" x2="12" y2="12" />
-                                      <line x1="12" y1="16" x2="12.01" y2="16" />
-                                    </svg>
-                                  </div>
-                                  <p className="ui-state__title">Couldn't load products</p>
-                                  <p className="ui-state__desc">{error}</p>
-                                  <button className="ui-btn ui-btn--secondary" onClick={() => handleTrayChange(selectedTray)}>Try again</button>
-                                </div>
-                              </td>
-                            </tr>
-                          ) : trayProducts.length === 0 ? (
-                            <tr>
-                              <td colSpan="8" className="p-0">
-                                <div className="ui-state ui-state--empty">
-                                  <div className="ui-state__icon">
-                                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                                      <rect x="3" y="7" width="18" height="13" rx="2" />
-                                      <path d="M3 11h18" />
-                                      <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                                    </svg>
-                                  </div>
-                                  <p className="ui-state__title">{selectedTray ? 'No products yet' : 'No tray selected'}</p>
-                                  <p className="ui-state__desc">
-                                    {selectedTray
-                                      ? 'This tray has no products. Use "Add Products to Tray" above to assign some.'
-                                      : 'Select a tray above to view and manage its products.'}
-                                  </p>
-                                </div>
-                              </td>
-                            </tr>
+                            <div className="tra-panel__msg">Loading…</div>
+                          ) : allProducts.length === 0 ? (
+                            <div className="tra-panel__msg">
+                              {productSearch.trim() ? `No products match "${productSearch}"` : 'No products available'}
+                            </div>
                           ) : (
-                            trayProducts.map((tp) => {
-                              // Match product by product_id - try both id and product_id fields
-                              const productId = tp.product_id || tp.product?.product_id || tp.product?.id;
-                              const product = allProducts.find(p => {
-                                const pId = p.product_id || p.id;
-                                return pId && productId && String(pId).toLowerCase() === String(productId).toLowerCase();
-                              });
-
-                              // If product not found, try to get brand and collection from nested product object
-                              const productData = product || tp.product;
-                              const brandId = productData?.brand_id;
-                              const collectionId = productData?.collection_id;
-
-                              const brand = brandId ? brands.find(b => {
-                                const bId = b.brand_id || b.id;
-                                return bId && String(bId).toLowerCase() === String(brandId).toLowerCase();
-                              }) : null;
-
-                              const collection = collectionId ? collections.find(c => {
-                                const cId = c.collection_id || c.id;
-                                return cId && String(cId).toLowerCase() === String(collectionId).toLowerCase();
-                              }) : null;
-
+                            allProducts.map((p) => {
+                              const productId = p.id || p.product_id;
+                              const productIdStr = String(productId);
+                              const isSelected = selectedProducts.includes(productIdStr);
                               return (
-                                <tr key={tp.id} className="border-b border-[#eee]">
-                                  <td className="p-3">
-                                    {productData?.model_no || 'N/A'}
-                                    {!product && productId && (
-                                      <span className="block text-[10px] text-[#999]">
-                                        (ID: {productId.substring(0, 8)}...)
-                                      </span>
+                                <label key={productId} className={`tra-opt${isSelected ? ' is-on' : ''}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        pickedLabels.current[productIdStr] = p.model_no || 'N/A';
+                                        setSelectedProducts(prev => [...prev, productIdStr]);
+                                      } else {
+                                        setSelectedProducts(prev => prev.filter(id => id !== productIdStr));
+                                      }
+                                    }}
+                                  />
+                                  <span className="tra-opt__t">
+                                    <strong>{p.model_no || 'N/A'}</strong>
+                                    {(p.brand_name || p.collection_name) && (
+                                      <span>{[p.brand_name, p.collection_name].filter(Boolean).join(' · ')}</span>
                                     )}
-                                  </td>
-                                  <td className="p-3">
-                                    {brand?.brand_name || productData?.brand_name || 'N/A'}
-                                  </td>
-                                  <td className="p-3">
-                                    {collection?.collection_name || productData?.collection_name || 'N/A'}
-                                  </td>
-                                  <td className="p-3">
-                                    {productData?.mrp ? `₹${parseFloat(productData.mrp || 0).toLocaleString('en-IN')}` : 'N/A'}
-                                  </td>
-                                  <td className="p-3">
-                                    {productData?.whp ? `₹${parseFloat(productData.whp || 0).toLocaleString('en-IN')}` : 'N/A'}
-                                  </td>
-                                  <td className="p-3">
-                                    1
-                                  </td>
-                                  <td className="p-3">
-                                    <span style={{
-                                      padding: '4px 8px',
-                                      borderRadius: '4px',
-                                      fontSize: '12px',
-                                      backgroundColor: getStatusColor(tp.status || TrayProductStatus.ALLOTED).bg,
-                                      color: getStatusColor(tp.status || TrayProductStatus.ALLOTED).text
-                                    }}>
-                                      {getStatusLabel(tp.status || TrayProductStatus.ALLOTED)}
-                                    </span>
-                                  </td>
-                                  <td className="p-3">
-                                    <RowActions
-                                      onEdit={() => startEditProduct(tp)}
-                                      onDelete={() => handleRemoveProduct(tp)}
-                                    />
-                                  </td>
-                                </tr>
+                                  </span>
+                                </label>
                               );
                             })
                           )}
-                        </tbody>
-                      </table>
-                    </div>
+                        </div>
+                        <div className="tra-panel__foot">
+                          <span>{selectedProducts.length > 0 ? `${selectedProducts.length} selected` : 'None selected'}</span>
+                          {selectedProducts.length > 0 && (
+                            <button type="button" className="tra-btn tra-btn--sm" onClick={() => setSelectedProducts([])}>Clear</button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {productDropdownOpen && (
+                    <div className="tra-backdrop" onClick={() => { setProductDropdownOpen(false); setProductSearch(''); }} />
+                  )}
+                </div>
+                {selectedProducts.length > 0 && (
+                  <div className="tra-chips" aria-label="Picked frames">
+                    {selectedProducts.map((id) => (
+                      <span className="tra-chip" key={id}>
+                        {pickedLabels.current[id] || 'Frame'}
+                        <button type="button" aria-label={`Remove ${pickedLabels.current[id] || 'frame'}`} onClick={() => setSelectedProducts(prev => prev.filter(x => x !== id))}>
+                          <FiX size={14} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="tra-add__foot">
+                  <span className="tra-sub">Pick one or more frames, then add them to this tray.</span>
+                  <button type="button" className="tra-btn tra-btn--pri" disabled={saving || selectedProducts.length === 0} onClick={handleAddProduct}>
+                    {saving ? 'Adding…' : selectedProducts.length > 0 ? `Add ${selectedProducts.length} ${selectedProducts.length === 1 ? 'frame' : 'frames'}` : 'Add frames'}
+                  </button>
+                </div>
+              </section>
+            )}
+
+            {/* Products in the tray: cards on a phone, a compact table on tablet and desktop */}
+            <section className="tra-list" aria-label="Products in tray">
+              <h3>Products in {selTrayObj ? (selTrayObj.tray_name || 'tray') : 'tray'} ({trayProducts.length})</h3>
+              {loadingProducts ? (
+                <div className="tra-card tra-skel" aria-busy="true">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <span key={`sk-${i}`} className="ui-skeleton" style={{ display: 'block', height: '16px', width: '100%', borderRadius: '6px' }} />
+                  ))}
+                </div>
+              ) : error && selectedTray ? (
+                <div className="tra-card">
+                  <div className="ui-state ui-state--error">
+                    <p className="ui-state__title">Couldn't load products</p>
+                    <p className="ui-state__desc">{error}</p>
+                    <button className="ui-btn ui-btn--secondary" onClick={() => handleTrayChange(selectedTray)}>Try again</button>
                   </div>
                 </div>
-              </div>
-            </div>
+              ) : trayProducts.length === 0 ? (
+                <div className="tra-card">
+                  <div className="ui-state ui-state--empty">
+                    <p className="ui-state__title">{selectedTray ? 'No products yet' : 'No tray selected'}</p>
+                    <p className="ui-state__desc">
+                      {selectedTray
+                        ? 'This tray has no products. Use "Add products" above to put some in.'
+                        : 'Select a tray above to view and manage its products.'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="tra-cards">
+                    {assignRows.map((r) => (
+                      <div className="tra-pc" key={r.key}>
+                        <div className="tra-pc__top">
+                          <b>{r.model}</b>
+                          <span className="tra-status" style={{ backgroundColor: r.statusColor.bg, color: r.statusColor.text }}>{r.statusLabel}</span>
+                        </div>
+                        <span className="tra-sub">{[r.brand, r.whp !== 'N/A' ? `WHP ${r.whp}` : null, 'Qty 1'].filter(Boolean).join(' · ')}</span>
+                        {!readOnly && (
+                          <div className="tra-pc__foot">
+                            <div className="tra-move">
+                              <DropdownSelector options={moveOptions} value="" placeholder="Move to…" disabled={saving} onChange={(v) => handleMoveProduct(r.tp, v === '__warehouse' ? '' : v)} />
+                            </div>
+                            <div className="tra-acts">
+                              <button type="button" className="tra-ic" aria-label="Edit status" title="Edit status" onClick={() => startEditProduct(r.tp)}><FiEdit size={18} /></button>
+                              <button type="button" className="tra-ic" aria-label="Take back" title="Take back" onClick={() => handleRemoveProduct(r.tp)}><FiUndo size={18} /></button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="tra-card tra-desk tray-assign-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Model no</th>
+                          <th>Brand</th>
+                          <th className="tra-c-coll">Collection</th>
+                          <th className="tra-c-mrp r">MRP</th>
+                          <th className="r">WHP</th>
+                          <th className="tra-c-qty r">Qty</th>
+                          <th>Status</th>
+                          {!readOnly && <th className="r">Actions</th>}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assignRows.map((r) => (
+                          <tr key={r.key}>
+                            <td>
+                              <b>{r.model}</b>
+                              {r.unresolvedId && <span className="tra-sub tra-block">(ID: {r.unresolvedId.substring(0, 8)}...)</span>}
+                            </td>
+                            <td>{r.brand}</td>
+                            <td className="tra-c-coll">{r.collection}</td>
+                            <td className="tra-c-mrp r">{r.mrp}</td>
+                            <td className="r">{r.whp}</td>
+                            <td className="tra-c-qty r">1</td>
+                            <td><span className="tra-status" style={{ backgroundColor: r.statusColor.bg, color: r.statusColor.text }}>{r.statusLabel}</span></td>
+                            {!readOnly && (
+                              <td className="r">
+                                <div className="tra-acts tra-acts--row">
+                                  <div className="tra-move">
+                                    <DropdownSelector options={moveOptions} value="" placeholder="Move to…" disabled={saving} onChange={(v) => handleMoveProduct(r.tp, v === '__warehouse' ? '' : v)} />
+                                  </div>
+                                  <button type="button" className="tra-ic" aria-label="Edit status" title="Edit status" onClick={() => startEditProduct(r.tp)}><FiEdit size={18} /></button>
+                                  <button type="button" className="tra-ic" aria-label="Take back" title="Take back" onClick={() => handleRemoveProduct(r.tp)}><FiUndo size={18} /></button>
+                                </div>
+                              </td>
+                            )}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </section>
           </div>
         )}
       </div>
       <AsidePanel
         open={openAdd}
         onClose={() => setOpenAdd(false)}
-        title="Add New Sample"
+        title="Add tray"
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => { resetForm(); setOpenAdd(false); }}>Cancel</button>
-            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleSubmitNew}>Save</button>
+            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleSubmitNew}>Save tray</button>
           </>
         )}
       >
-        <div className="ui-form">
+        <div className="ui-form rf-form">
+          <FormSec title="Tray" className="rf-sec--one">
           <div className="form-group">
-            <label className="ui-label">Title</label>
+            <label className="ui-label">Tray name</label>
             <input
               className="ui-input"
-              placeholder="Sample title"
+              placeholder="Tray 7"
               value={form.tray_name}
               onChange={(e) => setForm((p) => ({ ...p, tray_name: e.target.value }))}
             />
           </div>
           <div className="form-group">
             <label className="ui-label">Status</label>
-            <DropdownSelector
+            <ChipRow
+              label="Tray status"
               options={[
-                { value: TrayStatus.AVAILABLE, label: 'AVAILABLE' },
-                { value: TrayStatus.ASSIGNED, label: 'ASSIGNED' },
-                { value: TrayStatus.CLOSED, label: 'CLOSED' }
+                { value: TrayStatus.AVAILABLE, label: 'Available' },
+                { value: TrayStatus.ASSIGNED, label: 'Assigned' },
+                { value: TrayStatus.CLOSED, label: 'Closed' }
               ]}
               value={form.tray_status}
               onChange={(value) => setForm((p) => ({ ...p, tray_status: value }))}
-              placeholder="Select status"
             />
           </div>
+          </FormSec>
         </div>
       </AsidePanel>
       <AsidePanel
         open={!!editRow}
         onClose={() => setEditRow(null)}
-        title="Edit Sample"
+        title="Edit tray"
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => { setEditRow(null); resetForm(); }}>Cancel</button>
-            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleUpdate}>Update</button>
+            <button className="ui-btn ui-btn--primary" disabled={saving} onClick={handleUpdate}>Update tray</button>
           </>
         )}
       >
-        <div className="ui-form">
+        <div className="ui-form rf-form">
+          <FormSec title="Tray" className="rf-sec--one">
           <div className="form-group">
-            <label className="ui-label">Title</label>
+            <label className="ui-label">Tray name</label>
             <input
               className="ui-input"
               value={form.tray_name}
@@ -869,17 +1151,34 @@ const DashboardTray = () => {
           </div>
           <div className="form-group">
             <label className="ui-label">Status</label>
-            <DropdownSelector
+            <ChipRow
+              label="Tray status"
               options={[
-                { value: TrayStatus.AVAILABLE, label: 'AVAILABLE' },
-                { value: TrayStatus.ASSIGNED, label: 'ASSIGNED' },
-                { value: TrayStatus.CLOSED, label: 'CLOSED' }
+                { value: TrayStatus.AVAILABLE, label: 'Available' },
+                { value: TrayStatus.ASSIGNED, label: 'Assigned' },
+                { value: TrayStatus.CLOSED, label: 'Closed' }
               ]}
               value={form.tray_status}
               onChange={(value) => setForm((p) => ({ ...p, tray_status: value }))}
-              placeholder="Select status"
             />
           </div>
+          <div className="form-group">
+            <label className="ui-label">Active</label>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={form.is_active !== false}
+              onClick={() => setForm((p) => ({ ...p, is_active: p.is_active === false }))}
+              className="mng-switch"
+            >
+              <span className={`mng-switch__track ${form.is_active !== false ? 'is-on' : ''}`}>
+                <span className="mng-switch__dot" />
+              </span>
+              <span className="mng-switch__label">{form.is_active !== false ? 'Active' : 'Inactive'}</span>
+            </button>
+            <p className="mng-note">Inactive items are hidden from forms. Nothing is ever deleted. A tray can only be switched off when it is empty.</p>
+          </div>
+          </FormSec>
         </div>
       </AsidePanel>
 
@@ -904,7 +1203,7 @@ const DashboardTray = () => {
         <div className="ui-form">
           {editingProduct && (() => {
             const productId = editingProduct.product_id || editingProduct.product?.product_id || editingProduct.product?.id;
-            const product = allProducts.find(p => {
+            const product = trayProductMap[String(productId || '').toLowerCase()] || allProducts.find(p => {
               const pId = p.product_id || p.id;
               return pId && productId && String(pId).toLowerCase() === String(productId).toLowerCase();
             });

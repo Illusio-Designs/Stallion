@@ -1,5 +1,6 @@
 'use client';
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import '../../styles/components/ui.css';
 
 const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -20,6 +21,8 @@ const parse = (s) => {
 export default function DatePicker({ value, onChange, placeholder = 'Select date', disabled = false, min, max, className = '' }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
+  const popRef = useRef(null);
+  const [pos, setPos] = useState(null);
   const selected = parse(value);
   const today = new Date();
   const [view, setView] = useState(() => {
@@ -29,9 +32,32 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
 
   useEffect(() => {
     if (!open) return;
-    const onDoc = (e) => { if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false); };
+    const onDoc = (e) => {
+      if (wrapRef.current && wrapRef.current.contains(e.target)) return;
+      if (popRef.current && popRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
     document.addEventListener('mousedown', onDoc);
     return () => document.removeEventListener('mousedown', onDoc);
+  }, [open]);
+
+  // The calendar is drawn on the page itself (not inside the form), so a side panel's footer or the
+  // next field can never cover it; it opens upward when there is no room below.
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    const place = () => {
+      const r = wrapRef.current?.getBoundingClientRect();
+      if (!r) return;
+      const w = 300;
+      const h = 340;
+      const left = Math.max(8, Math.min(r.right - w, window.innerWidth - w - 8));
+      const up = window.innerHeight - r.bottom < h && r.top > h;
+      setPos({ left, width: w, ...(up ? { top: 'auto', bottom: window.innerHeight - r.top + 6 } : { top: r.bottom + 6, bottom: 'auto' }) });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
   }, [open]);
 
   // Keep the visible month in sync when the value changes externally.
@@ -84,8 +110,8 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
           <rect x="3" y="4" width="18" height="18" rx="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
         </svg>
       </div>
-      {open && !disabled && (
-        <div className="cal-popover" onMouseDown={(e) => e.stopPropagation()}>
+      {open && !disabled && pos && createPortal(
+        <div ref={popRef} className="cal-popover" style={{ position: 'fixed', right: 'auto', zIndex: 10100, ...pos }} onMouseDown={(e) => e.stopPropagation()}>
           <div className="cal">
             <div className="cal__head">
               <button type="button" className="cal__nav" onClick={goPrev} aria-label="Previous month">
@@ -101,7 +127,8 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
             </div>
             <div className="cal__grid">{cells}</div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

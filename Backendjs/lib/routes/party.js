@@ -1,16 +1,19 @@
 const express = require('express');
+const addressController = require('../controllers/addressController');
 const router = express.Router();
 const partyController = require('../controllers/partyController');
 const { authenticateToken } = require('../middleware/auth');
-const { isPartyManager, isPartyCreator } = require('../middleware/roleAuth');
+const { isAdmin, isPartyManager, isPartyCreator } = require('../middleware/roleAuth');
 const { partyFileUpload } = require('../constants/multer');
 const parsePartyFile = require('../middleware/party_parser');
 
 router.get('/', authenticateToken, (req, res) => partyController.getPartiesRoot(req, res));
 router.get('/my', authenticateToken, partyController.getMyParties);
+router.get('/filter-options', authenticateToken, (req, res) => partyController.getPartyFilterOptions(req, res));
 // Diagnostic: does the server's geocoder work? GET /parties/geocode-test?q=...
+// Admin only and read-only: it never saves coordinates on a party.
 // (declared before '/:id' so it isn't captured as an id)
-router.get('/geocode-test', authenticateToken, partyController.geocodeTest);
+router.get('/geocode-test', authenticateToken, isAdmin, partyController.geocodeTest);
 router.get('/salesman/:salesman_id', authenticateToken, partyController.getPartiesBySalesmanId);
 router.get('/:id', authenticateToken, partyController.getPartyById);
 router.post('/get', authenticateToken, isPartyManager, partyController.getParties);
@@ -21,7 +24,14 @@ router.post('/', authenticateToken, isPartyCreator, partyController.createParty)
 router.put('/:id/location', authenticateToken, partyController.setPartyLocation);
 // On-site capture ("I'm at the shop"): salesman/admin/party managers send device
 // GPS + accuracy to set the TRUSTED verified location. Before '/:id'.
+// Address search while typing (Google Places) and the parts of the picked address.
+router.post('/address-suggest', authenticateToken, isPartyCreator, addressController.suggest);
+router.post('/address-details', authenticateToken, isPartyCreator, addressController.details);
+router.post('/reverse-geocode', authenticateToken, isPartyCreator, partyController.reverseGeocodeLocation);
 router.put('/:id/verify-location', authenticateToken, isPartyCreator, partyController.verifyPartyLocation);
+// Remove a wrong saved location so "I'm at shop" can capture it again.
+// Managers only; before '/:id'.
+router.delete('/:id/location', authenticateToken, isPartyManager, partyController.removePartyLocation);
 router.put('/:id', authenticateToken, partyController.updateParty);
 router.delete('/:id', authenticateToken, isPartyManager, partyController.deleteParty);
 router.post('/byZoneId', authenticateToken, partyController.getPartiesByZoneId);

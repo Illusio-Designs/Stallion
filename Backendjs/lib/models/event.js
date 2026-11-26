@@ -28,6 +28,12 @@ const Event = sequelize.define('Event', {
         type: DataTypes.STRING(255),
         allowNull: false
     },
+    // Manual switch: inactive events are hidden from pickers. Never deleted.
+    is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: true
+    },
 }, {
     tableName: 'event',
     timestamps: true,

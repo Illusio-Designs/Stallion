@@ -1,5 +1,7 @@
 // Product controller — media gallery isAssigned fix (redeploy trigger).
 const Product = require('../models/Product');
+const { recordStockMove } = require('../utils/stockLedger');
+const StockMovement = require('../models/StockMovement');
 const { logAudit } = require('../utils/auditLogger');
 const Brand = require('../models/Brand');
 const Collection = require('../models/Collection');
@@ -15,8 +17,15 @@ const { PRODUCT_IMAGE_UPLOAD_DIR } = require('../constants/multer');
 const path = require('path');
 const fs = require('fs');
 const { Op, Sequelize } = require('sequelize');
-const { canManageInventory } = require('../utils/roleHelpers');
-const { getListSearchParams } = require('../utils/listSearchHelpers');
+const { canManageInventory, hasRole } = require('../utils/roleHelpers');
+const { getListSearchParams, likeContains } = require('../utils/listSearchHelpers');
+const { activeOnlyWhere, activeUpdate } = require('../utils/attributeActive');
+
+// true for true / 1 / yes / y / on (any case); everything else is false.
+function toBool(v) {
+    if (v === true || v === 1) return true;
+    return ['true', '1', 'yes', 'y', 'on'].includes(String(v ?? '').trim().toLowerCase());
+}
 
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i;
 
@@ -100,10 +109,10 @@ class ProductController {
         try {
             const { collection_id } = req.body;
             if (!collection_id || collection_id === '' || collection_id === 'all') {
-                const products = await Product.findAll({ limit: 6 });
+                const products = await Product.findAll({ where: { is_active: true }, limit: 6 });
                 return res.status(200).json(products);
             }
-            const products = await Product.findAll({ where: { collection_id: collection_id }, limit: 6 });
+            const products = await Product.findAll({ where: { collection_id: collection_id, is_active: true }, limit: 6 });
             res.status(200).json(products);
         }
         catch (error) {
@@ -122,7 +131,10 @@ class ProductController {
             }
             const pageNum = parseInt(page, 10);
             const limitNum = parseInt(limit, 10);
-            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody, product_ids, image_status } = req.body;
+            if (pageNum < 1 || limitNum < 1) {
+                return res.status(400).json({ error: 'Page and limit must be positive numbers' });
+            }
+            const { price, collection_id, brand_id, color_code_id, shape_id, lens_color_id, frame_color_id, frame_type_id, lens_material_id, frame_material_id, gender_id, search: searchBody, product_ids, image_status, status, in_stock, warehouse_in_stock } = req.body;
             const { name: nameQuery } = getListSearchParams(req);
             const search = (searchQuery || searchBody || nameQuery || '').trim();
             const conditions = [];
@@ -163,6 +175,29 @@ class ProductController {
             if (gender_id) {
                 conditions.push({ gender_id });
             }
+            // Optional status filter ('active', 'draft'), case-insensitive, so lists
+            // can be paged on the server instead of filtering each page afterwards.
+            if (status) {
+                conditions.push(Sequelize.where(Sequelize.fn('LOWER', Sequelize.col(`${Product.name}.status`)), String(status).trim().toLowerCase()));
+            }
+            // The shop (status 'active') and the pickers (?active=true or active:true in the body)
+            // only see products that are switched on. The dashboard list sends neither.
+            const wantsActive = activeOnlyWhere(req).is_active === true
+                || req.body.active === true || String(req.body.active).toLowerCase() === 'true'
+                || String(status || '').trim().toLowerCase() === 'active';
+            if (wantsActive) {
+                conditions.push({ is_active: true });
+            }
+            // The shop lists only frames that can be ordered: warehouse plus tray stock above zero,
+            // or an upcoming (pre-order) frame, which can be ordered in any quantity.
+            if (in_stock === true || String(in_stock).toLowerCase() === 'true') {
+                conditions.push(Sequelize.literal(`((COALESCE(\`${Product.name}\`.warehouse_qty, 0) + COALESCE(\`${Product.name}\`.tray_qty, 0)) > 0 OR COALESCE(\`${Product.name}\`.is_upcoming, 0) = 1)`));
+            }
+            // The tray assign picker lists only frames that have warehouse stock to put in a tray.
+            // An upcoming frame keeps no stock, so it is not listed even if an old number is kept.
+            if (warehouse_in_stock === true || String(warehouse_in_stock).toLowerCase() === 'true') {
+                conditions.push(Sequelize.literal(`(COALESCE(\`${Product.name}\`.warehouse_qty, 0) > 0 AND COALESCE(\`${Product.name}\`.is_upcoming, 0) = 0)`));
+            }
             if (price) {
                 conditions.push({
                     mrp: {
@@ -172,7 +207,7 @@ class ProductController {
                 });
             }
             if (search) {
-                const searchTerm = `%${search}%`;
+                const searchTerm = likeContains(search);
                 conditions.push({
                     [Op.or]: [
                         { model_no: { [Op.like]: searchTerm } },
@@ -194,13 +229,18 @@ class ProductController {
                 conditions.push(Sequelize.literal(image_status === 'unuploaded' ? emptyExpr : `NOT ${emptyExpr}`));
             }
             const where = conditions.length > 0 ? { [Op.and]: conditions } : {};
-            const { count, rows: products } = await Product.findAndCountAll({
-                where,
-                include: productIncludes,
-                limit: limitNum,
-                offset: (pageNum - 1) * limitNum,
-                distinct: true,
-            });
+            // The filters only touch the product's own columns, so the total is counted without the ten
+            // joins (they are all one-to-one, so they never change the count) and at the same time as the
+            // page itself, instead of one after the other.
+            const [count, products] = await Promise.all([
+                Product.count({ where }),
+                Product.findAll({
+                    where,
+                    include: productIncludes,
+                    limit: limitNum,
+                    offset: (pageNum - 1) * limitNum,
+                }),
+            ]);
             // Always present total_qty as warehouse + tray so the list never shows a
             // stale/drifted stored total — matches the invariant enforced on write.
             const rows = products.map((p) => {
@@ -218,7 +258,7 @@ class ProductController {
                 }
             });
         } catch (error) {
-            console.log(error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }
@@ -227,11 +267,15 @@ class ProductController {
             const user = req.user;
             const { model_no, gender_id, color_code_id, shape_id, lens_color_id,
                 frame_color_id, frame_type_id, lens_material_id, frame_material_id,
-                mrp, whp, size_mm, warehouse_qty, status, brand_id, collection_id, image_urls } = req.body;
+                mrp, whp, size_mm, warehouse_qty: warehouseQtyBody, status, brand_id, collection_id, image_urls } = req.body;
+            const isUpcoming = toBool(req.body.is_upcoming);
+            // An upcoming product keeps no stock, so the starting quantity is optional (default 0).
+            const warehouse_qty = (isUpcoming && (warehouseQtyBody === undefined || warehouseQtyBody === null || warehouseQtyBody === ''))
+                ? 0 : warehouseQtyBody;
             // The attribute FKs (gender/shape/lens color/color code/frame color/
             // frame type/lens material/frame material) and size_mm are OPTIONAL.
             // Only these core fields are required.
-            if (!model_no || !mrp || !whp || !warehouse_qty || !status || !brand_id || !collection_id) {
+            if (!model_no || !mrp || !whp || (!warehouse_qty && !isUpcoming) || !status || !brand_id || !collection_id) {
                 return res.status(400).json({ error: 'model_no, mrp, whp, warehouse_qty, status, brand and collection are required' });
             }
             // Normalise optional integer FKs: empty/0/invalid -> null (0 is not a
@@ -266,11 +310,17 @@ class ProductController {
                 warehouse_qty,
                 tray_qty: 0,
                 total_qty: warehouse_qty,
+                is_upcoming: isUpcoming,
+                preorder_qty: 0,
                 status,
                 brand_id,
                 collection_id,
                 created_at: new Date(),
                 updated_at: new Date(),
+            });
+            await recordStockMove({
+                productId: product.product_id, warehouseAfter: Number(warehouse_qty) || 0, trayAfter: 0,
+                kind: 'manual', dWarehouse: Number(warehouse_qty) || 0, user: req.user, reference: 'New product', note: 'Starting stock',
             });
             await logAudit({
                 req,
@@ -283,7 +333,7 @@ class ProductController {
             });
             res.status(200).json(product);
         } catch (error) {
-            console.log(error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }
@@ -301,13 +351,18 @@ class ProductController {
             if (!product) {
                 return res.status(404).json({ error: 'Product not found' });
             }
-            const brand = await Brand.findOne({ where: { brand_id: brand_id } });
-            if (!brand) {
-                return res.status(404).json({ error: 'Brand not found' });
+            // Check brand and collection only when the request changes them.
+            if (brand_id !== undefined && brand_id !== null && brand_id !== '') {
+                const brand = await Brand.findOne({ where: { brand_id: brand_id } });
+                if (!brand) {
+                    return res.status(404).json({ error: 'Brand not found' });
+                }
             }
-            const collection = await Collection.findOne({ where: { collection_id: collection_id } });
-            if (!collection) {
-                return res.status(404).json({ error: 'Collection not found' });
+            if (collection_id !== undefined && collection_id !== null && collection_id !== '') {
+                const collection = await Collection.findOne({ where: { collection_id: collection_id } });
+                if (!collection) {
+                    return res.status(404).json({ error: 'Collection not found' });
+                }
             }
             const oldSnapshot = product.toJSON();
             // Optional integer FKs: empty/0/invalid -> null (0 is not a valid FK).
@@ -327,8 +382,11 @@ class ProductController {
                 whp: whp !== undefined ? whp : product.whp,
                 size_mm: size_mm !== undefined ? (size_mm || null) : product.size_mm,
                 status: status !== undefined ? status : product.status,
-                brand_id: brand_id !== undefined ? brand_id : product.brand_id,
-                collection_id: collection_id !== undefined ? collection_id : product.collection_id,
+                // Switching upcoming on or off never changes the stock or pre-order numbers.
+                is_upcoming: req.body.is_upcoming !== undefined ? toBool(req.body.is_upcoming) : !!product.is_upcoming,
+                ...activeUpdate(req.body),
+                brand_id: brand_id ? brand_id : product.brand_id,
+                collection_id: collection_id ? collection_id : product.collection_id,
                 updated_at: new Date(),
             };
 
@@ -349,6 +407,17 @@ class ProductController {
             }
 
             await Product.update(updatePayload, { where: { product_id: id } });
+            {
+                // Stock history for a hand edit of the quantities.
+                const dW = (updatePayload.warehouse_qty !== undefined ? Number(updatePayload.warehouse_qty) : Number(oldSnapshot.warehouse_qty)) - (Number(oldSnapshot.warehouse_qty) || 0);
+                const dT = (updatePayload.tray_qty !== undefined ? Number(updatePayload.tray_qty) : Number(oldSnapshot.tray_qty)) - (Number(oldSnapshot.tray_qty) || 0);
+                await recordStockMove({
+                    productId: id,
+                    warehouseAfter: updatePayload.warehouse_qty !== undefined ? updatePayload.warehouse_qty : oldSnapshot.warehouse_qty,
+                    trayAfter: updatePayload.tray_qty !== undefined ? updatePayload.tray_qty : oldSnapshot.tray_qty,
+                    kind: 'manual', dWarehouse: dW, dTray: dT, user: req.user, reference: 'Product edit', note: 'Changed by hand',
+                });
+            }
 
             await logAudit({
                 req,
@@ -361,7 +430,7 @@ class ProductController {
             });
             res.status(200).json({ message: 'Product updated successfully' });
         } catch (error) {
-            console.log(error);
+            console.error('Request failed:', error.message);
             res.status(500).json({ error: error.message });
         }
     }
@@ -417,7 +486,7 @@ class ProductController {
                             Sequelize.fn('JSON_CONTAINS', Sequelize.col('image_urls'), JSON.stringify(withPath)),
                             1
                         ),
-                        { image_urls: { [Op.like]: `%${file_name}%` } },
+                        { image_urls: { [Op.like]: likeContains(file_name) } },
                     ],
                 },
             });
@@ -809,6 +878,43 @@ class ProductController {
         }
     }
 
+    /**
+     * GET /products/:id/stock-history?kind=&page=&limit=
+     * Every stock change of one product, newest first, with the numbers after each change.
+     */
+    async getStockHistory(req, res) {
+        try {
+            if (!hasRole(req.userRoleNames, ['admin', 'product_manager', 'tray_manager', 'order_manager'])) {
+                return res.status(403).json({ error: 'Access denied' });
+            }
+            const { id } = req.params;
+            const product = await Product.findOne({ where: { product_id: id }, attributes: ['product_id', 'model_no', 'warehouse_qty', 'tray_qty', 'total_qty'] });
+            if (!product) return res.status(404).json({ error: 'Product not found' });
+            const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+            const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+            const where = { product_id: id };
+            if (req.query.kind && ['order', 'cancel', 'tray', 'sheet', 'manual'].includes(req.query.kind)) where.kind = req.query.kind;
+            const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+            const [{ count, rows }, monthCount] = await Promise.all([
+                StockMovement.findAndCountAll({ where, order: [['created_at', 'DESC']], limit, offset: (page - 1) * limit }),
+                StockMovement.count({ where: { product_id: id, created_at: { [Op.gte]: since } } }),
+            ]);
+            res.status(200).json({
+                summary: {
+                    model_no: product.model_no,
+                    warehouse_qty: Number(product.warehouse_qty) || 0,
+                    tray_qty: Number(product.tray_qty) || 0,
+                    total_qty: (Number(product.warehouse_qty) || 0) + (Number(product.tray_qty) || 0),
+                    moves_30_days: monthCount,
+                },
+                data: rows.map((r) => r.toJSON()),
+                pagination: { page, limit, total: count, totalPages: Math.max(1, Math.ceil(count / limit)) },
+            });
+        } catch (error) {
+            res.status(500).json({ error: error.message });
+        }
+    }
+
     async hasData(data) {
         if (!data || data === undefined || data === null || data === '') {
             return false;
@@ -834,6 +940,9 @@ class ProductController {
                     const { model_no, gender, color_code, shape, lens_color, frame_color,
                         frame_type, lens_material, frame_material, mrp, whp, size_mm,
                         warehouse_qty, brand, collection } = item;
+                    // Optional sheet column "upcoming": yes / true / 1 marks the frame as upcoming.
+                    const upcomingCell = item.upcoming !== undefined ? item.upcoming : item.is_upcoming;
+                    const hasUpcomingCell = upcomingCell !== undefined && upcomingCell !== null && String(upcomingCell).trim() !== '';
 
                     let { status } = item;
 
@@ -843,6 +952,14 @@ class ProductController {
                         || !this.hasData(mrp) || !this.hasData(whp) || !this.hasData(size_mm)
                         || !this.hasData(warehouse_qty) || !this.hasData(brand) || !this.hasData(collection)) {
                         errors.push({ row: i + 1, model_no: model_no || 'N/A', error: 'All fields are required' });
+                        errorCount++;
+                        continue;
+                    }
+
+                    // The quantity must be a whole number of 0 or more.
+                    const qtyNumber = Number(warehouse_qty);
+                    if (!Number.isInteger(qtyNumber) || qtyNumber < 0) {
+                        errors.push({ row: i + 1, model_no, error: 'warehouse_qty must be a whole number of 0 or more' });
                         errorCount++;
                         continue;
                     }
@@ -906,9 +1023,13 @@ class ProductController {
                         }
                     });
                     if (existingProduct) {
+                        // The sheet's quantity REPLACES the warehouse stock. The total is always
+                        // warehouse + tray, so it is recalculated here (it used to stay stale).
                         const bulkUpdatePayload = {
                             status: status,
-                            warehouse_qty: warehouse_qty,
+                            ...(hasUpcomingCell ? { is_upcoming: toBool(upcomingCell) } : {}),
+                            warehouse_qty: qtyNumber,
+                            total_qty: qtyNumber + (Number(existingProduct.tray_qty) || 0),
                             mrp: mrp,
                             whp: whp,
                             size_mm: size_mm,
@@ -925,7 +1046,11 @@ class ProductController {
                             updated_at: new Date(),
                         };
                         const oldSnapshot = existingProduct.toJSON();
-                        Product.update(bulkUpdatePayload, { where: { product_id: existingProduct.product_id } });
+                        await Product.update(bulkUpdatePayload, { where: { product_id: existingProduct.product_id } });
+                        await recordStockMove({
+                            productId: existingProduct.product_id, warehouseAfter: qtyNumber, trayAfter: Number(existingProduct.tray_qty) || 0,
+                            kind: 'sheet', dWarehouse: qtyNumber - (Number(oldSnapshot.warehouse_qty) || 0), user, reference: 'Sheet upload', note: 'The sheet quantity replaced the warehouse number',
+                        });
                         await logAudit({
                             req,
                             action: 'update',
@@ -954,9 +1079,11 @@ class ProductController {
                         mrp,
                         whp,
                         size_mm,
-                        warehouse_qty,
+                        warehouse_qty: qtyNumber,
                         tray_qty: 0,
-                        total_qty: warehouse_qty,
+                        total_qty: qtyNumber,
+                        is_upcoming: hasUpcomingCell ? toBool(upcomingCell) : false,
+                        preorder_qty: 0,
                         status,
                         brand_id: brandModel.brand_id,
                         collection_id: collectionModel.collection_id,
@@ -965,6 +1092,10 @@ class ProductController {
                     });
 
                     createdProducts.push(product);
+                    await recordStockMove({
+                        productId: product.product_id, warehouseAfter: qtyNumber, trayAfter: 0,
+                        kind: 'sheet', dWarehouse: qtyNumber, user, reference: 'Sheet upload', note: 'New product from the sheet',
+                    });
 
                     // Create audit log if user is provided
                     if (user && req) {
@@ -988,7 +1119,7 @@ class ProductController {
 
             return {
                 success: successCount > 0,
-                message: `Bulk upload completed. ${successCount} products created, ${errorCount} errors.`,
+                message: `Bulk upload completed. ${createdProducts.length} created, ${updatedProducts.length} updated (stock replaced by the sheet's quantity), ${errorCount} errors.`,
                 data: {
                     created: createdProducts,
                     errors: errors,

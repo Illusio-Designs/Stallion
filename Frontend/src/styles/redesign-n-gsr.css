@@ -1,0 +1,11 @@
+/* Gooey search: sits above neighbouring controls while open, and fits the screen. */
+:root .gsr.is-open { z-index: 45; }
+:root .gsr__results { max-width: calc(100vw - 16px); }
+:root .gsr__results .gs-pop { left: auto; right: 0; min-width: 0; width: min(360px, var(--gsr-avail, 100vw), calc(100vw - 16px)); }
+@media (max-width: 639px) {
+  /* Toolbar mode: the open box takes its own full row so the buttons beside it stay clickable. */
+  :root .gsr--row.is-open { flex: 1 1 100%; width: 100%; order: -1; }
+}
+@media (max-width: 639px) {
+  :root .gtools:has(> .gsr--row), :root .tray-toolbar:has(> .gsr--row) { flex-wrap: wrap; }
+}

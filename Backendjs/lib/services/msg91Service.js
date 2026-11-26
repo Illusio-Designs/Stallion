@@ -51,7 +51,7 @@ class Msg91Service {
 
             // Log MSG91's raw reply so delivery issues (template/credits/test-mode)
             // are visible in the server logs.
-            console.log('[MSG91] send OTP ->', cleanedPhoneNumber, 'template:', tid || '(account default)', 'reply:', JSON.stringify(response.data));
+            console.log('[MSG91] send OTP -> ***' + String(cleanedPhoneNumber).slice(-4), 'template:', tid || '(account default)', 'reply:', JSON.stringify(response.data));
 
             // MSG91 signals failures with type:'error' even on HTTP 200, so don't
             // blindly report success — surface the real reason instead.
@@ -156,10 +156,13 @@ class Msg91Service {
                 headers: { 'Content-Type': 'application/json' },
             });
 
-            const ok = response.data && response.data.type === 'success';
+            // MSG91 can answer HTTP 200 with an error body, so judge by the body.
+            const ok = !!response.data && response.data.type === 'success' && response.data.code !== 201;
             return {
                 success: ok,
                 data: response.data,
+                // The phone number (or email) MSG91 says was verified for this token.
+                identifier: ok ? String(response.data.message == null ? '' : response.data.message) : '',
                 message: ok ? 'Access token verified' : 'Invalid access token',
             };
         } catch (error) {

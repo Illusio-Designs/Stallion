@@ -1,4 +1,5 @@
 const express = require('express');
+const noDelete = require('../middleware/noDelete');
 const router = express.Router();
 const productController = require('../controllers/productController');
 const { authenticateToken } = require('../middleware/auth');
@@ -10,8 +11,9 @@ router.post('/', authenticateToken, productController.getProducts);
 router.post('/featured', productController.getFeaturedProducts);
 router.get('/images/all', authenticateToken, isProductManager, productController.getAllUploadedImages);
 router.post('/create', authenticateToken, isProductManager, productController.createProduct);
+router.get('/:id/stock-history', authenticateToken, productController.getStockHistory);
 router.put('/:id', authenticateToken, checkRole(['admin', 'product_manager', 'tray_manager']), productController.updateProduct);
-router.delete('/:id', authenticateToken, isProductManager, productController.deleteProduct);
+router.delete('/:id', authenticateToken, noDelete('A product'));
 router.delete('/images/:file_name', authenticateToken, isProductManager, productController.deleteProductImage);
 router.post('/image-upload', authenticateToken, isProductManager, productImageUpload, productController.uploadProductImage);
 router.post('/relink-images', authenticateToken, isProductManager, productController.relinkImagesToProducts);

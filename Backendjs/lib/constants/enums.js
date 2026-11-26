@@ -1,7 +1,9 @@
 const TrayStatus = {
     AVAILABLE: 'available',
     ASSIGNED: 'assigned',
-    CLOSED: 'closed'
+    CLOSED: 'closed',
+    // The owner (a salesman) has left and the tray is empty. It comes back when they rejoin.
+    INACTIVE: 'inactive'
 };
 
 const TrayProductStatus = {
@@ -34,10 +36,10 @@ const OrderStatus = {
 
 const OrderStatusTransitions = {
     [OrderStatus.PENDING]: [OrderStatus.PROCESSED, OrderStatus.CANCELLED],
-    [OrderStatus.PROCESSED]: [OrderStatus.HOLD_BY_TRAY, OrderStatus.CANCELLED],
+    [OrderStatus.PROCESSED]: [OrderStatus.HOLD_BY_TRAY, OrderStatus.DISPATCHED, OrderStatus.PARTIALLY_DISPATCHED, OrderStatus.CANCELLED],
     [OrderStatus.HOLD_BY_TRAY]: [OrderStatus.DISPATCHED, OrderStatus.PARTIALLY_DISPATCHED, OrderStatus.CANCELLED],
     [OrderStatus.DISPATCHED]: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
-    [OrderStatus.PARTIALLY_DISPATCHED]: [OrderStatus.COMPLETED, OrderStatus.CANCELLED],
+    [OrderStatus.PARTIALLY_DISPATCHED]: [OrderStatus.DISPATCHED, OrderStatus.COMPLETED, OrderStatus.CANCELLED],
     [OrderStatus.COMPLETED]: [],
     [OrderStatus.CANCELLED]: [],
 };

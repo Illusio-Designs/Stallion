@@ -1,10 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import "../styles/pages/ProductDetail.css";
+import "../styles/redesign-n-product.css";
+import "../styles/redesign-p-detail.css";
 import Skeleton from "../components/ui/Skeleton";
 import { addToCart } from "../services/cartService";
 import { showAddToCartSuccess } from "../services/notificationService";
-import { parseProductPath } from "../utils/dashboardRoutes";
+import { parseProductPath, productPath } from "../utils/dashboardRoutes";
 import { encodeUploadName } from "../utils/imageUrl";
+import { isUpcoming, MAX_ORDER_QTY } from "../utils/upcoming";
 import {
   getProductModels,
   getProductById,
@@ -17,6 +20,7 @@ import {
   getLensMaterials,
   getFrameTypes
 } from "../services/apiService";
+import { getProducts } from "../services/api/productApi";
 
 // Shared state for viewMode to communicate with Breadcrumb
 let sharedViewMode = "list";
@@ -37,6 +41,26 @@ const display = (value) => {
   const str = String(value).trim();
   if (str === "" || str === "N/A") return "—";
   return str;
+};
+
+// Whole rupees when there are no paise, otherwise two decimals.
+const inr = (value) => {
+  const n = Number(value) || 0;
+  return `₹${n.toLocaleString("en-IN", { minimumFractionDigits: Number.isInteger(n) ? 0 : 2, maximumFractionDigits: 2 })}`;
+};
+
+// First image of a raw product row as a full upload URL (for the "other frames" cards).
+const firstImageUrl = (product) => {
+  const base = (process.env.NEXT_PUBLIC_IMAGE_BASE_URL || "https://api.stallioneyewear.in").replace(/\/$/, "");
+  let urls = product?.image_urls;
+  if (typeof urls === "string") {
+    try { urls = JSON.parse(urls); } catch (e) { urls = [urls]; }
+    if (typeof urls === "string") urls = [urls];
+  }
+  const first = (Array.isArray(urls) && urls[0]) || product?.image_url;
+  if (typeof first !== "string") return "/images/products/spac1.webp";
+  const file = first.split("?")[0].split("#")[0].replace(/([\]"\\])+$/, "").split("/").pop();
+  return file && file.includes(".") ? `${base}/uploads/products/${encodeUploadName(file)}` : "/images/products/spac1.webp";
 };
 
 const ProductDetail = ({ productId: propProductId = null }) => {
@@ -105,6 +129,7 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   // fallback, so we can show a graceful "image unavailable" affordance. Keyed by
   // src so selecting a different variation gives its image a fresh attempt.
   const [brokenMainImageSrc, setBrokenMainImageSrc] = useState(null);
+  const [otherFrames, setOtherFrames] = useState([]); // "Other frames you may like"
   
   // Lookup data for resolving IDs to names
   const [brands, setBrands] = useState([]);
@@ -177,9 +202,12 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   };
 
   // Available stock for a variation id (0 when unknown/out of stock).
+  // Upcoming (pre-order) frames have no stock cap, only the sanity limit.
   const getStock = (variationId) => {
     const v = productVariations.find((pv) => pv.id === variationId);
-    return v ? Number(v.stock ?? 0) : 0;
+    if (!v) return 0;
+    if (v.isUpcoming) return MAX_ORDER_QTY;
+    return Number(v.stock ?? 0);
   };
 
   const updateQuantity = (variationId, newQuantity) => {
@@ -219,7 +247,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
     if (e) {
       e.stopPropagation(); // Prevent card click when clicking button
     }
-    const stock = Number(variation.stock ?? 0);
+    const upcoming = !!variation.isUpcoming;
+    const stock = upcoming ? MAX_ORDER_QTY : Number(variation.stock ?? 0);
     if (stock <= 0) return; // out of stock — button is disabled, guard anyway
     const quantity = Math.min(getQuantity(variation.id), stock);
     addToCart({
@@ -229,7 +258,8 @@ const ProductDetail = ({ productId: propProductId = null }) => {
       lenseColour: variation.lenseColour,
       whp: variation.whp,
       quantity: quantity,
-      stock, // snapshot so the cart has an immediate cap before its live refresh
+      // snapshot so the cart has an immediate cap before its live refresh (upcoming has none)
+      ...(upcoming ? { is_upcoming: true } : { stock }),
     });
     // Show success notification
     showAddToCartSuccess(
@@ -357,6 +387,16 @@ const ProductDetail = ({ productId: propProductId = null }) => {
         return '/images/products/spac1.webp';
       };
 
+      // All image urls of this model (display only; first one is the main image).
+      const getAllImageUrls = (imageUrls) => {
+        const parsed = parseImageUrls(imageUrls);
+        if (!parsed) return [];
+        return parsed
+          .map((u) => extractFilename(u))
+          .filter(Boolean)
+          .map((f) => `${imageBaseUrl}/uploads/products/${encodeUploadName(f)}`);
+      };
+
       // Format price with currency
       const formatPrice = (price) => {
         if (!price) return '₹0';
@@ -396,9 +436,13 @@ const ProductDetail = ({ productId: propProductId = null }) => {
         qty: formatQty(model.total_qty || model.warehouse_qty || 0),
         // Raw available stock (number) — drives the qty cap and out-of-stock UI.
         stock: Number(model.total_qty ?? model.warehouse_qty ?? 0),
+        isUpcoming: isUpcoming(model),
         image: getImageUrl(model.image_urls, model.image_url),
+        images: getAllImageUrls(model.image_urls),
         mrp: formatPrice(model.mrp),
         whp: formatPrice(model.whp),
+        whpNum: Number(model.whp) || 0,
+        mrpNum: Number(model.mrp) || 0,
       };
     });
 
@@ -501,6 +545,23 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   }, [rawModels]);
 
   const currentProduct = productVariations[selectedVariation] || null;
+  const currentModelNo = currentProduct ? currentProduct.model : null;
+
+  // Other frames you may like: a few other active products (display only, best effort).
+  useEffect(() => {
+    if (!currentModelNo) return undefined;
+    let cancelled = false;
+    getProducts(1, 12, { status: "active" })
+      .then((res) => {
+        if (cancelled) return;
+        const rows = (res?.data || [])
+          .filter((p) => (p.status || "").toLowerCase().trim() === "active" && p.model_no && p.model_no !== currentModelNo)
+          .slice(0, 4);
+        setOtherFrames(rows);
+      })
+      .catch(() => { if (!cancelled) setOtherFrames([]); });
+    return () => { cancelled = true; };
+  }, [currentModelNo]);
   const totalVariations = productVariations.length;
 
   // Update display variation based on selected variation
@@ -599,6 +660,17 @@ const ProductDetail = ({ productId: propProductId = null }) => {
   const displayVariation = getDisplayVariation();
   const needsSlider = viewMode === "grid" && needsSliderArrows; // Only need slider arrows for >3 variations
 
+  // Gallery: several images on the selected variation -> its images; otherwise
+  // one thumbnail per variation (clicking selects that variation).
+  const [imageIndex, setImageIndex] = useState(0);
+  useEffect(() => { setImageIndex(0); }, [selectedVariation]);
+  const curForGallery = productVariations[selectedVariation] || null;
+  const ownImages = curForGallery && curForGallery.images && curForGallery.images.length > 1 ? curForGallery.images : null;
+  const galleryImages = ownImages || (curForGallery ? [curForGallery.image] : []);
+  const galleryThumbs = ownImages
+    ? ownImages.map((src, i) => ({ src, active: i === imageIndex, label: `Image ${i + 1}`, onSelect: () => setImageIndex(i) }))
+    : productVariations.map((v, i) => ({ src: v.image || '/images/products/spac1.webp', active: i === selectedVariation, label: `View ${v.name} ${v.lenseColour}`, onSelect: () => handleVariationClick(i) }));
+
   // Show loading state (shimmer placeholder mimicking the detail layout)
   if (loading) {
     return (
@@ -672,602 +744,210 @@ const ProductDetail = ({ productId: propProductId = null }) => {
     );
   }
 
+  const cur = currentProduct;
+  const curUpcoming = !!cur.isUpcoming;
+  // Upcoming frames keep no stock, so they are always orderable and have no cap.
+  const curStock = curUpcoming ? MAX_ORDER_QTY : Number(cur.stock ?? 0);
+  const curQty = curStock > 0 ? Math.min(getQuantity(cur.id), curStock) : getQuantity(cur.id);
+  const brandName = display(cur.brand);
+  const mainImageSrc = galleryImages[Math.min(imageIndex, galleryImages.length - 1)] || cur.image || '/images/products/spac1.webp';
+  const stockState = curUpcoming ? { cls: "upcoming", text: "Preorder" } : curStock <= 0 ? { cls: "bad", text: "Sold out" } : curStock <= 10 ? { cls: "warn", text: `Low stock, ${curStock} left` } : { cls: "ok", text: `In stock, ${curStock} left` };
+  const lensText = [cur.lenseColour, cur.lenseMaterial].map(display).filter((v) => v !== "—").join(", ") || "—";
+  const specRows = [
+    ["Shape", cur.shape],
+    ["Frame type", cur.type],
+    ["Frame material", cur.frameMaterial],
+    ["Lens", lensText],
+    ["Size", cur.size],
+    ["Gender", cur.gender],
+  ];
+  const offPct = cur.mrpNum > cur.whpNum && cur.whpNum > 0 ? Math.round(100 - (cur.whpNum * 100) / cur.mrpNum) : 0;
+  const lineTotal = inr(cur.whpNum * curQty);
+  const colourName = (v) => {
+    const c = display(v.lenseColour);
+    return c !== "—" ? c : display(v.frameColour);
+  };
+  const onImgError = (e) => {
+    if (e.target.dataset.fallbackApplied !== "true" && !e.target.src.endsWith('/images/products/spac1.webp')) {
+      e.target.dataset.fallbackApplied = "true";
+      e.target.src = '/images/products/spac1.webp';
+    } else {
+      setBrokenMainImageSrc(e.target.getAttribute("src"));
+    }
+  };
+
+  const qtyBox = (key) => (
+    <div className="pdp-qty" role="group" aria-label="Quantity" key={key}>
+      <button
+        type="button"
+        className="pdp-qty-btn"
+        aria-label="Decrease quantity"
+        disabled={curQty <= 1}
+        onClick={(e) => handleQuantityDecrease(cur.id, e)}
+      >
+        <span aria-hidden="true">&minus;</span>
+      </button>
+      <input
+        className="pdp-qty-input"
+        type="number"
+        inputMode="numeric"
+        min="1"
+        max={curStock > 0 ? curStock : undefined}
+        step="1"
+        aria-label="Quantity"
+        value={editingQuantities[cur.id] !== undefined ? editingQuantities[cur.id] : curQty}
+        onChange={(e) => {
+          let val = e.target.value;
+          const num = parseInt(val, 10);
+          if (curStock > 0 && !Number.isNaN(num) && num > curStock) val = String(curStock); // never above the stock
+          setEditingQuantities((q) => ({ ...q, [cur.id]: val }));
+        }}
+        onBlur={(e) => {
+          const val = editingQuantities[cur.id];
+          const num = parseInt(val, 10);
+          handleQuantityInputChange(cur.id, (!val || isNaN(num) || num < 1) ? '1' : val, e);
+          setEditingQuantities((q) => {
+            const { [cur.id]: _, ...rest } = q;
+            return rest;
+          });
+        }}
+      />
+      <button
+        type="button"
+        className="pdp-qty-btn"
+        aria-label="Increase quantity"
+        onClick={(e) => handleQuantityIncrease(cur.id, e)}
+        disabled={curStock <= 0 || curQty >= curStock}
+      >
+        <span aria-hidden="true">+</span>
+      </button>
+    </div>
+  );
+
   return (
-    <div className="product-detail-page bg-bg px-[3%] py-3 sm:px-[4%] sm:py-5 md:py-6 lg:py-7 xl:px-[5%] xl:py-8 min-h-[calc(100vh-200px)]">
-      {/* List View */}
-      {viewMode === "list" && (
-        <div className="list-view-container flex flex-col gap-5">
-          {productVariations.map((variation, index) => (
-            <div key={variation.id} className="list-view-item bg-surface rounded-lg p-4 sm:p-5 lg:p-5 xl:p-6 grid grid-cols-1 sm:grid-cols-[160px_1fr] lg:grid-cols-[220px_1fr] xl:grid-cols-[280px_1fr] gap-4 sm:gap-4 xl:gap-6 items-start border border-border shadow-sm transition duration-200 hover:shadow-md">
-              <div className="list-item-image w-full h-[180px] sm:h-[180px] lg:h-[200px] xl:h-[240px] flex items-center justify-center bg-surface-muted rounded-md overflow-hidden p-4">
-                <img
-                  src={variation.image || '/images/products/spac1.webp'}
-                  alt={variation.name}
-                  className="max-w-full max-h-full object-contain"
-                  onError={(e) => {
-                    // Fallback to default image if image fails to load
-                    if (e.target.src !== '/images/products/spac1.webp') {
-                      e.target.src = '/images/products/spac1.webp';
-                    }
-                  }}
-                />
+    <div className="product-detail-page pdp bg-bg">
+      <div className="pdp-grid">
+        <div className="pdp-gallery">
+          <div className="pdp-big">
+            <span className={`pdp-stock ${stockState.cls}`}>{stockState.text}</span>
+            {brokenMainImageSrc === mainImageSrc ? (
+              <div className="main-product-image-unavailable pdp-unavail" role="img" aria-label="Image unavailable">
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <circle cx="9" cy="9" r="1.5" />
+                  <path d="m21 15-3.5-3.5L9 20" />
+                  <line x1="3" y1="3" x2="21" y2="21" />
+                </svg>
+                <span>Image unavailable</span>
               </div>
-              <div className="list-item-details flex flex-col gap-5 justify-between">
-                <div className="detail-grid grid grid-cols-2 gap-4 md:grid-cols-3 md:gap-y-4 md:gap-x-5 lg:grid-cols-5 lg:gap-y-5 lg:gap-x-6">
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Brand</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.brand)}</span>
-                  </div>
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Model</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.model)}</span>
-                  </div>
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Type</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.type)}</span>
-                  </div>
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Gender</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.gender)}</span>
-                  </div>
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Shape</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.shape)}</span>
-                  </div>
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Frame Colour</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">
-                      {display(variation.frameColour)}
-                    </span>
-                  </div>
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Frame Material</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">
-                      {display(variation.frameMaterial)}
-                    </span>
-                  </div>
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Lense Colour</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">
-                      {display(variation.lenseColour)}
-                    </span>
-                  </div>
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Lense Material</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">
-                      {display(variation.lenseMaterial)}
-                    </span>
-                  </div>
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">Size</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.size)}</span>
-                  </div>
-                  {/* QTY label/value as a normal detail cell */}
-                  <div className="detail-item flex flex-col gap-1 min-w-0">
-                    <span className="detail-label font-normal text-text-subtle text-[length:var(--text-xs)] tracking-[var(--tracking-label)] uppercase">QTY</span>
-                    <span className="detail-value text-text font-medium text-[length:var(--text-base)] leading-[var(--leading-snug)] break-words">{display(variation.qty)}</span>
-                  </div>
-                  {/* Quantity selector in 5th column */}
-                  <div className="quantity-selector-wrapper flex items-end">
-                    <div className="quantity-selector w-full flex items-center justify-between gap-1 bg-surface border border-border-strong rounded-md p-1">
-                      <button
-                        type="button"
-                        className="qty-btn minus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
-                        aria-label={`Decrease quantity for ${variation.name}`}
-                        disabled={getQuantity(variation.id) <= 1}
-                        onClick={(e) => handleQuantityDecrease(variation.id, e)}
-                      >
-                        <span aria-hidden="true">&minus;</span>
-                      </button>
-                      <input
-                        className="qty-number text-center font-semibold text-text bg-transparent text-[length:var(--text-md)] px-2 border-none w-full min-w-[48px] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:m-0 focus-visible:outline-none focus-visible:rounded-sm focus-visible:shadow-[var(--focus-ring)]"
-                        type="number"
-                        inputMode="numeric"
-                        min="1"
-                        step="1"
-                        aria-label={`Quantity for ${variation.name}`}
-                        value={
-                          editingQuantities[variation.id] !== undefined
-                            ? editingQuantities[variation.id]
-                            : getQuantity(variation.id)
-                        }
-                        onChange={(e) => {
-                          setEditingQuantities((q) => ({
-                            ...q,
-                            [variation.id]: e.target.value,
-                          }));
-                        }}
-                        onBlur={(e) => {
-                          const val = editingQuantities[variation.id];
-                          const num = parseInt(val, 10);
-                          handleQuantityInputChange(
-                            variation.id,
-                            !val || isNaN(num) || num < 1 ? "1" : val,
-                            e
-                          );
-                          setEditingQuantities((q) => {
-                            const { [variation.id]: _, ...rest } = q;
-                            return rest;
-                          });
-                        }}
-                      />
-                      <button
-                        type="button"
-                        className="qty-btn plus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
-                        aria-label={`Increase quantity for ${variation.name}`}
-                        onClick={(e) => handleQuantityIncrease(variation.id, e)}
-                        disabled={variation.stock <= 0 || getQuantity(variation.id) >= variation.stock}
-                      >
-                        <span aria-hidden="true">+</span>
-                      </button>
-                    </div>
-                  </div>
-                  {/* Add to Cart button in 6th column */}
-                  <div className="add-to-cart-wrapper flex flex-col items-stretch justify-end gap-1">
-                    {variation.stock <= 0 && (
-                      <span className="text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-error">Out of stock</span>
-                    )}
-                    <button
-                      type="button"
-                      disabled={variation.stock <= 0}
-                      className={`add-to-cart-btn-list w-full min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-55 ${variation.stock <= 0 ? "cursor-not-allowed bg-surface-muted border-border text-text-subtle" : addedIds[variation.id] ? "is-added bg-success border-success text-text-on-primary cursor-pointer" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active cursor-pointer"}`}
-                      onClick={(e) => handleAddToCart(variation, e)}
-                    >
-                      {variation.stock <= 0 ? "Out of Stock" : addedIds[variation.id] ? "Added ✓" : "Add to Cart"}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Grid View */}
-      {viewMode === "grid" && (
-        <div className="grid-view-container flex flex-col gap-8">
-          {/* Main Product Display Area */}
-          <div className="grid-main-section flex flex-col gap-8">
-            {/* Slider Section */}
-            {totalVariations > 3 && (
-              <div className="variation-slider-section relative flex items-center gap-4">
-                {needsSlider && (
-                  <button
-                    type="button"
-                    className="slider-arrow left bg-surface text-primary border border-border w-11 h-11 rounded-pill cursor-pointer flex items-center justify-center transition duration-200 z-10 shrink-0 shadow-sm hover:enabled:bg-primary-soft hover:enabled:scale-[1.04] active:enabled:scale-[0.96] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
-                    aria-label="Previous variations"
-                    onClick={() => scrollSlider("prev")}
-                    disabled={sliderPosition === 0}
-                  >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M15 18L9 12L15 6"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                )}
-                <div className="variation-slider flex-1 overflow-hidden relative min-w-0" ref={sliderRef}>
-                  <div className="variation-slider-track grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 w-full">
-                    {visibleVariations.map((variation, index) => {
-                      // Calculate actual index based on which variations are shown
-                      let actualIndex;
-                      if (totalVariations === 4) {
-                        actualIndex = index; // indices 0, 1, 2
-                      } else if (totalVariations === 5) {
-                        actualIndex = sliderPosition === 0 ? index : 3 + index; // 0-2 or 3-4
-                      } else if (totalVariations === 6) {
-                        actualIndex = sliderPosition === 0 ? index : 3 + index; // 0-2 or 3-5
-                      } else {
-                        actualIndex = index;
-                      }
-                      return (
-                        <div
-                          key={variation.id}
-                          className={`variation-card bg-surface rounded-lg overflow-hidden cursor-pointer transition duration-200 border flex flex-col shadow-sm hover:shadow-md hover:-translate-y-0.5 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${
-                            selectedVariation === actualIndex ? "active border-primary shadow-md" : "border-border"
-                          }`}
-                          role="button"
-                          tabIndex={0}
-                          aria-pressed={selectedVariation === actualIndex}
-                          aria-label={`Select variation ${variation.name}`}
-                          onClick={() => handleVariationClick(actualIndex)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" || e.key === " ") {
-                              e.preventDefault();
-                              handleVariationClick(actualIndex);
-                            }
-                          }}
-                        >
-                          <div className="variation-card-image w-full h-[240px] flex items-center justify-center bg-surface-muted overflow-hidden p-4">
-                            <img
-                              src={variation.image || '/images/products/spac1.webp'}
-                              alt={variation.name}
-                              className="max-w-full max-h-full object-contain"
-                              onError={(e) => {
-                                // Fallback to default image if image fails to load
-                                if (e.target.src !== '/images/products/spac1.webp') {
-                                  e.target.src = '/images/products/spac1.webp';
-                                }
-                              }}
-                            />
-                          </div>
-                          <div className="variation-card-details p-5 flex flex-col gap-4 bg-surface">
-                            <h4 className="variation-card-title text-[length:var(--text-lg)] text-text m-0 font-semibold leading-[var(--leading-snug)] tracking-[-0.01em]">
-                              {display(variation.name)}
-                            </h4>
-                            <div className="variation-specs flex flex-col gap-2">
-                              <div className="variation-spec-item flex justify-between gap-2 items-baseline">
-                                <span className="variation-spec-label text-[length:var(--text-sm)] text-text-muted font-normal">
-                                  Frame Colour
-                                </span>
-                                <span className="variation-spec-value text-[length:var(--text-sm)] text-text font-medium text-right">
-                                  {display(variation.frameColour)}
-                                </span>
-                              </div>
-                              <div className="variation-spec-item flex justify-between gap-2 items-baseline">
-                                <span className="variation-spec-label text-[length:var(--text-sm)] text-text-muted font-normal">
-                                  Lense Colour
-                                </span>
-                                <span className="variation-spec-value text-[length:var(--text-sm)] text-text font-medium text-right">
-                                  {display(variation.lenseColour)}
-                                </span>
-                              </div>
-                            </div>
-                            <div
-                              className="quantity-selector-small w-full flex items-center justify-between gap-1 bg-surface border border-border-strong rounded-md p-1"
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <button
-                                type="button"
-                                className="qty-btn-small minus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
-                                aria-label={`Decrease quantity for ${variation.name}`}
-                                disabled={getQuantity(variation.id) <= 1}
-                                onClick={(e) =>
-                                  handleQuantityDecrease(variation.id, e)
-                                }
-                              >
-                                <span aria-hidden="true">&minus;</span>
-                              </button>
-                              <input
-                                className="qty-number-small text-center font-semibold text-text bg-transparent text-[length:var(--text-md)] px-2 border-none w-full min-w-[48px] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:m-0 focus-visible:outline-none focus-visible:rounded-sm focus-visible:shadow-[var(--focus-ring)]"
-                                type="number"
-                                inputMode="numeric"
-                                min="1"
-                                step="1"
-                                aria-label={`Quantity for ${variation.name}`}
-                                onClick={(e) => e.stopPropagation()}
-                                value={
-                                  editingQuantities[variation.id] !== undefined
-                                    ? editingQuantities[variation.id]
-                                    : getQuantity(variation.id)
-                                }
-                                onChange={(e) => {
-                                  setEditingQuantities((q) => ({
-                                    ...q,
-                                    [variation.id]: e.target.value,
-                                  }));
-                                }}
-                                onBlur={(e) => {
-                                  const val = editingQuantities[variation.id];
-                                  const num = parseInt(val, 10);
-                                  handleQuantityInputChange(
-                                    variation.id,
-                                    !val || isNaN(num) || num < 1 ? "1" : val,
-                                    e
-                                  );
-                                  setEditingQuantities((q) => {
-                                    const { [variation.id]: _, ...rest } = q;
-                                    return rest;
-                                  });
-                                }}
-                              />
-                              <button
-                                type="button"
-                                className="qty-btn-small plus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
-                                aria-label={`Increase quantity for ${variation.name}`}
-                                onClick={(e) =>
-                                  handleQuantityIncrease(variation.id, e)
-                                }
-                                disabled={variation.stock <= 0 || getQuantity(variation.id) >= variation.stock}
-                              >
-                                <span aria-hidden="true">+</span>
-                              </button>
-                            </div>
-                            {variation.stock <= 0 && (
-                              <span className="block mb-1 text-[length:var(--text-xs)] font-semibold uppercase tracking-[var(--tracking-label)] text-error">Out of stock</span>
-                            )}
-                            <button
-                              type="button"
-                              disabled={variation.stock <= 0}
-                              className={`add-to-cart-btn-small w-full min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-55 ${variation.stock <= 0 ? "cursor-not-allowed bg-surface-muted border-border text-text-subtle" : addedIds[variation.id] ? "is-added bg-success border-success text-text-on-primary cursor-pointer" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active cursor-pointer"}`}
-                              onClick={(e) => handleAddToCart(variation, e)}
-                            >
-                              {variation.stock <= 0 ? "Out of Stock" : addedIds[variation.id] ? "Added ✓" : "Add to Cart"}
-                            </button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                {needsSlider && (
-                  <button
-                    type="button"
-                    className="slider-arrow right bg-surface text-primary border border-border w-11 h-11 rounded-pill cursor-pointer flex items-center justify-center transition duration-200 z-10 shrink-0 shadow-sm hover:enabled:bg-primary-soft hover:enabled:scale-[1.04] active:enabled:scale-[0.96] focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
-                    aria-label="Next variations"
-                    onClick={() => scrollSlider("next")}
-                    disabled={sliderPosition >= maxSliderPosition}
-                  >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      xmlns="http://www.w3.org/2000/svg"
-                    >
-                      <path
-                        d="M9 18L15 12L9 6"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </button>
-                )}
-              </div>
+            ) : (
+              <img src={mainImageSrc} alt={cur.name} onError={onImgError} />
             )}
-
-            {/* Main Product Display */}
-            <div className="main-product-display grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-10 bg-transparent pt-4 px-0 pb-0 items-center">
-              <div className="main-product-image w-full h-[320px] md:h-[400px] flex items-center justify-center bg-surface rounded-lg overflow-hidden p-6 shadow-lg">
-                {(() => {
-                  const mainImageSrc = currentProduct.image || '/images/products/spac1.webp';
-                  if (brokenMainImageSrc === mainImageSrc) {
-                    return (
-                      <div
-                        className="main-product-image-unavailable flex flex-col items-center justify-center gap-2 text-text-subtle"
-                        role="img"
-                        aria-label="Image unavailable"
-                      >
-                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                          <rect x="3" y="3" width="18" height="18" rx="2" />
-                          <circle cx="9" cy="9" r="1.5" />
-                          <path d="m21 15-3.5-3.5L9 20" />
-                          <line x1="3" y1="3" x2="21" y2="21" />
-                        </svg>
-                        <span className="text-[length:var(--text-sm)] font-medium tracking-[var(--tracking-label)] uppercase">Image unavailable</span>
-                      </div>
-                    );
-                  }
-                  return (
-                    <img
-                      src={mainImageSrc}
-                      alt={currentProduct.name}
-                      className="max-w-full max-h-full object-contain"
-                      onError={(e) => {
-                        // Fallback to default image if image fails to load; if the
-                        // local placeholder fails too, show the "image unavailable"
-                        // affordance instead of leaving blank space.
-                        if (e.target.src !== '/images/products/spac1.webp' && e.target.dataset.fallbackApplied !== 'true') {
-                          e.target.dataset.fallbackApplied = 'true';
-                          e.target.src = '/images/products/spac1.webp';
-                        } else {
-                          setBrokenMainImageSrc(mainImageSrc);
-                        }
-                      }}
-                    />
-                  );
-                })()}
-              </div>
-              <div className="main-product-info flex flex-col gap-6">
-                <h2 className="product-title text-[length:var(--text-2xl)] text-text m-0 font-semibold leading-[var(--leading-tight)] tracking-[-0.02em]">{display(currentProduct.name)}</h2>
-                <div className="price-info flex flex-col gap-2">
-                  <div className="price-item flex items-baseline gap-4">
-                    <span className="price-label text-[length:var(--text-sm)] text-text-muted font-normal uppercase tracking-[var(--tracking-label)] min-w-[44px]">MRP</span>
-                    <span className="price-value text-[length:var(--text-xl)] text-text font-semibold">{display(currentProduct.mrp)}</span>
-                  </div>
-                  <div className="price-item flex items-baseline gap-4">
-                    <span className="price-label text-[length:var(--text-sm)] text-text-muted font-normal uppercase tracking-[var(--tracking-label)] min-w-[44px]">WHP</span>
-                    <span className="price-value text-[length:var(--text-lg)] text-accent font-semibold">{display(currentProduct.whp)}</span>
-                  </div>
-                </div>
-                <div className="main-selector-action-row flex flex-wrap gap-4 items-center mt-2 sm:flex-nowrap">
-                  <div className="quantity-selector-small w-full sm:w-auto flex-none flex items-center justify-between gap-1 bg-surface border border-border-strong rounded-md p-1">
-                    <button
-                      type="button"
-                      className="qty-btn-small minus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
-                      aria-label="Decrease quantity"
-                      disabled={getQuantity(currentProduct.id) <= 1}
-                      onClick={(e) =>
-                        handleQuantityDecrease(currentProduct.id, e)
-                      }
-                    >
-                      <span aria-hidden="true">&minus;</span>
-                    </button>
-                    <input
-                      className="qty-number-small text-center font-semibold text-text bg-transparent text-[length:var(--text-md)] px-2 border-none w-full min-w-[48px] [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:m-0 [&::-webkit-inner-spin-button]:m-0 focus-visible:outline-none focus-visible:rounded-sm focus-visible:shadow-[var(--focus-ring)]"
-                      type="number"
-                      inputMode="numeric"
-                      min="1"
-                      step="1"
-                      aria-label="Quantity"
-                      value={
-                        editingQuantities[currentProduct.id] !== undefined
-                          ? editingQuantities[currentProduct.id]
-                          : getQuantity(currentProduct.id)
-                      }
-                      onChange={e => {
-                        setEditingQuantities(q => ({ ...q, [currentProduct.id]: e.target.value }));
-                      }}
-                      onBlur={e => {
-                        const val = editingQuantities[currentProduct.id];
-                        const num = parseInt(val, 10);
-                        handleQuantityInputChange(currentProduct.id, (!val || isNaN(num) || num < 1) ? '1' : val, e);
-                        setEditingQuantities(q => {
-                          const { [currentProduct.id]: _, ...rest } = q;
-                          return rest;
-                        });
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="qty-btn-small plus bg-primary-soft rounded-sm border border-transparent cursor-pointer text-[length:var(--text-lg)] leading-none text-primary w-10 h-10 shrink-0 flex items-center justify-center transition duration-200 p-0 hover:enabled:bg-primary-soft-hover active:enabled:bg-primary active:enabled:text-text-on-primary focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] disabled:opacity-40 disabled:cursor-not-allowed"
-                      aria-label="Increase quantity"
-                      onClick={(e) =>
-                        handleQuantityIncrease(currentProduct.id, e)
-                      }
-                      disabled={currentProduct.stock <= 0 || getQuantity(currentProduct.id) >= currentProduct.stock}
-                    >
-                      <span aria-hidden="true">+</span>
-                    </button>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={currentProduct.stock <= 0}
-                    className={`add-to-cart-btn-small w-full sm:w-auto sm:flex-1 min-h-[44px] px-6 py-3 rounded-md text-[length:var(--text-base)] font-semibold border transition duration-200 focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 disabled:cursor-not-allowed disabled:opacity-55 ${currentProduct.stock <= 0 ? "cursor-not-allowed bg-surface-muted border-border text-text-subtle" : addedIds[currentProduct.id] ? "is-added bg-success border-success text-text-on-primary cursor-pointer" : "bg-primary border-primary text-text-on-primary hover:bg-primary-hover hover:border-primary-hover active:bg-primary-active active:border-primary-active cursor-pointer"}`}
-                    onClick={(e) => handleAddToCart(currentProduct, e)}
-                  >
-                    {currentProduct.stock <= 0 ? "Out of Stock" : addedIds[currentProduct.id] ? "Added ✓" : "Add to Cart"}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Variation Thumbnails */}
-            <div
-              className="variation-thumbnails flex gap-4 justify-start flex-wrap"
-              role="listbox"
-              aria-label="Product variation thumbnails"
-            >
-              {productVariations.map((variation, index) => (
+          </div>
+          {galleryThumbs.length > 1 && (
+            <div className="pdp-thumbs" role="listbox" aria-orientation="horizontal" aria-label="Product images">
+              {galleryThumbs.map((t, i) => (
                 <div
-                  key={variation.id}
-                  ref={(node) => {
-                    thumbnailRefs.current[index] = node;
-                  }}
-                  className={`thumbnail w-[88px] h-[88px] rounded-md overflow-hidden cursor-pointer border transition duration-200 bg-surface flex items-center justify-center p-2 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-none focus-visible:shadow-[0_0_0_3px_rgba(0,0,0,0.2)] motion-reduce:transition-none ${
-                    selectedVariation === index ? "active border-accent shadow-[0_0_0_2px_var(--color-accent),var(--shadow-md)]" : "border-transparent"
-                  }`}
+                  key={`${t.src}-${i}`}
+                  ref={(node) => { thumbnailRefs.current[i] = node; }}
+                  className={`pdp-thumb ${t.active ? "on" : ""}`}
                   role="option"
-                  tabIndex={selectedVariation === index ? 0 : -1}
-                  aria-selected={selectedVariation === index}
-                  aria-label={`View ${variation.name} ${variation.lenseColour}`}
-                  onClick={() => handleVariationClick(index)}
-                  onKeyDown={(e) =>
-                    handleThumbnailKeyDown(e, index, productVariations.length)
-                  }
+                  tabIndex={t.active ? 0 : -1}
+                  aria-selected={t.active}
+                  aria-label={t.label}
+                  onClick={t.onSelect}
+                  onKeyDown={(e) => handleThumbnailKeyDown(e, i, galleryThumbs.length)}
                 >
-                  <img
-                    src={variation.image || '/images/products/spac1.webp'}
-                    alt={`${variation.name} - ${variation.lenseColour}`}
-                    className="w-full h-full object-contain"
-                    onError={(e) => {
-                      // Fallback to default image if image fails to load
-                      if (e.target.src !== '/images/products/spac1.webp') {
-                        e.target.src = '/images/products/spac1.webp';
-                      }
-                    }}
-                  />
+                  <img src={t.src} alt={t.label} onError={(e) => { if (!e.target.src.endsWith('/images/products/spac1.webp')) e.target.src = '/images/products/spac1.webp'; }} />
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        <div className="pdp-info">
+          <div className="pdp-head">
+            {brandName !== "—" && <p className="pdp-brand">{brandName}</p>}
+            <h1 className="product-title pdp-title">{display(cur.name)}</h1>
+          </div>
+          <div className="pdp-price">
+            <span className="pdp-whp">{inr(cur.whpNum)}</span>
+            <span className="pdp-per">per piece (WHP)</span>
+            {cur.mrpNum > 0 && <s className="pdp-mrp" aria-label="MRP">{inr(cur.mrpNum)}</s>}
+            {offPct > 0 && <span className="pdp-off">{offPct}% off MRP</span>}
           </div>
 
-          {/* Features Box - Always shows selected variation's features */}
-          {viewMode === "grid" && displayVariation && (
-            <div className="features-box-standalone bg-surface rounded-lg py-5 px-6 md:py-6 md:px-8 border border-border shadow-sm mt-6">
-              <h3 className="features-title text-[length:var(--text-lg)] text-text mt-0 mb-6 mx-0 font-semibold tracking-[-0.01em]">Features</h3>
-              <div className="features-grid grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-y-6 md:gap-x-10 relative">
-                <div className="features-column flex flex-col gap-4 items-stretch">
-                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
-                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Brand</span>
-                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
-                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
-                      {display(displayVariation.brand)}
-                    </span>
-                  </div>
-                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
-                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Type</span>
-                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
-                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
-                      {display(displayVariation.type)}
-                    </span>
-                  </div>
-                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
-                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Gender</span>
-                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
-                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
-                      {display(displayVariation.gender)}
-                    </span>
-                  </div>
-                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
-                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Shape</span>
-                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
-                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
-                      {display(displayVariation.shape)}
-                    </span>
-                  </div>
-                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
-                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Size</span>
-                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
-                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
-                      {display(displayVariation.size)}
-                    </span>
-                  </div>
-                </div>
-                <div className="features-column flex flex-col gap-4 items-stretch">
-                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
-                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Frame Colour</span>
-                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
-                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
-                      {display(displayVariation.frameColour)}
-                    </span>
-                  </div>
-                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
-                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Frame Material</span>
-                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
-                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
-                      {display(displayVariation.frameMaterial)}
-                    </span>
-                  </div>
-                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
-                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Lense Colour</span>
-                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
-                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
-                      {display(displayVariation.lenseColour)}
-                    </span>
-                  </div>
-                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
-                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">Lense Material</span>
-                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
-                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
-                      {display(displayVariation.lenseMaterial)}
-                    </span>
-                  </div>
-                  <div className="feature-item grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1.2fr)] items-baseline gap-2 w-full">
-                    <span className="feature-label font-normal text-text-muted text-[length:var(--text-base)] whitespace-nowrap col-start-1 text-left">QTY</span>
-                    <span className="feature-separator text-border-strong font-normal text-[length:var(--text-base)] col-start-2">-</span>
-                    <span className="feature-value text-text font-semibold text-[length:var(--text-base)] col-start-3 text-right break-words">
-                      {display(displayVariation.qty)}
-                    </span>
-                  </div>
-                </div>
+          {totalVariations > 1 && (
+            <div className="pdp-colours" role="group" aria-label="Colour">
+              <span className="pdp-label">Colour: {colourName(cur)}</span>
+              <div className="pdp-chips">
+                {productVariations.map((v, i) => (
+                  <button
+                    type="button"
+                    key={`${v.id}-${i}`}
+                    className={`pdp-chip ${i === selectedVariation ? "on" : ""}`}
+                    aria-pressed={i === selectedVariation}
+                    onClick={() => handleVariationClick(i)}
+                  >
+                    {colourName(v)} <b>{v.isUpcoming ? "Preorder" : Number(v.stock ?? 0)}</b>
+                  </button>
+                ))}
               </div>
             </div>
           )}
+
+          <div className="pdp-buy">
+            {qtyBox("buy")}
+            <button
+              type="button"
+              disabled={curStock <= 0}
+              className={`pdp-add ${addedIds[cur.id] ? "is-added" : ""}`}
+              onClick={(e) => handleAddToCart(cur, e)}
+            >
+              {curStock <= 0 ? "Out of stock" : addedIds[cur.id] ? "Added to cart" : `Add to cart · ${lineTotal}`}
+            </button>
+          </div>
+
+          <dl className="pdp-specs">
+            {specRows.map(([label, value]) => (
+              <div key={label}><dt>{label}</dt><dd>{display(value)}</dd></div>
+            ))}
+          </dl>
         </div>
+      </div>
+
+      {otherFrames.length > 0 && (
+        <section className="pdp-others" aria-labelledby="pdp-others-h">
+          <h2 id="pdp-others-h">Other frames you may like</h2>
+          <div className="pdp-others-grid">
+            {otherFrames.map((p) => {
+              const w = Number(p.whp) || 0;
+              const m = Number(p.mrp) || 0;
+              const off = m > w && w > 0 ? Math.round(100 - (w * 100) / m) : 0;
+              return (
+                <a key={p.product_id || p.id || p.model_no} className="pdp-other" href={productPath(p.model_no)}>
+                  <span className="pdp-other-img"><img src={firstImageUrl(p)} alt="" loading="lazy" onError={(e) => { if (!e.target.src.endsWith('/images/products/spac1.webp')) e.target.src = '/images/products/spac1.webp'; }} /></span>
+                  <b className="pdp-other-name">{p.model_no}</b>
+                  <span className="pdp-other-price">{w > 0 && <b>{inr(w)}</b>}{off > 0 && <span className="pdp-off">{off}% off MRP</span>}</span>
+                </a>
+              );
+            })}
+          </div>
+        </section>
       )}
+
+      <div className="pdp-sticky">
+        <div className="pdp-sticky-total"><span>Total</span><b>{lineTotal}</b></div>
+        {qtyBox("sticky")}
+        <button
+          type="button"
+          disabled={curStock <= 0}
+          className={`pdp-add ${addedIds[cur.id] ? "is-added" : ""}`}
+          onClick={(e) => handleAddToCart(cur, e)}
+        >
+          {curStock <= 0 ? "Out of stock" : addedIds[cur.id] ? "Added" : "Add to cart"}
+        </button>
+      </div>
     </div>
   );
 };

@@ -16,11 +16,11 @@ import React from 'react';
  *
  * Props:
  *   distance  metres between the recorded GPS and the party address (null -> "—")
- *   radius    geofence radius in metres (default 250)
+ *   radius    geofence radius in metres (default 50)
  *   max       distance at which the meter reads 0% (default radius * 2)
  *   href      optional Google-Maps link for the recorded point ("map")
  */
-export default function MatchMeter({ distance, radius = 250, max, href }) {
+export default function MatchMeter({ distance, radius = 50, max, href }) {
   if (distance == null || Number.isNaN(Number(distance))) {
     return <span className="text-text-subtle">—</span>;
   }

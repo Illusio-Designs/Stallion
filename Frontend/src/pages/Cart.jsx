@@ -1,5 +1,7 @@
+import Link from "next/link";
 import React, { useState, useEffect, useRef } from "react";
 import "../styles/pages/Cart.css";
+import "../styles/redesign-p-cart.css";
 import {
   getCartItems,
   removeFromCart,
@@ -17,21 +19,24 @@ import { getUserRole, getUser } from "../services/authService";
 import { encodeUploadName } from "../utils/imageUrl";
 import DropdownSelector from "../components/ui/DropdownSelector";
 import AsidePanel from "../components/ui/AsidePanel";
+import ShopLocationCapture from "../components/ui/ShopLocationCapture";
 import {
   getMyParties,
   getPartyById,
   getEvents,
-  getCountries,
+  getIndianCountries,
   getStates,
+  getCities,
   getDistributors,
   createOrder,
   createParty,
   getAvailableOffers,
   quoteOrder,
   getProductsByIds,
-  verifyPartyLocation,
+  rememberEditParty,
 } from "../services/apiService";
-import { captureCurrentPosition } from "../utils/geolocation";
+import { captureCurrentPosition, distanceMeters, hasPartyPoint, visitRadius } from "../utils/geolocation";
+import { isUpcoming, MAX_ORDER_QTY } from "../utils/upcoming";
 
 // Re-point any product image URL (legacy host, absolute server path, or
 // relative) to the configured image host — the same base the Media gallery and
@@ -61,6 +66,9 @@ const Cart = ({ onPageChange = null }) => {
   // truth for the per-item quantity cap so a user can't order more than we hold
   // (the order endpoint rejects it anyway, but this stops it at the UI).
   const [stockById, setStockById] = useState({});
+  // Live "upcoming (pre-order)" flag per product_id. Upcoming frames keep no stock, so they have
+  // no entry in stockById and no cap. Before the lookup finishes the line's own flag is used.
+  const [upcomingById, setUpcomingById] = useState({});
   
   // Get user role and user info
   const userRole = getUserRole();
@@ -68,11 +76,14 @@ const Cart = ({ onPageChange = null }) => {
   const isParty = userRole === 'party';
   const isDistributor = userRole === 'distributor';
   const isSalesman = userRole === 'salesman';
+  // Admin and office accounts (managers) have no cart flow: orders are placed by
+  // a party, distributor or salesman. Without this they hit the server with no
+  // order type and only got "order_type is required".
+  const isOfficeOnly = !!userRole && !isParty && !isDistributor && !isSalesman;
   
   // Role-based state
   const [orderType, setOrderType] = useState(isDistributor ? "distributor_order" : "");
   const [selectedParty, setSelectedParty] = useState("");
-  const [verifyingLoc, setVerifyingLoc] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState("");
   const [selectedCountry, setSelectedCountry] = useState("");
   const [orderNote, setOrderNote] = useState("");
@@ -86,7 +97,10 @@ const Cart = ({ onPageChange = null }) => {
   // Inline "Add Party" (salesman + distributor can create a party from here)
   const [addPartyOpen, setAddPartyOpen] = useState(false);
   const [addPartySaving, setAddPartySaving] = useState(false);
+  const [addLocationPending, setAddLocationPending] = useState(false);
+  const [partyLocationPending, setPartyLocationPending] = useState(false);
   const [addPartyStates, setAddPartyStates] = useState([]);
+  const [addPartyCities, setAddPartyCities] = useState([]);
   const [addPartyForm, setAddPartyForm] = useState({
     party_name: "",
     phone: "",
@@ -209,13 +223,14 @@ const Cart = ({ onPageChange = null }) => {
     try {
       let list = countries;
       if (!list || list.length === 0) {
-        list = await getCountries().catch(() => []);
+        list = await getIndianCountries().catch(() => []);
         setCountries(list || []);
       }
       const india = (list || []).find(c =>
         c.name?.toLowerCase() === 'india' || c.code?.toLowerCase() === 'in'
       ) || (list || [])[0];
       if (india) {
+        setAddPartyForm(prev => ({ ...prev, country_id: prev.country_id || india.id }));
         const states = await getStates(india.id).catch(() => []);
         setAddPartyStates((states || []).map(s => ({ value: s.id, label: s.name })));
       }
@@ -228,14 +243,24 @@ const Cart = ({ onPageChange = null }) => {
   const openAddParty = () => {
     setAddPartyForm({ party_name: '', phone: '', address: '', state_id: '', pincode: '', contact_person: '' });
     setAddPartyOpen(true);
-    if (addPartyStates.length === 0) loadAddPartyStates();
+    loadAddPartyStates();
   };
 
   const handleAddPartyField = (field, value) => {
-    setAddPartyForm(prev => ({ ...prev, [field]: value }));
+    setAddPartyForm(prev => ({ ...prev, [field]: value, ...(field === 'state_id' ? { city_id: '' } : {}) }));
   };
 
+  useEffect(() => {
+    let current = true;
+    setAddPartyCities([]);
+    if (addPartyForm.state_id) getCities(addPartyForm.state_id).then(rows => {
+      if (current) setAddPartyCities(rows);
+    }).catch(() => { if (current) showError('Could not load cities. Select the state again to retry.'); });
+    return () => { current = false; };
+  }, [addPartyForm.state_id]);
+
   const handleCreateParty = async () => {
+    if (addLocationPending) return;
     const name = addPartyForm.party_name.trim();
     const phone = addPartyForm.phone.trim();
     const address = addPartyForm.address.trim();
@@ -243,8 +268,8 @@ const Cart = ({ onPageChange = null }) => {
       showError('Party name, phone and address are required.');
       return;
     }
-    if (!addPartyForm.state_id) {
-      showError('Please select a state.');
+    if (!addPartyForm.state_id || !addPartyForm.city_id || !/^\d{6}$/.test(addPartyForm.pincode.trim())) {
+      showError('Please select a state, city and a valid 6-digit PIN code, or capture the shop location.');
       return;
     }
     try {
@@ -253,6 +278,13 @@ const Cart = ({ onPageChange = null }) => {
         party_name: name,
         phone,
         address,
+        country_id: addPartyForm.country_id,
+        city_id: addPartyForm.city_id,
+        ...(addPartyForm.shipping_address_confirmed ? {
+          latitude: addPartyForm.latitude, longitude: addPartyForm.longitude,
+          accuracy: addPartyForm.location_accuracy_m, shipping_address_confirmed: true,
+          confirm_address_mismatch: true,
+        } : {}),
         state_id: addPartyForm.state_id,
         pincode: addPartyForm.pincode.trim(),
         contact_person: addPartyForm.contact_person.trim(),
@@ -313,64 +345,63 @@ const Cart = ({ onPageChange = null }) => {
     });
   };
 
-  // On-site capture ("I'm at shop") for the selected party — sets its TRUSTED
-  // verified location so the 250m visit geofence turns on. Lets a salesman verify
-  // right from the cart without opening the party editor.
-  const handleVerifyPartyLocation = async () => {
+  // A party with no location: Edit party opens for it (pick the address from Google) and the app
+  // comes back to this cart, with the visit order and the party chosen again.
+  const handleEditPartyLocation = () => {
     if (!selectedParty) return;
-    try {
-      setVerifyingLoc(true);
-      let pos;
-      try {
-        pos = await captureCurrentPosition();
-      } catch (geoErr) {
-        showError(geoErr?.message || 'Could not get your location. Please try again.');
-        return;
-      }
-      const res = await verifyPartyLocation(selectedParty, pos);
-      const acc = Number(res?.accuracy);
-      showSuccess(`Location verified & saved${Number.isFinite(acc) ? ` (±${Math.round(acc)}m)` : ''}. The 250m geofence is now active for this party.`);
-      setParties(prev => prev.map(p => {
-        const id = p.id || p.party_id;
-        return id === selectedParty
-          ? { ...p, latitude: Number(res?.latitude), longitude: Number(res?.longitude), location_source: 'verified', location_accuracy_m: acc }
-          : p;
-      }));
-    } catch (err) {
-      showError(err?.message || 'Could not verify location. Please try again from the shop.');
-    } finally {
-      setVerifyingLoc(false);
-    }
+    rememberEditParty(selectedParty, '/cart', { orderType: orderType || 'visit_order' });
+    if (onPageChange) onPageChange('party'); else window.location.href = '/dashboard/party';
   };
 
-  // Approximate location from the user's IP — used as a fallback when precise
-  // GPS isn't available (e.g. desktops with no location hardware/provider).
-  const getIpLocation = async () => {
-    const res = await fetch('https://ipwho.is/', { cache: 'no-store' });
-    const data = await res.json();
-    if (data && data.success !== false && Number.isFinite(data.latitude) && Number.isFinite(data.longitude)) {
-      return { latitude: Number(data.latitude), longitude: Number(data.longitude) };
-    }
-    throw new Error('IP location unavailable');
-  };
-
-  // Silently capture the visit-order location: precise GPS first, then an
-  // approximate IP-based fallback (so desktops without GPS still get coords).
-  // No UI/messages — the captured coords go straight onto the order.
+  // Early read of the phone's GPS when the order type is chosen (it also asks for
+  // permission up front). Only real GPS is used: an IP-based guess is accurate to
+  // a city at best and can never satisfy the shop's distance check. The position used
+  // for the order is read again at checkout (see handleCheckout).
   const requestLocation = async () => {
     try {
-      await getCurrentLocation(); // precise GPS — exact coords
+      await getCurrentLocation();
     } catch {
-      try {
-        const ip = await getIpLocation();
-        setLatitude(ip.latitude);
-        setLongitude(ip.longitude);
-        locationRef.current = { latitude: ip.latitude, longitude: ip.longitude };
-      } catch {
-        // Both failed — leave coords null; checkout surfaces a single error.
-      }
+      // No GPS yet: checkout reads it again and explains what to do.
     }
   };
+
+  // The selected party's saved (verified) shop point, if it has one.
+  const selectedPartyRecord = parties.find((p) => String(p.id || p.party_id) === String(selectedParty)) || null;
+  const selectedPartyHasPoint = hasPartyPoint(selectedPartyRecord);
+
+  // Read the GPS now and measure the distance to the shop. Used when a party is
+  // picked, from the "Check again" link, and right before the order is sent, so
+  // the order never carries an old position.
+  const [visitDistance, setVisitDistance] = useState(null); // { meters } | { error }
+  const [checkingDistance, setCheckingDistance] = useState(false);
+  const refreshVisitDistance = async () => {
+    if (!selectedPartyHasPoint) { setVisitDistance(null); return null; }
+    setCheckingDistance(true);
+    try {
+      const pos = await captureCurrentPosition();
+      locationRef.current = { latitude: pos.latitude, longitude: pos.longitude, accuracy: pos.accuracy };
+      setLatitude(pos.latitude);
+      setLongitude(pos.longitude);
+      const meters = distanceMeters(pos.latitude, pos.longitude, Number(selectedPartyRecord.latitude), Number(selectedPartyRecord.longitude));
+      const result = { meters, allowed: visitRadius(selectedPartyRecord, pos.accuracy) };
+      setVisitDistance(result);
+      return result;
+    } catch (e) {
+      const result = { error: e?.message || 'Could not get your location. Please turn on location and try again.' };
+      setVisitDistance(result);
+      return result;
+    } finally {
+      setCheckingDistance(false);
+    }
+  };
+  useEffect(() => {
+    if (isSalesman && orderType === 'visit_order' && selectedParty && selectedPartyHasPoint) {
+      refreshVisitDistance();
+    } else {
+      setVisitDistance(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderType, selectedParty, selectedPartyHasPoint, isSalesman, selectedPartyRecord?.latitude, selectedPartyRecord?.longitude, selectedPartyRecord?.location_source]);
 
   // Fetch parties based on order type for salesman
   useEffect(() => {
@@ -413,7 +444,8 @@ const Cart = ({ onPageChange = null }) => {
         // /parties/my. (getPartiesByZoneId / getParties are not used here — the
         // backend scopes /parties/my from the JWT for party/distributor/salesman.)
         console.log('[Cart] Fetching my parties for', orderType);
-        const partiesData = await getMyParties();
+        // Event orders: any party. Visit and WhatsApp orders: only the salesman's working states.
+        const partiesData = await getMyParties(isSalesman && orderType === 'event_order' ? { scope: 'event' } : undefined);
         setParties(Array.isArray(partiesData) ? partiesData : []);
         console.log('[Cart] Fetched my parties:', partiesData.length, 'parties');
 
@@ -433,6 +465,37 @@ const Cart = ({ onPageChange = null }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [orderType, isSalesman]); // Only depend on orderType and isSalesman, not user object
 
+  // Back from Edit party (a party that had no location): choose the visit order and that party again.
+  useEffect(() => {
+    if (!isSalesman || typeof window === 'undefined') return;
+    try {
+      const raw = sessionStorage.getItem('stallion.cartReturn');
+      if (!raw) return;
+      sessionStorage.removeItem('stallion.cartReturn');
+      const back = JSON.parse(raw);
+      if (!back || !back.party_id || !(Date.now() - Number(back.at) < 30 * 60 * 1000)) return;
+      sessionStorage.setItem('stallion.checkinParty', JSON.stringify({ party_id: back.party_id, at: Date.now() }));
+      setOrderType(back.orderType || 'visit_order');
+    } catch { /* storage unavailable: the order type and party are chosen again by hand */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSalesman]);
+
+  // After "I'm at the shop" on Home, preselect that party for a visit order. Selecting goes
+  // through setSelectedParty, so the verified-location / distance effects still run.
+  useEffect(() => {
+    if (!isSalesman || orderType !== 'visit_order' || selectedParty || parties.length === 0) return;
+    try {
+      const raw = sessionStorage.getItem('stallion.checkinParty');
+      if (!raw) return;
+      const stored = JSON.parse(raw);
+      if (!stored || !stored.party_id || !(Date.now() - Number(stored.at) < 6 * 60 * 60 * 1000)) return;
+      if (parties.some((p) => String(p.id || p.party_id) === String(stored.party_id))) {
+        const match = parties.find((p) => String(p.id || p.party_id) === String(stored.party_id));
+        setSelectedParty(match.id || match.party_id);
+      }
+    } catch { /* storage unavailable or bad data: leave the party empty */ }
+  }, [parties, orderType, isSalesman, selectedParty]);
+
   // Fetch events when event_order is selected (for salesman)
   useEffect(() => {
     if (isSalesman && orderType === 'event_order') {
@@ -444,7 +507,7 @@ const Cart = ({ onPageChange = null }) => {
 
   const fetchEvents = async () => {
     try {
-      const eventsData = await getEvents();
+      const eventsData = await getEvents({ activeOnly: true });
       setEvents(Array.isArray(eventsData) ? eventsData : []);
     } catch (err) {
       console.error('Failed to fetch events:', err);
@@ -464,18 +527,22 @@ const Cart = ({ onPageChange = null }) => {
   const cartIdsKey = cartItems.map((i) => i.id).filter(Boolean).sort().join(',');
   useEffect(() => {
     const ids = cartItems.map((i) => i.id).filter(Boolean);
-    if (ids.length === 0) { setStockById({}); return; }
+    if (ids.length === 0) { setStockById({}); setUpcomingById({}); return; }
     let cancelled = false;
     (async () => {
       try {
         const list = await getProductsByIds(ids);
         if (cancelled) return;
         const map = {};
+        const upcoming = {};
         (list || []).forEach((p) => {
           const pid = String(p.product_id ?? p.id);
-          map[pid] = Number(p.total_qty ?? p.warehouse_qty ?? 0);
+          upcoming[pid] = isUpcoming(p);
+          // No stock number for an upcoming frame: nothing to cap or warn about.
+          if (!upcoming[pid]) map[pid] = Number(p.total_qty ?? p.warehouse_qty ?? 0);
         });
         setStockById(map);
+        setUpcomingById(upcoming);
         // Pull any line that now exceeds available stock back down to the max.
         cartItems.forEach((it) => {
           const max = map[String(it.id)];
@@ -491,7 +558,14 @@ const Cart = ({ onPageChange = null }) => {
 
   // Available stock for a product id; Infinity when unknown so we never wrongly
   // block (the order endpoint still enforces the real limit server-side).
+  const isLineUpcoming = (productId) => {
+    const live = upcomingById[String(productId)];
+    if (live != null) return live;
+    return isUpcoming(cartItems.find((it) => it.id === productId));
+  };
+
   const maxFor = (productId) => {
+    if (isLineUpcoming(productId)) return MAX_ORDER_QTY;
     const s = stockById[String(productId)];
     return (s == null) ? Infinity : s;
   };
@@ -502,7 +576,9 @@ const Cart = ({ onPageChange = null }) => {
     if (item) {
       const max = maxFor(productId);
       if (item.quantity >= max) {
-        showError(max <= 0 ? 'This product is out of stock' : `Only ${max} in stock`);
+        showError(isLineUpcoming(productId)
+          ? `You can order up to ${MAX_ORDER_QTY.toLocaleString('en-IN')} pieces of one frame`
+          : max <= 0 ? 'This product is out of stock' : `Only ${max} in stock`);
         return;
       }
       const newQuantity = item.quantity + 1;
@@ -528,16 +604,34 @@ const Cart = ({ onPageChange = null }) => {
     const item = currentItems.find((item) => item.id === productId);
     if (!item) return;
 
+    const max = maxFor(productId);
+    // Nothing is available: do not pretend a quantity of 1 is fine.
+    if (max <= 0) {
+      showError('This product is out of stock. Please remove it from your cart.');
+      return;
+    }
     const parsed = parseInt(value, 10);
     let newQuantity = Number.isNaN(parsed) ? 1 : Math.max(1, parsed);
-    const max = maxFor(productId);
     let capped = false;
-    if (newQuantity > max) { newQuantity = Math.max(1, max); capped = true; }
-    updateCartQuantity(productId, newQuantity);
-    const itemName = `${item.name} (${item.lenseColour})`;
-    if (capped) showError(`Only ${max} in stock — quantity set to ${newQuantity}`);
-    else showCartUpdateSuccess(itemName, newQuantity);
+    if (newQuantity > max) { newQuantity = max; capped = true; }
+    if (newQuantity !== item.quantity) updateCartQuantity(productId, newQuantity);
+    // One message, only when the box is left, and only if something changed.
+    if (capped) {
+      showError(isLineUpcoming(productId)
+        ? `You can order up to ${MAX_ORDER_QTY.toLocaleString('en-IN')} pieces of one frame — quantity set to ${newQuantity}`
+        : `Only ${max} in stock — quantity set to ${newQuantity}`);
+    }
+    else if (newQuantity !== item.quantity) {
+      showCartUpdateSuccess(`${item.name} (${item.lenseColour})`, newQuantity);
+    }
   };
+
+  // Lines whose product has no stock left. They cannot be ordered.
+  const outOfStockItems = cartItems.filter((it) => {
+    if (isLineUpcoming(it.id)) return false;
+    const s = stockById[String(it.id)];
+    return s != null && s <= 0;
+  });
 
   const calculateSubtotal = () => {
     return cartItems.reduce((total, item) => {
@@ -607,8 +701,17 @@ const Cart = ({ onPageChange = null }) => {
   };
 
   const handleCheckout = async () => {
+    if (partyLocationPending) { showError('Confirm or cancel the location capture before placing the order.'); return; }
+    if (isOfficeOnly) {
+      showError('Admin and office accounts cannot place orders from the cart. Use Dashboard > Orders to create an order.');
+      return;
+    }
     if (cartItems.length === 0) {
       showError('Your cart is empty');
+      return;
+    }
+    if (outOfStockItems.length > 0) {
+      showError(`Remove out-of-stock items before checkout: ${outOfStockItems.map((it) => it.name).join(', ')}`);
       return;
     }
 
@@ -630,15 +733,26 @@ const Cart = ({ onPageChange = null }) => {
         showError('Please select an event');
         return;
       }
-      if (orderType === 'visit_order' &&
-          (locationRef.current?.latitude == null || locationRef.current?.longitude == null)) {
-        // Silently capture the visit-order location (precise GPS, then IP
-        // fallback). No prompts/messages — only error if it's truly impossible.
+      if (orderType === 'visit_order') {
+        if (!selectedParty) {
+          showError('Please select a party');
+          return;
+        }
+        if (!selectedPartyHasPoint) {
+          showError('Capture the shop location above before placing a visit order.');
+          return;
+        }
+        // Read the GPS again right now: the order must carry where the salesman
+        // is at this moment, not where they were when they chose the order type.
         setLoading(true);
-        await requestLocation();
+        const fresh = await refreshVisitDistance();
         setLoading(false);
-        if (locationRef.current?.latitude == null || locationRef.current?.longitude == null) {
-          showError('Could not capture your location for the visit order. Please try again.');
+        if (!fresh || fresh.error) {
+          showError((fresh && fresh.error) || 'Could not get your location. Please turn on location and try again.');
+          return;
+        }
+        if (fresh.meters > fresh.allowed) {
+          showError(`You are about ${Math.round(fresh.meters)} m from this shop. Move within ${Math.round(fresh.allowed)} m of it to place a visit order.`);
           return;
         }
       }
@@ -741,7 +855,7 @@ const Cart = ({ onPageChange = null }) => {
             // Fetch countries first
             let countriesList = countries;
             if (!countriesList || countriesList.length === 0) {
-              countriesList = await getCountries();
+              countriesList = await getIndianCountries();
               setCountries(countriesList);
             }
             
@@ -757,7 +871,7 @@ const Cart = ({ onPageChange = null }) => {
             // /parties/my (getParties / POST /parties/get is manager-only).
             let allParties = [];
             try {
-              const partiesResp = await getMyParties();
+              const partiesResp = await getMyParties(isSalesman && orderType === 'event_order' ? { scope: 'event' } : undefined);
               allParties = Array.isArray(partiesResp) ? partiesResp : [];
             } catch (err) {
               console.warn('[Cart] Failed to fetch parties:', err);
@@ -1112,6 +1226,12 @@ const Cart = ({ onPageChange = null }) => {
         });
       }
 
+      // The phone's GPS accuracy at this moment: the server allows a little extra distance for a weak signal.
+      if (orderData.order_type === 'visit_order') {
+        const acc = Number(locationRef.current?.accuracy);
+        if (Number.isFinite(acc) && acc > 0) orderData.accuracy = acc;
+      }
+
       // Final check: Log salesman_id status (but don't block API call - let backend validate)
       if (isSalesman) {
         if (!orderData.salesman_id) {
@@ -1168,10 +1288,17 @@ const Cart = ({ onPageChange = null }) => {
         removeFromCart(item.id);
       });
       
-      // Reset form
+      // Reset form. Nothing from this order may leak into the next one: the note,
+      // typed quantities and the captured visit location are forgotten too.
+      try { sessionStorage.removeItem('stallion.checkinParty'); } catch { /* ignore */ }
       setSelectedParty("");
       setSelectedEvent("");
       setSelectedCountry("");
+      setOrderNote("");
+      setEditingQuantities({});
+      setLatitude(null);
+      setLongitude(null);
+      locationRef.current = { latitude: null, longitude: null };
       if (isSalesman) {
         setOrderType("");
       }
@@ -1206,12 +1333,12 @@ const Cart = ({ onPageChange = null }) => {
   };
 
   return (
-    <div className="cart-page bg-surface-muted px-[5%] py-10 min-h-[70vh] max-md:px-4 max-md:py-6">
+    <div className={`cart-page bg-surface-muted px-[5%] py-10 min-h-[70vh] max-md:px-4 max-md:py-6${cartItems.length > 0 ? ' has-cart-bar' : ''}`}>
       <div className="cart-container max-w-[1200px] mx-auto">
-        <div className="cart-content grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 items-start">
+        <div className="cart-content grid grid-cols-1 min-[1400px]:grid-cols-[2fr_1fr] gap-6 items-start">
           {/* Shopping Cart Section */}
           <div className="shopping-cart-section bg-surface border border-grey-100 rounded-[20px] p-8 shadow-[0_1px_2px_rgba(16,18,38,0.04),0_18px_44px_-20px_rgba(16,18,38,0.18)] max-md:p-5 max-md:rounded-2xl">
-            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Shopping Cart</h2>
+            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Your cart{cartItems.length > 0 && (<span className="cart-sub">{cartItems.length} {cartItems.length === 1 ? 'model' : 'models'}, {cartItems.reduce((n, it) => n + (Number(it.quantity) || 0), 0)} frames</span>)}</h2>
 
             {cartItems.length === 0 ? (
               <div className="empty-cart flex flex-col items-center text-center gap-3 py-10 px-5">
@@ -1286,10 +1413,8 @@ const Cart = ({ onPageChange = null }) => {
                           aria-label={`Quantity for ${getDisplayName(item)}`}
                           value={editingQuantities[item.id] !== undefined ? editingQuantities[item.id] : item.quantity}
                           onChange={e => {
+                            // Just hold what is typed; it is checked when the box is left.
                             setEditingQuantities(q => ({ ...q, [item.id]: e.target.value }));
-                            const itemName = `${item.name} (${item.lenseColour})`;
-                            const num = parseInt(e.target.value, 10);
-                            showCartUpdateSuccess(itemName, (!e.target.value || isNaN(num) || num < 1) ? 1 : num);
                           }}
                           onBlur={e => {
                             const val = editingQuantities[item.id];
@@ -1311,7 +1436,9 @@ const Cart = ({ onPageChange = null }) => {
                           +
                         </button>
                       </div>
-                      {stockById[String(item.id)] != null && (
+                      {isLineUpcoming(item.id) ? (
+                        <span className="upc-tag">Preorder</span>
+                      ) : stockById[String(item.id)] != null && (
                         stockById[String(item.id)] <= 0 ? (
                           <span className="item-stock-note m-0 whitespace-nowrap text-[length:var(--text-xs)] font-semibold text-error">Out of stock</span>
                         ) : (
@@ -1347,21 +1474,18 @@ const Cart = ({ onPageChange = null }) => {
 
           {/* Summary Section */}
           <div className="summary-section bg-surface border border-grey-100 rounded-[20px] p-8 shadow-[0_1px_2px_rgba(16,18,38,0.04),0_18px_44px_-20px_rgba(16,18,38,0.18)] h-fit static lg:sticky lg:top-[calc(var(--header-height)+1.25rem)] max-md:p-5 max-md:rounded-2xl">
-            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Summary</h2>
+            <h2 className="section-title text-[length:var(--text-xl)] leading-[var(--leading-tight)] tracking-[-0.02em] font-bold text-text m-0 mb-6">Place the order</h2>
 
             <div className="summary-form flex flex-col gap-4">
               {/* Order Type Dropdown - Only for Salesman */}
               {isSalesman && (
                 <div className="form-group flex flex-col gap-2">
-                  <label htmlFor="order-type" className="form-label text-[length:var(--text-sm)] font-medium text-text">Order Type</label>
+                  <label className="form-label text-[length:var(--text-sm)] font-medium text-text">Order type</label>
                   <DropdownSelector
-                    className="ui-dropdown-custom--full-width"
-                    placeholder="Select Order Type"
                     options={[
-                      { value: '', label: 'Select Order Type' },
-                      { value: 'visit_order', label: 'Visit Order' },
-                      { value: 'whatsapp_order', label: 'WhatsApp Order' },
-                      { value: 'event_order', label: 'Event Order' },
+                      { value: 'visit_order', label: 'Visit' },
+                      { value: 'whatsapp_order', label: 'WhatsApp order' },
+                      { value: 'event_order', label: 'Event order' },
                     ]}
                     value={orderType}
                     onChange={(newOrderType) => {
@@ -1376,6 +1500,9 @@ const Cart = ({ onPageChange = null }) => {
                         setEvents([]);
                       }
                     }}
+                    placeholder="Select order type"
+                    searchable={false}
+                    className="ui-dropdown-custom--full-width"
                   />
                 </div>
               )}
@@ -1452,26 +1579,57 @@ const Cart = ({ onPageChange = null }) => {
                       setSelectedParty(value);
                     }}
                   />
+                  {selectedParty && !(isSalesman && orderType === 'visit_order') && (
+                    <ShopLocationCapture key={selectedParty} party={parties.find(p => String(p.party_id || p.id) === String(selectedParty)) || {}} disabled={loading} onPendingChange={setPartyLocationPending}
+                      onSaved={async saved => {
+                        setParties(prev => prev.map(p => String(p.party_id || p.id) === String(selectedParty) ? { ...p, ...saved } : p));
+                        showSuccess('Shop location and shipping address saved.');
+                      }} />
+                  )}
                   {isSalesman && orderType === 'visit_order' && selectedParty && (() => {
-                    const sp = parties.find(p => (p.id || p.party_id) === selectedParty);
-                    const verified = sp && sp.location_source === 'verified';
+                    const sp = parties.find(p => String(p.id || p.party_id) === String(selectedParty));
+                    const hasPoint = hasPartyPoint(sp);
+                    const precise = hasPoint && sp.location_source === 'verified';
+                    const allowed = visitDistance && visitDistance.allowed != null ? visitDistance.allowed : visitRadius(sp, 0);
+                    const farAway = hasPoint && ((visitDistance && visitDistance.error) || (visitDistance && visitDistance.meters != null && visitDistance.meters > allowed));
                     return (
-                      <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-col gap-2">
+                        <ShopLocationCapture key={selectedParty} party={sp} disabled={loading} onPendingChange={setPartyLocationPending}
+                          onSaved={async saved => {
+                            setParties(prev => prev.map(p => String(p.party_id || p.id) === String(selectedParty) ? { ...p, ...saved } : p));
+                            showSuccess('Shop location and shipping address saved.');
+                          }} />
+                        <div className={`flex flex-col gap-1.5 cart-notice ${(!hasPoint || farAway) ? 'cart-notice--bad' : ''}`}>
                         <p className="m-0 text-[length:var(--text-xs)] text-text-muted">
-                          {verified
-                            ? `✅ Location verified${Number.isFinite(Number(sp?.location_accuracy_m)) ? ` (±${Math.round(Number(sp.location_accuracy_m))}m)` : ''} — 250m geofence active.`
-                            : 'Location not verified yet. Stand at the shop and tap below to enable the 250m geofence.'}
+                          {!hasPoint
+                            ? 'Capture the shop location above before placing a visit order.'
+                            : precise
+                              ? 'Shop spot saved. You must be within 50 m of it.'
+                              : 'Location from the address. Use I’m at the shop above to confirm its exact spot.'}
                         </p>
-                        {!verified && (
-                          <button
-                            type="button"
-                            className="ui-btn ui-btn--secondary self-start"
-                            onClick={handleVerifyPartyLocation}
-                            disabled={verifyingLoc}
-                          >
-                            {verifyingLoc ? 'Capturing…' : 'I’m at shop'}
+                        {hasPoint && (
+                          <p className={`m-0 text-[length:var(--text-xs)] ${visitDistance && visitDistance.meters != null && visitDistance.meters > allowed ? 'text-error' : 'text-text-muted'}`} role="status">
+                            {checkingDistance
+                              ? 'Checking where you are…'
+                              : visitDistance && visitDistance.error
+                                ? visitDistance.error
+                                : visitDistance && visitDistance.meters != null
+                                  ? (visitDistance.meters <= allowed
+                                    ? `You are at the shop (${Math.round(visitDistance.meters)} m away).`
+                                    : `You are ${Math.round(visitDistance.meters)} m from this shop. Move within ${Math.round(allowed)} m to place the order.`)
+                                  : ''}
+                            {' '}
+                            <button type="button" className="border-none bg-transparent p-0 font-semibold text-primary underline cursor-pointer" onClick={refreshVisitDistance} disabled={checkingDistance}>
+                              Check again
+                            </button>
+                          </p>
+                        )}
+                        {!hasPoint && (
+                          <button type="button" className="ui-btn ui-btn--secondary self-start" onClick={handleEditPartyLocation}>
+                            Edit party
                           </button>
                         )}
+                        </div>
                       </div>
                     );
                   })()}
@@ -1533,7 +1691,7 @@ const Cart = ({ onPageChange = null }) => {
               )}
             </div>
 
-            <div className={`summary-breakdown flex flex-col gap-5 mb-8 ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'pt-6 mt-6 border-t border-border' : 'pt-3 mt-0'}`}>
+            <div className={`summary-breakdown cart-summary-total flex flex-col gap-5 mb-8 ${(isSalesman || shouldShowCountryDropdown() || shouldShowEventDropdown() || shouldShowPartyDropdown()) ? 'pt-6 mt-6 border-t border-border' : 'pt-3 mt-0'}`}>
               <div className="breakdown-item flex justify-between items-baseline gap-4">
                 <span className="breakdown-label text-[length:var(--text-base)] text-text-muted font-normal">Subtotal:</span>
                 <span className="breakdown-value text-[length:var(--text-base)] text-text font-semibold [font-variant-numeric:tabular-nums]">
@@ -1556,19 +1714,48 @@ const Cart = ({ onPageChange = null }) => {
               </div>
             </div>
 
+            {outOfStockItems.length > 0 && !isOfficeOnly && (
+              <p className="cart-notice cart-notice--bad mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-error" role="alert">
+                Remove the out-of-stock {outOfStockItems.length === 1 ? 'item' : 'items'} from your cart to continue.
+              </p>
+            )}
+            {isOfficeOnly && (
+              <p className="cart-notice mt-4 mb-0 rounded-lg border border-border bg-surface-muted p-3 text-[length:var(--text-sm)] text-text-muted" role="note">
+                Your account type cannot place orders from the cart. To create an order, go to{' '}
+                <Link href="/dashboard/orders" className="font-semibold text-primary underline">Dashboard &gt; Orders</Link>.
+              </p>
+            )}
             <button
               type="button"
-              className="checkout-btn mt-6 w-full min-h-[52px] bg-primary text-text-on-primary border border-primary px-6 py-3.5 rounded-xl text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_-8px_var(--color-primary)] hover:enabled:bg-primary-hover hover:enabled:border-primary-hover hover:enabled:-translate-y-px focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:translate-y-0 active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
+              className="checkout-btn cart-place-desktop mt-6 w-full min-h-[52px] bg-primary text-text-on-primary border border-primary px-6 py-3.5 rounded-xl text-[length:var(--text-base)] font-semibold cursor-pointer transition duration-[120ms] uppercase tracking-[var(--tracking-label)] inline-flex items-center justify-center gap-2 shadow-[0_8px_20px_-8px_var(--color-primary)] hover:enabled:bg-primary-hover hover:enabled:border-primary-hover hover:enabled:-translate-y-px focus-visible:outline-none focus-visible:shadow-[var(--focus-ring)] active:enabled:bg-primary-active active:enabled:border-primary-active active:enabled:translate-y-0 active:enabled:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none motion-reduce:transition-none"
               onClick={handleCheckout}
-              disabled={loading}
+              disabled={loading || partyLocationPending || isOfficeOnly || outOfStockItems.length > 0}
               aria-busy={loading}
             >
               {loading && <span className="checkout-btn__spinner w-4 h-4 rounded-pill border-2 border-[rgba(255,255,255,0.4)] border-t-[var(--color-text-on-primary)] animate-spin motion-reduce:animate-none flex-shrink-0" aria-hidden="true" />}
-              {loading ? 'PLACING ORDER...' : 'CHECKOUT'}
+              {loading ? 'Placing order...' : 'Place order'}
             </button>
           </div>
         </div>
       </div>
+
+      {cartItems.length > 0 && (
+        <div className="cart-bar" role="region" aria-label="Order total">
+          <div className="cart-bar__total">
+            <span className="cart-bar__label">Total</span>
+            <span className="cart-bar__amount">{formatPrice(quote && quote.order_total != null ? quote.order_total : calculateTotal())}</span>
+          </div>
+          <button
+            type="button"
+            className="checkout-btn cart-bar__btn"
+            onClick={handleCheckout}
+            disabled={loading || partyLocationPending || isOfficeOnly || outOfStockItems.length > 0}
+            aria-busy={loading}
+          >
+            {loading ? 'Placing order...' : 'Place order'}
+          </button>
+        </div>
+      )}
 
       <AsidePanel
         open={addPartyOpen}
@@ -1577,7 +1764,7 @@ const Cart = ({ onPageChange = null }) => {
         footer={(
           <>
             <button className="ui-btn ui-btn--secondary" onClick={() => setAddPartyOpen(false)} disabled={addPartySaving}>Cancel</button>
-            <button className="ui-btn ui-btn--primary" onClick={handleCreateParty} disabled={addPartySaving}>
+            <button className="ui-btn ui-btn--primary" onClick={handleCreateParty} disabled={addPartySaving || addLocationPending}>
               {addPartySaving ? 'Saving...' : 'Add Party'}
             </button>
           </>
@@ -1591,6 +1778,13 @@ const Cart = ({ onPageChange = null }) => {
           <div className="form-group">
             <label className="ui-label">Phone *</label>
             <input className="ui-input" placeholder="Enter phone number" value={addPartyForm.phone} onChange={(e) => handleAddPartyField('phone', e.target.value)} />
+          </div>
+          <div className="form-group form-group--full">
+            <ShopLocationCapture party={addPartyForm} disabled={addPartySaving} onPendingChange={setAddLocationPending} onConfirmed={async captured => {
+              const rows = await getStates(captured.country_id);
+              setAddPartyStates(rows.map(r => ({ value: r.id, label: r.name })));
+              setAddPartyForm(prev => ({ ...prev, ...captured }));
+            }} />
           </div>
           <div className="form-group">
             <label className="ui-label">Address *</label>
@@ -1606,7 +1800,13 @@ const Cart = ({ onPageChange = null }) => {
             />
           </div>
           <div className="form-group">
-            <label className="ui-label">Pincode</label>
+            <label className="ui-label">City *</label>
+            <DropdownSelector options={addPartyCities.map(c => ({ value: c.id, label: c.name }))}
+              value={addPartyForm.city_id || ''} onChange={value => handleAddPartyField('city_id', value)}
+              placeholder="Select city" disabled={!addPartyForm.state_id} className="ui-dropdown-custom--full-width" />
+          </div>
+          <div className="form-group">
+            <label className="ui-label">PIN code *</label>
             <input className="ui-input" placeholder="Enter pincode" value={addPartyForm.pincode} onChange={(e) => handleAddPartyField('pincode', e.target.value)} />
           </div>
           <div className="form-group">
