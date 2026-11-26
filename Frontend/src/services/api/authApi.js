@@ -372,3 +372,25 @@ export const requestOtpResend = async (phoneNumber) => {
     includeAuth: false,
   });
 };
+
+export async function getMultiRoleUsers() {
+  const users = [];
+  let page = 1;
+  let totalPages;
+  do {
+    const result = await apiRequest(`/users?scope=multiple-roles&limit=100&page=${page}`, {
+      method: 'GET',
+      includeAuth: true,
+    });
+    users.push(...result.data);
+    totalPages = result.pagination.totalPages;
+    page += 1;
+  } while (page <= totalPages);
+  return users;
+}
+
+export const updateUserRoles = (id, roleIds) => apiRequest(`/users/${encodeURIComponent(id)}`, {
+  method: 'PUT',
+  body: { role_ids: roleIds },
+  includeAuth: true,
+});
