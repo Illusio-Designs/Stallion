@@ -239,6 +239,9 @@ class SalesmanController {
         try {
             const user = req.user;
             const { user_id, employee_code, phone, alternate_phone, email, full_name, reporting_manager, address, country_id, state_id, city_id, zone_preference, joining_date } = req.body;
+            if (user_id && String(user_id) === String(user.user_id)) {
+                return res.status(400).json({ error: 'Create the salesman with their own login details.' });
+            }
 
             // zones / state_ids arrive as JSON strings over multipart (the form now
             // sends files), or as real arrays over JSON — normalize both.
