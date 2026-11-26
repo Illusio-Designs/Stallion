@@ -47,6 +47,10 @@ export function metadataForSlug(slug) {
     case 'privacy-policy':
       title = `Privacy Policy | ${SITE}`;
       break;
+    case 'delete-account':
+      title = `Delete Account | ${SITE}`;
+      description = 'How to request deletion of your Stallion Eyewear app account or data.';
+      break;
     case 'cart':
       title = `Your Cart | ${SITE}`;
       break;
