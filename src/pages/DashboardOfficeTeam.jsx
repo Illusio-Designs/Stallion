@@ -7,7 +7,7 @@ import RowActions from '../components/ui/RowActions';
 import DropdownSelector from '../components/ui/DropdownSelector';
 import PagedMultiSelect from '../components/ui/PagedMultiSelect';
 import { useConfirm } from '../components/ui/ConfirmProvider';
-import { createUser, updateUserById, getRoles, getUsers, deleteUser, getIndianCountries, getStates, getCities } from '../services/apiService';
+import { createUser, updateUserById, getRoles, getUsers, getMultiRoleUsers, updateUserRoles, deleteUser, getIndianCountries, getStates, getCities } from '../services/apiService';
 import { showSuccess, showError } from '../services/notificationService';
 import { FiSearch } from '../components/icons/hugeicons';
 import { Avatar, FormSection, usePeopleQuery } from '../components/people/PeopleBits';
@@ -19,6 +19,7 @@ const PAGE_STEP = 20;
 const DashboardOfficeTeam = () => {
   const confirm = useConfirm();
   const [activeTab, setActiveTab] = useState('All');
+  const multipleRoles = activeTab === 'Multiple';
   const [openAdd, setOpenAdd] = useState(false);
   const [editRow, setEditRow] = useState(null);
   const [roles, setRoles] = useState([]);
@@ -201,7 +202,7 @@ const DashboardOfficeTeam = () => {
         }
         
         // Exclude specific roles
-        if (roleName && excludedRoles.includes(roleName.toLowerCase())) {
+        if (!editRow && roleName && excludedRoles.includes(roleName.toLowerCase())) {
           return null;
         }
         
@@ -214,9 +215,7 @@ const DashboardOfficeTeam = () => {
     
     console.log('Role options:', options); // Debug log
     return options;
-  }, [roles]);
-
-  // --- Roles multi-select (uses our PagedMultiSelect widget) ---------------
+  }, [roles, editRow]); multi-select (uses our PagedMultiSelect widget) ---------------
   // Roles is a small static list, so "fetch a page" just filters + slices the
   // in-memory roleOptions. This lets us reuse the same widget as zones/states.
   const roleFetchPage = (page, search) => {
@@ -251,7 +250,7 @@ const DashboardOfficeTeam = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await getUsers();
+      const response = await (multipleRoles ? getMultiRoleUsers() : getUsers());
       console.log('Users API Response:', response); // Debug log
 
       // Handle different response structures
@@ -285,7 +284,7 @@ const DashboardOfficeTeam = () => {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [roles]);
+  }, [roles, multipleRoles]);
 
   useEffect(() => {
     // Fetch users - if roles are empty, we'll still fetch users but role names might show as "Unknown Role"
@@ -316,8 +315,10 @@ const DashboardOfficeTeam = () => {
   const listRows = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return filteredRowsByTab;
+    const digits = /^[+\d\s().-]+$/.test(q) ? q.replace(/\D/g, '') : '';
     return filteredRowsByTab.filter(r => [r.fullName, r.phoneNumber, r.email, r.role]
-      .filter(Boolean).join(' ').toLowerCase().includes(q));
+      .filter(Boolean).join(' ').toLowerCase().includes(q)
+      || (digits && String(r.phoneNumber || '').replace(/\D/g, '').includes(digits)));
   }, [filteredRowsByTab, query]);
 
   useEffect(() => { setShown(PAGE_STEP); }, [query, activeTab]);
@@ -431,6 +432,14 @@ const DashboardOfficeTeam = () => {
     
     setLoading(true);
     try {
+      if (multipleRoles) {
+        await updateUserRoles(editRow.id, editFormData.roleIds);
+        setEditRow(null);
+        await fetchUsers();
+        showSuccess('Roles updated successfully!');
+        return;
+      }
+
       // Format phone number to E.164 format if needed
       let phoneNumber = editFormData.phoneNumber.trim();
       if (!phoneNumber.startsWith('+')) {
@@ -644,7 +653,7 @@ const DashboardOfficeTeam = () => {
         <button
           className="ui-btn ui-btn--primary pp-btn pp-btn--pri"
           onClick={isEdit ? handleEditSubmit : handleSubmit}
-          disabled={loading || !d.fullName || !d.phoneNumber || !d.roleIds.length || !d.address}
+          disabled={loading || !d.roleIds.length || (!(isEdit && multipleRoles) && (!d.fullName || !d.phoneNumber || !d.address))}
         >
           {loading ? (isEdit ? 'Updating...' : 'Saving...') : (isEdit ? 'Update' : 'Save')}
         </button>
@@ -660,7 +669,7 @@ const DashboardOfficeTeam = () => {
       : setFormData(prev => ({ ...prev, ...obj })));
     return (
       <form className="ui-form pp-form rf-form" onSubmit={isEdit ? handleEditSubmit : handleSubmit}>
-        <FormSection title="Person" hint="Who they are and how to reach them.">
+        {!(isEdit && multipleRoles) && <FormSection title="Person" hint="Who they are and how to reach them.">
           <div className="form-group pp-full">
             <label className="ui-label">Full name *</label>
             <input
@@ -691,7 +700,7 @@ const DashboardOfficeTeam = () => {
               onChange={(e) => patch({ email: e.target.value })}
             />
           </div>
-        </FormSection>
+        </FormSection>}
 
         <FormSection title="Roles" hint="A member can hold several roles and sees the pages of all of them.">
           <div className="form-group pp-full">
@@ -708,7 +717,7 @@ const DashboardOfficeTeam = () => {
           </div>
         </FormSection>
 
-        <FormSection title="Address">
+        {!(isEdit && multipleRoles) && <FormSection title="Address">
           <div className="form-group pp-full">
             <label className="ui-label">Address *</label>
             <input
@@ -766,9 +775,9 @@ const DashboardOfficeTeam = () => {
               className="ui-dropdown-custom--full-width"
             />
           </div>
-        </FormSection>
+        </FormSection>}
 
-        {isEdit && (
+        {isEdit && !multipleRoles && (
           <FormSection title="Status" hint="Inactive people stay in the list. Nothing is deleted.">
             <div className="form-group pp-full">
               <label className="pp-check">
@@ -786,14 +795,14 @@ const DashboardOfficeTeam = () => {
     );
   };
 
-  const tabLabel = { All: 'All', Activate: 'Active', Deactivate: 'Inactive' };
+  const tabLabel = { All: 'All', Activate: 'Active', Deactivate: 'Inactive', Multiple: 'Multiple roles' };
 
   return (
     <div className="dash-page w-full">
       <div className="dash-container flex flex-col gap-4 pp-team">
         <div className="pg-head">
           <div><h1>Office team</h1><p>Admin only. A member can hold several roles and sees the pages of all of them.</p></div>
-          <button type="button" className="pp-btn pp-btn--pri" onClick={() => setOpenAdd(true)}>Add team member</button>
+          {!multipleRoles && <button type="button" className="pp-btn pp-btn--pri" onClick={() => setOpenAdd(true)}>Add team member</button>}
         </div>
 
         <div className="pp-bar">
@@ -810,9 +819,9 @@ const DashboardOfficeTeam = () => {
         </div>
 
         <div className="pp-chips" role="group" aria-label="Filter by status">
-          {['All', 'Activate', 'Deactivate'].map(tab => (
+          {['All', 'Activate', 'Deactivate', 'Multiple'].map(tab => (
             <button key={tab} type="button" className="pp-chip" aria-pressed={activeTab === tab} onClick={() => setActiveTab(tab)}>
-              {tabLabel[tab]} <b>{tabCounts[tab]}</b>
+              {tabLabel[tab]} {tab === 'Multiple' ? (multipleRoles && <b>{rows.length}</b>) : (!multipleRoles && <b>{tabCounts[tab]}</b>)}
             </button>
           ))}
         </div>
@@ -834,7 +843,7 @@ const DashboardOfficeTeam = () => {
               </button>
             </div>
           </div>
-        ) : !loading && rows.length === 0 ? (
+        ) : !multipleRoles && !loading && rows.length === 0 ? (
           <div className="ui-state ui-state--empty">
             <div className="ui-state__icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" width="32" height="32">
@@ -856,7 +865,7 @@ const DashboardOfficeTeam = () => {
           <>
             <div className="pp-list pp-desk">
               <TableWithControls
-                title="Office team"
+                title={multipleRoles ? 'Accounts with multiple roles' : 'Office team'}
                 columns={columns}
                 rows={listRows}
                 showSerialNumber={false}
@@ -868,7 +877,7 @@ const DashboardOfficeTeam = () => {
               {loading ? (
                 <div className="pp-empty">Loading the team...</div>
               ) : listRows.length === 0 ? (
-                <div className="pp-empty">No team members match.</div>
+                <div className="pp-empty">{multipleRoles ? "No multi-role accounts match." : "No team members match."}</div>
               ) : (
                 <>
                   {listRows.slice(0, shown).map((row) => (
@@ -918,7 +927,7 @@ const DashboardOfficeTeam = () => {
       <AsidePanel
         open={!!editRow}
         onClose={closeEdit}
-        title="Edit user"
+        title={multipleRoles && editRow ? `Edit roles · ${editRow.fullName}` : 'Edit user'}
         width="lg"
         footer={footerFor(true)}
       >
