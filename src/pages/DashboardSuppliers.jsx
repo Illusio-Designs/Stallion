@@ -1192,7 +1192,6 @@ const DashboardSuppliers = () => {
       const trimmedReportingManager = formData.reporting_manager ? String(formData.reporting_manager).trim() : '';
 
       const dataToSend = {
-        user_id: editRow?.user_id || currentUserId,
         employee_code: formData.employee_code.trim(),
         alternate_phone: formData.alternate_phone ? formData.alternate_phone.trim() : '',
         full_name: formData.full_name.trim(),
@@ -1250,6 +1249,7 @@ const DashboardSuppliers = () => {
         try {
           await updateSalesman(salesmanId, {
             ...dataToSend,
+            user_id: editRow.user_id,
             is_active: editRow.is_active !== undefined ? editRow.is_active : true
           });
 
