@@ -119,8 +119,13 @@ const ensureWidget = () => {
   return widgetLoading;
 };
 
-const extractToken = (data) =>
-  (data && (data.message || data['access-token'] || data.accessToken || data.token)) || null;
+const extractToken = (data) => {
+  const candidates = [data?.['access-token'], data?.accessToken, data?.token, data?.message, data];
+  return candidates
+    .filter((value) => typeof value === 'string')
+    .map((value) => value.trim())
+    .find((value) => /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value)) || null;
+};
 
 /** Load + init the widget (call once before send). */
 export const initializeOTPWidget = async (phoneNumber) => {
@@ -165,6 +170,10 @@ export const verifyOTP = async (otp) => {
       (data) => {
         const token = extractToken(data);
         currentAccessToken = token;
+        if (!token) {
+          reject({ success: false, message: 'OTP verification did not return a sign-in token. Please request a new code.' });
+          return;
+        }
         resolve({ success: true, message: 'OTP verified successfully', data, accessToken: token });
       },
       (error) => {
